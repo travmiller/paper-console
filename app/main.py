@@ -1,8 +1,11 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from contextlib import asynccontextmanager
 import asyncio
 import uuid
+import os
 from typing import Dict, Optional, List
 from datetime import datetime
 from app.config import settings, Settings, save_config, WebhookConfig, TextConfig, CalendarConfig, EmailConfig, ModuleInstance, ChannelModuleAssignment, ChannelConfig, PRINTER_WIDTH
@@ -596,13 +599,21 @@ async def test_webhook(action: WebhookConfig):
 
 
 
-@app.post("/debug/print-test")
-async def print_test_page():
-    """Forces a test print to the mock printer."""
-    printer.print_header("PC-1 TEST")
-    printer.print_text("If you can read this,")
-    printer.print_text("the mock driver is working.")
-    printer.print_line()
-    printer.print_text(f"Channel: {dial.read_position()}")
-    printer.feed(3)
-    return {"message": "Test receipt printed to console"}
+# --- STATIC FILES (FRONTEND) ---
+
+# Mount the built React app
+# Ensure 'web/dist' exists (run 'npm run build' in web/ directory first)
+if os.path.exists("web/dist"):
+    app.mount("/assets", StaticFiles(directory="web/dist/assets"), name="assets")
+    
+    # Serve index.html for the root and any client-side routes
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        # If path starts with api/, let it fall through to API routes
+        if full_path.startswith("api/") or full_path.startswith("docs") or full_path.startswith("openapi.json"):
+            raise HTTPException(status_code=404, detail="Not found")
+            
+        # Otherwise serve the React app
+        return FileResponse("web/dist/index.html")
+else:
+    print("[WARNING] web/dist directory not found. Frontend will not be served.")
