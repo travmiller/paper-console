@@ -36,8 +36,8 @@ function App() {
   // Fetch settings and modules on mount
   useEffect(() => {
     Promise.all([
-      fetch('http://localhost:8000/api/settings').then((res) => res.json()),
-      fetch('http://localhost:8000/api/modules').then((res) => res.json()),
+      fetch('/api/settings').then((res) => res.json()),
+      fetch('/api/modules').then((res) => res.json()),
     ])
       .then(([settingsData, modulesData]) => {
         setSettings(settingsData);
@@ -78,7 +78,7 @@ function App() {
 
   const updateChannelSchedule = async (position, schedule) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/channels/${position}/schedule`, {
+      const response = await fetch(`/api/channels/${position}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(schedule),
@@ -132,7 +132,7 @@ function App() {
       // Log for debugging
       console.log('Auto-saving settings:', updates);
 
-      const response = await fetch('http://localhost:8000/api/settings', {
+      const response = await fetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settingsToSave),
@@ -169,7 +169,7 @@ function App() {
 
   const createModule = async (moduleType, name = '') => {
     try {
-      const response = await fetch('http://localhost:8000/api/modules', {
+      const response = await fetch('/api/modules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -247,7 +247,7 @@ function App() {
       // Ensure ID is set correctly
       moduleToUpdate.id = moduleId;
 
-      const response = await fetch(`http://localhost:8000/api/modules/${moduleId}`, {
+      const response = await fetch(`/api/modules/${moduleId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(moduleToUpdate),
@@ -264,7 +264,7 @@ function App() {
       console.error('Error updating module:', err);
       setStatus({ type: 'error', message: 'Failed to update module' });
       // Revert optimistic update on error
-      const response = await fetch(`http://localhost:8000/api/modules/${moduleId}`);
+      const response = await fetch(`/api/modules/${moduleId}`);
       if (response.ok) {
         const data = await response.json();
         setModules((prev) => ({ ...prev, [moduleId]: data.module }));
@@ -288,13 +288,13 @@ function App() {
 
       // 2. Remove from all channels first (Backend requires this before deletion)
       for (const pos of assignments) {
-        await fetch(`http://localhost:8000/api/channels/${pos}/modules/${moduleId}`, {
+        await fetch(`/api/channels/${pos}/modules/${moduleId}`, {
           method: 'DELETE',
         });
       }
 
       // 3. Delete the module instance
-      const response = await fetch(`http://localhost:8000/api/modules/${moduleId}`, {
+      const response = await fetch(`/api/modules/${moduleId}`, {
         method: 'DELETE',
       });
 
@@ -355,7 +355,7 @@ function App() {
 
   const assignModuleToChannel = async (position, moduleId, order = null) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/channels/${position}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`, {
+      const response = await fetch(`/api/channels/${position}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`, {
         method: 'POST',
       });
 
@@ -376,7 +376,7 @@ function App() {
 
   const reorderChannelModules = async (position, moduleOrders) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/channels/${position}/modules/reorder`, {
+      const response = await fetch(`/api/channels/${position}/modules/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(moduleOrders),
@@ -1160,7 +1160,7 @@ function App() {
           onClick={async () => {
             if (confirm('Are you sure you want to reset ALL settings to default? This cannot be undone.')) {
               try {
-                const res = await fetch('http://localhost:8000/api/settings/reset', { method: 'POST' });
+                const res = await fetch('/api/settings/reset', { method: 'POST' });
                 const data = await res.json();
                 setSettings(data.config);
                 setModules({});
