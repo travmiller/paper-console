@@ -10,14 +10,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@rollup/rollup-win32-x64-msvc": "^4.53.3",
-    "lightningcss-win32-x64-msvc": "^1.30.2",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
-    "@tailwindcss/oxide-win32-x64-msvc": "^4.1.17",
     "@tailwindcss/postcss": "^4.1.17",
     "@tailwindcss/vite": "^4.1.17",
     "@types/react": "^19.2.5",
@@ -33,7 +30,9 @@
     "vite": "^7.2.4"
   },
   "optionalDependencies": {
-    "@tailwindcss/oxide-wasm32-wasi": "^4.1.17",
+    "@rollup/rollup-linux-arm64-gnu": "^4.9.0",
+    "@rollup/rollup-win32-x64-msvc": "^4.9.0",
+    "@tailwindcss/oxide-linux-arm64-gnu": "^4.1.17",
     "@tailwindcss/oxide-win32-x64-msvc": "^4.1.17"
   }
 }
