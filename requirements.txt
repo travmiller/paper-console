@@ -8,6 +8,8 @@ feedparser
 icalendar
 pytz
 python-dateutil
+astral
+beautifulsoup4
 
 # Hardware drivers (optional - only needed on Raspberry Pi)
 pyserial
