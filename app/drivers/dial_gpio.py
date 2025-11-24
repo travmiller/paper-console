@@ -49,8 +49,9 @@ class DialDriver:
             self.gpio_pins = gpio_pins
         
         self.common_pin = common_pin
+        self.gpio_available = GPIO_AVAILABLE
         
-        if not GPIO_AVAILABLE or GPIO is None:
+        if not self.gpio_available or GPIO is None:
             print("[DIAL] Running in fallback mode (RPi.GPIO not available)")
             print("[DIAL] Use set_position() to simulate dial changes")
             return
@@ -81,12 +82,11 @@ class DialDriver:
         except Exception as e:
             print(f"[DIAL ERROR] Failed to initialize GPIO: {e}")
             print("[DIAL] Falling back to mock mode")
-            global GPIO_AVAILABLE
-            GPIO_AVAILABLE = False
+            self.gpio_available = False
     
     def _read_gpio_position(self) -> int:
         """Read the current dial position from GPIO pins."""
-        if not GPIO_AVAILABLE:
+        if not self.gpio_available:
             return self.current_position
         
         try:
@@ -136,7 +136,7 @@ class DialDriver:
     
     def read_position(self) -> int:
         """Read the current dial position."""
-        if GPIO_AVAILABLE:
+        if self.gpio_available:
             # Update from GPIO
             self.current_position = self._read_gpio_position()
         return self.current_position
@@ -165,7 +165,7 @@ class DialDriver:
         if self.monitor_thread:
             self.monitor_thread.join(timeout=1)
         
-        if GPIO_AVAILABLE:
+        if self.gpio_available:
             try:
                 GPIO.cleanup()
                 print("[DIAL] GPIO cleaned up")
