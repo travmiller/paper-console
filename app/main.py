@@ -164,7 +164,7 @@ app.add_middleware(
 # --- CORE API ---
 
 
-@app.get("/")
+@app.get("/api/system/status")
 async def read_root():
     pos = dial.read_position()
     channel = settings.channels.get(pos)
