@@ -1,0 +1,14 @@
+fastapi
+uvicorn[standard]
+pydantic
+python-dotenv
+requests
+
+feedparser
+icalendar
+pytz
+python-dateutil
+
+# Hardware drivers (optional - only needed on Raspberry Pi)
+pyserial
+RPi.GPIO

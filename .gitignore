@@ -1,0 +1,69 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+.venv
+pip-log.txt
+pip-delete-this-directory.txt
+*.egg-info/
+dist/
+build/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+# Note: package-lock.json should be committed for reproducible builds
+
+# Build outputs
+web/dist/
+web/dist-ssr/
+*.local
+
+# Configuration & Secrets
+config.json
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Desktop.ini
+
+# Logs
+*.log
+logs/
+
+# Raspberry Pi specific
+raspberry_pi/*.exe
+raspberry_pi/*.img
+
+# Images
+images/
+
+# Temporary files
+*.tmp
+*.temp
+.cache/
+
