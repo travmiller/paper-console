@@ -520,6 +520,10 @@ async def trigger_channel(position: int):
     """
     Executes all modules assigned to a specific channel position.
     """
+    # Reset printer buffer at start of print job (for invert mode)
+    if hasattr(printer, 'reset_buffer'):
+        printer.reset_buffer()
+    
     # Get the full ChannelConfig object
     channel = settings.channels.get(position)
     
@@ -545,6 +549,10 @@ async def trigger_channel(position: int):
                 print(f"[ERROR] Module {assignment.module_id} not found in module registry")
         
         # Add cutter feed lines at the end of the print job
+        # If invert is enabled, flush the buffer (reversed) before the final feed
+        if hasattr(printer, 'invert') and printer.invert and hasattr(printer, 'flush_buffer'):
+            printer.flush_buffer()
+        
         feed_lines = getattr(settings, 'cutter_feed_lines', 4)
         if feed_lines > 0:
             printer.feed(feed_lines)
