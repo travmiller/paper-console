@@ -87,8 +87,11 @@ After=network.target
 [Service]
 User=$USER_NAME
 WorkingDirectory=$PROJECT_DIR
-ExecStart=$PYTHON_EXEC -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+ExecStart=$PYTHON_EXEC -m uvicorn app.main:app --host 0.0.0.0 --port 8000
 Restart=always
+RestartSec=5
+KillSignal=SIGINT
+TimeoutStopSec=10
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
