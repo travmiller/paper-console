@@ -90,7 +90,7 @@ class Settings(BaseModel):
     longitude: float = -74.0060
     city_name: str = "New York"
     time_format: str = "12h"  # "12h" for 12-hour format, "24h" for 24-hour format
-    cutter_feed_lines: int = 4  # Number of empty lines to add at end of print job to clear cutter
+    cutter_feed_lines: int = 3  # Number of empty lines to add at end of print job to clear cutter
     invert_print: bool = False  # Rotate print output 180 degrees (for upside-down printers)
 
     # Global Weather API (shared across modules if needed)

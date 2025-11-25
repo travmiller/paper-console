@@ -549,7 +549,7 @@ async def trigger_channel(position: int):
                 print(f"[ERROR] Module {assignment.module_id} not found in module registry")
         
         # Add cutter feed lines at the end of the print job
-        feed_lines = getattr(settings, 'cutter_feed_lines', 4)
+        feed_lines = getattr(settings, 'cutter_feed_lines', 3)
         
         # If invert is enabled, flush the buffer first, then feed directly (bypassing buffer)
         if hasattr(printer, 'invert') and printer.invert and hasattr(printer, 'flush_buffer'):

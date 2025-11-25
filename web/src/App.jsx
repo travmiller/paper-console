@@ -899,12 +899,12 @@ function App() {
                   type='number'
                   min='0'
                   max='20'
-                  value={settings.cutter_feed_lines ?? 4}
+                  value={settings.cutter_feed_lines ?? 3}
                   onChange={(e) => saveGlobalSettings({ cutter_feed_lines: parseInt(e.target.value) || 0 })}
                   className={inputClass}
                 />
                 <p className='text-xs text-gray-500 mt-1'>
-                  Number of empty lines to add at the end of each print job to clear the cutter (default: 4)
+                  Number of empty lines to add at the end of each print job to clear the cutter (default: 3)
                 </p>
               </div>
               
