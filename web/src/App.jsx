@@ -921,9 +921,9 @@ function App() {
                         <button
                           type='button'
                           onClick={() => triggerChannelPrint(pos)}
-                          className='text-xs px-2 py-0.5 rounded border bg-transparent text-gray-500 border-gray-700 hover:text-gray-300 hover:border-gray-600 transition-colors'
+                          className='text-xs px-2 py-0.5 rounded border bg-transparent text-gray-500 border-gray-700 hover:text-gray-300 transition-colors'
                           title='Print Channel'>
-                          🖨️
+                          🖨
                         </button>
                         <button
                           type='button'
