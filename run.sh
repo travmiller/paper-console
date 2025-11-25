@@ -33,11 +33,17 @@ if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "
 fi
 
 # Guard against any other lingering uvicorn process on the same port.
+# Force kill anything on the port before starting
 if lsof -ti tcp:"${PORT}" >/dev/null 2>&1; then
-    echo "Port ${PORT} is still in use. Please stop the other process or change PORT before running this script."
-    exit 1
+    echo "Port ${PORT} is in use. Force killing..."
+    lsof -ti tcp:"${PORT}" | xargs kill -9 || true
+    sleep 2
 fi
 
+# Also kill any lingering python processes for this app specifically (if run.sh is used)
+# Be careful not to kill system python, but this is usually safe in this context
+pkill -f "uvicorn app.main:app" || true
+
 echo "Starting PC-1 Server on port ${PORT}..."
-uvicorn app.main:app --host 0.0.0.0 --port "${PORT}" --reload
+exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT}"
 

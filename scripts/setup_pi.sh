@@ -87,7 +87,7 @@ After=network.target
 [Service]
 User=$USER_NAME
 WorkingDirectory=$PROJECT_DIR
-ExecStart=$PYTHON_EXEC -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+ExecStart=/bin/bash $PROJECT_DIR/run.sh
 Restart=always
 RestartSec=5
 KillSignal=SIGINT
