@@ -99,6 +99,22 @@ function App() {
     }
   };
 
+  const triggerChannelPrint = async (position) => {
+    try {
+      // Set dial position and trigger print
+      await fetch(`/action/dial/${position}`, { method: 'POST' });
+      const response = await fetch('/action/trigger', { method: 'POST' });
+      
+      if (!response.ok) throw new Error('Failed to trigger print');
+      
+      setStatus({ type: 'success', message: `Printing Channel ${position}...` });
+      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+    } catch (err) {
+      console.error('Error triggering print:', err);
+      setStatus({ type: 'error', message: 'Failed to trigger print' });
+    }
+  };
+
   const formatTimeForDisplay = (time24) => {
     if (!time24) return '';
     if (settings.time_format === '24h') return time24;
@@ -902,6 +918,13 @@ function App() {
                     <div className='flex items-center justify-between mb-3'>
                       <div className='flex items-center gap-2'>
                         <h3 className='font-bold text-white'>Channel {pos}</h3>
+                        <button
+                          type='button'
+                          onClick={() => triggerChannelPrint(pos)}
+                          className='text-xs px-2 py-0.5 rounded border bg-transparent text-gray-500 border-gray-700 hover:text-gray-300 hover:border-gray-600 transition-colors'
+                          title='Print Channel'>
+                          🖨️
+                        </button>
                         <button
                           type='button'
                           onClick={() => setShowScheduleModal(pos)}
