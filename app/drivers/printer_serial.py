@@ -108,8 +108,15 @@ class PrinterDriver:
             # Set default line spacing
             self._write(b'\x1B\x32')  # ESC 2 (Set line spacing to default)
             
-            # Note: Rotation is handled via line reversal in flush_buffer()
-            # We don't use ESC/POS rotation commands to avoid double-rotation
+            # Apply rotation if needed (180 degree rotation)
+            if self.invert:
+                # Try ESC i (some printers support this for 180° rotation)
+                # Alternative: ESC { n where n=1 enables rotation
+                # We'll try both common methods
+                self._write(b'\x1B\x7B\x01')  # ESC { 1 (Enable rotation on some printers)
+                # Also try ESC i (alternative rotation command)
+                self._write(b'\x1B\x69')  # ESC i (180° rotation on some printers)
+                print("[PRINTER] Rotation enabled (180 degrees)")
         except Exception as e:
             print(f"[PRINTER] Warning: Initialization error: {e}")
     
@@ -130,16 +137,15 @@ class PrinterDriver:
     
     def print_text(self, text: str):
         """Print a line of text. Handles multi-line strings by splitting them."""
-        # Split multi-line strings into individual lines
-        lines = text.split('\n')
+        # If invert is enabled, buffer the entire text (including newlines) as a single operation
+        # This preserves line order within multi-line content
+        if self.invert and self.print_buffer is not None:
+            self.print_buffer.append(('text', text))
+            return
         
+        # Normal printing (when not inverted) - split and print each line
+        lines = text.split('\n')
         for line in lines:
-            # If invert is enabled, buffer the operation instead of printing immediately
-            if self.invert and self.print_buffer is not None:
-                self.print_buffer.append(('text', line))
-                continue
-            
-            # Normal printing (when not inverted)
             self._write_text_line(line)
     
     def print_line(self):
@@ -179,7 +185,11 @@ class PrinterDriver:
         # Execute all operations in reverse order
         for op_type, op_data in reversed_ops:
             if op_type == 'text':
-                self._write_text_line(op_data)
+                # Handle multi-line text by splitting and printing each line
+                # Lines within a text operation maintain their order
+                lines = op_data.split('\n')
+                for line in lines:
+                    self._write_text_line(line)
             elif op_type == 'feed':
                 self._write_feed(op_data)
     

@@ -80,7 +80,7 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
             except:
                 content_to_print = response.text
 
-        # Print the result
+        # Print the result (as a single multi-line string to preserve line order when inverted)
         printer.print_text(content_to_print)
 
     except Exception as e:
