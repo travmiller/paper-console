@@ -186,9 +186,10 @@ class PrinterDriver:
         for op_type, op_data in reversed_ops:
             if op_type == 'text':
                 # Handle multi-line text by splitting and printing each line
-                # Lines within a text operation maintain their order
+                # When inverted, lines within a text operation are also reversed
                 lines = op_data.split('\n')
-                for line in lines:
+                reversed_lines = list(reversed(lines))
+                for line in reversed_lines:
                     self._write_text_line(line)
             elif op_type == 'feed':
                 self._write_feed(op_data)
