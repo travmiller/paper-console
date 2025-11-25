@@ -9,14 +9,20 @@ class PrinterDriver:
     Uses serial communication (TTL/USB) or direct USB device file.
     """
     
-    def __init__(self, width: int = 32, port: Optional[str] = None, baudrate: int = 19200, invert: bool = False):
+    def __init__(self, width: int = 32, port: Optional[str] = None, baudrate: int = 19200, invert: bool = False, font: str = "A"):
         self.width = width
         self.invert = invert
+        self.font = font.upper()  # "A" or "B"
         self.ser = None
         self.usb_file = None
         self.usb_fd = None
         # Buffer for line reversal when invert is enabled
         self.line_buffer = [] if invert else None
+        # Adjust width for Font B (smaller font allows more characters per line)
+        if self.font == "B":
+            # Font B is roughly 1.33x narrower, so we can fit more characters
+            # Typical: Font A = 32 chars, Font B = ~42 chars (58mm paper)
+            self.width = int(width * 1.3)  # Approximate adjustment
         
         # Auto-detect serial port if not specified
         if port is None:
@@ -106,6 +112,14 @@ class PrinterDriver:
             self._write(b'\x1B\x74\x01')  # ESC t 1 (Select character code table: PC437)
             # Set default line spacing
             self._write(b'\x1B\x32')  # ESC 2 (Set line spacing to default)
+            
+            # Select font: ESC M n (n=0 for Font A, n=1 for Font B)
+            if self.font == "B":
+                self._write(b'\x1B\x4D\x01')  # ESC M 1 (Font B - 9x17 dots)
+                print("[PRINTER] Font B selected (9x17, smaller)")
+            else:
+                self._write(b'\x1B\x4D\x00')  # ESC M 0 (Font A - 12x24 dots, default)
+                print("[PRINTER] Font A selected (12x24, default)")
             
             # Apply rotation if needed (180 degree rotation)
             if self.invert:

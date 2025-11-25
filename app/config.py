@@ -92,6 +92,7 @@ class Settings(BaseModel):
     time_format: str = "12h"  # "12h" for 12-hour format, "24h" for 24-hour format
     cutter_feed_lines: int = 3  # Number of empty lines to add at end of print job to clear cutter
     invert_print: bool = False  # Rotate print output 180 degrees (for upside-down printers)
+    printer_font: str = "A"  # Printer font: "A" (12x24, default) or "B" (9x17, smaller, more per line)
 
     # Global Weather API (shared across modules if needed)
     openweather_api_key: Optional[str] = os.getenv("OPENWEATHER_API_KEY")

@@ -1,7 +1,64 @@
 import feedparser
 from datetime import datetime
 from typing import Dict, Any
+from bs4 import BeautifulSoup
+import re
 from app.config import settings
+
+
+def clean_text(text: str) -> str:
+    """Cleans text by removing HTML, normalizing encoding, and removing non-printable characters."""
+    if not text:
+        return ""
+    
+    # Handle bytes - decode to string first
+    if isinstance(text, bytes):
+        try:
+            text = text.decode('utf-8', errors='replace')
+        except:
+            try:
+                text = text.decode('latin-1', errors='replace')
+            except:
+                return ""
+    
+    # Convert to string if needed
+    if not isinstance(text, str):
+        try:
+            text = str(text)
+        except:
+            return ""
+    
+    # Remove HTML tags using BeautifulSoup
+    try:
+        soup = BeautifulSoup(text, "html.parser")
+        text = soup.get_text(separator=" ", strip=True)
+    except:
+        # Fallback: simple regex removal
+        text = re.sub(r'<[^>]+>', '', text)
+    
+    # Remove HTML entities (decode common ones)
+    import html
+    try:
+        text = html.unescape(text)
+    except:
+        # Fallback manual replacement
+        text = text.replace("&nbsp;", " ")
+        text = text.replace("&amp;", "&")
+        text = text.replace("&lt;", "<")
+        text = text.replace("&gt;", ">")
+        text = text.replace("&quot;", '"')
+        text = text.replace("&#39;", "'")
+        text = text.replace("&apos;", "'")
+    
+    # Remove non-printable characters (keep only ASCII printable)
+    # This will remove emojis, Japanese characters, and other multi-byte characters
+    # that thermal printers can't handle properly
+    text = ''.join(char for char in text if (32 <= ord(char) < 127) or char in ['\n', '\t', '\r'])
+    
+    # Normalize whitespace
+    text = ' '.join(text.split())
+    
+    return text.strip()
 
 
 def wrap_text(text: str, width: int = 32, indent: int = 0) -> list[str]:
@@ -54,14 +111,14 @@ def get_rss_articles(config: Dict[str, Any] = None):
             
             # Get top 2 entries from each feed
             for entry in feed.entries[:2]:
-                # Clean up summary (remove HTML if possible, simple strip)
-                summary = entry.get("summary", entry.get("description", "No summary."))
-                # Basic HTML strip (better done with BS4, but keeping simple)
-                summary = summary.replace("<p>", "").replace("</p>", "")
+                # Clean up text - remove HTML, normalize encoding, remove emojis
+                title = clean_text(entry.get("title", "No Title"))
+                summary = clean_text(entry.get("summary", entry.get("description", "No summary.")))
+                source = clean_text(feed.feed.get("title", "RSS"))
                 
                 articles.append({
-                    "source": feed.feed.get("title", "RSS"),
-                    "title": entry.get("title", "No Title"),
+                    "source": source,
+                    "title": title,
                     "summary": summary
                 })
         except Exception as e:

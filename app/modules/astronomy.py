@@ -16,17 +16,17 @@ def get_city_info():
         settings.longitude
     )
 
-def get_moon_emoji(moon_phase: float) -> str:
-    """Returns an emoji representing the current moon phase (0-27)."""
+def get_moon_phase_text(moon_phase: float) -> str:
+    """Returns ASCII text representing the current moon phase (0-27)."""
     # 0 .. 28 days roughly
-    if moon_phase < 2 or moon_phase > 26: return "🌑" # New
-    elif moon_phase < 6: return "🌒" # Waxing Crescent
-    elif moon_phase < 9: return "🌓" # First Quarter
-    elif moon_phase < 12: return "🌔" # Waxing Gibbous
-    elif moon_phase < 16: return "🌕" # Full
-    elif moon_phase < 20: return "🌖" # Waning Gibbous
-    elif moon_phase < 23: return "🌗" # Last Quarter
-    else: return "🌘" # Waning Crescent
+    if moon_phase < 2 or moon_phase > 26: return "New"
+    elif moon_phase < 6: return "Wax Crescent"
+    elif moon_phase < 9: return "First Qtr"
+    elif moon_phase < 12: return "Wax Gibbous"
+    elif moon_phase < 16: return "Full"
+    elif moon_phase < 20: return "Wan Gibbous"
+    elif moon_phase < 23: return "Last Qtr"
+    else: return "Wan Crescent"
 
 def get_almanac_data():
     """Calculates local astronomical data for today."""
@@ -47,7 +47,7 @@ def get_almanac_data():
         "sunrise": format_time(s["sunrise"]),
         "sunset": format_time(s["sunset"]),
         "moon_phase_val": current_phase,
-        "moon_emoji": get_moon_emoji(current_phase),
+        "moon_phase": get_moon_phase_text(current_phase),
         "day_length": str(s["sunset"] - s["sunrise"]).split('.')[0] # HH:MM:SS
     }
 
@@ -67,6 +67,6 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     printer.print_text(f"LENGTH:  {data['day_length']}")
     printer.print_line()
     
-    printer.print_text(f"MOON:    {data['moon_emoji']}")
+    printer.print_text(f"MOON:    {data['moon_phase']}")
     printer.print_text(f"PHASE:   {data['moon_phase_val']:.1f} / 28")
 
