@@ -13,6 +13,7 @@ class PrinterDriver:
         self.width = width
         self.ser = None
         self.usb_file = None
+        self.usb_fd = None
         
         # Auto-detect serial port if not specified
         if port is None:
@@ -93,6 +94,57 @@ class PrinterDriver:
         except Exception as e:
             print(f"[PRINTER ERROR] Write failed: {e}")
 
+    def _initialize_printer(self):
+        """Send initialization commands to the printer."""
+        try:
+            # Reset printer
+            self._write(b'\x1B\x40')  # ESC @ (Initialize printer)
+            # Set character encoding (UTF-8)
+            self._write(b'\x1B\x74\x01')  # ESC t 1 (Select character code table: PC437)
+            # Set default line spacing
+            self._write(b'\x1B\x32')  # ESC 2 (Set line spacing to default)
+        except Exception as e:
+            print(f"[PRINTER] Warning: Initialization error: {e}")
+    
+    def print_text(self, text: str):
+        """Print a line of text."""
+        try:
+            # Encode text - try UTF-8 first, fallback to GBK if needed
+            try:
+                encoded = text.encode('utf-8')
+            except UnicodeEncodeError:
+                encoded = text.encode('gbk', errors='replace')
+            
+            self._write(encoded)
+            self._write(b'\n')  # Line feed
+        except Exception as e:
+            print(f"[PRINTER ERROR] Failed to print text: {e}")
+            print(f"[PRINT] {text}")  # Fallback to console
+    
+    def print_line(self):
+        """Print a separator line."""
+        line = '-' * self.width
+        self.print_text(line)
+    
+    def feed(self, lines: int = 3):
+        """Feed paper (advance lines)."""
+        try:
+            # ESC/POS: Feed n lines
+            for _ in range(lines):
+                self._write(b'\n')  # Line feed
+        except Exception as e:
+            print(f"[PRINTER ERROR] Failed to feed paper: {e}")
+            for _ in range(lines):
+                print("[PRINT] ")
+    
+    def print_header(self, text: str):
+        """Print centered header text."""
+        # Simple centering logic
+        padding = max(0, (self.width - len(text)) // 2)
+        header_text = ' ' * padding + text.upper()
+        self.print_text(header_text)
+        self.print_line()
+    
     def close(self):
         """Close the connection."""
         if self.ser and self.ser.is_open:
@@ -108,4 +160,3 @@ class PrinterDriver:
             except:
                 pass
         print("[PRINTER] Connection closed")
-
