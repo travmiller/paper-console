@@ -909,20 +909,6 @@ function App() {
               </div>
               
               <div className='mb-4'>
-                <label className={labelClass}>Printer Font</label>
-                <select
-                  value={settings.printer_font || 'A'}
-                  onChange={(e) => saveGlobalSettings({ printer_font: e.target.value })}
-                  className={inputClass}>
-                  <option value='A'>Font A (12x24 dots - Default, larger)</option>
-                  <option value='B'>Font B (9x17 dots - Smaller, more per line)</option>
-                </select>
-                <p className='text-xs text-gray-500 mt-1'>
-                  Font A is larger and easier to read. Font B is smaller and fits more text per line.
-                </p>
-              </div>
-              
-              <div className='mb-4'>
                 <label className={labelClass}>Invert Print (Upside Down)</label>
                 <div className='flex items-center gap-2'>
                   <input

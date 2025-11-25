@@ -32,11 +32,7 @@ else:
 
 # Global Hardware Instances
 # Note: printer will be reinitialized when settings change
-printer = PrinterDriver(
-    width=PRINTER_WIDTH, 
-    invert=getattr(settings, 'invert_print', False),
-    font=getattr(settings, 'printer_font', 'A')
-)
+printer = PrinterDriver(width=PRINTER_WIDTH, invert=getattr(settings, 'invert_print', False))
 dial = DialDriver()
 
 
@@ -220,11 +216,9 @@ async def update_settings(new_settings: Settings):
     """Updates the configuration and saves it to disk."""
     global settings, printer
 
-    # Check if printer settings changed
+    # Check if invert_print setting changed
     old_invert = getattr(settings, 'invert_print', False)
     new_invert = getattr(new_settings, 'invert_print', False)
-    old_font = getattr(settings, 'printer_font', 'A')
-    new_font = getattr(new_settings, 'printer_font', 'A')
     
     # Update in-memory
     settings = new_settings
@@ -232,16 +226,12 @@ async def update_settings(new_settings: Settings):
     # Save to disk
     save_config(settings)
     
-    # Reinitialize printer if printer settings changed
-    if old_invert != new_invert or old_font != new_font:
-        print(f"[SYSTEM] Printer settings changed (invert: {new_invert}, font: {new_font}), reinitializing printer...")
+    # Reinitialize printer if invert setting changed
+    if old_invert != new_invert:
+        print(f"[SYSTEM] Printer invert setting changed to {new_invert}, reinitializing printer...")
         if hasattr(printer, 'close'):
             printer.close()
-        printer = PrinterDriver(
-            width=PRINTER_WIDTH, 
-            invert=new_invert,
-            font=new_font
-        )
+        printer = PrinterDriver(width=PRINTER_WIDTH, invert=new_invert)
 
     return {"message": "Settings saved", "config": settings}
 
