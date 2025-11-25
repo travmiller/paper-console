@@ -15,8 +15,9 @@ class PrinterDriver:
         self.ser = None
         self.usb_file = None
         self.usb_fd = None
-        # Buffer for line reversal when invert is enabled
-        self.line_buffer = [] if invert else None
+        # Buffer for print operations when invert is enabled
+        # Each item is a tuple: ('text', line) or ('feed', count)
+        self.print_buffer = [] if invert else None
         
         # Auto-detect serial port if not specified
         if port is None:
@@ -119,93 +120,80 @@ class PrinterDriver:
         except Exception as e:
             print(f"[PRINTER] Warning: Initialization error: {e}")
     
-    def print_text(self, text: str):
-        """Print a line of text."""
-        # If invert is enabled, buffer the line instead of printing immediately
-        if self.invert and self.line_buffer is not None:
-            self.line_buffer.append(text)
-            return
-        
-        # Normal printing (when not inverted)
+    def _write_text_line(self, line: str):
+        """Internal method to write a single line of text to the printer."""
         try:
             # Encode text - try UTF-8 first, fallback to GBK if needed
             try:
-                encoded = text.encode('utf-8')
+                encoded = line.encode('utf-8')
             except UnicodeEncodeError:
-                encoded = text.encode('gbk', errors='replace')
+                encoded = line.encode('gbk', errors='replace')
             
             self._write(encoded)
             self._write(b'\n')  # Line feed
         except Exception as e:
             print(f"[PRINTER ERROR] Failed to print text: {e}")
-            print(f"[PRINT] {text}")  # Fallback to console
+            print(f"[PRINT] {line}")  # Fallback to console
+    
+    def print_text(self, text: str):
+        """Print a line of text. Handles multi-line strings by splitting them."""
+        # Split multi-line strings into individual lines
+        lines = text.split('\n')
+        
+        for line in lines:
+            # If invert is enabled, buffer the operation instead of printing immediately
+            if self.invert and self.print_buffer is not None:
+                self.print_buffer.append(('text', line))
+                continue
+            
+            # Normal printing (when not inverted)
+            self._write_text_line(line)
     
     def print_line(self):
         """Print a separator line."""
         line = '-' * self.width
         self.print_text(line)
     
-    def feed(self, lines: int = 3, flush: bool = False):
-        """Feed paper (advance lines).
-        
-        Args:
-            lines: Number of lines to feed
-            flush: If True and invert is enabled, flush the buffer before feeding
-        """
-        # If invert is enabled and flush is requested, flush the buffer first
-        if flush and self.invert and self.line_buffer is not None and len(self.line_buffer) > 0:
-            self.flush_buffer()
-            # After flushing, continue with normal feed
-            try:
-                for _ in range(lines):
-                    self._write(b'\n')  # Line feed
-            except Exception as e:
-                print(f"[PRINTER ERROR] Failed to feed paper: {e}")
-            return
-        
-        # If invert is enabled, buffer empty lines instead of printing immediately
-        if self.invert and self.line_buffer is not None:
-            for _ in range(lines):
-                self.line_buffer.append("")  # Add empty lines to buffer
-            return
-        
-        # Normal feed (when not inverted)
+    def _write_feed(self, count: int):
+        """Internal method to feed paper."""
         try:
-            # ESC/POS: Feed n lines
-            for _ in range(lines):
+            for _ in range(count):
                 self._write(b'\n')  # Line feed
         except Exception as e:
             print(f"[PRINTER ERROR] Failed to feed paper: {e}")
-            for _ in range(lines):
+            for _ in range(count):
                 print("[PRINT] ")
     
-    def flush_buffer(self):
-        """Flush the line buffer in reverse order (for invert mode)."""
-        if not self.invert or self.line_buffer is None or len(self.line_buffer) == 0:
+    def feed(self, lines: int = 3):
+        """Feed paper (advance lines)."""
+        # If invert is enabled, buffer the operation instead of printing immediately
+        if self.invert and self.print_buffer is not None:
+            self.print_buffer.append(('feed', lines))
             return
         
-        # Reverse the buffer and print all lines
-        reversed_lines = list(reversed(self.line_buffer))
-        self.line_buffer.clear()
+        # Normal feed (when not inverted)
+        self._write_feed(lines)
+    
+    def flush_buffer(self):
+        """Flush the print buffer in reverse order (for invert mode)."""
+        if not self.invert or self.print_buffer is None or len(self.print_buffer) == 0:
+            return
         
-        for line in reversed_lines:
-            try:
-                # Encode text - try UTF-8 first, fallback to GBK if needed
-                try:
-                    encoded = line.encode('utf-8')
-                except UnicodeEncodeError:
-                    encoded = line.encode('gbk', errors='replace')
-                
-                self._write(encoded)
-                self._write(b'\n')  # Line feed
-            except Exception as e:
-                print(f"[PRINTER ERROR] Failed to print buffered text: {e}")
-                print(f"[PRINT] {line}")  # Fallback to console
+        # Reverse the entire sequence of operations
+        reversed_ops = list(reversed(self.print_buffer))
+        self.print_buffer.clear()
+        
+        # Execute all operations in reverse order
+        for op_type, op_data in reversed_ops:
+            if op_type == 'text':
+                self._write_text_line(op_data)
+            elif op_type == 'feed':
+                self._write_feed(op_data)
     
     def reset_buffer(self):
-        """Reset/clear the line buffer (call at start of new print job)."""
-        if self.line_buffer is not None:
-            self.line_buffer.clear()
+        """Reset/clear the print buffer (call at start of new print job)."""
+        if self.print_buffer is not None:
+            self.print_buffer.clear()
     
     def feed_direct(self, lines: int = 3):
         """Feed paper directly, bypassing the buffer (for use after flushing in invert mode)."""

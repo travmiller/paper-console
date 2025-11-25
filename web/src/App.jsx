@@ -909,7 +909,7 @@ function App() {
               </div>
               
               <div className='mb-4'>
-                <label className={labelClass}>Invert Print (Upside Down)</label>
+                <label className={labelClass}>Invert Print</label>
                 <div className='flex items-center gap-2'>
                   <input
                     type='checkbox'
@@ -917,11 +917,8 @@ function App() {
                     onChange={(e) => saveGlobalSettings({ invert_print: e.target.checked })}
                     className='w-4 h-4'
                   />
-                  <span className='text-sm text-gray-300'>Rotate print output 180 degrees</span>
+                  <span className='text-sm text-gray-300'>Rotate output 180°</span>
                 </div>
-                <p className='text-xs text-gray-500 mt-1'>
-                  Enable if your printer outputs text upside down (due to paper orientation or hardware mounting)
-                </p>
               </div>
             </div>
 
