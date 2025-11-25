@@ -119,6 +119,27 @@ GPIO.setup(BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.add_event_detect(BUTTON_PIN, GPIO.FALLING, callback=button_callback, bounce_time=200)
 ```
 
+## Network & Auto-Start Setup
+
+To make the device accessible via `http://pc-1.local` (without a port number) and ensure it starts automatically on boot:
+
+1.  **Copy the setup script to your Pi:**
+    (You can do this via scp or just create the file on the Pi)
+
+2.  **Run the setup script:**
+    ```bash
+    cd /home/pi/paper-console
+    chmod +x scripts/setup_pi.sh
+    sudo scripts/setup_pi.sh
+    ```
+
+3.  **Follow the prompts:**
+    - Enter your desired hostname (default: `pc-1`)
+    - The script will install Nginx (web proxy), Avahi (mDNS), and configure the systemd service.
+
+4.  **Access the device:**
+    Open your browser and go to `http://pc-1.local` (or whatever hostname you chose).
+
 ## Testing
 
 ### Test the Printer
