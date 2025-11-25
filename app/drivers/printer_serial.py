@@ -44,9 +44,11 @@ class PrinterDriver:
         # Handle USB Line Printer (/dev/usb/lp0) differently from Serial
         if port and "lp" in port and platform.system() == "Linux":
             try:
-                # Open as a raw binary file
-                self.usb_file = open(port, "wb", buffering=0)
-                print(f"[PRINTER] Connected to {port} (Direct USB)")
+                # Open as a raw binary file using low-level os.open
+                # This avoids Python buffering entirely
+                self.usb_fd = os.open(port, os.O_RDWR)
+                self.usb_file = None # distinct from file object
+                print(f"[PRINTER] Connected to {port} (Direct USB via os.open)")
                 self._initialize_printer()
                 return
             except Exception as e:
@@ -77,7 +79,9 @@ class PrinterDriver:
     def _write(self, data: bytes):
         """Internal helper to write bytes to the correct interface."""
         try:
-            if self.usb_file:
+            if hasattr(self, 'usb_fd') and self.usb_fd is not None:
+                os.write(self.usb_fd, data)
+            elif self.usb_file:
                 self.usb_file.write(data)
                 self.usb_file.flush()
             elif self.ser:
@@ -89,69 +93,6 @@ class PrinterDriver:
         except Exception as e:
             print(f"[PRINTER ERROR] Write failed: {e}")
 
-    def _initialize_printer(self):
-        """Send initialization commands to the printer."""
-        if self.ser is None and self.usb_file is None:
-            return
-        
-        try:
-            # Reset printer
-            self._write(b'\x1B\x40')  # ESC @ (Initialize printer)
-            # Set character encoding (UTF-8)
-            self._write(b'\x1B\x74\x01')  # ESC t 1 (Select character code table: PC437)
-            # Set default line spacing
-            self._write(b'\x1B\x32')  # ESC 2 (Set line spacing to default)
-        except Exception as e:
-            print(f"[PRINTER] Warning: Initialization error: {e}")
-    
-    def print_text(self, text: str):
-        """Print a line of text."""
-        if self.ser is None and self.usb_file is None:
-            print(f"[PRINT] {text}")
-            return
-        
-        try:
-            # Encode text - try UTF-8 first, fallback to GBK if needed
-            try:
-                encoded = text.encode('utf-8')
-            except UnicodeEncodeError:
-                encoded = text.encode('gbk', errors='replace')
-            
-            self._write(encoded)
-            self._write(b'\n')  # Line feed
-        except Exception as e:
-            print(f"[PRINTER ERROR] Failed to print text: {e}")
-            print(f"[PRINT] {text}")  # Fallback to console
-    
-    def print_line(self):
-        """Print a separator line."""
-        line = '-' * self.width
-        self.print_text(line)
-    
-    def feed(self, lines: int = 3):
-        """Feed paper (advance lines)."""
-        if self.ser is None and self.usb_file is None:
-            for _ in range(lines):
-                print("[PRINT] ")
-            return
-        
-        try:
-            # ESC/POS: Feed n lines
-            for _ in range(lines):
-                self._write(b'\n')  # Line feed
-        except Exception as e:
-            print(f"[PRINTER ERROR] Failed to feed paper: {e}")
-            for _ in range(lines):
-                print("[PRINT] ")
-    
-    def print_header(self, text: str):
-        """Print centered header text."""
-        # Simple centering logic
-        padding = max(0, (self.width - len(text)) // 2)
-        header_text = ' ' * padding + text.upper()
-        self.print_text(header_text)
-        self.print_line()
-    
     def close(self):
         """Close the connection."""
         if self.ser and self.ser.is_open:
@@ -161,5 +102,10 @@ class PrinterDriver:
                 self.usb_file.close()
             except:
                 pass
-            print("[PRINTER] Connection closed")
+        if hasattr(self, 'usb_fd') and self.usb_fd is not None:
+            try:
+                os.close(self.usb_fd)
+            except:
+                pass
+        print("[PRINTER] Connection closed")
 

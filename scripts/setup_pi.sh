@@ -28,10 +28,14 @@ else
     echo "Hostname is already $HOSTNAME."
 fi
 
-# 2. Install Nginx
-echo "Installing Nginx..."
+# 2. Install Nginx and setup permissions
+echo "Installing dependencies..."
 apt-get update
 apt-get install -y nginx avahi-daemon
+
+# Add user to lp group for USB printer access
+echo "Adding $SUDO_USER to 'lp' group for printer access..."
+usermod -a -G lp "$SUDO_USER"
 
 # 3. Configure Nginx Reverse Proxy
 echo "Configuring Nginx..."
