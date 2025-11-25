@@ -11,7 +11,6 @@ from datetime import datetime
 from app.config import settings, Settings, save_config, WebhookConfig, TextConfig, CalendarConfig, EmailConfig, ModuleInstance, ChannelModuleAssignment, ChannelConfig, PRINTER_WIDTH
 from app.modules import astronomy, sudoku, news, rss, email_client, webhook, text, calendar, weather
 import platform
-import os
 
 # Auto-detect platform and use appropriate drivers
 _is_raspberry_pi = platform.system() == "Linux" and os.path.exists("/proc/device-tree/model")

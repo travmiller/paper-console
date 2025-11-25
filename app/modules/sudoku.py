@@ -1,5 +1,4 @@
 import random
-from copy import deepcopy
 from typing import Dict, Any
 
 
@@ -100,7 +99,9 @@ def generate_puzzle(difficulty="medium"):
     return gen.grid
 
 
-def format_sudoku_receipt(printer, config: Dict[str, Any] = None, module_name: str = None):
+def format_sudoku_receipt(
+    printer, config: Dict[str, Any] = None, module_name: str = None
+):
     """Prints a Sudoku puzzle."""
 
     # Default Difficulty
@@ -138,4 +139,3 @@ def format_sudoku_receipt(printer, config: Dict[str, Any] = None, module_name: s
     printer.print_line()
     printer.print_text("Good Luck!")
     printer.feed(5)
-
