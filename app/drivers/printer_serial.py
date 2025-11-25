@@ -207,6 +207,17 @@ class PrinterDriver:
         if self.line_buffer is not None:
             self.line_buffer.clear()
     
+    def feed_direct(self, lines: int = 3):
+        """Feed paper directly, bypassing the buffer (for use after flushing in invert mode)."""
+        try:
+            # ESC/POS: Feed n lines directly
+            for _ in range(lines):
+                self._write(b'\n')  # Line feed
+        except Exception as e:
+            print(f"[PRINTER ERROR] Failed to feed paper: {e}")
+            for _ in range(lines):
+                print("[PRINT] ")
+    
     def print_header(self, text: str):
         """Print centered header text."""
         # Simple centering logic

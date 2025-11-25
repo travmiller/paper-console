@@ -551,15 +551,13 @@ async def trigger_channel(position: int):
         # Add cutter feed lines at the end of the print job
         feed_lines = getattr(settings, 'cutter_feed_lines', 4)
         
-        # If invert is enabled, add feed lines to buffer first, then flush everything
-        if hasattr(printer, 'invert') and printer.invert and hasattr(printer, 'line_buffer'):
+        # If invert is enabled, flush the buffer first, then feed directly (bypassing buffer)
+        if hasattr(printer, 'invert') and printer.invert and hasattr(printer, 'flush_buffer'):
+            # Flush the entire buffer (reversed) - this prints all the content
+            printer.flush_buffer()
+            # Now feed paper directly (bypassing buffer) to clear the cutter
             if feed_lines > 0:
-                # Add feed lines to buffer (they'll be at the end, which becomes the beginning after reversal)
-                for _ in range(feed_lines):
-                    printer.line_buffer.append("")
-            # Now flush the entire buffer (reversed) - feed lines will be at the start of reversed output (end of actual print)
-            if hasattr(printer, 'flush_buffer'):
-                printer.flush_buffer()
+                printer.feed_direct(feed_lines)
             print(f"[SYSTEM] Added {feed_lines} feed line(s) to clear cutter (inverted)")
         else:
             # Normal mode: just feed normally
