@@ -137,5 +137,5 @@ def format_sudoku_receipt(printer, config: Dict[str, Any] = None, module_name: s
 
     printer.print_line()
     printer.print_text("Good Luck!")
-    printer.feed(1)
+    printer.feed(5)
 
