@@ -170,62 +170,149 @@ The device has 8 positions on the rotary dial. Each channel can contain multiple
 
 ---
 
-## 5. Hardware Architecture
-### Core Electronics
-* **Compute:** Raspberry Pi Zero 2 W (Headless).
-* **Printer:** Mini Thermal Receipt Printer (QR204 58mm TTL/USB).
-* **Power:** 5V 4A Power Supply (Barrel Jack) -> Green Terminal Adapter.
-* **Storage:** SanDisk Ultra 32GB (A1 Class).
+## 5. Hardware Setup Guide
 
-### The Physical Interface (Console Layout)
-* **Top Deck:**
-    *   **Channel Selector:** 1-Pole 8-Position Rotary Switch.
-    *   **Trigger:** Brass Momentary Push Button.
-*   **Front Face:**
-    *   **Output:** Brass Bezel Slot (Paper Ejection).
-    *   **Indicator:** None (Silent). Feedback is mechanical/auditory.
+### Prerequisites
+1. **Raspberry Pi Zero 2 W** with Raspberry Pi OS Lite installed
+2. **Thermal Printer** (QR204/CSN-A2 or compatible 58mm TTL/USB thermal printer)
+3. **1-Pole 8-Position Rotary Switch**
+4. **Momentary Push Button** (optional, for manual trigger)
+5. **Power Supply:** 5V 4A Power Supply (Barrel Jack) -> Green Terminal Adapter.
 
----
+### 1. Install Dependencies
+On your Raspberry Pi, install the required Python packages:
 
-## 6. Moving to Hardware (Next Steps)
-To turn this code into a physical device:
+```bash
+pip install -r requirements.txt
+```
+This will install `pyserial` and `RPi.GPIO` along with other dependencies.
 
-### 1. Hardware List
-*   **Compute:** Raspberry Pi Zero 2 W.
-*   **Printer:** QR204 / CSN-A2 (TTL Serial).
-*   **Input:** 1-Pole 8-Position Rotary Switch + Momentary Button.
+### 2. Enable Serial Interface
+Enable the serial interface on your Raspberry Pi:
+```bash
+sudo raspi-config
+```
+Navigate to:
+- **Interface Options** → **Serial Port**
+- Enable serial port hardware
+- Disable serial login shell (if prompted)
 
-### 2. Driver Swap
-Currently, `app/drivers/printer_mock.py` just `print()`s to console.
-You need to:
-1.  Install `pyserial`.
-2.  Create `app/drivers/printer_serial.py`.
-3.  Update `app/main.py` to use the real driver when running on Linux.
-
-```python
-# Example Serial Driver Logic
-import serial
-class PrinterDriver:
-    def __init__(self):
-        self.ser = serial.Serial('/dev/serial0', 19200)
-    def print_text(self, text):
-        self.ser.write(text.encode('gbk'))
-        self.ser.write(b'\n')
+Reboot after making changes:
+```bash
+sudo reboot
 ```
 
-### 3. GPIO Integration
-Replace `app/drivers/dial_mock.py` with `RPi.GPIO` logic to read the physical pins of the rotary switch.
+### 3. Connect the Thermal Printer
+#### USB Connection
+If your printer connects via USB:
+1. Connect the printer to a USB port on the Raspberry Pi
+2. The device should appear as `/dev/ttyUSB0` or `/dev/ttyACM0`
+3. Check available serial devices: `ls -l /dev/tty*`
+
+#### TTL Serial Connection
+If your printer uses TTL serial:
+1. Connect:
+   - **VCC** → 5V (Pin 2 or 4)
+   - **GND** → Ground (Pin 6 or any GND)
+   - **RX** → GPIO 14 (TXD, Pin 8) - **Note:** You may need a level shifter if printer is 3.3V
+   - **TX** → GPIO 15 (RXD, Pin 9)
+2. Enable serial in `raspi-config` (see step 2)
+3. The device will appear as `/dev/serial0` or `/dev/ttyAMA0`
+
+#### Configure Printer Port (if needed)
+If your printer is on a different port, you can modify `app/drivers/printer_serial.py`:
+```python
+printer = PrinterDriver(width=32, port="/dev/ttyUSB0", baudrate=19200)
+```
+
+### 4. Connect the Rotary Switch
+The 1-pole 8-position rotary switch needs to be connected to GPIO pins:
+
+#### Wiring
+- **Common terminal** → GND
+- **Position 1** → GPIO 5 (Pin 29)
+- **Position 2** → GPIO 6 (Pin 31)
+- **Position 3** → GPIO 13 (Pin 33)
+- **Position 4** → GPIO 19 (Pin 35)
+- **Position 5** → GPIO 26 (Pin 37)
+- **Position 6** → GPIO 16 (Pin 36)
+- **Position 7** → GPIO 20 (Pin 38)
+- **Position 8** → GPIO 21 (Pin 40)
+
+**Note:** These are the default GPIO pins. You can customize them in `app/drivers/dial_gpio.py`.
+
+### 5. Connect the Push Button (Optional)
+The push button can be connected to trigger the current channel:
+
+#### Wiring
+- **One terminal** → GPIO 18 (Pin 12)
+- **Other terminal** → GND
+- Add a 10kΩ pull-up resistor between GPIO 18 and 3.3V (or use internal pull-up)
+
+### 6. Network & Auto-Start Setup
+To make the device accessible via `http://pc-1.local` (without a port number) and ensure it starts automatically on boot:
+
+1.  **Copy the setup script to your Pi:**
+    (You can do this via scp or just create the file on the Pi)
+
+2.  **Run the setup script:**
+    ```bash
+    cd /home/pi/paper-console
+    chmod +x scripts/setup_pi.sh
+    sudo scripts/setup_pi.sh
+    ```
+
+3.  **Follow the prompts:**
+    - Enter your desired hostname (default: `pc-1`)
+    - The script will install Nginx (web proxy), Avahi (mDNS), and configure the systemd service.
+
+4.  **Access the device:**
+    Open your browser and go to `http://pc-1.local` (or whatever hostname you chose).
 
 ---
 
-## 7. Troubleshooting
-*   **NewsAPI Returns 0 Articles:** Check if your API key is valid and if you are on the free tier (sometimes aggressive caching returns empty lists). Try adding RSS feeds as an alternative.
-*   **RSS Feeds Not Working:** Ensure RSS feed URLs are valid and accessible. Check the terminal for `[NEWS] Fetching X RSS feeds...` messages.
+## 6. Troubleshooting
+*   **Printer Not Working:**
+    *   Check serial port: `ls -l /dev/tty*`
+    *   Check permissions: `sudo usermod -a -G dialout $USER`
+    *   Check baud rate matches driver (default 19200).
+*   **Dial Not Reading Positions:**
+    *   Check wiring: Ensure common terminal is connected to GND.
+    *   Test GPIO pins with a simple python script.
+*   **NewsAPI Returns 0 Articles:** Check if your API key is valid and if you are on the free tier.
+*   **RSS Feeds Not Working:** Ensure RSS feed URLs are valid and accessible.
 *   **Email Auth Failed:** Ensure you are using a **Google App Password**, not your main password. Ensure 2FA is enabled.
-*   **Calendar Not Showing Events:** Verify your iCal URL is correct (works in browser). Check that events exist in the date range (default is 2 days). Check terminal for `[CALENDAR]` error messages.
+*   **Calendar Not Showing Events:** Verify your iCal URL is correct. Check that events exist in the date range.
 *   **Weather Wrong:** Check `config.json` Lat/Long via the UI location search feature.
 *   **Printer Width:** Adjust `printer_width` in config if lines wrap unexpectedly (standard is 32 chars).
 *   **Channel Not Triggering:** Verify the channel type is set correctly in the UI and that the config is saved.
+
+---
+
+## 7. GPIO Pin Reference
+For Raspberry Pi Zero 2 W (40-pin header):
+```
+    3.3V  [1]  [2]  5V
+   GPIO2  [3]  [4]  5V
+   GPIO3  [5]  [6]  GND
+   GPIO4  [7]  [8]  GPIO14 (TXD)
+     GND  [9]  [10] GPIO15 (RXD)
+  GPIO17 [11]  [12] GPIO18 (BTN)
+  GPIO27 [13]  [14] GND
+  GPIO22 [15]  [16] GPIO23
+    3.3V [17]  [18] GPIO24
+  GPIO10 [19]  [20] GND
+   GPIO9 [21]  [22] GPIO25
+  GPIO11 [23]  [24] GPIO8
+     GND [25]  [26] GPIO7
+   GPIO0 [27]  [28] GPIO1
+   GPIO5 [29]  [30] GND
+   GPIO6 [31]  [32] GPIO12
+  GPIO13 [33]  [34] GND
+  GPIO19 [35]  [36] GPIO16
+  GPIO26 [37]  [38] GPIO20
+   GND   [39]  [40] GPIO21
+```
 
 ---
 
@@ -250,7 +337,7 @@ Replace `app/drivers/dial_mock.py` with `RPi.GPIO` logic to read the physical pi
 │   │   ├── calendar.py    # iCal Calendar Parsing Logic
 │   └── /web               # React + Vite + Tailwind CSS Frontend
 ├── /scripts
-│   └── install.sh         # One-step setup script (TODO)
+│   └── setup_pi.sh        # Setup script (Hostname, Nginx, Systemd)
 ├── config.json            # User Settings (GitIgnore)
 ├── .env                   # Secrets (GitIgnore)
 ├── requirements.txt       # Python dependencies
