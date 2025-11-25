@@ -50,21 +50,22 @@ async def email_polling_loop():
         try:
             # Find all active email modules
             email_modules = []
-            min_interval = 60  # Default hardcoded interval
+            min_interval = 30  # Default polling interval
             
             for module in settings.modules.values():
                 if module.type == "email":
                     email_config = EmailConfig(**(module.config or {}))
                     if email_config.auto_print_new:
                         email_modules.append(module)
-            
+                        # Use the shortest interval if multiple email modules exist (future proofing)
+                        if email_config.polling_interval < min_interval:
+                            min_interval = email_config.polling_interval
+
             # Wait for the interval
             await asyncio.sleep(min_interval)
             
             if not email_modules:
                 continue
-            
-            print(f"[AUTO-POLL] Checking {len(email_modules)} email module(s)...")
             
             # Check each email module
             for module in email_modules:
@@ -73,8 +74,6 @@ async def email_polling_loop():
                     if emails:
                         print(f"[AUTO-POLL] Found {len(emails)} new email(s) in module '{module.name}'. Printing...")
                         email_client.format_email_receipt(printer, messages=emails, config=module.config, module_name=module.name)
-                    else:
-                        print(f"[AUTO-POLL] No new emails in module '{module.name}'.")
                 except Exception as e:
                     print(f"[AUTO-POLL] Error checking email module {module.id}: {e}")
                     

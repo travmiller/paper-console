@@ -34,7 +34,7 @@ class EmailConfig(BaseModel):
     email_host: str = "imap.gmail.com"
     email_user: Optional[str] = os.getenv("EMAIL_USER")
     email_password: Optional[str] = os.getenv("EMAIL_PW")
-    polling_interval: int = 60  # Hardcoded to 60 seconds
+    polling_interval: int = 30  # Default to 30 seconds
     auto_print_new: bool = True  # Whether to automatically print new emails
 
 
@@ -216,7 +216,7 @@ def load_config() -> Settings:
     # Get absolute path to config.json (one directory up from this file)
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, "config.json")
-    
+
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
             try:
