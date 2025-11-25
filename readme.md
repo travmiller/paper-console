@@ -213,27 +213,30 @@ sudo reboot
 ```
 
 ### 3. Connect the Thermal Printer
-#### USB Connection
-If your printer connects via USB:
-1. Connect the printer to a USB port on the Raspberry Pi
-2. The device should appear as `/dev/ttyUSB0` or `/dev/ttyACM0`
-3. Check available serial devices: `ls -l /dev/tty*`
+#### USB Connection (Recommended)
+If your printer connects via USB (e.g., QR204 / CSN-A2):
+1. Connect the printer to a USB port on the Raspberry Pi.
+2. The device usually appears as `/dev/usb/lp0` (USB Line Printer) or `/dev/ttyUSB0` (Serial).
+3. **Permissions:** The user running the app must be in the `lp` group (handled by `setup_pi.sh`).
+   ```bash
+   sudo usermod -a -G lp $USER
+   ```
 
-#### TTL Serial Connection
-If your printer uses TTL serial:
+#### TTL Serial Connection (Advanced)
+If your printer uses TTL serial pins:
 1. Connect:
-   - **VCC** → 5V (Pin 2 or 4)
-   - **GND** → Ground (Pin 6 or any GND)
-   - **RX** → GPIO 14 (TXD, Pin 8) - **Note:** You may need a level shifter if printer is 3.3V
-   - **TX** → GPIO 15 (RXD, Pin 9)
-2. Enable serial in `raspi-config` (see step 2)
-3. The device will appear as `/dev/serial0` or `/dev/ttyAMA0`
+   - **VCC** → 5V
+   - **GND** → Ground
+   - **RX** → GPIO 14 (TXD)
+   - **TX** → GPIO 15 (RXD)
+2. Enable serial in `raspi-config`.
+3. The device will appear as `/dev/serial0`.
 
-#### Configure Printer Port (if needed)
-If your printer is on a different port, you can modify `app/drivers/printer_serial.py`:
-```python
-printer = PrinterDriver(width=32, port="/dev/ttyUSB0", baudrate=19200)
-```
+#### Configure Printer Driver
+The system auto-detects the printer in this order:
+1. `/dev/usb/lp0` (Direct USB)
+2. `/dev/ttyUSB0` (Serial to USB)
+3. `/dev/serial0` (GPIO Serial)
 
 ### 4. Connect the Rotary Switch
 The 1-pole 8-position rotary switch needs to be connected to GPIO pins:
