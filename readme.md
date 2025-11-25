@@ -22,6 +22,15 @@ You can run the entire system on your PC without the hardware to test logic and 
 The Python FastAPI server handles logic, data fetching, and "Virtual Hardware" drivers.
 
 ```bash
+# Quick Start (Windows/Linux/Mac)
+./run.sh
+
+# Or on Windows CMD
+run.bat
+```
+
+Manual command:
+```bash
 # 1. Activate Virtual Env (Windows)
 source venv/Scripts/activate
 
