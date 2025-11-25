@@ -213,7 +213,10 @@ def migrate_old_config(data: dict) -> dict:
 
 def load_config() -> Settings:
     """Load settings from config.json or return defaults."""
-    config_path = "config.json"
+    # Get absolute path to config.json (one directory up from this file)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = os.path.join(base_dir, "config.json")
+    
     if os.path.exists(config_path):
         with open(config_path, "r") as f:
             try:
@@ -252,7 +255,11 @@ def load_config() -> Settings:
 
 def save_config(new_settings: Settings):
     """Saves the settings object to config.json."""
-    with open("config.json", "w") as f:
+    # Get absolute path to config.json (one directory up from this file)
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    config_path = os.path.join(base_dir, "config.json")
+
+    with open(config_path, "w") as f:
         json.dump(new_settings.model_dump(), f, indent=4)
 
 
