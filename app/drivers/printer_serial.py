@@ -9,8 +9,9 @@ class PrinterDriver:
     Uses serial communication (TTL/USB) or direct USB device file.
     """
     
-    def __init__(self, width: int = 32, port: Optional[str] = None, baudrate: int = 19200):
+    def __init__(self, width: int = 32, port: Optional[str] = None, baudrate: int = 19200, invert: bool = False):
         self.width = width
+        self.invert = invert
         self.ser = None
         self.usb_file = None
         self.usb_fd = None
@@ -103,6 +104,16 @@ class PrinterDriver:
             self._write(b'\x1B\x74\x01')  # ESC t 1 (Select character code table: PC437)
             # Set default line spacing
             self._write(b'\x1B\x32')  # ESC 2 (Set line spacing to default)
+            
+            # Apply rotation if needed (180 degree rotation)
+            if self.invert:
+                # Try ESC i (some printers support this for 180° rotation)
+                # Alternative: ESC { n where n=1 enables rotation
+                # We'll try both common methods
+                self._write(b'\x1B\x7B\x01')  # ESC { 1 (Enable rotation on some printers)
+                # Also try ESC i (alternative rotation command)
+                self._write(b'\x1B\x69')  # ESC i (180° rotation on some printers)
+                print("[PRINTER] Rotation enabled (180 degrees)")
         except Exception as e:
             print(f"[PRINTER] Warning: Initialization error: {e}")
     

@@ -9,9 +9,13 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
     Executes a custom webhook action and prints the result.
     Supports JSON path extraction to print specific fields.
     """
+    from datetime import datetime
+    
     # Use module_name if provided, otherwise use action.label, otherwise default
-    header_label = (module_name or action.label or "Webhook").upper()
+    header_label = (module_name or action.label or "WEBHOOK").upper()
     printer.print_header(header_label)
+    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_line()
     printer.print_text(f"Fetching: {action.url}")
 
     try:
@@ -37,7 +41,6 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
         if response.status_code >= 400:
             printer.print_text(f"Error: {response.status_code}")
             printer.print_text(response.text[:100]) # Truncate error
-            printer.feed(1)
             return
 
         # Success - Parse Content
@@ -83,6 +86,4 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
     except Exception as e:
         print(f"[WEBHOOK] Error: {e}")
         printer.print_text(f"Connection Failed: {e}")
-
-    printer.feed(1)
 

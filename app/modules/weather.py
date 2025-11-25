@@ -79,6 +79,3 @@ def format_weather_receipt(printer: PrinterDriver, config: Dict[str, Any] = None
     printer.print_text(f"H/L:  {weather['high']}F / {weather['low']}F")
     printer.print_line()
 
-    # Footer
-    printer.feed(1)
-

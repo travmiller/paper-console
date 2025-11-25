@@ -186,15 +186,20 @@ def format_email_receipt(printer, messages=None, config: Dict[str, Any] = None, 
     if messages is None:
         messages = fetch_emails(config)
 
+    from datetime import datetime
+    
     header_name = (module_name or "EMAIL INBOX").upper()
 
     if not messages:
         printer.print_header(header_name)
+        printer.print_text(datetime.now().strftime("%A, %b %d"))
+        printer.print_line()
         printer.print_text("No new messages.")
-        printer.feed(1)
         return
 
     printer.print_header(f"{header_name} ({len(messages)})")
+    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_line()
 
     for i, msg in enumerate(messages):
         # Header: FROM
@@ -219,5 +224,3 @@ def format_email_receipt(printer, messages=None, config: Dict[str, Any] = None, 
             printer.print_text(line)
 
         printer.print_line()  # Separator between emails
-
-    printer.feed(1)

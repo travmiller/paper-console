@@ -31,7 +31,8 @@ else:
     print("[SYSTEM] Running on non-Raspberry Pi - using mock drivers")
 
 # Global Hardware Instances
-printer = PrinterDriver(width=PRINTER_WIDTH)
+# Note: printer will be reinitialized when settings change
+printer = PrinterDriver(width=PRINTER_WIDTH, invert=getattr(settings, 'invert_print', False))
 dial = DialDriver()
 
 
@@ -213,13 +214,24 @@ async def get_settings():
 @app.post("/api/settings")
 async def update_settings(new_settings: Settings):
     """Updates the configuration and saves it to disk."""
-    global settings
+    global settings, printer
 
+    # Check if invert_print setting changed
+    old_invert = getattr(settings, 'invert_print', False)
+    new_invert = getattr(new_settings, 'invert_print', False)
+    
     # Update in-memory
     settings = new_settings
 
     # Save to disk
     save_config(settings)
+    
+    # Reinitialize printer if invert setting changed
+    if old_invert != new_invert:
+        print(f"[SYSTEM] Printer invert setting changed to {new_invert}, reinitializing printer...")
+        if hasattr(printer, 'close'):
+            printer.close()
+        printer = PrinterDriver(width=PRINTER_WIDTH, invert=new_invert)
 
     return {"message": "Settings saved", "config": settings}
 
@@ -427,7 +439,6 @@ def execute_module(module: ModuleInstance):
         except Exception as e:
             print(f"[ERROR] Webhook config invalid: {e}")
             printer.print_text("Webhook Configuration Error")
-            printer.feed(3)
         return
     
     if module_type == "text":
@@ -437,7 +448,6 @@ def execute_module(module: ModuleInstance):
         except Exception as e:
             print(f"[ERROR] Text config invalid: {e}")
             printer.print_text("Text Configuration Error")
-            printer.feed(3)
         return
     
     if module_type == "calendar":
@@ -447,7 +457,6 @@ def execute_module(module: ModuleInstance):
         except Exception as e:
             print(f"[ERROR] Calendar config invalid: {e}")
             printer.print_text("Calendar Configuration Error")
-            printer.feed(3)
         return
     
     if module_type == "news":
@@ -456,7 +465,6 @@ def execute_module(module: ModuleInstance):
         except Exception as e:
             print(f"[ERROR] NewsAPI config invalid: {e}")
             printer.print_text("NewsAPI Configuration Error")
-            printer.feed(3)
         return
     
     if module_type == "rss":
@@ -465,7 +473,6 @@ def execute_module(module: ModuleInstance):
         except Exception as e:
             print(f"[ERROR] RSS config invalid: {e}")
             printer.print_text("RSS Configuration Error")
-            printer.feed(3)
         return
     
     if module_type == "email":
@@ -476,7 +483,6 @@ def execute_module(module: ModuleInstance):
         except Exception as e:
             print(f"[ERROR] Email module failed: {e}")
             printer.print_text(f"Email Error: {e}")
-            printer.feed(3)
         return
     
     if module_type == "games":
@@ -485,7 +491,6 @@ def execute_module(module: ModuleInstance):
         except Exception as e:
             print(f"[ERROR] Sudoku module failed: {e}")
             printer.print_text(f"Sudoku Error: {e}")
-            printer.feed(3)
         return
     
     if module_type == "astronomy":
@@ -494,7 +499,6 @@ def execute_module(module: ModuleInstance):
         except Exception as e:
             print(f"[ERROR] Astronomy module failed: {e}")
             printer.print_text(f"Astronomy Error: {e}")
-            printer.feed(3)
         return
     
     if module_type == "weather":
@@ -503,7 +507,6 @@ def execute_module(module: ModuleInstance):
         except Exception as e:
             print(f"[ERROR] Weather module failed: {e}")
             printer.print_text(f"Weather Error: {e}")
-            printer.feed(3)
         return
     
     if module_type == "off":
@@ -540,6 +543,12 @@ async def trigger_channel(position: int):
                     printer.feed(1)
             else:
                 print(f"[ERROR] Module {assignment.module_id} not found in module registry")
+        
+        # Add cutter feed lines at the end of the print job
+        feed_lines = getattr(settings, 'cutter_feed_lines', 4)
+        if feed_lines > 0:
+            printer.feed(feed_lines)
+            print(f"[SYSTEM] Added {feed_lines} feed line(s) to clear cutter")
         return
     
     print(f"[SYSTEM] Channel {position} has no modules assigned")

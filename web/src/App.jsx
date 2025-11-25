@@ -892,6 +892,37 @@ function App() {
                   Choose how times are displayed across all modules
                 </p>
               </div>
+              
+              <div className='mb-4'>
+                <label className={labelClass}>Cutter Feed Lines</label>
+                <input
+                  type='number'
+                  min='0'
+                  max='20'
+                  value={settings.cutter_feed_lines ?? 4}
+                  onChange={(e) => saveGlobalSettings({ cutter_feed_lines: parseInt(e.target.value) || 0 })}
+                  className={inputClass}
+                />
+                <p className='text-xs text-gray-500 mt-1'>
+                  Number of empty lines to add at the end of each print job to clear the cutter (default: 4)
+                </p>
+              </div>
+              
+              <div className='mb-4'>
+                <label className={labelClass}>Invert Print (Upside Down)</label>
+                <div className='flex items-center gap-2'>
+                  <input
+                    type='checkbox'
+                    checked={settings.invert_print || false}
+                    onChange={(e) => saveGlobalSettings({ invert_print: e.target.checked })}
+                    className='w-4 h-4'
+                  />
+                  <span className='text-sm text-gray-300'>Rotate print output 180 degrees</span>
+                </div>
+                <p className='text-xs text-gray-500 mt-1'>
+                  Enable if your printer outputs text upside down (due to paper orientation or hardware mounting)
+                </p>
+              </div>
             </div>
 
           </>

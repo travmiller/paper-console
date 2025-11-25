@@ -114,6 +114,3 @@ def format_news_receipt(printer, config: Dict[str, Any] = None, module_name: str
                     printer.print_text("...")
 
             printer.print_line()  # Separator between articles
-
-    # Footer
-    printer.feed(1)

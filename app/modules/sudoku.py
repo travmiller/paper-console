@@ -109,9 +109,13 @@ def format_sudoku_receipt(
     if config and "difficulty" in config:
         difficulty = config["difficulty"]
 
+    from datetime import datetime
+
     grid = generate_puzzle(difficulty)
 
     printer.print_header((module_name or "SUDOKU").upper())
+    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_line()
     printer.print_text(f"Difficulty: {difficulty.title()}")
     printer.print_line()
 
@@ -138,4 +142,3 @@ def format_sudoku_receipt(
 
     printer.print_line()
     printer.print_text("Good Luck!")
-    printer.feed(5)

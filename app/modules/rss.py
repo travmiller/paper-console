@@ -112,6 +112,3 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
 
             printer.print_line()  # Separator between articles
 
-    # Footer
-    printer.feed(1)
-

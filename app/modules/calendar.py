@@ -163,7 +163,7 @@ def format_calendar_receipt(printer: PrinterDriver, config: CalendarConfig, modu
     # Use module_name if provided, otherwise use config.label, otherwise default
     header_label = (module_name or config.label or "CALENDAR").upper()
     printer.print_header(header_label)
-    printer.print_text(datetime.now().strftime("%a, %b %d, %Y"))
+    printer.print_text(datetime.now().strftime("%A, %b %d"))
     printer.print_line()
 
     print(f"[CALENDAR] Days to show: {config.days_to_show}")
@@ -182,7 +182,6 @@ def format_calendar_receipt(printer: PrinterDriver, config: CalendarConfig, modu
     
     if not sources:
         printer.print_text("No iCal URLs configured.")
-        printer.feed(1)
         return
 
     all_events = {}
@@ -201,7 +200,6 @@ def format_calendar_receipt(printer: PrinterDriver, config: CalendarConfig, modu
 
     if not all_events:
         printer.print_text("No upcoming events found.")
-        printer.feed(1)
         return
 
     # Sort days
@@ -232,6 +230,4 @@ def format_calendar_receipt(printer: PrinterDriver, config: CalendarConfig, modu
             
         if i < len(sorted_dates) - 1:
             printer.print_line()  # Separator between days
-            
-    printer.feed(1)
 
