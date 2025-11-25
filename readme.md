@@ -22,14 +22,15 @@ You can run the entire system on your PC without the hardware to test logic and 
 The Python FastAPI server handles logic, data fetching, and "Virtual Hardware" drivers.
 
 ```bash
-# Quick Start (Windows/Linux/Mac)
+# Quick Start (Linux / macOS / Git Bash)
+# Automatically stops the pc-1 systemd service while you develop.
 ./run.sh
 
-# Or on Windows CMD
+# Or on Windows CMD (no systemd management)
 run.bat
 ```
 
-Manual command:
+Manual command (if you prefer to manage services yourself):
 ```bash
 # 1. Activate Virtual Env (Windows)
 source venv/Scripts/activate
