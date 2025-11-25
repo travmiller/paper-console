@@ -108,15 +108,8 @@ class PrinterDriver:
             # Set default line spacing
             self._write(b'\x1B\x32')  # ESC 2 (Set line spacing to default)
             
-            # Apply rotation if needed (180 degree rotation)
-            if self.invert:
-                # Try ESC i (some printers support this for 180° rotation)
-                # Alternative: ESC { n where n=1 enables rotation
-                # We'll try both common methods
-                self._write(b'\x1B\x7B\x01')  # ESC { 1 (Enable rotation on some printers)
-                # Also try ESC i (alternative rotation command)
-                self._write(b'\x1B\x69')  # ESC i (180° rotation on some printers)
-                print("[PRINTER] Rotation enabled (180 degrees)")
+            # Note: Rotation is handled via line reversal in flush_buffer()
+            # We don't use ESC/POS rotation commands to avoid double-rotation
         except Exception as e:
             print(f"[PRINTER] Warning: Initialization error: {e}")
     
