@@ -549,14 +549,23 @@ async def trigger_channel(position: int):
                 print(f"[ERROR] Module {assignment.module_id} not found in module registry")
         
         # Add cutter feed lines at the end of the print job
-        # If invert is enabled, flush the buffer (reversed) before the final feed
-        if hasattr(printer, 'invert') and printer.invert and hasattr(printer, 'flush_buffer'):
-            printer.flush_buffer()
-        
         feed_lines = getattr(settings, 'cutter_feed_lines', 4)
-        if feed_lines > 0:
-            printer.feed(feed_lines)
-            print(f"[SYSTEM] Added {feed_lines} feed line(s) to clear cutter")
+        
+        # If invert is enabled, add feed lines to buffer first, then flush everything
+        if hasattr(printer, 'invert') and printer.invert and hasattr(printer, 'line_buffer'):
+            if feed_lines > 0:
+                # Add feed lines to buffer (they'll be at the end, which becomes the beginning after reversal)
+                for _ in range(feed_lines):
+                    printer.line_buffer.append("")
+            # Now flush the entire buffer (reversed) - feed lines will be at the start of reversed output (end of actual print)
+            if hasattr(printer, 'flush_buffer'):
+                printer.flush_buffer()
+            print(f"[SYSTEM] Added {feed_lines} feed line(s) to clear cutter (inverted)")
+        else:
+            # Normal mode: just feed normally
+            if feed_lines > 0:
+                printer.feed(feed_lines)
+                print(f"[SYSTEM] Added {feed_lines} feed line(s) to clear cutter")
         return
     
     print(f"[SYSTEM] Channel {position} has no modules assigned")
