@@ -4,16 +4,17 @@ from astral import LocationInfo
 from astral.sun import sun
 from astral.moon import phase
 from typing import Dict, Any
-from app.config import settings, format_time
+import app.config
+from app.config import format_time
 
 # Dynamic Location from Config
 def get_city_info():
     return LocationInfo(
-        settings.city_name, 
+        app.config.settings.city_name, 
         "Local", 
-        settings.timezone, 
-        settings.latitude, 
-        settings.longitude
+        app.config.settings.timezone, 
+        app.config.settings.latitude, 
+        app.config.settings.longitude
     )
 
 def get_moon_phase_text(moon_phase: float) -> str:
@@ -30,7 +31,7 @@ def get_moon_phase_text(moon_phase: float) -> str:
 
 def get_almanac_data():
     """Calculates local astronomical data for today."""
-    tz = pytz.timezone(settings.timezone)
+    tz = pytz.timezone(app.config.settings.timezone)
     now = datetime.now(tz)
     
     city = get_city_info()
@@ -60,7 +61,7 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     printer.print_header((module_name or "ASTRONOMY").upper())
     printer.print_text(datetime.now().strftime("%A, %b %d"))
     printer.print_line()
-    printer.print_text(f"{settings.city_name}")
+    printer.print_text(f"{app.config.settings.city_name}")
     
     printer.print_text(f"SUNRISE: {data['sunrise']}")
     printer.print_text(f"SUNSET:  {data['sunset']}")

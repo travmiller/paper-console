@@ -5,7 +5,8 @@ from typing import List, Dict, Any
 from icalendar import Calendar
 from dateutil.rrule import rrulestr
 from app.drivers.printer_mock import PrinterDriver
-from app.config import CalendarConfig, settings, format_time
+from app.config import CalendarConfig, format_time
+import app.config
 
 def fetch_ics(url: str) -> str:
     """Fetches the ICS file content from a URL."""
@@ -189,7 +190,7 @@ def format_calendar_receipt(printer: PrinterDriver, config: CalendarConfig, modu
     for url in sources:
         ics_data = fetch_ics(url)
         if ics_data:
-            events = parse_events(ics_data, config.days_to_show or 2, settings.timezone)
+            events = parse_events(ics_data, config.days_to_show or 2, app.config.settings.timezone)
             # Merge into master list
             for d, evts in events.items():
                 if d not in all_events:

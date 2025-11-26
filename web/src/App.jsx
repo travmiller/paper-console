@@ -134,12 +134,7 @@ function App() {
 
     try {
       const settingsToSave = {
-        timezone: settings.timezone,
-        latitude: settings.latitude,
-        longitude: settings.longitude,
-        city_name: settings.city_name,
-        time_format: settings.time_format,
-        openweather_api_key: settings.openweather_api_key,
+        ...settings, // Include all existing settings
         channels: settings.channels || {},
         modules: modules, // Include current modules
         ...updates, // Overwrite with new values

@@ -191,12 +191,9 @@ class PrinterDriver:
             if op_type == 'text':
                 # Handle multi-line text by splitting and reversing lines within the operation
                 lines = op_data.split('\n')
-                # Filter out empty lines from splitting (trailing newlines create empty strings)
-                lines = [line for line in lines if line or len(lines) == 1]  # Keep empty only if it's the only line
                 reversed_lines = list(reversed(lines))
                 for line in reversed_lines:
-                    if line or len(reversed_lines) == 1:  # Print empty lines only if it's the only line
-                        self._write_text_line(line)
+                    self._write_text_line(line)
             elif op_type == 'feed':
                 self._write_feed(op_data)
     

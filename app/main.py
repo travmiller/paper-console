@@ -215,13 +215,16 @@ async def get_settings():
 async def update_settings(new_settings: Settings):
     """Updates the configuration and saves it to disk."""
     global settings, printer
+    import app.config as config_module
 
     # Check if invert_print setting changed
     old_invert = getattr(settings, 'invert_print', False)
     new_invert = getattr(new_settings, 'invert_print', False)
     
-    # Update in-memory
+    # Update in-memory - create new settings object
     settings = new_settings
+    # Update module-level reference so modules that access app.config.settings will see the update
+    config_module.settings = settings
 
     # Save to disk
     save_config(settings)

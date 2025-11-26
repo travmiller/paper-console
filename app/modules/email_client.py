@@ -3,7 +3,8 @@ import email
 from email.header import decode_header
 from bs4 import BeautifulSoup
 from typing import Dict, Any
-from app.config import settings, EmailConfig
+from app.config import EmailConfig
+import app.config
 
 
 def clean_text(text):
@@ -39,7 +40,7 @@ def fetch_emails(config: Dict[str, Any] = None):
     # Backwards compatibility / Direct Call support
     if config is None:
         # Try to find email config from channels (legacy support)
-        for _, chan in settings.channels.items():
+        for _, chan in app.config.settings.channels.items():
             if chan.type == "email":
                 config = chan.config
                 break

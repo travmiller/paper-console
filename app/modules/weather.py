@@ -1,7 +1,7 @@
 import requests
 from datetime import datetime
 from typing import Dict, Any
-from app.config import settings
+import app.config
 from app.drivers.printer_mock import PrinterDriver
 
 
@@ -28,11 +28,11 @@ def get_weather():
     try:
         url = "https://api.open-meteo.com/v1/forecast"
         params = {
-            "latitude": settings.latitude,
-            "longitude": settings.longitude,
+            "latitude": app.config.settings.latitude,
+            "longitude": app.config.settings.longitude,
             "current_weather": "true",
             "daily": "temperature_2m_max,temperature_2m_min",
-            "timezone": settings.timezone,
+            "timezone": app.config.settings.timezone,
             "temperature_unit": "fahrenheit",
         }
 
@@ -43,7 +43,7 @@ def get_weather():
         daily = data["daily"]
 
         # Open-Meteo doesn't provide city name, so we use config or generic
-        city_name = settings.city_name
+        city_name = app.config.settings.city_name
 
         return {
             "current": int(current["temperature"]),
