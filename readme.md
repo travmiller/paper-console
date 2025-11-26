@@ -1,6 +1,6 @@
 # Project: PC-1 (Paper Console 1)
 
-**A fully-customizable, offline-first device that curates the digital world into a physical artifact.**
+**A tiny customizable printer that prints news, weather, emails, games, and other content on demand.**
 *Status: V1 Prototype*
 *Date: November 2025*
 
@@ -282,12 +282,6 @@ paper-console/
 * **Port Already in Use:**
   * `run.sh` automatically kills zombie processes
   * If persistent, reboot: `sudo reboot`
-
-### Dial Issues
-* **Not Reading Positions:**
-  * Check wiring: Ensure common terminal is connected to GND
-  * Verify GPIO pins match `app/drivers/dial_gpio.py`
-  * Test GPIO pins with a simple Python script
 
 ### Module-Specific Issues
 * **NewsAPI Returns 0 Articles:** Check if API key is valid and on free tier
