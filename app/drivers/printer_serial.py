@@ -183,14 +183,20 @@ class PrinterDriver:
         self.print_buffer.clear()
         
         # Execute all operations in reverse order
+        # Note: We reverse the ORDER of operations, and also reverse lines within each text operation
+        # This handles both cases:
+        # - Line-by-line printing (each line = separate operation, reversed by operation order)
+        # - Multi-line strings (one operation with multiple lines, reversed by line order within)
         for op_type, op_data in reversed_ops:
             if op_type == 'text':
-                # Handle multi-line text by splitting and printing each line
-                # When inverted, lines within a text operation are also reversed
+                # Handle multi-line text by splitting and reversing lines within the operation
                 lines = op_data.split('\n')
+                # Filter out empty lines from splitting (trailing newlines create empty strings)
+                lines = [line for line in lines if line or len(lines) == 1]  # Keep empty only if it's the only line
                 reversed_lines = list(reversed(lines))
                 for line in reversed_lines:
-                    self._write_text_line(line)
+                    if line or len(reversed_lines) == 1:  # Print empty lines only if it's the only line
+                        self._write_text_line(line)
             elif op_type == 'feed':
                 self._write_feed(op_data)
     
