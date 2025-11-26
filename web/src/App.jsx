@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 const AVAILABLE_MODULE_TYPES = [
   { id: 'news', label: 'News API' },
@@ -204,7 +204,10 @@ function App() {
     }
   };
 
-  const updateModule = async (moduleId, updates) => {
+  // Debounce timers for module updates
+  const moduleUpdateTimers = useRef({});
+
+  const updateModule = async (moduleId, updates, immediate = false) => {
     try {
       // Ensure we're updating the correct module by ID
       const targetModule = modules[moduleId];
@@ -282,6 +285,20 @@ function App() {
       }
     }
   };
+
+  // Debounced version for when modal is open
+  const updateModuleDebounced = useCallback((moduleId, updates, delay = 1500) => {
+    // Clear existing timer for this module
+    if (moduleUpdateTimers.current[moduleId]) {
+      clearTimeout(moduleUpdateTimers.current[moduleId]);
+    }
+
+    // Set new timer
+    moduleUpdateTimers.current[moduleId] = setTimeout(() => {
+      updateModule(moduleId, updates, true);
+      delete moduleUpdateTimers.current[moduleId];
+    }, delay);
+  }, []);
 
   const deleteModule = async (moduleId) => {
     if (!confirm('Are you sure you want to delete this module?')) {
@@ -458,16 +475,23 @@ function App() {
     const moduleId = module.id;
     const moduleType = module.type;
 
-    const updateConfig = (field, value) => {
+    const updateConfig = (field, value, immediate = false) => {
       // Always use the latest module.config to avoid stale closures
       const currentConfig = module.config || {};
       // Only update the config, preserving the module ID and type from closure
-      onUpdate({ 
+      const updated = { 
         id: moduleId,
         type: moduleType,
         name: module.name,
         config: { ...currentConfig, [field]: value } 
-      });
+      };
+      if (immediate) {
+        // For immediate updates (on blur), call updateModule directly
+        updateModule(moduleId, updated, true);
+      } else {
+        // For typing, use debounced update
+        onUpdate(updated);
+      }
     };
 
     if (module.type === 'webhook') {
@@ -510,6 +534,11 @@ function App() {
               onChange={(e) => {
                 try {
                   updateConfig('headers', JSON.parse(e.target.value));
+                } catch {}
+              }}
+              onBlur={(e) => {
+                try {
+                  updateConfig('headers', JSON.parse(e.target.value), true);
                 } catch {}
               }}
               className={`${inputClass} font-mono text-sm min-h-[80px]`}
@@ -699,6 +728,7 @@ function App() {
             <textarea
               value={config.content || ''}
               onChange={(e) => updateConfig('content', e.target.value)}
+              onBlur={(e) => updateConfig('content', e.target.value, true)}
               className={`${inputClass} font-mono text-sm min-h-[120px]`}
             />
           </div>
@@ -1075,7 +1105,17 @@ function App() {
 
         {/* Edit Module Modal */}
         {showEditModuleModal !== null && modules[showEditModuleModal] && (
-          <div className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4' onClick={() => setShowEditModuleModal(null)}>
+          <div className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4' onClick={() => {
+            // Save any pending changes before closing
+            const moduleId = showEditModuleModal;
+            if (moduleUpdateTimers.current[moduleId]) {
+              clearTimeout(moduleUpdateTimers.current[moduleId]);
+              delete moduleUpdateTimers.current[moduleId];
+              // Force immediate save of current state
+              updateModule(moduleId, modules[moduleId], true);
+            }
+            setShowEditModuleModal(null);
+          }}>
             <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto' onClick={e => e.stopPropagation()}>
               <div className='flex justify-between items-start mb-6'>
                 <div>
@@ -1085,7 +1125,17 @@ function App() {
                     <span>Type: {AVAILABLE_MODULE_TYPES.find(t => t.id === modules[showEditModuleModal].type)?.label}</span>
                   </div>
                 </div>
-                <button onClick={() => setShowEditModuleModal(null)} className='text-gray-400 hover:text-white text-2xl'>&times;</button>
+                <button onClick={() => {
+                  // Save any pending changes before closing
+                  const moduleId = showEditModuleModal;
+                  if (moduleUpdateTimers.current[moduleId]) {
+                    clearTimeout(moduleUpdateTimers.current[moduleId]);
+                    delete moduleUpdateTimers.current[moduleId];
+                    // Force immediate save of current state
+                    updateModule(moduleId, modules[moduleId], true);
+                  }
+                  setShowEditModuleModal(null);
+                }} className='text-gray-400 hover:text-white text-2xl'>&times;</button>
               </div>
 
               <div className='mb-6'>
@@ -1093,7 +1143,15 @@ function App() {
                 <input 
                   type="text" 
                   value={modules[showEditModuleModal].name}
-                  onChange={(e) => updateModule(showEditModuleModal, { name: e.target.value })}
+                  onChange={(e) => updateModuleDebounced(showEditModuleModal, { name: e.target.value })}
+                  onBlur={(e) => {
+                    // Save immediately on blur with a short delay
+                    const moduleId = showEditModuleModal;
+                    if (moduleUpdateTimers.current[moduleId]) {
+                      clearTimeout(moduleUpdateTimers.current[moduleId]);
+                    }
+                    setTimeout(() => updateModule(moduleId, { name: e.target.value }, true), 300);
+                  }}
                   className="w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none"
                 />
               </div>
@@ -1102,7 +1160,7 @@ function App() {
                 // Always use the module ID from the current module, not from updated object
                 const moduleId = modules[showEditModuleModal].id;
                 console.log('[UPDATE] Updating module:', moduleId, 'Type:', modules[showEditModuleModal].type, 'Config:', updated.config);
-                updateModule(moduleId, updated);
+                updateModuleDebounced(moduleId, updated);
               })}
 
               <div className='mt-8 pt-6 border-t border-gray-700 flex justify-end gap-3'>
