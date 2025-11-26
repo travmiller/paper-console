@@ -14,9 +14,6 @@
 ![PC-1 Front View](images/pc-1_front.jpg)
 *Front view showing the brass rotary dial, push button, and thermal paper output*
 
-![PC-1 Back View](images/pc-1_back.jpg)
-*Back view showing power cord and power button*
-
 ---
 
 ## 1. Quick Start (Software)
