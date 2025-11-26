@@ -485,11 +485,19 @@ function App() {
         name: module.name,
         config: { ...currentConfig, [field]: value } 
       };
+      
+      // Always update local state immediately for responsive UI
+      setModules((prev) => {
+        const mod = prev[moduleId];
+        if (!mod) return prev;
+        return { ...prev, [moduleId]: { ...mod, ...updated } };
+      });
+      
       if (immediate) {
         // For immediate updates (on blur), call updateModule directly
         updateModule(moduleId, updated, true);
       } else {
-        // For typing, use debounced update
+        // For typing, use debounced update (but local state already updated above)
         onUpdate(updated);
       }
     };
