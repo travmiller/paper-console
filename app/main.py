@@ -289,6 +289,7 @@ async def get_module(module_id: str):
 async def update_module(module_id: str, module: ModuleInstance):
     """Update a module instance."""
     global settings
+    import app.config as config_module
     
     if module_id not in settings.modules:
         raise HTTPException(status_code=404, detail="Module not found")
@@ -297,6 +298,9 @@ async def update_module(module_id: str, module: ModuleInstance):
     module.id = module_id
     settings.modules[module_id] = module
     save_config(settings)
+    
+    # Update module-level reference so modules that access app.config.settings will see the update
+    config_module.settings = settings
     
     return {"message": "Module updated", "module": module}
 

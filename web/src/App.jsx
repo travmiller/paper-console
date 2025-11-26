@@ -32,6 +32,8 @@ function App() {
   const [showAddModuleModal, setShowAddModuleModal] = useState(null); // channel position or null
   const [showEditModuleModal, setShowEditModuleModal] = useState(null); // module ID or null
   const [showScheduleModal, setShowScheduleModal] = useState(null); // channel position or null
+  // Track where mouse down occurred to prevent accidental modal closes
+  const modalMouseDownTarget = useRef(null);
 
   // Fetch settings and modules on mount
   useEffect(() => {
@@ -101,6 +103,20 @@ function App() {
 
   const triggerChannelPrint = async (position) => {
     try {
+      // Flush any pending debounced module updates before printing
+      // This ensures the backend has the latest data when printing
+      const pendingModuleIds = Object.keys(moduleUpdateTimers.current);
+      for (const moduleId of pendingModuleIds) {
+        if (moduleUpdateTimers.current[moduleId]) {
+          clearTimeout(moduleUpdateTimers.current[moduleId]);
+          delete moduleUpdateTimers.current[moduleId];
+          // Force immediate save of current state
+          if (modules[moduleId]) {
+            await updateModule(moduleId, modules[moduleId], true);
+          }
+        }
+      }
+      
       // Set dial position and trigger print
       await fetch(`/action/dial/${position}`, { method: 'POST' });
       const response = await fetch('/action/trigger', { method: 'POST' });
@@ -1081,7 +1097,21 @@ function App() {
 
         {/* Add Module Modal */}
         {showAddModuleModal !== null && (
-          <div className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4' onClick={() => setShowAddModuleModal(null)}>
+          <div 
+            className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4' 
+            onMouseDown={(e) => {
+              // Track if mousedown was on the backdrop (not the modal content)
+              if (e.target === e.currentTarget) {
+                modalMouseDownTarget.current = 'backdrop';
+              }
+            }}
+            onClick={(e) => {
+              // Only close if both mousedown and click were on the backdrop
+              if (e.target === e.currentTarget && modalMouseDownTarget.current === 'backdrop') {
+                setShowAddModuleModal(null);
+              }
+              modalMouseDownTarget.current = null;
+            }}>
             <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto' onClick={e => e.stopPropagation()}>
               <div className='flex justify-between items-center mb-6'>
                 <h3 className='text-xl font-bold text-white'>Add Module to Channel {showAddModuleModal}</h3>
@@ -1113,17 +1143,29 @@ function App() {
 
         {/* Edit Module Modal */}
         {showEditModuleModal !== null && modules[showEditModuleModal] && (
-          <div className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4' onClick={() => {
-            // Save any pending changes before closing
-            const moduleId = showEditModuleModal;
-            if (moduleUpdateTimers.current[moduleId]) {
-              clearTimeout(moduleUpdateTimers.current[moduleId]);
-              delete moduleUpdateTimers.current[moduleId];
-              // Force immediate save of current state
-              updateModule(moduleId, modules[moduleId], true);
-            }
-            setShowEditModuleModal(null);
-          }}>
+          <div 
+            className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4'
+            onMouseDown={(e) => {
+              // Track if mousedown was on the backdrop (not the modal content)
+              if (e.target === e.currentTarget) {
+                modalMouseDownTarget.current = 'backdrop';
+              }
+            }}
+            onClick={(e) => {
+              // Only close if both mousedown and click were on the backdrop
+              if (e.target === e.currentTarget && modalMouseDownTarget.current === 'backdrop') {
+                // Save any pending changes before closing
+                const moduleId = showEditModuleModal;
+                if (moduleUpdateTimers.current[moduleId]) {
+                  clearTimeout(moduleUpdateTimers.current[moduleId]);
+                  delete moduleUpdateTimers.current[moduleId];
+                  // Force immediate save of current state
+                  updateModule(moduleId, modules[moduleId], true);
+                }
+                setShowEditModuleModal(null);
+              }
+              modalMouseDownTarget.current = null;
+            }}>
             <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto' onClick={e => e.stopPropagation()}>
               <div className='flex justify-between items-start mb-6'>
                 <div>
@@ -1151,7 +1193,18 @@ function App() {
                 <input 
                   type="text" 
                   value={modules[showEditModuleModal].name}
-                  onChange={(e) => updateModuleDebounced(showEditModuleModal, { name: e.target.value })}
+                  onChange={(e) => {
+                    const moduleId = showEditModuleModal;
+                    const newName = e.target.value;
+                    // Update local state immediately for responsive UI
+                    setModules((prev) => {
+                      const mod = prev[moduleId];
+                      if (!mod) return prev;
+                      return { ...prev, [moduleId]: { ...mod, name: newName } };
+                    });
+                    // Debounce the API call
+                    updateModuleDebounced(moduleId, { name: newName });
+                  }}
                   onBlur={(e) => {
                     // Save immediately on blur with a short delay
                     const moduleId = showEditModuleModal;
@@ -1191,7 +1244,21 @@ function App() {
 
         {/* Schedule Modal */}
         {showScheduleModal !== null && (
-          <div className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4' onClick={() => setShowScheduleModal(null)}>
+          <div 
+            className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4'
+            onMouseDown={(e) => {
+              // Track if mousedown was on the backdrop (not the modal content)
+              if (e.target === e.currentTarget) {
+                modalMouseDownTarget.current = 'backdrop';
+              }
+            }}
+            onClick={(e) => {
+              // Only close if both mousedown and click were on the backdrop
+              if (e.target === e.currentTarget && modalMouseDownTarget.current === 'backdrop') {
+                setShowScheduleModal(null);
+              }
+              modalMouseDownTarget.current = null;
+            }}>
             <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-md w-full' onClick={e => e.stopPropagation()}>
               <div className='flex justify-between items-center mb-6'>
                 <h3 className='text-xl font-bold text-white'>Schedule Channel {showScheduleModal}</h3>
