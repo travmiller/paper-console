@@ -1,4 +1,4 @@
-# Project: PC-1 (Paper Console 1)
+# PC-1 (Paper Console 1)
 
 **A tiny customizable printer that prints news, weather, emails, games, and other content on demand.**
 *Status: V1 Prototype*
@@ -109,8 +109,6 @@ Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **
 ---
 
 ## 4. Architecture & Modules
-
-**Philosophy:** Local-First, API-Agnostic, Privacy-Centric.
 
 ### Tech Stack
 * **OS:** Raspberry Pi OS Lite (64-bit)
