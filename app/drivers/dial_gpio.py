@@ -1,22 +1,33 @@
 import platform
-from typing import Callable, Optional
+from typing import Callable, Optional, List
 import threading
 import time
+import os
 
-# Only import RPi.GPIO on Raspberry Pi
+# Try to import our new ioctl-based driver
 GPIO_AVAILABLE = False
-GPIO = None
-
 try:
-    import RPi.GPIO as GPIO
-    GPIO_AVAILABLE = True
+    from app.drivers.gpio_ioctl import (
+        GpioChip, 
+        GPIOHANDLE_REQUEST_INPUT, 
+        GPIOHANDLE_REQUEST_OUTPUT,
+        GPIOHANDLE_REQUEST_BIAS_PULL_UP,
+        GPIOHANDLE_REQUEST_ACTIVE_LOW
+    )
+    # Check if gpiochip0 exists
+    if os.path.exists("/dev/gpiochip0"):
+        GPIO_AVAILABLE = True
+    else:
+        print("[DIAL] /dev/gpiochip0 not found (not on Raspberry Pi?)")
 except ImportError:
-    print("[DIAL] RPi.GPIO not available (not running on Raspberry Pi)")
+    print("[DIAL] ioctl GPIO driver not available (not on Linux?)")
+except Exception as e:
+    print(f"[DIAL] Error importing GPIO driver: {e}")
 
 class DialDriver:
     """
     Real hardware driver for 1-pole 8-position rotary switch.
-    Reads GPIO pins to determine the current position.
+    Reads GPIO pins to determine the current position using Linux ioctl interface.
     
     Wiring assumption:
     - The rotary switch has 8 positions (1-8)
@@ -51,24 +62,33 @@ class DialDriver:
         self.common_pin = common_pin
         self.gpio_available = GPIO_AVAILABLE
         
-        if not self.gpio_available or GPIO is None:
-            print("[DIAL] Running in fallback mode (RPi.GPIO not available)")
+        self.chip = None
+        self.input_handle = None
+        self.common_handle = None
+
+        if not self.gpio_available:
+            print("[DIAL] Running in fallback mode (GPIO not available)")
             print("[DIAL] Use set_position() to simulate dial changes")
             return
         
         try:
-            # Set up GPIO
-            GPIO.setmode(GPIO.BCM)
-            GPIO.setwarnings(False)
+            # Initialize Chip
+            self.chip = GpioChip("/dev/gpiochip0")
             
-            # Set up each position pin as input with pull-up
-            for pin in self.gpio_pins:
-                GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+            # Request all 8 position pins as INPUT with PULL_UP
+            # We use the built-in pull-ups so when switch connects to GND (Common), it reads 0
+            flags = GPIOHANDLE_REQUEST_INPUT | GPIOHANDLE_REQUEST_BIAS_PULL_UP
+            self.input_handle = self.chip.request_lines(self.gpio_pins, flags, label="dial_input")
             
             # Set up common pin if specified
             if self.common_pin is not None:
-                GPIO.setup(self.common_pin, GPIO.OUT)
-                GPIO.output(self.common_pin, GPIO.LOW)
+                # Common pin as Output, initialized to LOW (GND)
+                # Active Low means writing 1 sets it LOW? No, usually:
+                # Standard output: 0=Low, 1=High.
+                # If we want it to be GND, we set it to 0.
+                flags_common = GPIOHANDLE_REQUEST_OUTPUT
+                self.common_handle = self.chip.request_lines([self.common_pin], flags_common, label="dial_common")
+                self.common_handle.set_values([0])
             
             # Read initial position
             self.current_position = self._read_gpio_position()
@@ -83,17 +103,21 @@ class DialDriver:
             print(f"[DIAL ERROR] Failed to initialize GPIO: {e}")
             print("[DIAL] Falling back to mock mode")
             self.gpio_available = False
+            self.cleanup()
     
     def _read_gpio_position(self) -> int:
         """Read the current dial position from GPIO pins."""
-        if not self.gpio_available:
+        if not self.gpio_available or not self.input_handle:
             return self.current_position
         
         try:
-            # Check each position pin (1-8)
-            # When a position is selected, that pin should read LOW (connected to GND)
-            for i, pin in enumerate(self.gpio_pins, start=1):
-                if GPIO.input(pin) == GPIO.LOW:
+            # Get values of all 8 pins
+            values = self.input_handle.get_values()
+            
+            # We expect one pin to be LOW (0) if selected (because of pull-up and connection to GND)
+            # All others should be HIGH (1)
+            for i, val in enumerate(values, start=1):
+                if val == 0:
                     return i
             
             # If no pin is LOW, return current position (switch might be between positions)
@@ -165,10 +189,16 @@ class DialDriver:
         if self.monitor_thread:
             self.monitor_thread.join(timeout=1)
         
-        if self.gpio_available:
-            try:
-                GPIO.cleanup()
-                print("[DIAL] GPIO cleaned up")
-            except Exception as e:
-                print(f"[DIAL] Cleanup error: {e}")
-
+        if self.input_handle:
+            self.input_handle.close()
+            self.input_handle = None
+            
+        if self.common_handle:
+            self.common_handle.close()
+            self.common_handle = None
+            
+        if self.chip:
+            self.chip.close()
+            self.chip = None
+            
+        print("[DIAL] GPIO cleaned up")
