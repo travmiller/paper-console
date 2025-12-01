@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import './App.css';
 
 const AVAILABLE_MODULE_TYPES = [
   { id: 'news', label: 'News API' },
