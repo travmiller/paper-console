@@ -19,21 +19,25 @@ if _is_raspberry_pi:
     try:
         from app.drivers.printer_serial import PrinterDriver
         from app.drivers.dial_gpio import DialDriver
+        from app.drivers.button_gpio import ButtonDriver
         print("[SYSTEM] Running on Raspberry Pi - using hardware drivers")
     except ImportError as e:
         print(f"[SYSTEM] Hardware drivers not available: {e}")
         print("[SYSTEM] Falling back to mock drivers")
         from app.drivers.printer_mock import PrinterDriver
         from app.drivers.dial_mock import DialDriver
+        from app.drivers.button_mock import ButtonDriver
 else:
     from app.drivers.printer_mock import PrinterDriver
     from app.drivers.dial_mock import DialDriver
+    from app.drivers.button_mock import ButtonDriver
     print("[SYSTEM] Running on non-Raspberry Pi - using mock drivers")
 
 # Global Hardware Instances
 # Note: printer will be reinitialized when settings change
 printer = PrinterDriver(width=PRINTER_WIDTH, invert=getattr(settings, 'invert_print', False))
 dial = DialDriver()
+button = ButtonDriver(pin=18)
 
 
 # --- BACKGROUND TASKS ---
@@ -111,15 +115,55 @@ async def scheduler_loop():
             print(f"[SCHEDULE] Error: {e}")
             await asyncio.sleep(60)
 
+# --- HARDWARE CALLBACKS ---
+
+def on_button_press():
+    """
+    Callback for when the physical button is pressed.
+    Calls the async trigger_current_channel function.
+    Since this runs in a separate thread (from the driver), we need to schedule it on the main event loop.
+    """
+    print("[EVENT] Button Press Detected!")
+    try:
+        # Create a task in the running loop
+        loop = asyncio.get_running_loop()
+        loop.create_task(trigger_current_channel())
+    except RuntimeError:
+        # Fallback if loop interaction fails (or if called from outside loop context)
+        # For the driver thread, we might need a reference to the loop
+        pass
+
+# We need to pass the loop to the callback if possible, or set it up during startup.
+# A better way: The button driver calls a simple function, which uses `asyncio.run_coroutine_threadsafe`.
+
+global_loop = None
+
+def on_button_press_threadsafe():
+    """Callback that schedules the trigger on the main event loop."""
+    global global_loop
+    if global_loop and global_loop.is_running():
+        print("[EVENT] Button Press -> Scheduling Trigger")
+        asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
+    else:
+        print("[ERROR] Event loop not available for button press")
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    global email_polling_task, scheduler_task
+    global email_polling_task, scheduler_task, global_loop
+    
+    # Capture the running loop
+    global_loop = asyncio.get_running_loop()
+    
     # Startup
     print("[SYSTEM] Starting PC-1...")
     email_polling_task = asyncio.create_task(email_polling_loop())
     scheduler_task = asyncio.create_task(scheduler_loop())
+    
+    # Initialize Button Callback
+    button.set_callback(on_button_press_threadsafe)
+    
     yield
     # Shutdown
     print("[SYSTEM] Shutting down PC-1...")
@@ -141,6 +185,8 @@ async def lifespan(app: FastAPI):
         printer.close()
     if hasattr(dial, 'cleanup'):
         dial.cleanup()
+    if hasattr(button, 'cleanup'):
+        button.cleanup()
 
 
 app = FastAPI(
