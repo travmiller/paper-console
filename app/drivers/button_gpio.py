@@ -71,18 +71,26 @@ class ButtonDriver:
 
     def _monitor_loop(self):
         """Waits for button events."""
+        last_press_time = 0
+        debounce_interval = 2.0  # 2s debounce
+
         while self.monitoring and self.event_handle:
             try:
                 # read_event blocks until an event occurs
                 event_id = self.event_handle.read_event()
                 
                 if event_id == GPIOEVENT_EVENT_FALLING_EDGE:
+                    current_time = time.time()
+                    if current_time - last_press_time < debounce_interval:
+                        print(f"[BUTTON] Ignored press (debounce: {current_time - last_press_time:.3f}s)")
+                        continue
+                        
+                    last_press_time = current_time
                     print("[BUTTON] Button pressed!")
+                    
                     if self.callback:
                         try:
-                            # Run callback in a separate thread or async task if needed, 
-                            # but here we just call it directly. 
-                            # If the callback is async, it needs to be scheduled.
+                            # Run callback
                             self.callback() 
                         except Exception as e:
                             print(f"[BUTTON] Callback error: {e}")
