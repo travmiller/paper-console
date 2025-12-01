@@ -35,6 +35,15 @@ function App() {
   // Track where mouse down occurred to prevent accidental modal closes
   const modalMouseDownTarget = useRef(null);
 
+  // Refs for debounced saving
+  const settingsRef = useRef(settings);
+  const modulesRef = useRef(modules);
+  const settingsUpdateTimer = useRef(null);
+
+  // Keep refs updated
+  useEffect(() => { settingsRef.current = settings; }, [settings]);
+  useEffect(() => { modulesRef.current = modules; }, [modules]);
+
   // Fetch settings and modules on mount
   useEffect(() => {
     Promise.all([
@@ -103,79 +112,75 @@ function App() {
 
   const triggerChannelPrint = async (position) => {
     try {
-      // Flush any pending debounced module updates before printing
-      // This ensures the backend has the latest data when printing
-      const pendingModuleIds = Object.keys(moduleUpdateTimers.current);
-      for (const moduleId of pendingModuleIds) {
-        if (moduleUpdateTimers.current[moduleId]) {
-          clearTimeout(moduleUpdateTimers.current[moduleId]);
-          delete moduleUpdateTimers.current[moduleId];
-          // Force immediate save of current state
-          if (modules[moduleId]) {
-            await updateModule(moduleId, modules[moduleId], true);
-          }
-        }
-      }
-      
-      // Set dial position and trigger print
-      await fetch(`/action/dial/${position}`, { method: 'POST' });
       const response = await fetch('/action/trigger', { method: 'POST' });
-      
-      if (!response.ok) throw new Error('Failed to trigger print');
-      
-      setStatus({ type: 'success', message: `Printing Channel ${position}...` });
-      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+      if (response.ok) {
+        setStatus({ type: 'success', message: 'Triggered!' });
+        setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+      }
     } catch (err) {
-      console.error('Error triggering print:', err);
-      setStatus({ type: 'error', message: 'Failed to trigger print' });
+      console.error(err);
     }
   };
 
-  const formatTimeForDisplay = (time24) => {
-    if (!time24) return '';
-    if (settings.time_format === '24h') return time24;
-    
-    const [hours, minutes] = time24.split(':');
-    const h = parseInt(hours, 10);
-    const ampm = h >= 12 ? 'PM' : 'AM';
-    const h12 = h % 12 || 12;
-    return `${h12}:${minutes} ${ampm}`;
+  const triggerModulePrint = async (moduleId) => {
+    try {
+      const response = await fetch(`/debug/print-module/${moduleId}`, { method: 'POST' });
+      if (response.ok) {
+        setStatus({ type: 'success', message: 'Module triggered!' });
+        setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+      }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   // --- Settings Save ---
 
-  const saveGlobalSettings = async (updates) => {
-    // Optimistic update
+  const saveGlobalSettings = async (updates, debounce = false) => {
+    // Optimistic update immediately
     setSettings((prev) => ({ ...prev, ...updates }));
 
-    try {
-      const settingsToSave = {
-        ...settings, // Include all existing settings
-        channels: settings.channels || {},
-        modules: modules, // Include current modules
-        ...updates, // Overwrite with new values
-      };
+    // Helper to perform the actual fetch
+    const performSave = async (finalUpdates) => {
+      try {
+        // Use Refs to get the absolutely latest state, merging with our specific updates
+        const settingsToSave = {
+          ...settingsRef.current, 
+          channels: settingsRef.current.channels || {},
+          modules: modulesRef.current, // Use latest modules
+          ...finalUpdates, // Apply the specific updates on top
+        };
 
-      // Log for debugging
-      console.log('Auto-saving settings:', updates);
+        // Log for debugging
+        console.log('Auto-saving settings:', finalUpdates);
 
-      const response = await fetch('/api/settings', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(settingsToSave),
-      });
+        const response = await fetch('/api/settings', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(settingsToSave),
+        });
 
-      if (!response.ok) {
-        throw new Error('Failed to save settings');
+        if (!response.ok) {
+          throw new Error('Failed to save settings');
+        }
+      } catch (err) {
+        console.error('Error auto-saving settings:', err);
+        setStatus({ type: 'error', message: 'Failed to save settings automatically.' });
       }
+    };
 
-      // We don't necessarily need to update state from response here if we trust our optimistic update,
-      // but it's good practice to handle any server-side sanitization.
-      // For now, we'll just rely on the optimistic update to keep UI snappy.
-      
-    } catch (err) {
-      console.error('Error auto-saving settings:', err);
-      setStatus({ type: 'error', message: 'Failed to save settings automatically.' });
+    if (debounce) {
+      // Clear existing timer
+      if (settingsUpdateTimer.current) {
+        clearTimeout(settingsUpdateTimer.current);
+      }
+      // Set new timer
+      settingsUpdateTimer.current = setTimeout(() => {
+        performSave(updates);
+      }, 1000);
+    } else {
+      // Immediate save
+      performSave(updates);
     }
   };
 
@@ -194,33 +199,216 @@ function App() {
 
   // --- Module Management ---
 
+  // Simple ID generator for optimistic updates
+  const generateId = () => 'mod_' + Math.random().toString(36).substr(2, 9);
+
   const createModule = async (moduleType, name = '') => {
+    const tempId = generateId();
+    const newModule = {
+      id: tempId,
+      type: moduleType,
+      name: name || moduleType,
+      config: {}
+    };
+
+    // Optimistic update
+    setModules((prev) => ({ ...prev, [tempId]: newModule }));
+    
+    // If we were in "Add Module" flow for a channel, assign it immediately (optimistically)
+    if (showAddModuleModal) {
+      assignModuleToChannel(showAddModuleModal, tempId); // This is now optimistic too
+      setShowAddModuleModal(null);
+    }
+    
+    // Open edit modal immediately
+    setShowEditModuleModal(tempId);
+
     try {
       const response = await fetch('/api/modules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          type: moduleType,
-          name: name || `${AVAILABLE_MODULE_TYPES.find((m) => m.id === moduleType)?.label || moduleType}`,
-          config: getDefaultConfig(moduleType),
-        }),
+        body: JSON.stringify(newModule), // Send the ID we generated
       });
-
+      
       if (!response.ok) throw new Error('Failed to create module');
-
+      
+      // The server might return a normalized object, but ID should match if we sent it.
+      // If backend ignores our ID, we'd be in trouble, but app/main.py uses provided ID if present.
       const data = await response.json();
+      
+      // Update with server response just in case (e.g. server-side defaults)
       setModules((prev) => ({ ...prev, [data.module.id]: data.module }));
-      setStatus({ type: 'success', message: 'Module created successfully!' });
-      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
-      return data.module;
+      
     } catch (err) {
       console.error('Error creating module:', err);
       setStatus({ type: 'error', message: 'Failed to create module' });
-      return null;
+      // Revert optimistic creation
+      setModules((prev) => {
+        const next = { ...prev };
+        delete next[tempId];
+        return next;
+      });
+      setShowEditModuleModal(null);
     }
   };
 
-  // Debounce timers for module updates
+  const assignModuleToChannel = async (position, moduleId) => {
+    // Optimistic update
+    setSettings((prev) => {
+      const channel = prev.channels[position] || { modules: [] };
+      const currentModules = channel.modules || [];
+      // Calculate next order
+      const maxOrder = currentModules.reduce((max, m) => Math.max(max, m.order), -1);
+      const newAssignment = { module_id: moduleId, order: maxOrder + 1 };
+      
+      return {
+        ...prev,
+        channels: {
+          ...prev.channels,
+          [position]: { ...channel, modules: [...currentModules, newAssignment] }
+        }
+      };
+    });
+
+    try {
+      const response = await fetch(`/api/channels/${position}/modules?module_id=${moduleId}`, {
+        method: 'POST',
+      });
+      
+      if (!response.ok) throw new Error('Failed to assign module');
+      
+      // Sync with server response to ensure consistency
+      const data = await response.json();
+      setSettings((prev) => ({
+        ...prev,
+        channels: { ...prev.channels, [position]: data.channel }
+      }));
+      
+    } catch (err) {
+      console.error('Error assigning module:', err);
+      setStatus({ type: 'error', message: 'Failed to assign module' });
+      // Revert logic could go here (reload settings)
+      // For now, user sees error and can refresh
+    }
+  };
+
+  const removeModuleFromChannel = async (position, moduleId) => {
+    // Optimistic update
+    setSettings((prev) => {
+      const channel = prev.channels[position];
+      if (!channel || !channel.modules) return prev;
+      
+      return {
+        ...prev,
+        channels: {
+          ...prev.channels,
+          [position]: {
+            ...channel,
+            modules: channel.modules.filter(m => m.module_id !== moduleId)
+          }
+        }
+      };
+    });
+
+    try {
+      const response = await fetch(`/api/channels/${position}/modules/${moduleId}`, {
+        method: 'DELETE',
+      });
+      
+      if (!response.ok) throw new Error('Failed to remove module');
+      
+      const data = await response.json();
+      // Sync with server response
+      setSettings((prev) => ({
+        ...prev,
+        channels: { ...prev.channels, [position]: data.channel }
+      }));
+      
+    } catch (err) {
+      console.error('Error removing module:', err);
+      setStatus({ type: 'error', message: 'Failed to remove module' });
+    }
+  };
+
+  const moveModule = async (position, moduleId, direction) => {
+    // Calculate new state first for optimistic update
+    let optimisticSuccess = false;
+    
+    setSettings((prev) => {
+      const channel = prev.channels[position];
+      if (!channel || !channel.modules) return prev;
+      
+      const currentIndex = channel.modules.findIndex(m => m.module_id === moduleId);
+      if (currentIndex === -1) return prev;
+      
+      const newIndex = currentIndex + direction;
+      if (newIndex < 0 || newIndex >= channel.modules.length) return prev;
+      
+      // Create copy and swap
+      const newModules = [...channel.modules];
+      // Swap orders logic: in array representation, we swap positions. 
+      // But we also need to swap the 'order' property if we rely on it for sorting.
+      // The render sorts by order. So we must swap order values.
+      
+      const tempOrder = newModules[currentIndex].order;
+      newModules[currentIndex] = { ...newModules[currentIndex], order: newModules[newIndex].order };
+      newModules[newIndex] = { ...newModules[newIndex], order: tempOrder };
+      
+      optimisticSuccess = true;
+      
+      return {
+        ...prev,
+        channels: {
+          ...prev.channels,
+          [position]: { ...channel, modules: newModules }
+        }
+      };
+    });
+
+    if (!optimisticSuccess) return;
+    
+    // We need to calculate the order map to send to server
+    // We can grab the state we just set? No, React state update is async.
+    // We need to reconstruct the map from the logic we just used.
+    // Actually, reusing the existing moveModule logic for the API call is fine, 
+    // but we need to construct the moduleOrders map based on the *new* state.
+    
+    // Let's reconstruct the channel modules from the *current* settings (before update) + the swap
+    const channel = settings.channels[position];
+    const currentIndex = channel.modules.findIndex(m => m.module_id === moduleId);
+    const newIndex = currentIndex + direction;
+    const newModules = [...channel.modules];
+    [newModules[currentIndex], newModules[newIndex]] = [newModules[newIndex], newModules[currentIndex]];
+    
+    const moduleOrders = {};
+    newModules.forEach((m, index) => {
+      // We assign index as order to be clean
+      moduleOrders[m.module_id] = index;
+    });
+    
+    try {
+      const response = await fetch(`/api/channels/${position}/modules/reorder`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(moduleOrders),
+      });
+      
+      if (!response.ok) throw new Error('Failed to reorder modules');
+      
+      const data = await response.json();
+      // Confirm with server state
+      setSettings((prev) => ({
+        ...prev,
+        channels: { ...prev.channels, [position]: data.channel }
+      }));
+      
+    } catch (err) {
+      console.error('Error reordering modules:', err);
+      // Revert by reloading settings (lazy way)
+      // fetch('/api/settings').then(res => res.json()).then(setSettings);
+    }
+  };
+
   const moduleUpdateTimers = useRef({});
 
   const updateModule = async (moduleId, updates, immediate = false) => {
@@ -317,168 +505,74 @@ function App() {
   }, []);
 
   const deleteModule = async (moduleId) => {
-    if (!confirm('Are you sure you want to delete this module?')) {
-      return;
-    }
+    if (!confirm('Are you sure you want to delete this module?')) return;
+    
+    // Optimistic update
+    setModules((prev) => {
+      const next = { ...prev };
+      delete next[moduleId];
+      return next;
+    });
+    
+    setSettings((prev) => {
+      const newChannels = { ...prev.channels };
+      Object.keys(newChannels).forEach(pos => {
+        if (newChannels[pos].modules) {
+          newChannels[pos].modules = newChannels[pos].modules.filter(m => m.module_id !== moduleId);
+        }
+      });
+      return { ...prev, channels: newChannels };
+    });
+    
+    setShowEditModuleModal(null);
 
     try {
-      // 1. Find all channels this module is assigned to
-      const assignments = [];
-      for (const [pos, channel] of Object.entries(settings.channels)) {
-        if (channel.modules && channel.modules.some(m => m.module_id === moduleId)) {
-          assignments.push(pos);
-        }
-      }
-
-      // 2. Remove from all channels first (Backend requires this before deletion)
-      for (const pos of assignments) {
-        await fetch(`/api/channels/${pos}/modules/${moduleId}`, {
-          method: 'DELETE',
-        });
-      }
-
-      // 3. Delete the module instance
       const response = await fetch(`/api/modules/${moduleId}`, {
         method: 'DELETE',
       });
-
+      
       if (!response.ok) {
         const data = await response.json();
         throw new Error(data.detail || 'Failed to delete module');
       }
-
-      // 4. Update Local State
-      setModules((prev) => {
-        const newModules = { ...prev };
-        delete newModules[moduleId];
-        return newModules;
-      });
-
-      setSettings((prev) => {
-        const updatedChannels = { ...prev.channels };
-        for (const pos in updatedChannels) {
-          if (updatedChannels[pos].modules) {
-            updatedChannels[pos].modules = updatedChannels[pos].modules.filter(
-              (m) => m.module_id !== moduleId
-            );
-          }
-        }
-        return { ...prev, channels: updatedChannels };
-      });
-
-      setStatus({ type: 'success', message: 'Module deleted successfully!' });
+      
+      // Success - UI already updated
+      setStatus({ type: 'success', message: 'Module deleted' });
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
-
-      // Close edit modal if open
-      if (showEditModuleModal === moduleId) {
-        setShowEditModuleModal(null);
-      }
-
+      
     } catch (err) {
       console.error('Error deleting module:', err);
-      setStatus({ type: 'error', message: err.message || 'Failed to delete module' });
+      setStatus({ type: 'error', message: err.message });
+      // Revert: reload full state
+      fetch('/api/settings').then(res => res.json()).then(setSettings);
+      fetch('/api/modules').then(res => res.json()).then(data => setModules(data.modules));
     }
   };
 
-  const getDefaultConfig = (moduleType) => {
-    const defaults = {
-      news: { news_api_key: '' },
-      rss: { rss_feeds: [] },
-      weather: {},
-      email: { email_host: 'imap.gmail.com', email_user: '', email_password: '', polling_interval: 60 },
-      games: { difficulty: 'medium' },
-      astronomy: {},
-      calendar: { ical_sources: [], label: 'My Calendar', days_to_show: 2 },
-      webhook: { label: 'Webhook', url: '', method: 'GET', headers: {}, json_path: '' },
-      text: { label: 'Note', content: '' },
-    };
-    return defaults[moduleType] || {};
-  };
+  // --- UI Helper Components ---
 
-  // --- Channel Management ---
-
-  const assignModuleToChannel = async (position, moduleId, order = null) => {
-    try {
-      const response = await fetch(`/api/channels/${position}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`, {
-        method: 'POST',
-      });
-
-      if (!response.ok) throw new Error('Failed to assign module');
-
-      const data = await response.json();
-      setSettings((prev) => ({
-        ...prev,
-        channels: { ...prev.channels, [position]: data.channel },
-      }));
-      setStatus({ type: 'success', message: 'Module assigned to channel!' });
-      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
-    } catch (err) {
-      console.error('Error assigning module:', err);
-      setStatus({ type: 'error', message: err.message || 'Failed to assign module' });
-    }
-  };
-
-  const reorderChannelModules = async (position, moduleOrders) => {
-    try {
-      const response = await fetch(`/api/channels/${position}/modules/reorder`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(moduleOrders),
-      });
-
-      if (!response.ok) throw new Error('Failed to reorder modules');
-
-      const data = await response.json();
-      setSettings((prev) => ({
-        ...prev,
-        channels: { ...prev.channels, [position]: data.channel },
-      }));
-    } catch (err) {
-      console.error('Error reordering modules:', err);
-      setStatus({ type: 'error', message: 'Failed to reorder modules' });
-    }
-  };
-
-  const moveModuleInChannel = (position, moduleId, direction) => {
-    const channel = settings.channels[position];
-    if (!channel || !channel.modules) return;
-
-    const sortedModules = [...channel.modules].sort((a, b) => a.order - b.order);
-    const index = sortedModules.findIndex((m) => m.module_id === moduleId);
-    if (index === -1) return;
-
-    const newIndex = direction === 'up' ? index - 1 : index + 1;
-    if (newIndex < 0 || newIndex >= sortedModules.length) return;
-
-    // Swap orders
-    const tempOrder = sortedModules[index].order;
-    sortedModules[index].order = sortedModules[newIndex].order;
-    sortedModules[newIndex].order = tempOrder;
-
-    const moduleOrders = {};
-    sortedModules.forEach((m) => {
-      moduleOrders[m.module_id] = m.order;
-    });
-
-    reorderChannelModules(position, moduleOrders);
-  };
-
-  const swapChannels = (pos1, pos2) => {
-    const channel1 = settings.channels[pos1];
-    const channel2 = settings.channels[pos2];
-    
-    const newChannels = {
-      ...settings.channels,
-      [pos1]: channel2 || { modules: [] },
-      [pos2]: channel1 || { modules: [] },
-    };
-
-    saveGlobalSettings({ channels: newChannels });
-  };
-
-  // --- Settings Save ---
-  // saveGlobalSettings defined above
-
+  const Modal = ({ title, children, onClose }) => (
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4" onClick={(e) => {
+      // Only close if clicking the background, not the modal content
+      if (e.target === e.currentTarget) onClose();
+    }}>
+      <div 
+        className="bg-[#222] rounded-lg border border-gray-700 w-full max-w-2xl max-h-[90vh] overflow-y-auto flex flex-col shadow-2xl"
+        onMouseDown={(e) => { modalMouseDownTarget.current = e.currentTarget; }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center p-6 border-b border-gray-700 sticky top-0 bg-[#222] z-10">
+          <h2 className="text-xl font-bold">{title}</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-white">
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="p-6 flex-grow">
+          {children}
+        </div>
+      </div>
+    </div>
+  );
 
   // --- Module Configuration Rendering ---
 
@@ -520,9 +614,9 @@ function App() {
 
     if (module.type === 'webhook') {
       return (
-        <div className='space-y-3'>
+        <div className='space-y-4'>
           <div>
-            <label className={labelClass}>Label</label>
+            <label className={labelClass}>Label (for receipt)</label>
             <input
               type='text'
               value={config.label || ''}
@@ -530,8 +624,19 @@ function App() {
               className={inputClass}
             />
           </div>
-          <div className='flex gap-2'>
-            <div className='w-1/4'>
+          <div>
+            <label className={labelClass}>URL</label>
+            <input
+              type='url'
+              value={config.url || ''}
+              onChange={(e) => updateConfig('url', e.target.value)}
+              onBlur={(e) => updateConfig('url', e.target.value, true)}
+              className={inputClass}
+              placeholder='https://api.example.com/data'
+            />
+          </div>
+          <div className='grid grid-cols-2 gap-4'>
+            <div>
               <label className={labelClass}>Method</label>
               <select
                 value={config.method || 'GET'}
@@ -541,41 +646,38 @@ function App() {
                 <option value='POST'>POST</option>
               </select>
             </div>
-            <div className='w-3/4'>
-              <label className={labelClass}>URL</label>
+            <div>
+              <label className={labelClass}>JSON Path (Optional)</label>
               <input
                 type='text'
-                value={config.url || ''}
-                onChange={(e) => updateConfig('url', e.target.value)}
+                value={config.json_path || ''}
+                onChange={(e) => updateConfig('json_path', e.target.value)}
                 className={inputClass}
+                placeholder='e.g. data.fact'
               />
             </div>
           </div>
           <div>
-            <label className={labelClass}>Headers (JSON)</label>
-            <textarea
-              value={JSON.stringify(config.headers || {}, null, 2)}
-              onChange={(e) => {
+            <label className={labelClass}>Test Webhook</label>
+            <button
+              onClick={async () => {
                 try {
-                  updateConfig('headers', JSON.parse(e.target.value));
-                } catch {}
+                  const res = await fetch('/debug/test-webhook', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(config),
+                  });
+                  if (res.ok) {
+                    setStatus({ type: 'success', message: 'Webhook test triggered!' });
+                    setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+                  }
+                } catch (err) {
+                  console.error(err);
+                }
               }}
-              onBlur={(e) => {
-                try {
-                  updateConfig('headers', JSON.parse(e.target.value), true);
-                } catch {}
-              }}
-              className={`${inputClass} font-mono text-sm min-h-[80px]`}
-            />
-          </div>
-          <div>
-            <label className={labelClass}>JSON Path (Optional)</label>
-            <input
-              type='text'
-              value={config.json_path || ''}
-              onChange={(e) => updateConfig('json_path', e.target.value)}
-              className={inputClass}
-            />
+              className='bg-gray-700 hover:bg-gray-600 text-white px-4 py-2 rounded text-sm transition-colors'>
+              Test Fire
+            </button>
           </div>
         </div>
       );
@@ -583,113 +685,106 @@ function App() {
 
     if (module.type === 'news') {
       return (
-        <div className='space-y-3'>
+        <div className='space-y-4'>
+          <div className='p-4 bg-blue-900/20 border border-blue-800 rounded mb-4 text-sm text-blue-200'>
+            This module fetches top headlines from NewsAPI.org. Requires a valid API Key.
+          </div>
           <div>
             <label className={labelClass}>NewsAPI Key</label>
             <input
-              type='password'
+              type='text'
               value={config.news_api_key || ''}
               onChange={(e) => updateConfig('news_api_key', e.target.value)}
+              onBlur={(e) => updateConfig('news_api_key', e.target.value, true)}
               className={inputClass}
-              placeholder='Enter your NewsAPI key'
+              placeholder='Get key from newsapi.org'
             />
-            <p className='text-xs text-gray-500 mt-1'>
-              Get your free API key from newsapi.org
-            </p>
           </div>
         </div>
       );
     }
 
     if (module.type === 'rss') {
-      const addRssFeed = () => {
-        const currentConfig = module.config || {};
-        const currentFeeds = currentConfig.rss_feeds || [];
-        updateConfig('rss_feeds', [...currentFeeds, '']);
+      const feeds = config.rss_feeds || [];
+      
+      const updateFeed = (index, value) => {
+        const newFeeds = [...feeds];
+        newFeeds[index] = value;
+        updateConfig('rss_feeds', newFeeds);
       };
 
-      const updateRssFeed = (index, value) => {
-        // Read fresh from module.config to avoid stale closures
-        const currentConfig = module.config || {};
-        const currentFeeds = [...(currentConfig.rss_feeds || [])];
-        currentFeeds[index] = value;
-        updateConfig('rss_feeds', currentFeeds);
+      const addFeed = () => {
+        updateConfig('rss_feeds', [...feeds, '']);
       };
 
-      const removeRssFeed = (index) => {
-        const currentConfig = module.config || {};
-        const currentFeeds = [...(currentConfig.rss_feeds || [])];
-        currentFeeds.splice(index, 1);
-        updateConfig('rss_feeds', currentFeeds);
+      const removeFeed = (index) => {
+        const newFeeds = feeds.filter((_, i) => i !== index);
+        updateConfig('rss_feeds', newFeeds);
       };
 
       return (
-        <div className='space-y-3'>
-          <div>
-            <label className={labelClass}>RSS Feed URLs</label>
-            <div className='space-y-3'>
-              {(config.rss_feeds || []).map((feed, index) => (
-                <div key={index} className='bg-[#1a1a1a] p-3 rounded border border-gray-800'>
-                  <div className='flex justify-between items-start mb-2'>
-                    <span className='text-sm text-gray-400'>Feed {index + 1}</span>
-                    <button
-                      type='button'
-                      onClick={() => removeRssFeed(index)}
-                      className='px-2 py-1 text-xs bg-red-900/30 text-red-300 rounded hover:bg-red-900/50 transition-colors'>
-                      Remove
-                    </button>
-                  </div>
-                  <div>
-                    <label className='block mb-1 text-xs text-gray-400'>RSS Feed URL</label>
-                    <input
-                      type='text'
-                      value={feed || ''}
-                      onChange={(e) => updateRssFeed(index, e.target.value)}
-                      placeholder='https://feeds.bbci.co.uk/news/rss.xml'
-                      className={inputClass}
-                    />
-                  </div>
-                </div>
-              ))}
+        <div className='space-y-4'>
+          <div className='p-4 bg-gray-800 rounded mb-4 text-sm text-gray-300'>
+            Add one or more RSS feed URLs. The printer will summarize headlines.
+          </div>
+          
+          <label className={labelClass}>RSS Feeds</label>
+          {feeds.map((feed, idx) => (
+            <div key={idx} className='flex gap-2 mb-2'>
+              <input
+                type='url'
+                value={feed}
+                onChange={(e) => updateFeed(idx, e.target.value)}
+                onBlur={(e) => updateFeed(idx, e.target.value, true)}
+                className={inputClass}
+                placeholder='https://example.com/feed.xml'
+              />
               <button
-                type='button'
-                onClick={addRssFeed}
-                className='w-full py-2 bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors text-sm'>
-                + Add RSS Feed
+                onClick={() => removeFeed(idx)}
+                className='bg-red-900/50 hover:bg-red-900 text-red-200 px-3 rounded border border-red-800 transition-colors'>
+                ×
               </button>
             </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (module.type === 'weather') {
-      return (
-        <div className='text-gray-400 text-sm'>
-          Weather uses the global location settings configured in the General tab.
-          No additional configuration needed.
+          ))}
+          <button
+            onClick={addFeed}
+            className='text-sm text-blue-400 hover:text-blue-300 font-medium'>
+            + Add Feed URL
+          </button>
         </div>
       );
     }
 
     if (module.type === 'email') {
       return (
-        <div className='space-y-3'>
-          <div>
-            <label className={labelClass}>IMAP Host</label>
-            <input
-              type='text'
-              value={config.email_host || 'imap.gmail.com'}
-              onChange={(e) => updateConfig('email_host', e.target.value)}
-              className={inputClass}
-            />
+        <div className='space-y-4'>
+          <div className='grid grid-cols-2 gap-4'>
+            <div>
+              <label className={labelClass}>IMAP Host</label>
+              <input
+                type='text'
+                value={config.email_host || 'imap.gmail.com'}
+                onChange={(e) => updateConfig('email_host', e.target.value)}
+                className={inputClass}
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Polling (sec)</label>
+              <input
+                type='number'
+                value={config.polling_interval || 30}
+                onChange={(e) => updateConfig('polling_interval', parseInt(e.target.value) || 30)}
+                className={inputClass}
+              />
+            </div>
           </div>
           <div>
-            <label className={labelClass}>Email</label>
+            <label className={labelClass}>Email User</label>
             <input
-              type='email'
+              type='text'
               value={config.email_user || ''}
               onChange={(e) => updateConfig('email_user', e.target.value)}
+              onBlur={(e) => updateConfig('email_user', e.target.value, true)}
               className={inputClass}
             />
           </div>
@@ -699,22 +794,19 @@ function App() {
               type='password'
               value={config.email_password || ''}
               onChange={(e) => updateConfig('email_password', e.target.value)}
+              onBlur={(e) => updateConfig('email_password', e.target.value, true)}
               className={inputClass}
+              placeholder='Google App Password (not login pw)'
             />
           </div>
-          <div>
-            <label className={labelClass}>Auto-Print New Emails</label>
-            <div className='flex items-center gap-2'>
-              <input
-                type='checkbox'
-                checked={config.auto_print_new !== false} // Default to true
-                onChange={(e) => updateConfig('auto_print_new', e.target.checked)}
-                className='w-5 h-5 accent-blue-500 bg-[#333] border-gray-600 rounded focus:ring-blue-500 focus:ring-2'
-              />
-              <span className='text-sm text-gray-300'>
-                Automatically print new emails as they arrive (checks every minute)
-              </span>
-            </div>
+          <div className='flex items-center gap-2 mt-2'>
+            <input 
+              type="checkbox" 
+              checked={config.auto_print_new !== false} 
+              onChange={(e) => updateConfig('auto_print_new', e.target.checked)}
+              className="w-4 h-4"
+            />
+            <span className="text-sm text-gray-300">Auto-print new emails on arrival</span>
           </div>
         </div>
       );
@@ -761,95 +853,85 @@ function App() {
     }
 
     if (module.type === 'calendar') {
-      const addCalendarSource = () => {
-        const currentSources = config.ical_sources || [];
-        updateConfig('ical_sources', [...currentSources, { label: '', url: '' }]);
+      const sources = config.ical_sources || [];
+      
+      const updateSource = (index, field, value) => {
+        const newSources = [...sources];
+        newSources[index] = { ...newSources[index], [field]: value };
+        updateConfig('ical_sources', newSources);
       };
 
-      const updateCalendarSource = (index, field, value) => {
-        const currentSources = [...(config.ical_sources || [])];
-        currentSources[index] = { ...currentSources[index], [field]: value };
-        updateConfig('ical_sources', currentSources);
+      const addSource = () => {
+        updateConfig('ical_sources', [...sources, { label: 'New Cal', url: '' }]);
       };
 
-      const removeCalendarSource = (index) => {
-        const currentSources = [...(config.ical_sources || [])];
-        currentSources.splice(index, 1);
-        updateConfig('ical_sources', currentSources);
+      const removeSource = (index) => {
+        const newSources = sources.filter((_, i) => i !== index);
+        updateConfig('ical_sources', newSources);
       };
 
       return (
-        <div className='space-y-3'>
+        <div className='space-y-4'>
           <div>
-            <label className={labelClass}>Calendar Sources</label>
-            <div className='space-y-3'>
-              {(config.ical_sources || []).map((source, index) => (
-                <div key={index} className='bg-[#1a1a1a] p-3 rounded border border-gray-800'>
-                  <div className='flex justify-between items-start mb-2'>
-                    <span className='text-sm text-gray-400'>Calendar {index + 1}</span>
-                    <button
-                      type='button'
-                      onClick={() => removeCalendarSource(index)}
-                      className='px-2 py-1 text-xs bg-red-900/30 text-red-300 rounded hover:bg-red-900/50 transition-colors'>
-                      Remove
-                    </button>
-                  </div>
-                  <div className='space-y-2'>
-                    <div>
-                      <label className='block mb-1 text-xs text-gray-400'>Label</label>
-                      <input
-                        type='text'
-                        value={source.label || ''}
-                        onChange={(e) => updateCalendarSource(index, 'label', e.target.value)}
-                        placeholder='e.g. Work, Holidays'
-                        className={inputClass}
-                      />
-                    </div>
-                    <div>
-                      <label className='block mb-1 text-xs text-gray-400'>iCal URL</label>
-                      <input
-                        type='text'
-                        value={source.url || ''}
-                        onChange={(e) => updateCalendarSource(index, 'url', e.target.value)}
-                        placeholder='https://calendar.google.com/calendar/ical/...'
-                        className={inputClass}
-                      />
-                    </div>
-                  </div>
-                </div>
-              ))}
-              <button
-                type='button'
-                onClick={addCalendarSource}
-                className='w-full py-2 bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors text-sm'>
-                + Add Calendar
-              </button>
-            </div>
+            <label className={labelClass}>Header Label</label>
+            <input
+              type='text'
+              value={config.label || 'Calendar'}
+              onChange={(e) => updateConfig('label', e.target.value)}
+              className={inputClass}
+            />
           </div>
           <div>
             <label className={labelClass}>Days to Show</label>
-            <select
+            <input
+              type='number'
+              min="1"
+              max="7"
               value={config.days_to_show || 2}
-              onChange={(e) => updateConfig('days_to_show', parseInt(e.target.value))}
-              className={inputClass}>
-              <option value={1}>Today Only</option>
-              <option value={2}>Today + Tomorrow</option>
-              <option value={3}>3 Days</option>
-              <option value={7}>Next 7 Days</option>
-            </select>
+              onChange={(e) => updateConfig('days_to_show', parseInt(e.target.value) || 1)}
+              className={inputClass}
+            />
+          </div>
+          
+          <div className="border-t border-gray-700 pt-4 mt-2">
+            <label className={labelClass}>iCal Sources</label>
+            {sources.map((source, idx) => (
+              <div key={idx} className='bg-gray-800 p-3 rounded mb-3'>
+                <div className="flex justify-between mb-2">
+                  <span className="text-xs text-gray-500">Source #{idx+1}</span>
+                  <button onClick={() => removeSource(idx)} className="text-red-400 hover:text-red-300 text-xs">Remove</button>
+                </div>
+                <input
+                  type='text'
+                  value={source.label}
+                  onChange={(e) => updateSource(idx, 'label', e.target.value)}
+                  className={`${inputClass} mb-2 text-sm py-2`}
+                  placeholder='Label (e.g. Work)'
+                />
+                <input
+                  type='url'
+                  value={source.url}
+                  onChange={(e) => updateSource(idx, 'url', e.target.value)}
+                  onBlur={(e) => updateSource(idx, 'url', e.target.value, true)}
+                  className={`${inputClass} text-sm py-2`}
+                  placeholder='https://...'
+                />
+              </div>
+            ))}
+            <button
+              onClick={addSource}
+              className='text-sm text-blue-400 hover:text-blue-300 font-medium'>
+              + Add iCal Source
+            </button>
           </div>
         </div>
       );
     }
 
-    return <div className='text-gray-400 text-sm'>No configuration needed for this module type.</div>;
+    return <div className='text-gray-500 italic'>No configuration available for this module.</div>;
   };
 
-  if (loading) {
-    return <div className='max-w-[800px] w-full p-8 text-center'>Loading settings...</div>;
-  }
-
-  const inputClass = 'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none box-border';
+  const inputClass = 'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none';
   const labelClass = 'block mb-2 font-bold text-gray-200';
 
   return (
@@ -881,49 +963,58 @@ function App() {
         {/* General Tab */}
         {activeTab === 'general' && (
           <>
-            <div className='mb-6'>
-              <div className='mb-6 text-left relative'>
-                <label className={labelClass}>Search City / Location</label>
+            <div className='mb-6 relative'>
+              <label className={labelClass}>Location</label>
+              <div className='relative'>
                 <input
                   type='text'
+                  placeholder='Search for your city...'
                   value={searchTerm}
                   onChange={(e) => handleSearch(e.target.value)}
-                  placeholder='Type to search (e.g. London)'
-                  autoComplete='off'
                   className={inputClass}
                 />
-                {searchResults.length > 0 && (
-                  <ul className='absolute w-full z-10 max-h-[200px] overflow-y-auto bg-[#333] border border-[#444] border-t-0 rounded-b shadow-lg list-none p-0 m-0'>
-                    {searchResults.map((result) => (
-                      <li
-                        key={result.id}
-                        onClick={() => selectLocation(result)}
-                        className='p-3 cursor-pointer border-b border-[#444] last:border-0 hover:bg-[#444] transition-colors'>
-                        <strong>{result.name}</strong>
-                        <span className='text-xs text-gray-400 ml-2'>
-                          {result.admin1} {result.country}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
+                {isSearching && (
+                  <div className='absolute right-3 top-3 text-gray-400'>
+                    <svg className='animate-spin h-5 w-5' viewBox='0 0 24 24'>
+                      <circle
+                        className='opacity-25'
+                        cx='12'
+                        cy='12'
+                        r='10'
+                        stroke='currentColor'
+                        strokeWidth='4'></circle>
+                      <path
+                        className='opacity-75'
+                        fill='currentColor'
+                        d='M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z'></path>
+                    </svg>
+                  </div>
                 )}
               </div>
 
-              <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 bg-[#2a2a2a] p-4 rounded border border-gray-700 mb-6'>
-                <div className='flex flex-col'>
-                  <span className='text-xs text-gray-400 mb-1 uppercase'>Selected City</span>
-                  <span className='font-bold text-white'>{settings.city_name || 'Not Set'}</span>
+              {searchResults.length > 0 && (
+                <div className='absolute top-full left-0 right-0 bg-[#222] border border-gray-700 rounded-b shadow-xl z-10 max-h-[200px] overflow-y-auto'>
+                  {searchResults.map((result) => (
+                    <button
+                      key={result.id}
+                      onClick={() => selectLocation(result)}
+                      className='w-full text-left p-3 hover:bg-gray-800 border-b border-gray-700 last:border-0 transition-colors'>
+                      <div className='font-bold'>
+                        {result.name}, {result.admin1}
+                      </div>
+                      <div className='text-xs text-gray-400'>
+                        {result.country} • {result.latitude.toFixed(2)}, {result.longitude.toFixed(2)}
+                      </div>
+                    </button>
+                  ))}
                 </div>
-                <div className='flex flex-col'>
-                  <span className='text-xs text-gray-400 mb-1 uppercase'>Timezone</span>
-                  <span className='font-bold text-white'>{settings.timezone || 'Not Set'}</span>
-                </div>
-                <div className='flex flex-col'>
-                  <span className='text-xs text-gray-400 mb-1 uppercase'>Coordinates</span>
-                  <span className='font-bold text-white'>
-                    {settings.latitude?.toFixed(4)}, {settings.longitude?.toFixed(4)}
-                  </span>
-                </div>
+              )}
+
+              <div className='mt-2 text-sm text-gray-400 flex justify-between'>
+                <span>
+                  Current: <span className='text-white font-medium'>{settings.city_name || 'Unknown'}</span>
+                </span>
+                <span>{settings.timezone}</span>
               </div>
             </div>
 
@@ -949,7 +1040,7 @@ function App() {
                   min='0'
                   max='20'
                   value={settings.cutter_feed_lines ?? 3}
-                  onChange={(e) => saveGlobalSettings({ cutter_feed_lines: parseInt(e.target.value) || 0 })}
+                  onChange={(e) => saveGlobalSettings({ cutter_feed_lines: parseInt(e.target.value) || 0 }, true)} 
                   className={inputClass}
                 />
                 <p className='text-xs text-gray-500 mt-1'>
@@ -977,362 +1068,290 @@ function App() {
 
         {/* Channels Tab */}
         {activeTab === 'channels' && (
-          <div className='space-y-4'>
-            <h2 className='text-xl font-bold mb-4'>Channel Configuration</h2>
-            <div className='grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4'>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((pos) => {
-                const channel = settings.channels?.[pos] || { modules: [] };
-                const channelModules = (channel.modules || [])
-                  .map((assignment) => ({
-                    ...assignment,
-                    module: modules[assignment.module_id],
-                  }))
-                  .filter((item) => item.module)
-                  .sort((a, b) => a.order - b.order);
+          
+          <div className='space-y-6'>
+            {[1, 2, 3, 4, 5, 6, 7, 8].map((position) => {
+              const channel = settings.channels[position] || { modules: [] };
+              const hasModules = channel.modules && channel.modules.length > 0;
+              
+              // Sort modules based on order
+              const sortedAssignments = [...(channel.modules || [])].sort((a, b) => a.order - b.order);
 
-                return (
-                  <div key={pos} className='bg-[#2a2a2a] border border-gray-700 rounded-md p-4 flex flex-col h-full'>
-                    <div className='flex items-center justify-between mb-3'>
-                      <div className='flex items-center gap-2'>
-                        <h3 className='font-bold text-white'>Channel {pos}</h3>
-                        <button
-                          type='button'
-                          onClick={() => triggerChannelPrint(pos)}
-                          className='text-xs px-2 py-0.5 rounded border bg-transparent text-gray-300 border-gray-500 hover:text-white hover:border-gray-400 transition-colors'
-                          title='Print Channel'>
-                          🖨
-                        </button>
-                        <button
-                          type='button'
-                          onClick={() => setShowScheduleModal(pos)}
-                          className={`text-xs px-2 py-0.5 rounded border transition-colors ${
-                            channel.schedule && channel.schedule.length > 0
-                              ? 'bg-blue-900/30 text-blue-300 border-blue-800 hover:bg-blue-900/50'
-                              : 'bg-transparent text-gray-500 border-gray-700 hover:text-gray-300'
-                          }`}
-                          title='Configure Schedule'>
-                          ⏱ {channel.schedule?.length || 0}
-                        </button>
-                      </div>
-                      <div className='flex gap-1'>
-                        <button
-                          type='button'
-                          onClick={(e) => {
-                            e.preventDefault();
-                            swapChannels(pos, pos - 1);
-                          }}
-                          disabled={pos === 1}
-                          className='px-2 py-1 text-xs bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors disabled:opacity-30'>
-                          ↑
-                        </button>
-                        <button
-                          type='button'
-                          onClick={(e) => {
-                            e.preventDefault();
-                            swapChannels(pos, pos + 1);
-                          }}
-                          disabled={pos === 8}
-                          className='px-2 py-1 text-xs bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors disabled:opacity-30'>
-                          ↓
-                        </button>
-                      </div>
+              return (
+                <div key={position} className='bg-[#222] border border-gray-700 rounded-lg p-4'>
+                  <div className='flex justify-between items-start mb-4'>
+                    <div>
+                      <h3 className='text-xl font-bold text-white flex items-center gap-2'>
+                        <span className='bg-gray-700 text-xs px-2 py-1 rounded text-gray-300 font-mono'>CH {position}</span>
+                      </h3>
                     </div>
-
-                    <div className='space-y-2 mb-4 flex-grow'>
-                      {channelModules.map((item, idx) => (
-                        <div
-                          key={item.module_id}
-                          className='flex items-center justify-between p-2 bg-[#1a1a1a] rounded border border-gray-800 group hover:border-gray-600 transition-colors cursor-pointer'
-                          onClick={() => setShowEditModuleModal(item.module_id)}>
-                          <div className='flex-1 min-w-0 mr-2'>
-                            <div className='text-sm font-medium text-white truncate'>{item.module.name}</div>
-                            <div className='text-xs text-gray-400 truncate'>
-                              {AVAILABLE_MODULE_TYPES.find((t) => t.id === item.module.type)?.label}
-                            </div>
-                          </div>
-                          <div className='flex gap-1' onClick={(e) => e.stopPropagation()}>
-                            <div className='flex flex-col gap-0.5'>
-                              <button
-                                type='button'
-                                onClick={() => moveModuleInChannel(pos, item.module_id, 'up')}
-                                disabled={idx === 0}
-                                className='px-1 text-[10px] leading-none text-gray-400 hover:text-white disabled:opacity-30'>
-                                ▲
-                              </button>
-                              <button
-                                type='button'
-                                onClick={() => moveModuleInChannel(pos, item.module_id, 'down')}
-                                disabled={idx === channelModules.length - 1}
-                                className='px-1 text-[10px] leading-none text-gray-400 hover:text-white disabled:opacity-30'>
-                                ▼
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-
-                      {channelModules.length === 0 && (
-                        <div className='text-center text-gray-500 py-8 text-sm border-2 border-dashed border-gray-800 rounded-md'>
-                          Empty Channel
-                        </div>
-                      )}
-                    </div>
-
-                    <div className='pt-3 border-t border-gray-700 mt-auto'>
+                    <div className='flex gap-2'>
                       <button
-                        type='button'
-                        onClick={() => setShowAddModuleModal(pos)}
-                        className='w-full py-2 bg-[#333] hover:bg-[#444] border border-gray-600 hover:border-gray-500 rounded text-white transition-colors text-sm font-medium'>
-                        + Add Module
+                        onClick={() => triggerChannelPrint(position)}
+                        className='text-xs bg-green-900/30 hover:bg-green-900/50 text-green-400 border border-green-900/50 px-3 py-1 rounded transition-colors'
+                        title="Test Print"
+                      >
+                        Test Print
+                      </button>
+                      <button
+                        onClick={() => setShowScheduleModal(position)}
+                        className={`text-xs px-3 py-1 rounded border transition-colors ${
+                          channel.schedule && channel.schedule.length > 0 
+                            ? 'bg-blue-900/30 text-blue-400 border-blue-900/50' 
+                            : 'bg-gray-800 text-gray-400 border-gray-700 hover:text-white'
+                        }`}
+                        title="Configure Schedule"
+                      >
+                        {channel.schedule && channel.schedule.length > 0 ? 'Scheduled' : 'Schedule'}
                       </button>
                     </div>
                   </div>
-                );
-              })}
-            </div>
 
-            {/* Unassigned Modules Section removed */}
+                  {/* Module List */}
+                  <div className='space-y-2'>
+                    {sortedAssignments.length === 0 ? (
+                      <div className='text-center py-4 border-2 border-dashed border-gray-800 rounded text-gray-600 text-sm'>
+                        No modules assigned
+                      </div>
+                    ) : (
+                      sortedAssignments.map((assignment, index) => {
+                        const module = modules[assignment.module_id];
+                        if (!module) return null; // Should not happen
+                        
+                        return (
+                          <div key={assignment.module_id} className='bg-[#333] p-3 rounded flex justify-between items-center group'>
+                            <div>
+                              <div className='font-medium text-white'>
+                                {module.name || module.type.toUpperCase()}
+                              </div>
+                              <div className='text-xs text-gray-500'>
+                                {module.type}
+                              </div>
+                            </div>
+                            <div className='flex items-center gap-2 opacity-50 group-hover:opacity-100 transition-opacity'>
+                              {/* Reordering */}
+                              <div className='flex flex-col mr-2'>
+                                <button 
+                                  disabled={index === 0}
+                                  onClick={() => moveModule(position, assignment.module_id, -1)}
+                                  className='text-gray-400 hover:text-white disabled:opacity-20 text-[10px] leading-none mb-1'
+                                >▲</button>
+                                <button 
+                                  disabled={index === sortedAssignments.length - 1}
+                                  onClick={() => moveModule(position, assignment.module_id, 1)}
+                                  className='text-gray-400 hover:text-white disabled:opacity-20 text-[10px] leading-none'
+                                >▼</button>
+                              </div>
+                              
+                              <button
+                                onClick={() => setShowEditModuleModal(assignment.module_id)}
+                                className='p-1 hover:bg-gray-700 rounded text-blue-400'
+                                title="Configure Module"
+                              >
+                                ⚙
+                              </button>
+                              <button
+                                onClick={() => removeModuleFromChannel(position, assignment.module_id)}
+                                className='p-1 hover:bg-gray-700 rounded text-red-400'
+                                title="Remove from Channel"
+                              >
+                                ×
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <button
+                    onClick={() => setShowAddModuleModal(position)}
+                    className='w-full mt-3 py-2 border border-gray-700 hover:border-gray-500 text-gray-400 hover:text-white rounded text-sm transition-colors flex items-center justify-center gap-2'
+                  >
+                    + Add Module
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
+      </div>
 
-        {/* Add Module Modal */}
-        {showAddModuleModal !== null && (
-          <div 
-            className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4' 
-            onMouseDown={(e) => {
-              // Track if mousedown was on the backdrop (not the modal content)
-              if (e.target === e.currentTarget) {
-                modalMouseDownTarget.current = 'backdrop';
-              }
-            }}
-            onClick={(e) => {
-              // Only close if both mousedown and click were on the backdrop
-              if (e.target === e.currentTarget && modalMouseDownTarget.current === 'backdrop') {
-                setShowAddModuleModal(null);
-              }
-              modalMouseDownTarget.current = null;
-            }}>
-            <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto' onClick={e => e.stopPropagation()}>
-              <div className='flex justify-between items-center mb-6'>
-                <h3 className='text-xl font-bold text-white'>Add Module to Channel {showAddModuleModal}</h3>
-                <button onClick={() => setShowAddModuleModal(null)} className='text-gray-400 hover:text-white text-2xl'>&times;</button>
-              </div>
-              
-              <div className='grid grid-cols-2 md:grid-cols-3 gap-3'>
-                {AVAILABLE_MODULE_TYPES.map((type) => (
+      {/* Add Module Modal */}
+      {showAddModuleModal !== null && (
+        <Modal title={`Add Module to Channel ${showAddModuleModal}`} onClose={() => setShowAddModuleModal(null)}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="md:col-span-2 mb-4">
+              <h3 className="text-sm font-bold text-gray-400 mb-2">EXISTING MODULES</h3>
+              <div className="grid grid-cols-1 gap-2 max-h-[200px] overflow-y-auto custom-scrollbar">
+                {Object.values(modules).length === 0 && (
+                  <div className="text-gray-500 text-sm italic">No existing modules found. Create one below.</div>
+                )}
+                {Object.values(modules).map(mod => (
                   <button
-                    key={type.id}
-                    type='button'
+                    key={mod.id}
                     onClick={async () => {
-                      const newModule = await createModule(type.id);
-                      if (newModule) {
-                        await assignModuleToChannel(showAddModuleModal, newModule.id);
-                        setShowAddModuleModal(null);
-                        setShowEditModuleModal(newModule.id);
-                      }
+                      await assignModuleToChannel(showAddModuleModal, mod.id);
+                      setShowAddModuleModal(null);
                     }}
-                    className='flex flex-col items-center p-4 bg-[#1a1a1a] border border-gray-700 hover:border-white rounded-lg transition-colors text-center group'>
-                    <span className='font-bold text-white group-hover:text-blue-300 mb-1'>{type.label}</span>
-                    <span className='text-xs text-gray-500'>Create new</span>
+                    className="flex items-center justify-between bg-[#333] hover:bg-[#444] p-3 rounded text-left transition-colors border border-gray-700"
+                  >
+                    <div>
+                      <div className="font-medium text-white">{mod.name || mod.type}</div>
+                      <div className="text-xs text-gray-500">{mod.type}</div>
+                    </div>
+                    <span className="text-blue-400 text-xs px-2 py-1 bg-blue-900/20 rounded">Select</span>
                   </button>
                 ))}
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Edit Module Modal */}
-        {showEditModuleModal !== null && modules[showEditModuleModal] && (
-          <div 
-            className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4'
-            onMouseDown={(e) => {
-              // Track if mousedown was on the backdrop (not the modal content)
-              if (e.target === e.currentTarget) {
-                modalMouseDownTarget.current = 'backdrop';
-              }
-            }}
-            onClick={(e) => {
-              // Only close if both mousedown and click were on the backdrop
-              if (e.target === e.currentTarget && modalMouseDownTarget.current === 'backdrop') {
-                // Save any pending changes before closing
-                const moduleId = showEditModuleModal;
-                if (moduleUpdateTimers.current[moduleId]) {
-                  clearTimeout(moduleUpdateTimers.current[moduleId]);
-                  delete moduleUpdateTimers.current[moduleId];
-                  // Force immediate save of current state
-                  updateModule(moduleId, modules[moduleId], true);
-                }
-                setShowEditModuleModal(null);
-              }
-              modalMouseDownTarget.current = null;
-            }}>
-            <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto' onClick={e => e.stopPropagation()}>
-              <div className='flex justify-between items-start mb-6'>
-                <div>
-                  <h3 className='text-xl font-bold text-white mb-1'>Edit Module</h3>
-                  <div className='text-sm text-gray-400 flex gap-4'>
-                    <span>ID: {showEditModuleModal}</span>
-                    <span>Type: {AVAILABLE_MODULE_TYPES.find(t => t.id === modules[showEditModuleModal].type)?.label}</span>
-                  </div>
-                </div>
-                <button onClick={() => {
-                  // Save any pending changes before closing
+            <div className="md:col-span-2 mt-4 mb-2">
+              <h3 className="text-sm font-bold text-gray-400 border-t border-gray-700 pt-4">CREATE NEW MODULE</h3>
+            </div>
+
+            {AVAILABLE_MODULE_TYPES.map((type) => (
+              <button
+                key={type.id}
+                onClick={() => createModule(type.id, type.label)}
+                className="bg-[#333] hover:bg-[#444] p-4 rounded border border-gray-700 transition-colors text-left group"
+              >
+                <div className="font-bold text-gray-200 group-hover:text-white">{type.label}</div>
+                <div className="text-xs text-gray-500">Create new {type.label.toLowerCase()} instance</div>
+              </button>
+            ))}
+          </div>
+        </Modal>
+      )}
+
+      {/* Edit Module Modal */}
+      {showEditModuleModal !== null && modules[showEditModuleModal] && (
+        <Modal 
+          title={`Edit ${modules[showEditModuleModal].name || 'Module'}`} 
+          onClose={() => setShowEditModuleModal(null)}
+        >
+          <div>
+            <div className='flex justify-between items-center mb-6 bg-gray-800 p-3 rounded'>
+              <div>
+                <span className='text-xs text-gray-500 uppercase tracking-wider'>Module Type</span>
+                <div className='font-mono text-blue-300'>{modules[showEditModuleModal].type}</div>
+              </div>
+              <div>
+                <span className='text-xs text-gray-500 uppercase tracking-wider'>ID</span>
+                <div className='font-mono text-xs text-gray-600'>{modules[showEditModuleModal].id.split('-')[0]}...</div>
+              </div>
+            </div>
+
+            <div className='mb-6'>
+              <label className='block mb-2 text-sm text-gray-400'>Module Name</label>
+              <input 
+                type="text" 
+                value={modules[showEditModuleModal].name}
+                onChange={(e) => {
+                  const moduleId = showEditModuleModal;
+                  const newName = e.target.value;
+                  // Update local state immediately for responsive UI
+                  setModules((prev) => {
+                    const mod = prev[moduleId];
+                    if (!mod) return prev;
+                    return { ...prev, [moduleId]: { ...mod, name: newName } };
+                  });
+                  // Debounce the API call
+                  updateModuleDebounced(moduleId, { name: newName });
+                }}
+                onBlur={(e) => {
+                  // Save immediately on blur with a short delay
                   const moduleId = showEditModuleModal;
                   if (moduleUpdateTimers.current[moduleId]) {
                     clearTimeout(moduleUpdateTimers.current[moduleId]);
-                    delete moduleUpdateTimers.current[moduleId];
-                    // Force immediate save of current state
-                    updateModule(moduleId, modules[moduleId], true);
                   }
-                  setShowEditModuleModal(null);
-                }} className='text-gray-400 hover:text-white text-2xl'>&times;</button>
-              </div>
+                  setTimeout(() => updateModule(moduleId, { name: e.target.value }, true), 300);
+                }}
+                className="w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none"
+              />
+            </div>
 
-              <div className='mb-6'>
-                <label className='block mb-2 text-sm text-gray-400'>Module Name</label>
-                <input 
-                  type="text" 
-                  value={modules[showEditModuleModal].name}
-                  onChange={(e) => {
-                    const moduleId = showEditModuleModal;
-                    const newName = e.target.value;
-                    // Update local state immediately for responsive UI
-                    setModules((prev) => {
-                      const mod = prev[moduleId];
-                      if (!mod) return prev;
-                      return { ...prev, [moduleId]: { ...mod, name: newName } };
-                    });
-                    // Debounce the API call
-                    updateModuleDebounced(moduleId, { name: newName });
-                  }}
-                  onBlur={(e) => {
-                    // Save immediately on blur with a short delay
-                    const moduleId = showEditModuleModal;
-                    if (moduleUpdateTimers.current[moduleId]) {
-                      clearTimeout(moduleUpdateTimers.current[moduleId]);
-                    }
-                    setTimeout(() => updateModule(moduleId, { name: e.target.value }, true), 300);
-                  }}
-                  className="w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none"
-                />
-              </div>
+            {renderModuleConfig(modules[showEditModuleModal], (updated) => {
+              // Always use the module ID from the current module, not from updated object
+              const moduleId = modules[showEditModuleModal].id;
+              console.log('[UPDATE] Updating module:', moduleId, 'Type:', modules[showEditModuleModal].type, 'Config:', updated.config);
+              updateModuleDebounced(moduleId, updated);
+            })}
 
-              {renderModuleConfig(modules[showEditModuleModal], (updated) => {
-                // Always use the module ID from the current module, not from updated object
-                const moduleId = modules[showEditModuleModal].id;
-                console.log('[UPDATE] Updating module:', moduleId, 'Type:', modules[showEditModuleModal].type, 'Config:', updated.config);
-                updateModuleDebounced(moduleId, updated);
-              })}
-
-              <div className='mt-8 pt-6 border-t border-gray-700 flex justify-end gap-3'>
-                <button
-                  type='button'
-                  onClick={() => deleteModule(showEditModuleModal)}
-                  className='px-4 py-2 bg-red-900/20 text-red-400 border border-red-900/50 hover:bg-red-900/40 rounded transition-colors'>
-                  Delete Module
-                </button>
-                <button
-                  type='button'
-                  onClick={() => setShowEditModuleModal(null)}
-                  className='px-6 py-2 bg-white text-black font-medium rounded hover:bg-gray-200 transition-colors'>
-                  Done
-                </button>
-              </div>
+            <div className='mt-8 pt-6 border-t border-gray-700 flex justify-end gap-3'>
+              <button
+                onClick={() => triggerModulePrint(showEditModuleModal)}
+                className='bg-green-900/30 hover:bg-green-900/50 text-green-400 border border-green-900/50 px-4 py-2 rounded transition-colors'
+              >
+                Test Print
+              </button>
+              <button
+                onClick={() => deleteModule(showEditModuleModal)}
+                className='bg-red-900/30 hover:bg-red-900/50 text-red-400 border border-red-900/50 px-4 py-2 rounded transition-colors'
+              >
+                Delete Module
+              </button>
             </div>
           </div>
-        )}
+        </Modal>
+      )}
 
-        {/* Schedule Modal */}
-        {showScheduleModal !== null && (
-          <div 
-            className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4'
-            onMouseDown={(e) => {
-              // Track if mousedown was on the backdrop (not the modal content)
-              if (e.target === e.currentTarget) {
-                modalMouseDownTarget.current = 'backdrop';
-              }
-            }}
-            onClick={(e) => {
-              // Only close if both mousedown and click were on the backdrop
-              if (e.target === e.currentTarget && modalMouseDownTarget.current === 'backdrop') {
-                setShowScheduleModal(null);
-              }
-              modalMouseDownTarget.current = null;
-            }}>
-            <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-md w-full' onClick={e => e.stopPropagation()}>
-              <div className='flex justify-between items-center mb-6'>
-                <h3 className='text-xl font-bold text-white'>Schedule Channel {showScheduleModal}</h3>
-                <button onClick={() => setShowScheduleModal(null)} className='text-gray-400 hover:text-white text-2xl'>&times;</button>
-              </div>
-
-              <div className='space-y-4'>
-                <div className='text-sm text-gray-400 mb-4'>
-                  Add times when this channel should automatically print.
-                </div>
-
-                <div className='space-y-2 max-h-[300px] overflow-y-auto'>
-                  {((settings.channels[showScheduleModal]?.schedule || [])).map((time, idx) => (
-                    <div key={idx} className='flex items-center justify-between bg-[#1a1a1a] p-3 rounded border border-gray-800'>
-                      <span className='text-white font-mono text-lg'>{formatTimeForDisplay(time)}</span>
-                      <button
-                        onClick={() => {
-                          const newSchedule = [...(settings.channels[showScheduleModal]?.schedule || [])];
-                          newSchedule.splice(idx, 1);
-                          updateChannelSchedule(showScheduleModal, newSchedule);
-                        }}
-                        className='text-red-400 hover:text-red-300 px-2'>
-                        &times;
-                      </button>
-                    </div>
-                  ))}
-                  {(!settings.channels[showScheduleModal]?.schedule || settings.channels[showScheduleModal]?.schedule.length === 0) && (
-                    <div className='text-gray-600 text-center py-4 italic'>No scheduled times.</div>
-                  )}
-                </div>
-
-                <div className='pt-4 border-t border-gray-700'>
-                  <form
-                    onSubmit={(e) => {
-                      e.preventDefault();
-                      const input = e.target.elements.timeInput;
-                      const time = input.value;
-                      if (time) {
-                        const currentSchedule = settings.channels[showScheduleModal]?.schedule || [];
-                        if (!currentSchedule.includes(time)) {
-                          const newSchedule = [...currentSchedule, time].sort();
-                          updateChannelSchedule(showScheduleModal, newSchedule);
-                          input.value = '';
-                        }
-                      }
+      {/* Schedule Modal */}
+      {showScheduleModal !== null && (
+        <Modal title={`Schedule for Channel ${showScheduleModal}`} onClose={() => setShowScheduleModal(null)}>
+          <div className="space-y-6">
+            <p className="text-gray-400 text-sm">
+              Set specific times for this channel to print automatically every day.
+            </p>
+            
+            <div className="space-y-2">
+              {(settings.channels[showScheduleModal]?.schedule || []).map((time, idx) => (
+                <div key={idx} className="flex gap-2">
+                  <input 
+                    type="time" 
+                    value={time}
+                    onChange={(e) => {
+                      const newSchedule = [...(settings.channels[showScheduleModal].schedule || [])];
+                      newSchedule[idx] = e.target.value;
+                      updateChannelSchedule(showScheduleModal, newSchedule);
                     }}
-                    className='flex gap-2'>
-                    <input
-                      name='timeInput'
-                      type='time'
-                      required
-                      className='flex-1 bg-[#333] border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-white'
-                    />
-                    <button
-                      type='submit'
-                      className='bg-white text-black px-4 py-2 rounded font-medium hover:bg-gray-200 transition-colors'>
-                      Add
-                    </button>
-                  </form>
+                    className="flex-grow p-3 bg-[#333] border border-gray-700 rounded text-white"
+                  />
+                  <button 
+                    onClick={() => {
+                      const newSchedule = (settings.channels[showScheduleModal].schedule || []).filter((_, i) => i !== idx);
+                      updateChannelSchedule(showScheduleModal, newSchedule);
+                    }}
+                    className="px-4 bg-red-900/30 text-red-400 rounded border border-red-900/50 hover:bg-red-900/50"
+                  >
+                    Remove
+                  </button>
                 </div>
-              </div>
+              ))}
             </div>
+            
+            <button 
+              onClick={() => {
+                const newSchedule = [...(settings.channels[showScheduleModal]?.schedule || []), "09:00"];
+                updateChannelSchedule(showScheduleModal, newSchedule);
+              }}
+              className="w-full py-3 bg-[#333] hover:bg-[#444] border border-gray-700 rounded text-gray-300 hover:text-white transition-colors"
+            >
+              + Add Time
+            </button>
           </div>
-        )}
+        </Modal>
+      )}
 
-        {status.message && (
-          <div
-            className={`mt-4 p-4 rounded text-center border ${
-              status.type === 'success' ? 'bg-green-500/10 text-green-400 border-green-500' : 'bg-red-500/10 text-red-400 border-red-400'
-            }`}>
-            {status.message}
-          </div>
-        )}
-      </div>
+      {/* Status Toast */}
+      {status.message && (
+        <div
+          className={`fixed bottom-4 right-4 p-4 rounded shadow-lg transition-opacity duration-500 ${
+            status.type === 'error' ? 'bg-red-900 text-white' : 'bg-green-900 text-white'
+          }`}>
+          {status.message}
+        </div>
+      )}
 
       <div className='mt-8 pt-8 border-t border-gray-800 text-center'>
         <button
