@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -70,6 +70,15 @@ button = ButtonDriver(pin=18)
 
 
 # --- BACKGROUND TASKS ---
+
+config_lock = asyncio.Lock()
+
+
+async def save_settings_background(settings_snapshot: Settings):
+    """Save settings to disk in background with a lock to prevent race conditions."""
+    async with config_lock:
+        await asyncio.to_thread(save_config, settings_snapshot)
+
 
 email_polling_task = None
 scheduler_task = None
@@ -310,7 +319,7 @@ async def get_settings():
 
 
 @app.post("/api/settings")
-async def update_settings(new_settings: Settings):
+async def update_settings(new_settings: Settings, background_tasks: BackgroundTasks):
     """Updates the configuration and saves it to disk."""
     global settings, printer
     import app.config as config_module
@@ -325,7 +334,7 @@ async def update_settings(new_settings: Settings):
     config_module.settings = settings
 
     # Save to disk
-    save_config(settings)
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     # Reinitialize printer if invert setting changed
     if old_invert != new_invert:
@@ -340,7 +349,7 @@ async def update_settings(new_settings: Settings):
 
 
 @app.post("/api/settings/reset")
-async def reset_settings():
+async def reset_settings(background_tasks: BackgroundTasks):
     """Resets all settings to their default values."""
     global settings
 
@@ -348,7 +357,7 @@ async def reset_settings():
     settings = Settings()
 
     # Save to disk (overwriting existing config.json)
-    save_config(settings)
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     return {"message": "Settings reset to defaults", "config": settings}
 
@@ -392,7 +401,7 @@ async def list_modules():
 
 
 @app.post("/api/modules")
-async def create_module(module: ModuleInstance):
+async def create_module(module: ModuleInstance, background_tasks: BackgroundTasks):
     """Create a new module instance."""
     global settings
 
@@ -401,7 +410,7 @@ async def create_module(module: ModuleInstance):
         module.id = str(uuid.uuid4())
 
     settings.modules[module.id] = module
-    save_config(settings)
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     return {"message": "Module created", "module": module}
 
@@ -416,7 +425,7 @@ async def get_module(module_id: str):
 
 
 @app.put("/api/modules/{module_id}")
-async def update_module(module_id: str, module: ModuleInstance):
+async def update_module(module_id: str, module: ModuleInstance, background_tasks: BackgroundTasks):
     """Update a module instance."""
     global settings
     import app.config as config_module
@@ -427,7 +436,7 @@ async def update_module(module_id: str, module: ModuleInstance):
     # Ensure ID matches
     module.id = module_id
     settings.modules[module_id] = module
-    save_config(settings)
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     # Update module-level reference so modules that access app.config.settings will see the update
     config_module.settings = settings
@@ -436,7 +445,7 @@ async def update_module(module_id: str, module: ModuleInstance):
 
 
 @app.delete("/api/modules/{module_id}")
-async def delete_module(module_id: str):
+async def delete_module(module_id: str, background_tasks: BackgroundTasks):
     """Delete a module instance."""
     global settings
 
@@ -458,14 +467,14 @@ async def delete_module(module_id: str):
         )
 
     del settings.modules[module_id]
-    save_config(settings)
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     return {"message": "Module deleted"}
 
 
 @app.post("/api/channels/{position}/modules")
 async def assign_module_to_channel(
-    position: int, module_id: str, order: Optional[int] = None
+    position: int, module_id: str, background_tasks: BackgroundTasks, order: Optional[int] = None
 ):
     """Assign a module to a channel."""
     global settings
@@ -498,13 +507,13 @@ async def assign_module_to_channel(
 
     # Add assignment
     channel.modules.append(ChannelModuleAssignment(module_id=module_id, order=order))
-    save_config(settings)
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     return {"message": "Module assigned to channel", "channel": channel}
 
 
 @app.delete("/api/channels/{position}/modules/{module_id}")
-async def remove_module_from_channel(position: int, module_id: str):
+async def remove_module_from_channel(position: int, module_id: str, background_tasks: BackgroundTasks):
     """Remove a module from a channel."""
     global settings
 
@@ -520,13 +529,13 @@ async def remove_module_from_channel(position: int, module_id: str):
 
     # Remove assignment
     channel.modules = [a for a in channel.modules if a.module_id != module_id]
-    save_config(settings)
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     return {"message": "Module removed from channel", "channel": channel}
 
 
 @app.post("/api/channels/{position}/modules/reorder")
-async def reorder_channel_modules(position: int, module_orders: Dict[str, int]):
+async def reorder_channel_modules(position: int, module_orders: Dict[str, int], background_tasks: BackgroundTasks):
     """Reorder modules within a channel. module_orders is {module_id: new_order}."""
     global settings
 
@@ -543,13 +552,13 @@ async def reorder_channel_modules(position: int, module_orders: Dict[str, int]):
         if assignment.module_id in module_orders:
             assignment.order = module_orders[assignment.module_id]
 
-    save_config(settings)
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     return {"message": "Modules reordered", "channel": channel}
 
 
 @app.post("/api/channels/{position}/schedule")
-async def update_channel_schedule(position: int, schedule: List[str]):
+async def update_channel_schedule(position: int, schedule: List[str], background_tasks: BackgroundTasks):
     """Update the print schedule for a channel."""
     global settings
 
@@ -557,7 +566,7 @@ async def update_channel_schedule(position: int, schedule: List[str]):
         settings.channels[position] = ChannelConfig(modules=[])
 
     settings.channels[position].schedule = schedule
-    save_config(settings)
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     return {"message": "Schedule updated", "channel": settings.channels[position]}
 
