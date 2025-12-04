@@ -9,7 +9,7 @@ class PrinterDriver:
     Uses serial communication (TTL/USB) or direct USB device file.
     """
     
-    def __init__(self, width: int = 32, port: Optional[str] = None, baudrate: int = 19200, invert: bool = False):
+    def __init__(self, width: int = 32, port: Optional[str] = None, baudrate: int = 9600, invert: bool = False):
         self.width = width
         self.invert = invert
         self.ser = None
