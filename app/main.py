@@ -757,8 +757,8 @@ async def print_channel(position: int):
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
     
-    dial.set_position(position)
-    await trigger_current_channel()
+    # Don't need to set dial.set_position since we're passing position directly
+    await trigger_channel(position)
     return {"message": f"Printing channel {position}"}
 
 
