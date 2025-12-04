@@ -12,6 +12,7 @@ pip-log.txt
 pip-delete-this-directory.txt
 *.egg-info/
 dist/
+!web/dist/
 build/
 
 # Node.js
