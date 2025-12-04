@@ -165,6 +165,28 @@ systemctl daemon-reload
 systemctl enable pc-1.service
 systemctl restart pc-1.service
 
+# Remove unnecessary default user folders (headless device doesn't need them)
+echo "Removing default user folders..."
+USER_HOME=$(eval echo ~$SUDO_USER)
+rm -rf "$USER_HOME/Desktop" "$USER_HOME/Documents" "$USER_HOME/Downloads" \
+       "$USER_HOME/Music" "$USER_HOME/Pictures" "$USER_HOME/Public" \
+       "$USER_HOME/Templates" "$USER_HOME/Videos" 2>/dev/null || true
+
+# Prevent them from being recreated
+mkdir -p "$USER_HOME/.config"
+cat > "$USER_HOME/.config/user-dirs.dirs" << 'XDGEOF'
+XDG_DESKTOP_DIR="$HOME"
+XDG_DOWNLOAD_DIR="$HOME"
+XDG_DOCUMENTS_DIR="$HOME"
+XDG_MUSIC_DIR="$HOME"
+XDG_PICTURES_DIR="$HOME"
+XDG_VIDEOS_DIR="$HOME"
+XDG_TEMPLATES_DIR="$HOME"
+XDG_PUBLICSHARE_DIR="$HOME"
+XDGEOF
+echo "enabled=False" > "$USER_HOME/.config/user-dirs.conf"
+chown -R "$SUDO_USER:$SUDO_USER" "$USER_HOME/.config"
+
 echo "--- Setup Complete ---"
 echo "1. Your device is now accessible at http://$HOSTNAME.local"
 echo "2. The application is running as a background service (pc-1.service)"

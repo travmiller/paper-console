@@ -34,6 +34,9 @@ config.json
 .env.local
 .env.*.local
 
+# Manufacturing (internal production tools & images)
+manufacturing/
+
 # IDE
 .vscode/
 .idea/
