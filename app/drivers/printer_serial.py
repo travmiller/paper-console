@@ -74,13 +74,14 @@ class PrinterDriver:
             print(f"[PRINTER] Connected to {port} at {baudrate} baud")
             
             # Clear any leftover data in the serial buffer
+            # Aggressive flush to prevent garbage
             if self.ser.in_waiting:
                 self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
             
             # Small delay for printer to be ready
             import time
-            time.sleep(0.1)
+            time.sleep(0.5)
             
             # Initialize printer (ESC/POS commands)
             self._initialize_printer()
@@ -110,10 +111,21 @@ class PrinterDriver:
     def _initialize_printer(self):
         """Send initialization commands to the printer."""
         try:
+            # Wake up printer with NULL bytes (clears noise)
+            self._write(b'\x00\x00\x00')
+            import time
+            time.sleep(0.1)
+            
             # Reset printer
             self._write(b'\x1B\x40')  # ESC @ (Initialize printer)
-            # Set character encoding
-            self._write(b'\x1B\x74\x01')  # ESC t 1 (Select character code table: PC437)
+            time.sleep(0.2) # Wait for reset to complete
+            
+            # Set character encoding explicitly to PC437 (Western)
+            # This is critical to avoid Chinese characters (GBK)
+            self._write(b'\x1B\x74\x00')  # ESC t 0 (PC437)
+            self._write(b'\x1C\x2E')      # Cancel Chinese character mode (FS .)
+            self._write(b'\x1C\x26')      # Cancel Kanji mode (FS &)
+            
             # Set default line spacing
             self._write(b'\x1B\x32')  # ESC 2 (Set line spacing to default)
             
