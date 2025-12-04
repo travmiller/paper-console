@@ -6,6 +6,8 @@ set -e
 AP_SSID_PREFIX="PC-1-Setup"
 AP_PASSWORD="setup1234"
 AP_INTERFACE="wlan0"
+AP_IP="192.168.4.1"
+AP_GATEWAY="192.168.4.1"
 
 # Generate unique SSID suffix from CPU serial
 get_device_id() {
@@ -24,17 +26,25 @@ start_ap() {
     
     # Check if hotspot already exists
     if nmcli connection show "PC-1-Hotspot" &>/dev/null; then
-        echo "Hotspot profile exists, activating..."
-        nmcli connection up "PC-1-Hotspot"
-    else
-        echo "Creating new hotspot profile..."
-        # Create AP using NetworkManager (it handles all the complexity)
-        nmcli device wifi hotspot \
-            ifname "$AP_INTERFACE" \
-            con-name "PC-1-Hotspot" \
-            ssid "$SSID" \
-            password "$AP_PASSWORD"
+        echo "Hotspot profile exists, deleting and recreating..."
+        nmcli connection delete "PC-1-Hotspot"
     fi
+    
+    echo "Creating new hotspot profile..."
+    # Create AP using NetworkManager with specific IP
+    nmcli connection add type wifi ifname "$AP_INTERFACE" \
+        con-name "PC-1-Hotspot" \
+        autoconnect no \
+        ssid "$SSID" \
+        mode ap \
+        ipv4.method shared \
+        ipv4.addresses "$AP_IP/24" \
+        ipv6.method ignore \
+        wifi-sec.key-mgmt wpa-psk \
+        wifi-sec.psk "$AP_PASSWORD"
+    
+    # Activate the hotspot
+    nmcli connection up "PC-1-Hotspot"
     
     # Wait for AP to be ready
     sleep 3
@@ -44,7 +54,7 @@ start_ap() {
     
     echo "AP Mode Active: $SSID"
     echo "Password: $AP_PASSWORD"
-    echo "Portal: http://192.168.4.1"
+    echo "Portal: http://$AP_IP"
 }
 
 stop_ap() {
@@ -62,19 +72,23 @@ stop_ap() {
 }
 
 start_captive_portal() {
+    # Get the actual IP of wlan0 (in case it differs)
+    ACTUAL_IP=$(ip -4 addr show "$AP_INTERFACE" | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1)
+    PORTAL_IP="${ACTUAL_IP:-$AP_IP}"
+    
     # Create dnsmasq config for captive portal
     # This makes ANY domain resolve to our IP
     cat > /tmp/dnsmasq-captive.conf <<EOF
-interface=wlan0
+interface=$AP_INTERFACE
 bind-interfaces
-address=/#/192.168.4.1
+address=/#/$PORTAL_IP
 EOF
     
     # Start dnsmasq for captive portal DNS
     dnsmasq -C /tmp/dnsmasq-captive.conf -k &
     echo $! > /tmp/dnsmasq-captive.pid
     
-    echo "Captive portal started"
+    echo "Captive portal started (redirecting to $PORTAL_IP)"
 }
 
 stop_captive_portal() {
