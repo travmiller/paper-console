@@ -191,6 +191,8 @@ def print_setup_instructions_sync():
     """Sync version of print_setup_instructions for use in background tasks."""
     print("[SYSTEM] Printing Setup Instructions...")
     try:
+        printer.feed(1)  # Ensure printer is awake
+
         # Helper for centering text
         def center(text):
             padding = max(0, (PRINTER_WIDTH - len(text)) // 2)
@@ -276,12 +278,18 @@ async def check_wifi_startup():
 async def manual_ap_mode_trigger():
     """Manually trigger AP mode (e.g. via button hold)."""
     print("[SYSTEM] Manual AP mode trigger...")
-    wifi_manager.start_ap_mode()
-    
-    # Wait for AP to start
-    await asyncio.sleep(5)
-    
+
+    # Print instructions BEFORE switching network mode
+    # This ensures the user gets the info even if the network switch is messy
     await print_setup_instructions()
+    
+    print("[SYSTEM] Instructions printed. Switching to AP mode...")
+    
+    # Give a small delay for the printer buffer to flush/finish
+    await asyncio.sleep(2)
+
+    wifi_manager.start_ap_mode()
+
 
 
 @asynccontextmanager
