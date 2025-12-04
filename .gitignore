@@ -23,7 +23,7 @@ pnpm-debug.log*
 # Note: package-lock.json should be committed for reproducible builds
 
 # Build outputs
-web/dist/
+# web/dist/
 web/dist-ssr/
 *.local
 
