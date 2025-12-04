@@ -35,8 +35,6 @@ from app.modules import (
 )
 from app.routers import wifi
 import app.wifi_manager as wifi_manager
-import qrcode
-import platform
 import app.hardware as hardware
 from app.hardware import printer, dial, button, _is_raspberry_pi
 
@@ -182,59 +180,12 @@ def on_button_long_press_threadsafe():
         print("[ERROR] Event loop not available for button long press")
 
 
+from app.utils import print_setup_instructions_sync
+
+
 async def print_setup_instructions():
-    """Prints the WiFi setup instructions with QR code."""
+    """Prints the WiFi setup instructions."""
     print_setup_instructions_sync()
-
-
-def print_setup_instructions_sync():
-    """Sync version of print_setup_instructions for use in background tasks."""
-    print("[SYSTEM] Printing Setup Instructions...")
-    try:
-        printer.feed(1)  # Ensure printer is awake
-
-        # Helper for centering text
-        def center(text):
-            padding = max(0, (PRINTER_WIDTH - len(text)) // 2)
-            return " " * padding + text
-
-        printer.print_text(center("PC-1 SETUP MODE"))
-        printer.print_text(center("=" * 20))
-        printer.feed(1)
-        printer.print_text(center("Connect to WiFi:"))
-
-        # Get device ID for SSID
-        ssid_suffix = "XXXX"
-        try:
-            if _is_raspberry_pi:
-                with open("/proc/cpuinfo", "r") as f:
-                    for line in f:
-                        if line.startswith("Serial"):
-                            ssid_suffix = line.split(":")[1].strip()[-4:]
-                            break
-        except:
-            pass
-
-        ssid = f"PC-1-Setup-{ssid_suffix}"
-
-        printer.print_text(center(ssid))
-        printer.print_text(center("Password: setup1234"))
-        printer.feed(1)
-        printer.print_text(center("Then visit:"))
-        printer.print_text(center("http://pc-1.local"))
-        printer.print_text(center("OR"))
-        printer.print_text(center("http://10.42.0.1"))
-        printer.feed(3)
-
-        # CRITICAL: If invert mode is on, we must flush the buffer to actually print
-        if hasattr(printer, "flush_buffer") and getattr(printer, "invert", False):
-            printer.flush_buffer()
-            # Add feed lines after flushing (direct feed)
-            if hasattr(printer, "feed_direct"):
-                printer.feed_direct(3)
-
-    except Exception as e:
-        print(f"[ERROR] Failed to print setup instructions: {e}")
 
 
 async def check_wifi_startup():

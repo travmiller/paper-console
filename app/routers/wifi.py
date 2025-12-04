@@ -82,82 +82,10 @@ async def trigger_ap_mode(background_tasks: BackgroundTasks):
 
     def delayed_ap_start():
         import time
-        import qrcode
-        from app.hardware import printer, _is_raspberry_pi
-        from app.config import PRINTER_WIDTH
+        from app.utils import print_setup_instructions_sync
 
         # PRINT FIRST to ensure instructions are out before network disruption
-        try:
-            print("[SYSTEM] Printing Setup Instructions (pre-AP start)...")
-            from app.hardware import printer, _is_raspberry_pi
-            from app.config import PRINTER_WIDTH
-            import qrcode
-
-            # Ensure printer is awake
-            printer.feed(1)
-
-            # Helper for centering text
-            def center(text):
-                padding = max(0, (PRINTER_WIDTH - len(text)) // 2)
-                return " " * padding + text
-
-            printer.print_text(center("PC-1 SETUP MODE"))
-            printer.print_text(center("=" * 20))
-            printer.feed(1)
-            printer.print_text(center("Switching to AP Mode..."))
-            printer.print_text(center("Please Wait..."))
-            printer.feed(1)
-
-            # Get device ID for SSID calculation ahead of time
-            ssid_suffix = "XXXX"
-            try:
-                if _is_raspberry_pi:
-                    with open("/proc/cpuinfo", "r") as f:
-                        for line in f:
-                            if line.startswith("Serial"):
-                                ssid_suffix = line.split(":")[1].strip()[-4:]
-                                break
-            except:
-                pass
-            ssid = f"PC-1-Setup-{ssid_suffix}"
-
-            printer.print_text(center("Connect to WiFi:"))
-            printer.print_text(center(ssid))
-            printer.print_text(center("Password: setup1234"))
-            printer.feed(1)
-            printer.print_text(center("Then visit:"))
-            printer.print_text(center("http://pc-1.local"))
-            printer.print_text(center("OR"))
-            printer.print_text(center("http://10.42.0.1"))
-            printer.feed(2)
-
-            # QR Code
-            try:
-                qr_data = f"WIFI:T:WPA;S:{ssid};P:setup1234;H:false;;"
-                qr = qrcode.QRCode(version=1, box_size=1, border=1)
-                qr.add_data(qr_data)
-                qr.make(fit=True)
-                printer.print_text(center("Scan to Connect:"))
-                printer.feed(1)
-                matrix = qr.get_matrix()
-                for row in matrix:
-                    line = "".join(["█" if cell else " " for cell in row])
-                    printer.print_text(center(line))
-            except Exception:
-                printer.print_text(center("(QR Code Failed)"))
-
-            printer.feed(3)
-
-            # CRITICAL: Flush buffer if inverted
-            if hasattr(printer, "flush_buffer") and getattr(printer, "invert", False):
-                printer.flush_buffer()
-                if hasattr(printer, "feed_direct"):
-                    printer.feed_direct(3)
-
-            print("[SYSTEM] Print complete.")
-
-        except Exception as e:
-            print(f"[ERROR] Failed to print instructions: {e}")
+        print_setup_instructions_sync()
 
         print(
             "[WIFI] Waiting 2 seconds before starting AP mode (to allow response to send)..."
