@@ -76,11 +76,20 @@ async def connect_wifi(request: WiFiConnectRequest, background_tasks: Background
 
 
 @router.post("/ap-mode")
-async def trigger_ap_mode():
+async def trigger_ap_mode(background_tasks: BackgroundTasks):
     """Manually trigger AP mode for reconfiguration."""
     success = wifi_manager.start_ap_mode()
     
     if success:
+        # Print setup instructions in background
+        def print_instructions():
+            import time
+            time.sleep(5)  # Wait for AP to stabilize
+            # Import here to avoid circular import
+            from app.main import print_setup_instructions_sync
+            print_setup_instructions_sync()
+        
+        background_tasks.add_task(print_instructions)
         return {"success": True, "message": "AP mode activated"}
     else:
         raise HTTPException(status_code=500, detail="Failed to start AP mode")

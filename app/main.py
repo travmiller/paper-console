@@ -216,6 +216,11 @@ def on_button_long_press_threadsafe():
 
 async def print_setup_instructions():
     """Prints the WiFi setup instructions with QR code."""
+    print_setup_instructions_sync()
+
+
+def print_setup_instructions_sync():
+    """Sync version of print_setup_instructions for use in background tasks."""
     print("[SYSTEM] Printing Setup Instructions...")
     try:
         # Helper for centering text

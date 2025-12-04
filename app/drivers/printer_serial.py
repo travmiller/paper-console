@@ -73,6 +73,15 @@ class PrinterDriver:
             )
             print(f"[PRINTER] Connected to {port} at {baudrate} baud")
             
+            # Clear any leftover data in the serial buffer
+            if self.ser.in_waiting:
+                self.ser.reset_input_buffer()
+            self.ser.reset_output_buffer()
+            
+            # Small delay for printer to be ready
+            import time
+            time.sleep(0.1)
+            
             # Initialize printer (ESC/POS commands)
             self._initialize_printer()
             
