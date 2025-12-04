@@ -112,7 +112,8 @@ class GpioEventHandle:
     """
     def __init__(self, fd: int):
         self.fd = fd
-        self._data = gpioevent_data()
+        self._event_data = gpioevent_data()
+        self._handle_data = gpiohandle_data()
 
     def read_event(self) -> Optional[int]:
         """
@@ -126,10 +127,23 @@ class GpioEventHandle:
                 return None
             
             # Unpack into struct
-            ctypes.memmove(ctypes.addressof(self._data), data_bytes, ctypes.sizeof(gpioevent_data))
-            return self._data.id
+            ctypes.memmove(ctypes.addressof(self._event_data), data_bytes, ctypes.sizeof(gpioevent_data))
+            return self._event_data.id
         except OSError:
             return None
+
+    def read_value(self) -> int:
+        """
+        Read the current value of the GPIO line.
+        Returns 0 (low) or 1 (high).
+        This can be used on an event handle to check if the button is still pressed.
+        """
+        try:
+            if fcntl.ioctl(self.fd, GPIOHANDLE_GET_LINE_VALUES_IOCTL, self._handle_data) < 0:
+                return 1  # Assume released on error
+            return self._handle_data.values[0]
+        except Exception:
+            return 1  # Assume released on error
 
     def close(self):
         if self.fd is not None:

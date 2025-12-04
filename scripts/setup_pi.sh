@@ -31,28 +31,26 @@ fi
 # 2. Install dependencies
 echo "Installing dependencies..."
 apt-get update
-apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager dnsmasq
+apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager dnsmasq-base
 
-# Enable dnsmasq in NetworkManager for captive portal support
-if [ ! -f /etc/NetworkManager/conf.d/20-connectivity.conf ]; then
-    mkdir -p /etc/NetworkManager/conf.d
-    echo "[connectivity]" > /etc/NetworkManager/conf.d/20-connectivity.conf
-    echo "uri=http://captive.apple.com/hotspot-detect.html" >> /etc/NetworkManager/conf.d/20-connectivity.conf
-fi
+# Stop and disable standalone dnsmasq service if it exists (we use NM's internal dnsmasq)
+systemctl stop dnsmasq 2>/dev/null || true
+systemctl disable dnsmasq 2>/dev/null || true
+systemctl mask dnsmasq 2>/dev/null || true
+
+# Configure NetworkManager to use dnsmasq for DNS
+echo "Configuring NetworkManager for captive portal support..."
+mkdir -p /etc/NetworkManager/conf.d
+mkdir -p /etc/NetworkManager/dnsmasq.d
 
 # Enable dnsmasq plugin in NetworkManager
-if ! grep -q "^dns=dnsmasq" /etc/NetworkManager/NetworkManager.conf 2>/dev/null; then
-    # Backup original config
-    cp /etc/NetworkManager/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf.bak 2>/dev/null || true
-    # Add dnsmasq configuration
-    if grep -q "^\[main\]" /etc/NetworkManager/NetworkManager.conf; then
-        sed -i '/^\[main\]/a dns=dnsmasq' /etc/NetworkManager/NetworkManager.conf
-    else
-        echo "[main]" >> /etc/NetworkManager/NetworkManager.conf
-        echo "dns=dnsmasq" >> /etc/NetworkManager/NetworkManager.conf
-    fi
-    systemctl restart NetworkManager
-fi
+cat > /etc/NetworkManager/conf.d/00-use-dnsmasq.conf <<EOF
+[main]
+dns=dnsmasq
+EOF
+
+# Restart NetworkManager to apply changes
+systemctl restart NetworkManager
 
 # Add user to groups for printer access
 echo "Adding $SUDO_USER to 'lp' and 'dialout' groups for printer access..."
