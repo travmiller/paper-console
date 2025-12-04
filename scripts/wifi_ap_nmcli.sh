@@ -52,12 +52,10 @@ start_ap() {
     AP_IP=$(get_ap_ip)
     
     # Configure DNS server for captive portal
-    # Set the hotspot connection to use the Pi's IP as DNS server
-    # This tells connected devices to use the Pi for DNS resolution
-    nmcli connection modify "PC-1-Hotspot" ipv4.dns "${AP_IP:-10.42.0.1}"
-    nmcli connection modify "PC-1-Hotspot" ipv4.ignore-auto-dns yes
+    # Note: 'shared' method starts its own dnsmasq, so we don't set ipv4.dns on the interface itself
+    # Instead we rely on the global dnsmasq config we set up
     
-    # Restart the connection to apply DNS settings
+    # Restart the connection to apply settings
     nmcli connection down "PC-1-Hotspot" 2>/dev/null || true
     sleep 1
     nmcli connection up "PC-1-Hotspot"

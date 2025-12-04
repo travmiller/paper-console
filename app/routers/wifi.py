@@ -100,6 +100,7 @@ async def trigger_ap_mode(background_tasks: BackgroundTasks):
             # Print instructions directly here to avoid import loops
             try:
                 print("[SYSTEM] Printing Setup Instructions (from wifi module)...")
+                printer.feed(1)  # Ensure printer is awake
 
                 # Helper for centering text
                 def center(text):
@@ -137,25 +138,21 @@ async def trigger_ap_mode(background_tasks: BackgroundTasks):
                 # Generate QR Code for WiFi
                 try:
                     qr_data = f"WIFI:T:WPA;S:{ssid};P:setup1234;H:false;;"
-                    qr = qrcode.QRCode(version=1, box_size=1, border=1)
+                    # Use version 1, box_size 4 for a clear image
+                    qr = qrcode.QRCode(version=1, box_size=4, border=1)
                     qr.add_data(qr_data)
                     qr.make(fit=True)
+                    img = qr.make_image(fill_color="black", back_color="white")
 
-                    printer.print_text(center("Scan to Connect:"))
-                    printer.feed(1)
-
-                    matrix = qr.get_matrix()
-                    for row in matrix:
-                        line = "".join(["█" if cell else " " for cell in row])
-                        printer.print_text(center(line))
-
-                    printer.feed(1)
-                    printer.print_text(center("(If QR fails, use manual)"))
-
+                    print("[SYSTEM] Printing QR code image...")
+                    printer.print_image(img)
                 except Exception as qr_e:
                     print(f"[ERROR] QR Generation failed: {qr_e}")
+                    # Fallback to text
+                    printer.print_text(center("(QR Code Failed)"))
 
                 printer.feed(3)
+                print("[SYSTEM] Print complete.")
 
             except Exception as e:
                 print(f"[ERROR] Failed to print instructions: {e}")
