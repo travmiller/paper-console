@@ -14,3 +14,4 @@ beautifulsoup4
 # Hardware drivers (optional - only needed on Raspberry Pi)
 pyserial
 RPi.GPIO
+qrcode[pil]

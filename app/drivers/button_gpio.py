@@ -26,11 +26,14 @@ class ButtonDriver:
     """
     Driver for a momentary push button connected to GPIO.
     Uses ioctl interrupts to detect presses (falling edge).
+    Supports both short press and long press (5 seconds) callbacks.
     """
     
     def __init__(self, pin: int = 18):
         self.pin = pin
         self.callback = None
+        self.long_press_callback = None
+        self.long_press_duration = 5.0  # 5 seconds for long press
         self.monitoring = False
         self.monitor_thread = None
         self.gpio_available = GPIO_AVAILABLE
@@ -70,30 +73,56 @@ class ButtonDriver:
             self.cleanup()
 
     def _monitor_loop(self):
-        """Waits for button events."""
+        """Waits for button events and detects short vs long press."""
         last_press_time = 0
         debounce_interval = 2.0  # 2s debounce
 
         while self.monitoring and self.event_handle:
             try:
-                # read_event blocks until an event occurs
+                # read_event blocks until an event occurs (falling edge = button pressed)
                 event_id = self.event_handle.read_event()
                 
                 if event_id == GPIOEVENT_EVENT_FALLING_EDGE:
-                    current_time = time.time()
-                    if current_time - last_press_time < debounce_interval:
-                        print(f"[BUTTON] Ignored press (debounce: {current_time - last_press_time:.3f}s)")
-                        continue
-                        
-                    last_press_time = current_time
-                    print("[BUTTON] Button pressed!")
+                    press_start_time = time.time()
                     
-                    if self.callback:
+                    # Check debounce
+                    if press_start_time - last_press_time < debounce_interval:
+                        print(f"[BUTTON] Ignored press (debounce: {press_start_time - last_press_time:.3f}s)")
+                        continue
+                    
+                    print("[BUTTON] Button pressed, waiting for release...")
+                    
+                    # Wait for button release (or long press timeout)
+                    is_long_press = False
+                    while time.time() - press_start_time < self.long_press_duration:
+                        # Check if button is still pressed (pin is LOW when pressed)
                         try:
-                            # Run callback
-                            self.callback() 
-                        except Exception as e:
-                            print(f"[BUTTON] Callback error: {e}")
+                            pin_value = self.event_handle.read()
+                            if pin_value == 1:  # Button released (pulled HIGH)
+                                break
+                        except:
+                            break
+                        time.sleep(0.1)
+                    else:
+                        # Loop completed without break = button held for full duration
+                        is_long_press = True
+                    
+                    last_press_time = time.time()
+                    
+                    if is_long_press:
+                        print("[BUTTON] Long press detected!")
+                        if self.long_press_callback:
+                            try:
+                                self.long_press_callback()
+                            except Exception as e:
+                                print(f"[BUTTON] Long press callback error: {e}")
+                    else:
+                        print("[BUTTON] Short press detected!")
+                        if self.callback:
+                            try:
+                                self.callback()
+                            except Exception as e:
+                                print(f"[BUTTON] Callback error: {e}")
                             
             except Exception as e:
                 print(f"[BUTTON] Monitor error: {e}")
@@ -101,8 +130,12 @@ class ButtonDriver:
                 time.sleep(1)
 
     def set_callback(self, callback: Callable[[], None]):
-        """Register a function to be called when the button is pressed."""
+        """Register a function to be called when the button is pressed (short press)."""
         self.callback = callback
+    
+    def set_long_press_callback(self, callback: Callable[[], None]):
+        """Register a function to be called when the button is held for 5 seconds."""
+        self.long_press_callback = callback
 
     def cleanup(self):
         self.monitoring = False

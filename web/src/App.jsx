@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
+import WiFiSetup from './WiFiSetup';
 
 const AVAILABLE_MODULE_TYPES = [
   { id: 'news', label: 'News API' },
@@ -13,6 +14,7 @@ const AVAILABLE_MODULE_TYPES = [
 ];
 
 function App() {
+  const [wifiMode, setWifiMode] = useState(null); // null = checking, 'client' = normal, 'ap' = setup mode
   const [settings, setSettings] = useState({
     timezone: '',
     latitude: 0,
@@ -35,12 +37,29 @@ function App() {
   // Track where mouse down occurred to prevent accidental modal closes
   const modalMouseDownTarget = useRef(null);
 
-  // Fetch settings and modules on mount
+  // Check WiFi status on mount
   useEffect(() => {
-    Promise.all([fetch('/api/settings').then((res) => res.json()), fetch('/api/modules').then((res) => res.json())])
-      .then(([settingsData, modulesData]) => {
-        setSettings(settingsData);
-        setModules(modulesData.modules || {});
+    fetch('/api/wifi/status')
+      .then((res) => res.json())
+      .then((data) => {
+        setWifiMode(data.mode);
+        // If in AP mode, don't fetch settings yet
+        if (data.mode === 'ap') {
+          setLoading(false);
+          return;
+        }
+        // Otherwise, fetch normal settings
+        return Promise.all([
+          fetch('/api/settings').then((res) => res.json()),
+          fetch('/api/modules').then((res) => res.json())
+        ]);
+      })
+      .then((results) => {
+        if (results) {
+          const [settingsData, modulesData] = results;
+          setSettings(settingsData);
+          setModules(modulesData.modules || {});
+        }
         setLoading(false);
       })
       .catch((err) => {
@@ -812,8 +831,31 @@ function App() {
     return <div className='text-gray-400 text-sm'>No configuration needed for this module type.</div>;
   };
 
+  const handleWiFiSetupComplete = () => {
+    // After WiFi is configured, reload the page to fetch settings
+    setWifiMode('client');
+    window.location.reload();
+  };
+
+  const triggerAPMode = async () => {
+    try {
+      await fetch('/api/wifi/ap-mode', { method: 'POST' });
+      setStatus({ type: 'success', message: 'AP mode activated. Connect to PC-1-Setup-XXXX network.' });
+      setTimeout(() => {
+        setWifiMode('ap');
+      }, 2000);
+    } catch (err) {
+      setStatus({ type: 'error', message: 'Failed to activate AP mode' });
+    }
+  };
+
   if (loading) {
     return <div className='max-w-[800px] w-full p-8 text-center'>Loading settings...</div>;
+  }
+
+  // Show WiFi setup if in AP mode
+  if (wifiMode === 'ap') {
+    return <WiFiSetup onComplete={handleWiFiSetupComplete} />;
   }
 
   const inputClass =
@@ -934,6 +976,19 @@ function App() {
                   />
                   <span className='text-sm text-gray-300'>Rotate output 180°</span>
                 </div>
+              </div>
+
+              <div className='mb-4 pt-4 border-t border-gray-700'>
+                <label className={labelClass}>WiFi Configuration</label>
+                <button
+                  type='button'
+                  onClick={triggerAPMode}
+                  className='w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-bold transition-colors'>
+                  Reconfigure WiFi Network
+                </button>
+                <p className='text-xs text-gray-500 mt-2'>
+                  Activate setup mode to connect to a different WiFi network. Your device will create a temporary access point.
+                </p>
               </div>
             </div>
           </>

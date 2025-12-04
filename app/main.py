@@ -33,6 +33,9 @@ from app.modules import (
     calendar,
     weather,
 )
+from app.routers import wifi
+import app.wifi_manager as wifi_manager
+import qrcode
 import platform
 
 # Auto-detect platform and use appropriate drivers
@@ -201,6 +204,105 @@ def on_button_press_threadsafe():
         print("[ERROR] Event loop not available for button press")
 
 
+def on_button_long_press_threadsafe():
+    """Callback for long press (5 seconds) - triggers AP mode."""
+    global global_loop
+    if global_loop and global_loop.is_running():
+        print("[EVENT] Button Long Press -> Activating AP Mode")
+        asyncio.run_coroutine_threadsafe(manual_ap_mode_trigger(), global_loop)
+    else:
+        print("[ERROR] Event loop not available for button long press")
+
+
+async def print_setup_instructions():
+    """Prints the WiFi setup instructions with QR code."""
+    print("[SYSTEM] Printing Setup Instructions...")
+    try:
+        # Helper for centering text
+        def center(text):
+            padding = max(0, (PRINTER_WIDTH - len(text)) // 2)
+            return " " * padding + text
+        
+        printer.print_text(center("PC-1 SETUP MODE"))
+        printer.print_text(center("=" * 20))
+        printer.feed(1)
+        printer.print_text(center("Connect to WiFi:"))
+        
+        # Get device ID for SSID
+        ssid_suffix = "XXXX"
+        try:
+            if _is_raspberry_pi:
+                with open('/proc/cpuinfo', 'r') as f:
+                    for line in f:
+                        if line.startswith('Serial'):
+                            ssid_suffix = line.split(':')[1].strip()[-4:]
+                            break
+        except:
+            pass
+            
+        ssid = f"PC-1-Setup-{ssid_suffix}"
+        
+        printer.print_text(center(ssid))
+        printer.print_text(center("Password: setup1234"))
+        printer.feed(1)
+        printer.print_text(center("Then visit:"))
+        printer.print_text(center("http://192.168.4.1"))
+        printer.feed(2)
+        
+        # Generate QR Code for WiFi
+        try:
+            qr_data = f"WIFI:T:WPA;S:{ssid};P:setup1234;H:false;;"
+            qr = qrcode.QRCode(version=1, box_size=1, border=1)
+            qr.add_data(qr_data)
+            qr.make(fit=True)
+            
+            printer.print_text(center("Scan to Connect:"))
+            printer.feed(1)
+            
+            matrix = qr.get_matrix()
+            for row in matrix:
+                line = "".join(["█" if cell else " " for cell in row])
+                printer.print_text(center(line))
+                
+            printer.feed(1)
+            printer.print_text(center("(If QR fails, use manual)"))
+            
+        except Exception as qr_e:
+            print(f"[ERROR] QR Generation failed: {qr_e}")
+        
+        printer.feed(3)
+    except Exception as e:
+        print(f"[ERROR] Failed to print setup instructions: {e}")
+
+
+async def check_wifi_startup():
+    """Check WiFi status on startup and enter AP mode if needed."""
+    print("[SYSTEM] Checking WiFi status...")
+    # Give system some time to connect to saved WiFi
+    await asyncio.sleep(10)
+    
+    status = wifi_manager.get_wifi_status()
+    if not status["connected"] and status["mode"] != "ap":
+        print("[SYSTEM] No WiFi connection detected. Starting AP mode...")
+        wifi_manager.start_ap_mode()
+        
+        # Wait for AP to start
+        await asyncio.sleep(5)
+        
+        await print_setup_instructions()
+
+
+async def manual_ap_mode_trigger():
+    """Manually trigger AP mode (e.g. via button hold)."""
+    print("[SYSTEM] Manual AP mode trigger...")
+    wifi_manager.start_ap_mode()
+    
+    # Wait for AP to start
+    await asyncio.sleep(5)
+    
+    await print_setup_instructions()
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
@@ -223,11 +325,15 @@ async def lifespan(app: FastAPI):
     else:
         print("[SYSTEM] Config file NOT found. Using defaults.")
 
+    # Check WiFi and start AP mode if needed
+    asyncio.create_task(check_wifi_startup())
+
     email_polling_task = asyncio.create_task(email_polling_loop())
     scheduler_task = asyncio.create_task(scheduler_loop())
 
-    # Initialize Button Callback
+    # Initialize Button Callbacks
     button.set_callback(on_button_press_threadsafe)
+    button.set_long_press_callback(on_button_long_press_threadsafe)
 
     yield
     # Shutdown
@@ -269,6 +375,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include WiFi router
+app.include_router(wifi.router)
 
 
 # --- CORE API ---

@@ -28,10 +28,10 @@ else
     echo "Hostname is already $HOSTNAME."
 fi
 
-# 2. Install Nginx and setup permissions
+# 2. Install dependencies
 echo "Installing dependencies..."
 apt-get update
-apt-get install -y nginx avahi-daemon python3-venv python3-pip
+apt-get install -y nginx avahi-daemon python3-venv python3-pip dnsmasq network-manager
 
 # Add user to groups for printer access
 echo "Adding $SUDO_USER to 'lp' and 'dialout' groups for printer access..."
@@ -97,6 +97,18 @@ if [ -d "$PROJECT_DIR/venv" ]; then
 else
     echo "Warning: No venv found. Using system python3."
 fi
+
+# Make WiFi script executable
+echo "Setting up WiFi AP script..."
+chmod +x "$PROJECT_DIR/scripts/wifi_ap_nmcli.sh"
+
+# Give sudo access for WiFi management (no password required for specific scripts)
+echo "Configuring sudo permissions for WiFi management..."
+cat > /etc/sudoers.d/pc-1-wifi <<EOL
+$USER_NAME ALL=(ALL) NOPASSWD: $PROJECT_DIR/scripts/wifi_ap_nmcli.sh
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/nmcli
+EOL
+chmod 0440 /etc/sudoers.d/pc-1-wifi
 
 cat > /etc/systemd/system/pc-1.service <<EOL
 [Unit]
