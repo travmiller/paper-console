@@ -859,9 +859,9 @@ function App() {
   const labelClass = 'block mb-2 font-bold text-gray-200';
 
   return (
-    <div className='max-w-[800px] w-full p-8'>
-      <h1 className='text-4xl mb-8 text-center leading-tight font-bold'>PC-1 Settings</h1>
-      <p className='text-center text-gray-500 mb-8'>Configure your Paper Console</p>
+    <div className='max-w-[800px] w-full p-4 sm:p-6 md:p-8 mx-auto'>
+      <h1 className='text-3xl sm:text-4xl mb-6 sm:mb-8 text-center leading-tight font-bold'>PC-1 Settings</h1>
+      <p className='text-center text-gray-500 mb-6 sm:mb-8 text-sm sm:text-base'>Configure your Paper Console</p>
 
       {/* Tabs */}
       <div className='flex gap-2 mb-6 border-b border-gray-700'>
@@ -994,7 +994,7 @@ function App() {
         {activeTab === 'channels' && (
           <div className='space-y-4'>
             <h2 className='text-xl font-bold mb-4'>Channel Configuration</h2>
-            <div className='grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4'>
+            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4'>
               {[1, 2, 3, 4, 5, 6, 7, 8].map((pos) => {
                 const channel = settings.channels?.[pos] || { modules: [] };
                 const channelModules = (channel.modules || [])
@@ -1128,7 +1128,7 @@ function App() {
               modalMouseDownTarget.current = null;
             }}>
             <div
-              className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto'
+              className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto'
               onClick={(e) => e.stopPropagation()}>
               <div className='flex justify-between items-center mb-6'>
                 <h3 className='text-xl font-bold text-white'>Add Module to Channel {showAddModuleModal}</h3>
@@ -1186,7 +1186,7 @@ function App() {
               modalMouseDownTarget.current = null;
             }}>
             <div
-              className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto'
+              className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto'
               onClick={(e) => e.stopPropagation()}>
               <div className='flex justify-between items-start mb-6'>
                 <div>
@@ -1284,7 +1284,7 @@ function App() {
               }
               modalMouseDownTarget.current = null;
             }}>
-            <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-6 max-w-md w-full' onClick={(e) => e.stopPropagation()}>
+            <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-4 sm:p-6 max-w-md w-full' onClick={(e) => e.stopPropagation()}>
               <div className='flex justify-between items-center mb-6'>
                 <h3 className='text-xl font-bold text-white'>Schedule Channel {showScheduleModal}</h3>
                 <button onClick={() => setShowScheduleModal(null)} className='text-gray-400 hover:text-white text-2xl'>
@@ -1350,7 +1350,7 @@ function App() {
         {/* AP Instructions Modal */}
         {showAPInstructions && (
           <div className='fixed inset-0 bg-black/90 flex items-center justify-center z-50 p-4'>
-            <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-8 max-w-md w-full text-center'>
+            <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-4 sm:p-6 md:p-8 max-w-md w-full text-center'>
               <div className='text-6xl mb-4'>📡</div>
               <h3 className='text-2xl font-bold text-white mb-4'>Setup Mode Activating...</h3>
               
