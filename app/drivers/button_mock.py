@@ -12,6 +12,10 @@ class ButtonDriver:
     def set_callback(self, callback: Callable[[], None]):
         self.callback = callback
 
+    def set_long_press_callback(self, callback: Callable[[], None]):
+        """Mock long press callback (not implemented in mock driver)."""
+        pass
+
     def press(self):
         """Simulate a button press."""
         print("[MOCK BUTTON] Button pressed (virtual)")

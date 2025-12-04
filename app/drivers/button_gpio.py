@@ -40,6 +40,7 @@ class ButtonDriver:
         
         self.chip = None
         self.event_handle = None
+        self.read_handle = None  # Separate handle for reading pin state
         
         if not self.gpio_available:
             print("[BUTTON] Running in fallback mode (GPIO not available)")
@@ -57,7 +58,14 @@ class ButtonDriver:
                 self.pin, 
                 handle_flags, 
                 event_flags, 
-                label="button_input"
+                label="button_event"
+            )
+            
+            # Create a separate handle for reading pin state (needed for long press detection)
+            self.read_handle = self.chip.request_lines(
+                [self.pin],
+                handle_flags,
+                label="button_read"
             )
             
             print(f"[BUTTON] Initialized on GPIO {self.pin}")
@@ -90,34 +98,45 @@ class ButtonDriver:
                         print(f"[BUTTON] Ignored press (debounce: {press_start_time - last_press_time:.3f}s)")
                         continue
                     
-                    print("[BUTTON] Button pressed, waiting for release...")
+                    print("[BUTTON] Button pressed, waiting for release or long press...")
                     
                     # Wait for button release (or long press timeout)
                     is_long_press = False
+                    button_still_pressed = True
+                    
                     while time.time() - press_start_time < self.long_press_duration:
-                        # Check if button is still pressed (pin is LOW when pressed)
+                        # Check if button is still pressed (pin is LOW when pressed, HIGH when released)
                         try:
-                            pin_value = self.event_handle.read()
-                            if pin_value == 1:  # Button released (pulled HIGH)
-                                break
-                        except:
+                            if self.read_handle:
+                                pin_values = self.read_handle.get_values()
+                                pin_value = pin_values[0] if pin_values else 1
+                                if pin_value == 1:  # Button released (pulled HIGH)
+                                    button_still_pressed = False
+                                    break
+                        except Exception as e:
+                            print(f"[BUTTON] Error reading pin state: {e}")
+                            # If we can't read, assume button was released
+                            button_still_pressed = False
                             break
                         time.sleep(0.1)
-                    else:
-                        # Loop completed without break = button held for full duration
+                    
+                    # If we exited the loop and button is still pressed, it's a long press
+                    if button_still_pressed:
                         is_long_press = True
+                        print(f"[BUTTON] Long press detected! (held for {time.time() - press_start_time:.1f}s)")
+                    else:
+                        press_duration = time.time() - press_start_time
+                        print(f"[BUTTON] Short press detected! (held for {press_duration:.1f}s)")
                     
                     last_press_time = time.time()
                     
                     if is_long_press:
-                        print("[BUTTON] Long press detected!")
                         if self.long_press_callback:
                             try:
                                 self.long_press_callback()
                             except Exception as e:
                                 print(f"[BUTTON] Long press callback error: {e}")
                     else:
-                        print("[BUTTON] Short press detected!")
                         if self.callback:
                             try:
                                 self.callback()
@@ -141,6 +160,10 @@ class ButtonDriver:
         self.monitoring = False
         # The read_event call is blocking, so the thread might not exit immediately 
         # unless we interrupt it or close the fd.
+        
+        if self.read_handle:
+            self.read_handle.close()
+            self.read_handle = None
         
         if self.event_handle:
             self.event_handle.close()
