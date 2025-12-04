@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse, Response
 from contextlib import asynccontextmanager
 import asyncio
 import uuid
@@ -37,40 +37,8 @@ from app.routers import wifi
 import app.wifi_manager as wifi_manager
 import qrcode
 import platform
-
-# Auto-detect platform and use appropriate drivers
-_is_raspberry_pi = platform.system() == "Linux" and os.path.exists(
-    "/proc/device-tree/model"
-)
-
-if _is_raspberry_pi:
-    try:
-        from app.drivers.printer_serial import PrinterDriver
-        from app.drivers.dial_gpio import DialDriver
-        from app.drivers.button_gpio import ButtonDriver
-
-        print("[SYSTEM] Running on Raspberry Pi - using hardware drivers")
-    except ImportError as e:
-        print(f"[SYSTEM] Hardware drivers not available: {e}")
-        print("[SYSTEM] Falling back to mock drivers")
-        from app.drivers.printer_mock import PrinterDriver
-        from app.drivers.dial_mock import DialDriver
-        from app.drivers.button_mock import ButtonDriver
-else:
-    from app.drivers.printer_mock import PrinterDriver
-    from app.drivers.dial_mock import DialDriver
-    from app.drivers.button_mock import ButtonDriver
-
-    print("[SYSTEM] Running on non-Raspberry Pi - using mock drivers")
-
-# Global Hardware Instances
-# Note: printer will be reinitialized when settings change
-printer = PrinterDriver(
-    width=PRINTER_WIDTH, invert=getattr(settings, "invert_print", False)
-)
-dial = DialDriver()
-button = ButtonDriver(pin=18)
-
+import app.hardware as hardware
+from app.hardware import printer, dial, button, _is_raspberry_pi
 
 # --- BACKGROUND TASKS ---
 
@@ -251,6 +219,8 @@ def print_setup_instructions_sync():
         printer.print_text(center("Password: setup1234"))
         printer.feed(1)
         printer.print_text(center("Then visit:"))
+        printer.print_text(center("http://pc-1.local"))
+        printer.print_text(center("OR"))
         printer.print_text(center("http://10.42.0.1"))
         printer.feed(2)
         
@@ -461,9 +431,24 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
         print(
             f"[SYSTEM] Printer invert setting changed to {new_invert}, reinitializing printer..."
         )
-        if hasattr(printer, "close"):
-            printer.close()
-        printer = PrinterDriver(width=PRINTER_WIDTH, invert=new_invert)
+        if hasattr(hardware.printer, "close"):
+            hardware.printer.close()
+        
+        # Create new instance
+        if _is_raspberry_pi:
+            from app.drivers.printer_serial import PrinterDriver
+        else:
+            from app.drivers.printer_mock import PrinterDriver
+            
+        hardware.printer = PrinterDriver(width=PRINTER_WIDTH, invert=new_invert)
+        # Update local reference if used elsewhere in this file (it is used in background tasks)
+        # Note: modules importing 'printer' from hardware will still have the OLD reference!
+        # This is a limitation of Python imports.
+        # To fix this, we should probably make 'printer' a proxy or always access it via hardware.printer
+        
+        # Update global reference for this module
+        global printer
+        printer = hardware.printer
 
     return {"message": "Settings saved", "config": settings}
 
@@ -902,6 +887,48 @@ async def test_webhook(action: WebhookConfig):
     """
     webhook.run_webhook(action, printer, module_name=None)
     return {"message": "Webhook executed"}
+
+
+# --- CAPTIVE PORTAL (Auto-launch setup page) ---
+
+@app.get("/hotspot-detect.html")
+@app.get("/library/test/success.html")
+async def captive_apple():
+    """iOS/macOS captive portal detection - redirect to setup page."""
+    # Check if we're in AP mode
+    status = wifi_manager.get_wifi_status()
+    if status.get("mode") == "ap":
+        return RedirectResponse(url="/", status_code=302)
+    # If not in AP mode, return success (device has internet)
+    return {"status": "success"}
+
+@app.get("/generate_204")
+@app.get("/gen_204")
+async def captive_android():
+    """Android captive portal detection - redirect to setup page."""
+    status = wifi_manager.get_wifi_status()
+    if status.get("mode") == "ap":
+        return RedirectResponse(url="/", status_code=302)
+    # Return 204 No Content if not in AP mode (device has internet)
+    return Response(status_code=204)
+
+@app.get("/connecttest.txt")
+@app.get("/ncsi.txt")
+async def captive_windows():
+    """Windows captive portal detection - redirect to setup page."""
+    status = wifi_manager.get_wifi_status()
+    if status.get("mode") == "ap":
+        return RedirectResponse(url="/", status_code=302)
+    # Return success text if not in AP mode
+    return Response(content="Microsoft Connect Test", media_type="text/plain")
+
+@app.get("/success.txt")
+async def captive_other():
+    """Generic captive portal detection."""
+    status = wifi_manager.get_wifi_status()
+    if status.get("mode") == "ap":
+        return RedirectResponse(url="/", status_code=302)
+    return {"status": "success"}
 
 
 # --- STATIC FILES (FRONTEND) ---
