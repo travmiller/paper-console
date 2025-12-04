@@ -825,19 +825,17 @@ async def trigger_channel(position: int):
                     f"[ERROR] Module {assignment.module_id} not found in module registry"
                 )
 
+        # If invert is enabled, flush buffer to actually print (in reverse order)
+        if (
+            hasattr(printer, "invert")
+            and printer.invert
+            and hasattr(printer, "flush_buffer")
+        ):
+            printer.flush_buffer()
+
         # Add cutter feed lines at the end of the print job
         feed_lines = getattr(settings, "cutter_feed_lines", 3)
-
-        # Feed paper directly at the end of print job (bypasses any buffering)
         if feed_lines > 0:
-            # If invert is enabled, flush buffer first
-            if (
-                hasattr(printer, "invert")
-                and printer.invert
-                and hasattr(printer, "flush_buffer")
-            ):
-                printer.flush_buffer()
-            # Feed paper directly (same for both inverted and normal mode)
             printer.feed_direct(feed_lines)
             print(f"[SYSTEM] Added {feed_lines} feed line(s) to clear cutter")
         return
