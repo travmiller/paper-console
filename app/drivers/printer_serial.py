@@ -178,7 +178,13 @@ class PrinterDriver:
         self._write_feed(lines)
     
     def flush_buffer(self):
-        """Flush the print buffer in reverse order (for invert mode)."""
+        """Flush the print buffer in reverse order (for invert mode).
+        
+        For true 180° rotation effect:
+        1. Reverse the order of all operations (print last things first)
+        2. Reverse the order of lines within each multi-line text
+        3. Reverse the characters within each line
+        """
         if not self.invert or self.print_buffer is None or len(self.print_buffer) == 0:
             return
         
@@ -186,18 +192,15 @@ class PrinterDriver:
         reversed_ops = list(reversed(self.print_buffer))
         self.print_buffer.clear()
         
-        # Execute all operations in reverse order
-        # Note: We reverse the ORDER of operations, and also reverse lines within each text operation
-        # This handles both cases:
-        # - Line-by-line printing (each line = separate operation, reversed by operation order)
-        # - Multi-line strings (one operation with multiple lines, reversed by line order within)
         for op_type, op_data in reversed_ops:
             if op_type == 'text':
                 # Handle multi-line text by splitting and reversing lines within the operation
                 lines = op_data.split('\n')
                 reversed_lines = list(reversed(lines))
                 for line in reversed_lines:
-                    self._write_text_line(line)
+                    # Reverse the characters in each line for 180° rotation
+                    flipped_line = line[::-1]
+                    self._write_text_line(flipped_line)
             elif op_type == 'feed':
                 self._write_feed(op_data)
     
