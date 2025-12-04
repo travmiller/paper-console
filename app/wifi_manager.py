@@ -146,27 +146,56 @@ def scan_networks() -> List[Dict]:
 
 
 def connect_to_wifi(ssid: str, password: Optional[str] = None) -> bool:
-    """Connect to a WiFi network."""
+    """Connect to a WiFi network and save it for auto-connect on boot."""
     try:
         # Delete existing connection with same SSID if it exists
         run_command(['sudo', 'nmcli', 'connection', 'delete', ssid], check=False)
         
-        # Create and activate new connection
+        # Create a saved connection profile (this persists across reboots)
         if password:
+            # Create WiFi connection with password
             result = run_command([
-                'sudo', 'nmcli', 'device', 'wifi', 'connect', ssid,
-                'password', password
+                'sudo', 'nmcli', 'connection', 'add',
+                'type', 'wifi',
+                'con-name', ssid,
+                'ifname', 'wlan0',
+                'ssid', ssid,
+                'wifi-sec.key-mgmt', 'wpa-psk',
+                'wifi-sec.psk', password
             ], check=False)
         else:
+            # Create open WiFi connection
             result = run_command([
-                'sudo', 'nmcli', 'device', 'wifi', 'connect', ssid
+                'sudo', 'nmcli', 'connection', 'add',
+                'type', 'wifi',
+                'con-name', ssid,
+                'ifname', 'wlan0',
+                'ssid', ssid
             ], check=False)
         
+        if result.returncode != 0:
+            print(f"[WIFI] Failed to create connection profile: {result.stderr}")
+            return False
+        
+        # Set connection to auto-connect (critical for persistence)
+        result = run_command([
+            'sudo', 'nmcli', 'connection', 'modify', ssid,
+            'connection.autoconnect', 'yes'
+        ], check=False)
+        
+        if result.returncode != 0:
+            print(f"[WIFI] Warning: Failed to set autoconnect: {result.stderr}")
+        
+        # Activate the connection
+        result = run_command([
+            'sudo', 'nmcli', 'connection', 'up', ssid
+        ], check=False)
+        
         if result.returncode == 0:
-            print(f"[WIFI] Connected to {ssid}")
+            print(f"[WIFI] Connected to {ssid} (saved for auto-connect)")
             return True
         else:
-            print(f"[WIFI] Failed to connect: {result.stderr}")
+            print(f"[WIFI] Failed to activate connection: {result.stderr}")
             return False
         
     except Exception as e:
