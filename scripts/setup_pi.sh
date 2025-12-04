@@ -31,7 +31,7 @@ fi
 # 2. Install Nginx and setup permissions
 echo "Installing dependencies..."
 apt-get update
-apt-get install -y nginx avahi-daemon
+apt-get install -y nginx avahi-daemon python3-venv python3-pip
 
 # Add user to lp group for USB printer access
 echo "Adding $SUDO_USER to 'lp' group for printer access..."
@@ -74,7 +74,22 @@ echo "Configuring Systemd Service..."
 echo "Project Directory: $PROJECT_DIR"
 echo "User: $USER_NAME"
 
-# Check for venv
+# Create/Update virtual environment
+echo "Checking virtual environment..."
+if [ ! -d "$PROJECT_DIR/venv" ]; then
+    echo "Creating new virtual environment..."
+    sudo -u "$USER_NAME" python3 -m venv "$PROJECT_DIR/venv"
+fi
+
+# Install/Upgrade dependencies
+echo "Installing Python dependencies..."
+if [ -f "$PROJECT_DIR/requirements.txt" ]; then
+    sudo -u "$USER_NAME" "$PROJECT_DIR/venv/bin/pip" install -r "$PROJECT_DIR/requirements.txt"
+else
+    echo "Warning: requirements.txt not found!"
+fi
+
+# Check for venv (now guaranteed to exist)
 PYTHON_EXEC="python3"
 if [ -d "$PROJECT_DIR/venv" ]; then
     PYTHON_EXEC="$PROJECT_DIR/venv/bin/python"
