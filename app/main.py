@@ -751,6 +751,17 @@ async def set_dial(position: int):
     return {"message": f"Dial turned to {position}"}
 
 
+@app.post("/action/print-channel/{position}")
+async def print_channel(position: int):
+    """Set dial position and trigger print atomically."""
+    if position < 1 or position > 8:
+        raise HTTPException(status_code=400, detail="Position must be 1-8")
+    
+    dial.set_position(position)
+    await trigger_current_channel()
+    return {"message": f"Printing channel {position}"}
+
+
 # --- DEBUG / VIRTUAL HARDWARE CONTROLS ---
 
 

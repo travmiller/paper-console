@@ -114,9 +114,8 @@ function App() {
         }
       }
 
-      // Set dial position and trigger print
-      await fetch(`/action/dial/${position}`, { method: 'POST' });
-      const response = await fetch('/action/trigger', { method: 'POST' });
+      // Use atomic endpoint that sets dial and prints
+      const response = await fetch(`/action/print-channel/${position}`, { method: 'POST' });
 
       if (!response.ok) throw new Error('Failed to trigger print');
 
