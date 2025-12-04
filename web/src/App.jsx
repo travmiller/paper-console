@@ -859,7 +859,7 @@ function App() {
   const labelClass = 'block mb-2 font-bold text-gray-200';
 
   return (
-    <div className='max-w-[800px] w-full p-4 sm:p-6 md:p-8 mx-auto'>
+    <div className='max-w-[1000px] w-full px-2 py-4 sm:p-8 mx-auto'>
       <h1 className='text-3xl sm:text-4xl mb-6 sm:mb-8 text-center leading-tight font-bold'>PC-1 Settings</h1>
       <p className='text-center text-gray-500 mb-6 sm:mb-8 text-sm sm:text-base'>Configure your Paper Console</p>
 
@@ -994,7 +994,7 @@ function App() {
         {activeTab === 'channels' && (
           <div className='space-y-4'>
             <h2 className='text-xl font-bold mb-4'>Channel Configuration</h2>
-            <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-4'>
+            <div className='space-y-6'>
               {[1, 2, 3, 4, 5, 6, 7, 8].map((pos) => {
                 const channel = settings.channels?.[pos] || { modules: [] };
                 const channelModules = (channel.modules || [])
@@ -1007,8 +1007,8 @@ function App() {
 
                 return (
                   <div key={pos} className='bg-[#2a2a2a] border border-gray-700 rounded-md p-4 flex flex-col h-full'>
-                    <div className='flex items-center justify-between mb-3'>
-                      <div className='flex items-center gap-2'>
+                    <div className='flex items-center justify-between mb-3 gap-4'>
+                      <div className='flex items-center gap-2 overflow-x-auto'>
                         <h3 className='font-bold text-white'>Channel {pos}</h3>
                         <button
                           type='button'
