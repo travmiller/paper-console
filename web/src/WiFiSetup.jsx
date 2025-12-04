@@ -6,6 +6,7 @@ export default function WiFiSetup({ onComplete }) {
   const [password, setPassword] = useState('');
   const [isScanning, setIsScanning] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionStarted, setConnectionStarted] = useState(false);
   const [error, setError] = useState('');
   const [showManualEntry, setShowManualEntry] = useState(false);
 
@@ -49,37 +50,64 @@ export default function WiFiSetup({ onComplete }) {
       });
 
       if (response.ok) {
-        // Give device time to connect
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        
-        // Try to check if we're still accessible (might fail if we switched networks)
-        try {
-          const statusResponse = await fetch('/api/wifi/status');
-          if (statusResponse.ok) {
-            const status = await statusResponse.json();
-            if (status.connected && status.mode === 'client') {
-              // Success! Notify parent
-              if (onComplete) onComplete();
-            }
-          }
-        } catch {
-          // Expected if we switched networks - assume success
-          if (onComplete) onComplete();
-        }
+        // Connection started in background
+        setConnectionStarted(true);
+        setIsConnecting(false);
       } else {
         const errorData = await response.json();
         setError(errorData.detail || 'Failed to connect');
+        setIsConnecting(false);
       }
     } catch (err) {
-      setError('Connection error. Please try again.');
-      console.error(err);
-    } finally {
+      // Connection might have been lost because AP mode stopped - that's expected!
+      setConnectionStarted(true);
       setIsConnecting(false);
     }
   };
 
   const inputClass = 'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none';
   const buttonClass = 'w-full py-3 px-4 rounded font-bold transition-colors';
+
+  // Show success screen after connection started
+  if (connectionStarted) {
+    return (
+      <div className='max-w-[600px] w-full p-8'>
+        <div className='text-center'>
+          <div className='text-6xl mb-6'>📡</div>
+          <h1 className='text-3xl mb-4 font-bold text-green-400'>Connecting to WiFi...</h1>
+          <p className='text-gray-300 mb-6'>
+            Your PC-1 is now connecting to <strong>{selectedSSID}</strong>
+          </p>
+          
+          <div className='bg-gray-800 rounded-lg p-6 text-left mb-6'>
+            <h2 className='font-bold text-white mb-4'>Next Steps:</h2>
+            <ol className='space-y-3 text-gray-300'>
+              <li className='flex items-start gap-2'>
+                <span className='bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm'>1</span>
+                <span>Disconnect from <strong>PC-1-Setup</strong> network on your phone</span>
+              </li>
+              <li className='flex items-start gap-2'>
+                <span className='bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm'>2</span>
+                <span>Connect your phone to <strong>{selectedSSID}</strong></span>
+              </li>
+              <li className='flex items-start gap-2'>
+                <span className='bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm'>3</span>
+                <span>Wait about 30 seconds for the device to connect</span>
+              </li>
+              <li className='flex items-start gap-2'>
+                <span className='bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm'>4</span>
+                <span>Visit <strong className='text-blue-400'>http://pc-1.local</strong> to access settings</span>
+              </li>
+            </ol>
+          </div>
+
+          <p className='text-sm text-gray-500'>
+            If the connection fails, the PC-1 will re-create the setup network automatically.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className='max-w-[600px] w-full p-8'>
@@ -180,13 +208,12 @@ export default function WiFiSetup({ onComplete }) {
 
       <div className='mt-8 p-4 bg-gray-800 rounded border border-gray-700'>
         <p className='text-sm text-gray-300 mb-2'>
-          <strong>Note:</strong> After connecting, this setup page will close and you'll be redirected to the settings page.
+          <strong>Note:</strong> After clicking Connect, this device will disconnect from the setup network and join your home WiFi.
         </p>
         <p className='text-sm text-gray-400'>
-          If the connection fails, the device will return to AP mode automatically.
+          You'll need to reconnect your phone to your home WiFi to access the settings page.
         </p>
       </div>
     </div>
   );
 }
-

@@ -148,12 +148,6 @@ def scan_networks() -> List[Dict]:
 def connect_to_wifi(ssid: str, password: Optional[str] = None) -> bool:
     """Connect to a WiFi network."""
     try:
-        # Stop AP mode if active
-        if is_ap_mode_active():
-            stop_ap_mode()
-            import time
-            time.sleep(2)
-        
         # Delete existing connection with same SSID if it exists
         run_command(['sudo', 'nmcli', 'connection', 'delete', ssid], check=False)
         

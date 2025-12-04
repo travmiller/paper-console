@@ -3,10 +3,11 @@ WiFi API Router
 Provides endpoints for WiFi management.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 import app.wifi_manager as wifi_manager
+import asyncio
 
 router = APIRouter(prefix="/api/wifi", tags=["wifi"])
 
@@ -14,6 +15,27 @@ router = APIRouter(prefix="/api/wifi", tags=["wifi"])
 class WiFiConnectRequest(BaseModel):
     ssid: str
     password: Optional[str] = None
+
+
+def do_wifi_connect(ssid: str, password: Optional[str]):
+    """Background task to connect to WiFi."""
+    import time
+    print(f"[WIFI] Background: Starting connection to {ssid}")
+    
+    # Stop AP mode first
+    if wifi_manager.is_ap_mode_active():
+        print("[WIFI] Background: Stopping AP mode...")
+        wifi_manager.stop_ap_mode()
+        time.sleep(3)
+    
+    # Connect to the new network
+    print(f"[WIFI] Background: Connecting to {ssid}...")
+    success = wifi_manager.connect_to_wifi(ssid, password)
+    
+    if success:
+        print(f"[WIFI] Background: Successfully connected to {ssid}")
+    else:
+        print(f"[WIFI] Background: Failed to connect to {ssid}")
 
 
 @router.get("/status")
@@ -30,14 +52,21 @@ async def scan_wifi_networks():
 
 
 @router.post("/connect")
-async def connect_wifi(request: WiFiConnectRequest):
-    """Connect to a WiFi network."""
-    success = wifi_manager.connect_to_wifi(request.ssid, request.password)
+async def connect_wifi(request: WiFiConnectRequest, background_tasks: BackgroundTasks):
+    """
+    Connect to a WiFi network.
+    This returns immediately and does the connection in the background,
+    because the AP mode will be stopped and the client will lose connection.
+    """
+    # Schedule the connection in the background
+    background_tasks.add_task(do_wifi_connect, request.ssid, request.password)
     
-    if success:
-        return {"success": True, "message": f"Connected to {request.ssid}"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to connect to WiFi")
+    # Return immediately - the client will lose connection anyway
+    return {
+        "success": True, 
+        "message": f"Connecting to {request.ssid}... Device will be available at http://pc-1.local in ~30 seconds",
+        "connecting": True
+    }
 
 
 @router.post("/ap-mode")
@@ -60,4 +89,3 @@ async def forget_network(request: WiFiConnectRequest):
         return {"success": True, "message": f"Forgot {request.ssid}"}
     else:
         raise HTTPException(status_code=500, detail="Failed to forget network")
-
