@@ -117,10 +117,11 @@ class PrinterDriver:
             # Set default line spacing
             self._write(b'\x1B\x32')  # ESC 2 (Set line spacing to default)
             
-            # Note: We use software-based inversion (reversing print order in buffer)
-            # rather than hardware rotation commands which aren't universally supported
+            # Apply 180 degree rotation if invert mode is enabled
             if self.invert:
-                print("[PRINTER] Invert mode enabled (software line reversal)")
+                # ESC { 1 = Enable 180° rotation (upside-down printing)
+                self._write(b'\x1B\x7B\x01')
+                print("[PRINTER] Hardware 180° rotation enabled")
         except Exception as e:
             print(f"[PRINTER] Warning: Initialization error: {e}")
     
@@ -180,10 +181,9 @@ class PrinterDriver:
     def flush_buffer(self):
         """Flush the print buffer in reverse order (for invert mode).
         
-        For true 180° rotation effect:
-        1. Reverse the order of all operations (print last things first)
-        2. Reverse the order of lines within each multi-line text
-        3. Reverse the characters within each line
+        For 180° rotation:
+        - Hardware handles character rotation (ESC { 1)
+        - Software reverses line order (print last line first)
         """
         if not self.invert or self.print_buffer is None or len(self.print_buffer) == 0:
             return
@@ -194,13 +194,11 @@ class PrinterDriver:
         
         for op_type, op_data in reversed_ops:
             if op_type == 'text':
-                # Handle multi-line text by splitting and reversing lines within the operation
+                # Handle multi-line text by splitting and reversing lines
                 lines = op_data.split('\n')
                 reversed_lines = list(reversed(lines))
                 for line in reversed_lines:
-                    # Reverse the characters in each line for 180° rotation
-                    flipped_line = line[::-1]
-                    self._write_text_line(flipped_line)
+                    self._write_text_line(line)
             elif op_type == 'feed':
                 self._write_feed(op_data)
     
