@@ -15,20 +15,23 @@ elif [ -f "venv/bin/activate" ]; then
     source venv/bin/activate
 fi
 
-cleanup() {
-    if [ "$SERVICE_WAS_ACTIVE" -eq 1 ]; then
-        echo "Restarting ${SERVICE_NAME}.service..."
-        sudo systemctl start "${SERVICE_NAME}" || echo "Failed to restart ${SERVICE_NAME}.service"
-    fi
-}
-trap cleanup EXIT
+# Only stop the service if we're running interactively (not from systemd)
+if [ -t 0 ]; then
+    cleanup() {
+        if [ "$SERVICE_WAS_ACTIVE" -eq 1 ]; then
+            echo "Restarting ${SERVICE_NAME}.service..."
+            sudo systemctl start "${SERVICE_NAME}" || echo "Failed to restart ${SERVICE_NAME}.service"
+        fi
+    }
+    trap cleanup EXIT
 
-# If the systemd service is running, stop it so that --reload can bind to the port cleanly.
-if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "^${SERVICE_NAME}.service"; then
-    if systemctl is-active --quiet "${SERVICE_NAME}"; then
-        echo "Stopping ${SERVICE_NAME}.service so run.sh can own port ${PORT}..."
-        sudo systemctl stop "${SERVICE_NAME}"
-        SERVICE_WAS_ACTIVE=1
+    # If the systemd service is running, stop it so that --reload can bind to the port cleanly.
+    if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files | grep -q "^${SERVICE_NAME}.service"; then
+        if systemctl is-active --quiet "${SERVICE_NAME}"; then
+            echo "Stopping ${SERVICE_NAME}.service so run.sh can own port ${PORT}..."
+            sudo systemctl stop "${SERVICE_NAME}"
+            SERVICE_WAS_ACTIVE=1
+        fi
     fi
 fi
 
