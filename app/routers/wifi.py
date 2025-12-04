@@ -138,14 +138,21 @@ async def trigger_ap_mode(background_tasks: BackgroundTasks):
                 # Generate QR Code for WiFi
                 try:
                     qr_data = f"WIFI:T:WPA;S:{ssid};P:setup1234;H:false;;"
-                    # Use version 1, box_size 4 for a clear image
-                    qr = qrcode.QRCode(version=1, box_size=4, border=1)
+                    qr = qrcode.QRCode(version=1, box_size=1, border=1)
                     qr.add_data(qr_data)
                     qr.make(fit=True)
-                    img = qr.make_image(fill_color="black", back_color="white")
 
-                    print("[SYSTEM] Printing QR code image...")
-                    printer.print_image(img)
+                    printer.print_text(center("Scan to Connect:"))
+                    printer.feed(1)
+
+                    matrix = qr.get_matrix()
+                    for row in matrix:
+                        line = "".join(["█" if cell else " " for cell in row])
+                        printer.print_text(center(line))
+
+                    printer.feed(1)
+                    printer.print_text(center("(If QR fails, use manual)"))
+
                 except Exception as qr_e:
                     print(f"[ERROR] QR Generation failed: {qr_e}")
                     # Fallback to text
