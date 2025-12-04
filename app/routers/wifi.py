@@ -26,7 +26,9 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
     if wifi_manager.is_ap_mode_active():
         print("[WIFI] Background: Stopping AP mode...")
         wifi_manager.stop_ap_mode()
-        time.sleep(3)
+        # Wait for WiFi adapter to switch back to client mode
+        print("[WIFI] Background: Waiting for adapter to reset...")
+        time.sleep(5)
     
     # Connect to the new network
     print(f"[WIFI] Background: Connecting to {ssid}...")
@@ -36,6 +38,10 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
         print(f"[WIFI] Background: Successfully connected to {ssid}")
     else:
         print(f"[WIFI] Background: Failed to connect to {ssid}")
+        # If connection failed, restart AP mode so user can try again
+        print("[WIFI] Background: Restarting AP mode for retry...")
+        time.sleep(2)
+        wifi_manager.start_ap_mode()
 
 
 @router.get("/status")

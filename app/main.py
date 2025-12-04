@@ -282,14 +282,20 @@ async def check_wifi_startup():
     await asyncio.sleep(10)
     
     status = wifi_manager.get_wifi_status()
+    print(f"[SYSTEM] WiFi status: connected={status.get('connected')}, mode={status.get('mode')}, ssid={status.get('ssid')}")
+    
     if not status["connected"] and status["mode"] != "ap":
         print("[SYSTEM] No WiFi connection detected. Starting AP mode...")
-        wifi_manager.start_ap_mode()
+        success = wifi_manager.start_ap_mode()
         
-        # Wait for AP to start
-        await asyncio.sleep(5)
-        
-        await print_setup_instructions()
+        if success:
+            # Wait for AP to start
+            await asyncio.sleep(5)
+            await print_setup_instructions()
+        else:
+            print("[SYSTEM] Failed to start AP mode!")
+    else:
+        print("[SYSTEM] WiFi connected or AP mode already active - skipping AP setup")
 
 
 async def manual_ap_mode_trigger():
