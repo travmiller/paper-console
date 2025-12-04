@@ -102,25 +102,37 @@ fi
 echo "Setting up WiFi AP script..."
 chmod +x "$PROJECT_DIR/scripts/wifi_ap_nmcli.sh"
 
-# Give sudo access for WiFi management and service control (no password required)
-echo "Configuring sudo permissions for WiFi management and service control..."
+# Give sudo access for WiFi management (no password required)
+echo "Configuring sudo permissions for WiFi management..."
 cat > /etc/sudoers.d/pc-1-wifi <<EOL
 $USER_NAME ALL=(ALL) NOPASSWD: $PROJECT_DIR/scripts/wifi_ap_nmcli.sh
 $USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/nmcli
-$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl restart pc-1.service
-$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl start pc-1.service
-$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl stop pc-1.service
-$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl status pc-1.service
 EOL
 chmod 0440 /etc/sudoers.d/pc-1-wifi
 
-cat > /etc/systemd/system/pc-1.service <<EOL
+# Stop and remove old system service if it exists
+if systemctl is-active --quiet pc-1.service 2>/dev/null; then
+    echo "Stopping old system service..."
+    systemctl stop pc-1.service || true
+fi
+if [ -f /etc/systemd/system/pc-1.service ]; then
+    echo "Removing old system service..."
+    systemctl disable pc-1.service || true
+    rm -f /etc/systemd/system/pc-1.service
+    systemctl daemon-reload
+fi
+
+# Create user systemd directory if it doesn't exist
+mkdir -p "/home/$USER_NAME/.config/systemd/user"
+chown -R "$USER_NAME:$USER_NAME" "/home/$USER_NAME/.config"
+
+# Create user service (no sudo needed to manage)
+cat > "/home/$USER_NAME/.config/systemd/user/pc-1.service" <<EOL
 [Unit]
 Description=PC-1 Paper Console
 After=network.target
 
 [Service]
-User=$USER_NAME
 WorkingDirectory=$PROJECT_DIR
 ExecStart=/bin/bash $PROJECT_DIR/run.sh
 Restart=always
@@ -130,17 +142,25 @@ TimeoutStopSec=10
 Environment=PYTHONUNBUFFERED=1
 
 [Install]
-WantedBy=multi-user.target
+WantedBy=default.target
 EOL
 
-systemctl daemon-reload
-systemctl enable pc-1.service
-systemctl restart pc-1.service
+chown "$USER_NAME:$USER_NAME" "/home/$USER_NAME/.config/systemd/user/pc-1.service"
+
+# Enable lingering so user service starts on boot (requires root)
+loginctl enable-linger "$USER_NAME"
+
+# Reload and enable user service (run as the user)
+sudo -u "$USER_NAME" systemctl --user daemon-reload
+sudo -u "$USER_NAME" systemctl --user enable pc-1.service
+sudo -u "$USER_NAME" systemctl --user restart pc-1.service
 
 echo "--- Setup Complete ---"
 echo "1. Your device is now accessible at http://$HOSTNAME.local"
 echo "2. The application is running as a background service (pc-1.service)"
 echo "3. Nginx is proxying port 80 to 8000"
 echo ""
-echo "To check status: sudo systemctl status pc-1.service"
+echo "To check status: systemctl --user status pc-1.service"
+echo "To restart: systemctl --user restart pc-1.service"
+echo "(No sudo needed - it's a user service!)"
 
