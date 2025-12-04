@@ -112,20 +112,15 @@ class PrinterDriver:
         try:
             # Reset printer
             self._write(b'\x1B\x40')  # ESC @ (Initialize printer)
-            # Set character encoding (UTF-8)
+            # Set character encoding
             self._write(b'\x1B\x74\x01')  # ESC t 1 (Select character code table: PC437)
             # Set default line spacing
             self._write(b'\x1B\x32')  # ESC 2 (Set line spacing to default)
             
-            # Apply rotation if needed (180 degree rotation)
+            # Note: We use software-based inversion (reversing print order in buffer)
+            # rather than hardware rotation commands which aren't universally supported
             if self.invert:
-                # Try ESC i (some printers support this for 180° rotation)
-                # Alternative: ESC { n where n=1 enables rotation
-                # We'll try both common methods
-                self._write(b'\x1B\x7B\x01')  # ESC { 1 (Enable rotation on some printers)
-                # Also try ESC i (alternative rotation command)
-                self._write(b'\x1B\x69')  # ESC i (180° rotation on some printers)
-                print("[PRINTER] Rotation enabled (180 degrees)")
+                print("[PRINTER] Invert mode enabled (software line reversal)")
         except Exception as e:
             print(f"[PRINTER] Warning: Initialization error: {e}")
     

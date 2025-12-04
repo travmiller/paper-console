@@ -266,8 +266,7 @@ def print_setup_instructions_sync():
             
             matrix = qr.get_matrix()
             for row in matrix:
-                # Use ASCII characters instead of Unicode
-                line = "".join(["#" if cell else " " for cell in row])
+                line = "".join(["█" if cell else " " for cell in row])
                 printer.print_text(center(line))
                 
             printer.feed(1)
