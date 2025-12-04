@@ -102,11 +102,15 @@ fi
 echo "Setting up WiFi AP script..."
 chmod +x "$PROJECT_DIR/scripts/wifi_ap_nmcli.sh"
 
-# Give sudo access for WiFi management (no password required for specific scripts)
-echo "Configuring sudo permissions for WiFi management..."
+# Give sudo access for WiFi management and service control (no password required)
+echo "Configuring sudo permissions for WiFi management and service control..."
 cat > /etc/sudoers.d/pc-1-wifi <<EOL
 $USER_NAME ALL=(ALL) NOPASSWD: $PROJECT_DIR/scripts/wifi_ap_nmcli.sh
 $USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/nmcli
+$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl restart pc-1.service
+$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl start pc-1.service
+$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl stop pc-1.service
+$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl status pc-1.service
 EOL
 chmod 0440 /etc/sudoers.d/pc-1-wifi
 
