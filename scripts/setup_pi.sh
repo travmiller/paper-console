@@ -31,7 +31,28 @@ fi
 # 2. Install dependencies
 echo "Installing dependencies..."
 apt-get update
-apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager
+apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager dnsmasq
+
+# Enable dnsmasq in NetworkManager for captive portal support
+if [ ! -f /etc/NetworkManager/conf.d/20-connectivity.conf ]; then
+    mkdir -p /etc/NetworkManager/conf.d
+    echo "[connectivity]" > /etc/NetworkManager/conf.d/20-connectivity.conf
+    echo "uri=http://captive.apple.com/hotspot-detect.html" >> /etc/NetworkManager/conf.d/20-connectivity.conf
+fi
+
+# Enable dnsmasq plugin in NetworkManager
+if ! grep -q "^dns=dnsmasq" /etc/NetworkManager/NetworkManager.conf 2>/dev/null; then
+    # Backup original config
+    cp /etc/NetworkManager/NetworkManager.conf /etc/NetworkManager/NetworkManager.conf.bak 2>/dev/null || true
+    # Add dnsmasq configuration
+    if grep -q "^\[main\]" /etc/NetworkManager/NetworkManager.conf; then
+        sed -i '/^\[main\]/a dns=dnsmasq' /etc/NetworkManager/NetworkManager.conf
+    else
+        echo "[main]" >> /etc/NetworkManager/NetworkManager.conf
+        echo "dns=dnsmasq" >> /etc/NetworkManager/NetworkManager.conf
+    fi
+    systemctl restart NetworkManager
+fi
 
 # Add user to groups for printer access
 echo "Adding $SUDO_USER to 'lp' and 'dialout' groups for printer access..."

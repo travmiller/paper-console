@@ -51,6 +51,31 @@ start_ap() {
     # Get the IP that was assigned
     AP_IP=$(get_ap_ip)
     
+    # Configure DNS server for captive portal
+    # Set the hotspot connection to use the Pi's IP as DNS server
+    # This tells connected devices to use the Pi for DNS resolution
+    nmcli connection modify "PC-1-Hotspot" ipv4.dns "${AP_IP:-10.42.0.1}"
+    nmcli connection modify "PC-1-Hotspot" ipv4.ignore-auto-dns yes
+    
+    # Restart the connection to apply DNS settings
+    nmcli connection down "PC-1-Hotspot" 2>/dev/null || true
+    sleep 1
+    nmcli connection up "PC-1-Hotspot"
+    
+    # Wait for connection to stabilize
+    sleep 2
+    
+    # Configure NetworkManager's dnsmasq to answer all queries with Pi's IP
+    # NetworkManager uses dnsmasq internally, we need to configure it
+    # Create a dnsmasq config snippet for NetworkManager
+    NM_DNSMASQ_DIR="/etc/NetworkManager/dnsmasq.d"
+    mkdir -p "$NM_DNSMASQ_DIR"
+    echo "address=/#/${AP_IP:-10.42.0.1}" > "$NM_DNSMASQ_DIR/captive-portal.conf"
+    
+    # Restart NetworkManager to apply dnsmasq config
+    systemctl reload NetworkManager 2>/dev/null || systemctl restart NetworkManager 2>/dev/null || true
+    sleep 2
+    
     echo ""
     echo "========================================"
     echo "AP Mode Active!"
@@ -63,6 +88,10 @@ start_ap() {
 
 stop_ap() {
     echo "Stopping AP Mode..."
+    
+    # Remove dnsmasq config for captive portal
+    rm -f /etc/NetworkManager/dnsmasq.d/captive-portal.conf 2>/dev/null || true
+    systemctl reload NetworkManager 2>/dev/null || true
     
     # Deactivate hotspot
     nmcli connection down "PC-1-Hotspot" 2>/dev/null || true
