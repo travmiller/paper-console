@@ -248,6 +248,14 @@ def print_setup_instructions_sync():
             print(f"[ERROR] QR Generation failed: {qr_e}")
         
         printer.feed(3)
+        
+        # CRITICAL: If invert mode is on, we must flush the buffer to actually print
+        if hasattr(printer, "flush_buffer") and getattr(printer, "invert", False):
+            printer.flush_buffer()
+            # Add feed lines after flushing (direct feed)
+            if hasattr(printer, "feed_direct"):
+                printer.feed_direct(3)
+            
     except Exception as e:
         print(f"[ERROR] Failed to print setup instructions: {e}")
 

@@ -147,6 +147,13 @@ async def trigger_ap_mode(background_tasks: BackgroundTasks):
                 printer.print_text(center("(QR Code Failed)"))
 
             printer.feed(3)
+
+            # CRITICAL: Flush buffer if inverted
+            if hasattr(printer, "flush_buffer") and getattr(printer, "invert", False):
+                printer.flush_buffer()
+                if hasattr(printer, "feed_direct"):
+                    printer.feed_direct(3)
+
             print("[SYSTEM] Print complete.")
 
         except Exception as e:
