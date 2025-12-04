@@ -78,21 +78,34 @@ async def connect_wifi(request: WiFiConnectRequest, background_tasks: Background
 @router.post("/ap-mode")
 async def trigger_ap_mode(background_tasks: BackgroundTasks):
     """Manually trigger AP mode for reconfiguration."""
-    success = wifi_manager.start_ap_mode()
     
-    if success:
-        # Print setup instructions in background
-        def print_instructions():
-            import time
-            time.sleep(5)  # Wait for AP to stabilize
-            # Import here to avoid circular import
-            from app.main import print_setup_instructions_sync
-            print_setup_instructions_sync()
+    def delayed_ap_start():
+        import time
+        print("[WIFI] Waiting 2 seconds before starting AP mode (to allow response to send)...")
+        time.sleep(2)
         
-        background_tasks.add_task(print_instructions)
-        return {"success": True, "message": "AP mode activated"}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to start AP mode")
+        success = wifi_manager.start_ap_mode()
+        
+        if success:
+            print("[WIFI] AP mode started. Waiting for stabilization...")
+            time.sleep(5)  # Wait for AP to stabilize
+            
+            # Print instructions
+            try:
+                # Import here to avoid circular import
+                from app.main import print_setup_instructions_sync
+                print_setup_instructions_sync()
+            except ImportError:
+                print("[ERROR] Could not import print_setup_instructions_sync")
+            except Exception as e:
+                print(f"[ERROR] Failed to print instructions: {e}")
+        else:
+            print("[ERROR] Failed to start AP mode from background task")
+
+    # Add to background tasks so we can return response immediately
+    background_tasks.add_task(delayed_ap_start)
+    
+    return {"success": True, "message": "AP mode activating in 2 seconds..."}
 
 
 @router.post("/forget")

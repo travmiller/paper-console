@@ -49,10 +49,7 @@ function App() {
           return;
         }
         // Otherwise, fetch normal settings
-        return Promise.all([
-          fetch('/api/settings').then((res) => res.json()),
-          fetch('/api/modules').then((res) => res.json())
-        ]);
+        return Promise.all([fetch('/api/settings').then((res) => res.json()), fetch('/api/modules').then((res) => res.json())]);
       })
       .then((results) => {
         if (results) {
