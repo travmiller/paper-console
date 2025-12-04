@@ -197,26 +197,26 @@ def print_setup_instructions_sync():
         def center(text):
             padding = max(0, (PRINTER_WIDTH - len(text)) // 2)
             return " " * padding + text
-        
+
         printer.print_text(center("PC-1 SETUP MODE"))
         printer.print_text(center("=" * 20))
         printer.feed(1)
         printer.print_text(center("Connect to WiFi:"))
-        
+
         # Get device ID for SSID
         ssid_suffix = "XXXX"
         try:
             if _is_raspberry_pi:
-                with open('/proc/cpuinfo', 'r') as f:
+                with open("/proc/cpuinfo", "r") as f:
                     for line in f:
-                        if line.startswith('Serial'):
-                            ssid_suffix = line.split(':')[1].strip()[-4:]
+                        if line.startswith("Serial"):
+                            ssid_suffix = line.split(":")[1].strip()[-4:]
                             break
         except:
             pass
-            
+
         ssid = f"PC-1-Setup-{ssid_suffix}"
-        
+
         printer.print_text(center(ssid))
         printer.print_text(center("Password: setup1234"))
         printer.feed(1)
@@ -224,38 +224,15 @@ def print_setup_instructions_sync():
         printer.print_text(center("http://pc-1.local"))
         printer.print_text(center("OR"))
         printer.print_text(center("http://10.42.0.1"))
-        printer.feed(2)
-        
-        # Generate QR Code for WiFi
-        try:
-            qr_data = f"WIFI:T:WPA;S:{ssid};P:setup1234;H:false;;"
-            qr = qrcode.QRCode(version=1, box_size=1, border=1)
-            qr.add_data(qr_data)
-            qr.make(fit=True)
-            
-            printer.print_text(center("Scan to Connect:"))
-            printer.feed(1)
-            
-            matrix = qr.get_matrix()
-            for row in matrix:
-                line = "".join(["█" if cell else " " for cell in row])
-                printer.print_text(center(line))
-                
-            printer.feed(1)
-            printer.print_text(center("(If QR fails, use manual)"))
-            
-        except Exception as qr_e:
-            print(f"[ERROR] QR Generation failed: {qr_e}")
-        
         printer.feed(3)
-        
+
         # CRITICAL: If invert mode is on, we must flush the buffer to actually print
         if hasattr(printer, "flush_buffer") and getattr(printer, "invert", False):
             printer.flush_buffer()
             # Add feed lines after flushing (direct feed)
             if hasattr(printer, "feed_direct"):
                 printer.feed_direct(3)
-            
+
     except Exception as e:
         print(f"[ERROR] Failed to print setup instructions: {e}")
 
@@ -265,14 +242,16 @@ async def check_wifi_startup():
     print("[SYSTEM] Checking WiFi status...")
     # Give system some time to connect to saved WiFi
     await asyncio.sleep(10)
-    
+
     status = wifi_manager.get_wifi_status()
-    print(f"[SYSTEM] WiFi status: connected={status.get('connected')}, mode={status.get('mode')}, ssid={status.get('ssid')}")
-    
+    print(
+        f"[SYSTEM] WiFi status: connected={status.get('connected')}, mode={status.get('mode')}, ssid={status.get('ssid')}"
+    )
+
     if not status["connected"] and status["mode"] != "ap":
         print("[SYSTEM] No WiFi connection detected. Starting AP mode...")
         success = wifi_manager.start_ap_mode()
-        
+
         if success:
             # Wait for AP to start
             await asyncio.sleep(5)
@@ -290,14 +269,13 @@ async def manual_ap_mode_trigger():
     # Print instructions BEFORE switching network mode
     # This ensures the user gets the info even if the network switch is messy
     await print_setup_instructions()
-    
+
     print("[SYSTEM] Instructions printed. Switching to AP mode...")
-    
+
     # Give a small delay for the printer buffer to flush/finish
     await asyncio.sleep(2)
 
     wifi_manager.start_ap_mode()
-
 
 
 @asynccontextmanager
@@ -449,19 +427,19 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
         )
         if hasattr(hardware.printer, "close"):
             hardware.printer.close()
-        
+
         # Create new instance
         if _is_raspberry_pi:
             from app.drivers.printer_serial import PrinterDriver
         else:
             from app.drivers.printer_mock import PrinterDriver
-            
+
         hardware.printer = PrinterDriver(width=PRINTER_WIDTH, invert=new_invert)
         # Update local reference if used elsewhere in this file (it is used in background tasks)
         # Note: modules importing 'printer' from hardware will still have the OLD reference!
         # This is a limitation of Python imports.
         # To fix this, we should probably make 'printer' a proxy or always access it via hardware.printer
-        
+
         # Update global reference for this module
         global printer
         printer = hardware.printer
@@ -507,6 +485,12 @@ async def reload_settings():
         )
         if hasattr(printer, "close"):
             printer.close()
+
+        if _is_raspberry_pi:
+            from app.drivers.printer_serial import PrinterDriver
+        else:
+            from app.drivers.printer_mock import PrinterDriver
+
         printer = PrinterDriver(width=PRINTER_WIDTH, invert=new_invert)
 
     return {"message": "Settings reloaded from disk", "config": settings}
@@ -546,7 +530,9 @@ async def get_module(module_id: str):
 
 
 @app.put("/api/modules/{module_id}")
-async def update_module(module_id: str, module: ModuleInstance, background_tasks: BackgroundTasks):
+async def update_module(
+    module_id: str, module: ModuleInstance, background_tasks: BackgroundTasks
+):
     """Update a module instance."""
     global settings
     import app.config as config_module
@@ -595,7 +581,10 @@ async def delete_module(module_id: str, background_tasks: BackgroundTasks):
 
 @app.post("/api/channels/{position}/modules")
 async def assign_module_to_channel(
-    position: int, module_id: str, background_tasks: BackgroundTasks, order: Optional[int] = None
+    position: int,
+    module_id: str,
+    background_tasks: BackgroundTasks,
+    order: Optional[int] = None,
 ):
     """Assign a module to a channel."""
     global settings
@@ -634,7 +623,9 @@ async def assign_module_to_channel(
 
 
 @app.delete("/api/channels/{position}/modules/{module_id}")
-async def remove_module_from_channel(position: int, module_id: str, background_tasks: BackgroundTasks):
+async def remove_module_from_channel(
+    position: int, module_id: str, background_tasks: BackgroundTasks
+):
     """Remove a module from a channel."""
     global settings
 
@@ -656,7 +647,9 @@ async def remove_module_from_channel(position: int, module_id: str, background_t
 
 
 @app.post("/api/channels/{position}/modules/reorder")
-async def reorder_channel_modules(position: int, module_orders: Dict[str, int], background_tasks: BackgroundTasks):
+async def reorder_channel_modules(
+    position: int, module_orders: Dict[str, int], background_tasks: BackgroundTasks
+):
     """Reorder modules within a channel. module_orders is {module_id: new_order}."""
     global settings
 
@@ -679,7 +672,9 @@ async def reorder_channel_modules(position: int, module_orders: Dict[str, int], 
 
 
 @app.post("/api/channels/{position}/schedule")
-async def update_channel_schedule(position: int, schedule: List[str], background_tasks: BackgroundTasks):
+async def update_channel_schedule(
+    position: int, schedule: List[str], background_tasks: BackgroundTasks
+):
     """Update the print schedule for a channel."""
     global settings
 
@@ -875,7 +870,7 @@ async def print_channel(position: int):
     """Set dial position and trigger print atomically."""
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
-    
+
     # Don't need to set dial.set_position since we're passing position directly
     await trigger_channel(position)
     return {"message": f"Printing channel {position}"}
@@ -907,6 +902,7 @@ async def test_webhook(action: WebhookConfig):
 
 # --- CAPTIVE PORTAL (Auto-launch setup page) ---
 
+
 @app.get("/hotspot-detect.html")
 @app.get("/library/test/success.html")
 async def captive_apple():
@@ -918,6 +914,7 @@ async def captive_apple():
     # If not in AP mode, return success (device has internet)
     return {"status": "success"}
 
+
 @app.get("/generate_204")
 @app.get("/gen_204")
 async def captive_android():
@@ -928,6 +925,7 @@ async def captive_android():
     # Return 204 No Content if not in AP mode (device has internet)
     return Response(status_code=204)
 
+
 @app.get("/connecttest.txt")
 @app.get("/ncsi.txt")
 async def captive_windows():
@@ -937,6 +935,7 @@ async def captive_windows():
         return RedirectResponse(url="/", status_code=302)
     # Return success text if not in AP mode
     return Response(content="Microsoft Connect Test", media_type="text/plain")
+
 
 @app.get("/success.txt")
 async def captive_other():
