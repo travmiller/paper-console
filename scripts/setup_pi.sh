@@ -33,9 +33,9 @@ echo "Installing dependencies..."
 apt-get update
 apt-get install -y nginx avahi-daemon python3-venv python3-pip
 
-# Add user to lp group for USB printer access
-echo "Adding $SUDO_USER to 'lp' group for printer access..."
-usermod -a -G lp "$SUDO_USER"
+# Add user to groups for printer access
+echo "Adding $SUDO_USER to 'lp' and 'dialout' groups for printer access..."
+usermod -a -G lp,dialout "$SUDO_USER"
 
 # 3. Configure Nginx Reverse Proxy
 echo "Configuring Nginx..."
