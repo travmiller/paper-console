@@ -246,7 +246,7 @@ async def print_setup_instructions():
         printer.print_text(center("Password: setup1234"))
         printer.feed(1)
         printer.print_text(center("Then visit:"))
-        printer.print_text(center("http://192.168.4.1"))
+        printer.print_text(center("http://10.42.0.1"))
         printer.feed(2)
         
         # Generate QR Code for WiFi

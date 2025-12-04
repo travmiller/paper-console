@@ -31,7 +31,7 @@ fi
 # 2. Install dependencies
 echo "Installing dependencies..."
 apt-get update
-apt-get install -y nginx avahi-daemon python3-venv python3-pip dnsmasq network-manager
+apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager
 
 # Add user to groups for printer access
 echo "Adding $SUDO_USER to 'lp' and 'dialout' groups for printer access..."
@@ -41,8 +41,8 @@ usermod -a -G lp,dialout "$SUDO_USER"
 echo "Configuring Nginx..."
 cat > /etc/nginx/sites-available/paper-console <<EOL
 server {
-    listen 80;
-    server_name $HOSTNAME.local;
+    listen 80 default_server;
+    server_name _;
 
     location / {
         proxy_pass http://127.0.0.1:8000;

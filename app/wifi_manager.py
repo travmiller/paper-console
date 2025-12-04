@@ -4,8 +4,6 @@ Handles WiFi scanning, connection, and AP mode management.
 """
 
 import subprocess
-import json
-import re
 import os
 from typing import List, Dict, Optional
 
@@ -23,7 +21,7 @@ def run_command(cmd: List[str], check: bool = True) -> subprocess.CompletedProce
         return result
     except subprocess.CalledProcessError as e:
         print(f"[WIFI] Command failed: {' '.join(cmd)}")
-        print(f"[WIFI] Error: {e.stderr}")
+        print(f"[WIFI] stderr: {e.stderr}")
         raise
 
 
@@ -37,31 +35,55 @@ def is_ap_mode_active() -> bool:
         return False
 
 
+def has_wifi_connection() -> bool:
+    """Check if we have an active WiFi connection (not AP mode)."""
+    try:
+        # Check if wlan0 has an IP address from a WiFi connection
+        result = run_command(['nmcli', '-t', '-f', 'DEVICE,TYPE,STATE', 'device'], check=False)
+        
+        for line in result.stdout.splitlines():
+            parts = line.split(':')
+            if len(parts) >= 3:
+                device, dev_type, state = parts[0], parts[1], parts[2]
+                if device == 'wlan0' and dev_type == 'wifi' and state == 'connected':
+                    # Check it's not AP mode
+                    if not is_ap_mode_active():
+                        return True
+        return False
+    except Exception as e:
+        print(f"[WIFI] Error checking WiFi connection: {e}")
+        return False
+
+
 def get_wifi_status() -> Dict:
     """Get current WiFi connection status."""
     try:
-        # Check if in AP mode
+        # Check if in AP mode first
         if is_ap_mode_active():
             return {
                 "connected": False,
                 "mode": "ap",
                 "ssid": None,
-                "ip": "192.168.4.1"
+                "ip": "10.42.0.1"
             }
         
-        # Check regular WiFi connection
-        result = run_command(['nmcli', '-t', '-f', 'ACTIVE,SSID,IP4.ADDRESS', 'connection', 'show', '--active'], check=False)
+        # Check for active WiFi connection
+        result = run_command(['nmcli', '-t', '-f', 'NAME,TYPE,DEVICE', 'connection', 'show', '--active'], check=False)
         
         for line in result.stdout.splitlines():
-            if line.startswith('yes:'):
-                parts = line.split(':')
-                if len(parts) >= 3:
-                    ssid = parts[1]
-                    ip = parts[2].split('/')[0] if parts[2] else None
+            parts = line.split(':')
+            if len(parts) >= 3:
+                name, conn_type, device = parts[0], parts[1], parts[2]
+                # Look for WiFi connection on wlan0
+                if conn_type == '802-11-wireless' and device == 'wlan0':
+                    # Get IP address
+                    ip_result = run_command(['hostname', '-I'], check=False)
+                    ip = ip_result.stdout.strip().split()[0] if ip_result.stdout.strip() else None
+                    
                     return {
                         "connected": True,
                         "mode": "client",
-                        "ssid": ssid,
+                        "ssid": name,
                         "ip": ip
                     }
         
@@ -88,8 +110,12 @@ def scan_networks() -> List[Dict]:
         # Request fresh scan
         run_command(['sudo', 'nmcli', 'device', 'wifi', 'rescan'], check=False)
         
+        # Wait a moment for scan to complete
+        import time
+        time.sleep(2)
+        
         # Get scan results
-        result = run_command(['nmcli', '-t', '-f', 'SSID,SIGNAL,SECURITY', 'device', 'wifi', 'list'])
+        result = run_command(['nmcli', '-t', '-f', 'SSID,SIGNAL,SECURITY', 'device', 'wifi', 'list'], check=False)
         
         networks = []
         seen_ssids = set()
@@ -106,7 +132,7 @@ def scan_networks() -> List[Dict]:
                     networks.append({
                         "ssid": ssid,
                         "signal": int(signal) if signal.isdigit() else 0,
-                        "secure": security != ""
+                        "secure": security != "" and security != "--"
                     })
                     seen_ssids.add(ssid)
         
@@ -120,31 +146,34 @@ def scan_networks() -> List[Dict]:
 
 
 def connect_to_wifi(ssid: str, password: Optional[str] = None) -> bool:
-    """
-    Connect to a WiFi network.
-    Creates a new connection profile and activates it.
-    """
+    """Connect to a WiFi network."""
     try:
-        # Delete existing connection with same SSID if it exists
-        run_command(['sudo', 'nmcli', 'connection', 'delete', ssid], check=False)
-        
         # Stop AP mode if active
         if is_ap_mode_active():
             stop_ap_mode()
+            import time
+            time.sleep(2)
+        
+        # Delete existing connection with same SSID if it exists
+        run_command(['sudo', 'nmcli', 'connection', 'delete', ssid], check=False)
         
         # Create and activate new connection
-        cmd = [
-            'sudo', 'nmcli', 'device', 'wifi', 'connect',
-            ssid
-        ]
-        
         if password:
-            cmd.extend(['password', password])
+            result = run_command([
+                'sudo', 'nmcli', 'device', 'wifi', 'connect', ssid,
+                'password', password
+            ], check=False)
+        else:
+            result = run_command([
+                'sudo', 'nmcli', 'device', 'wifi', 'connect', ssid
+            ], check=False)
         
-        result = run_command(cmd)
-        
-        print(f"[WIFI] Connected to {ssid}")
-        return True
+        if result.returncode == 0:
+            print(f"[WIFI] Connected to {ssid}")
+            return True
+        else:
+            print(f"[WIFI] Failed to connect: {result.stderr}")
+            return False
         
     except Exception as e:
         print(f"[WIFI] Failed to connect to {ssid}: {e}")
@@ -155,9 +184,18 @@ def start_ap_mode() -> bool:
     """Start AP mode using the shell script."""
     try:
         script_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'wifi_ap_nmcli.sh')
-        result = run_command(['sudo', script_path, 'start'])
-        print("[WIFI] AP mode started")
-        return True
+        print(f"[WIFI] Starting AP mode with script: {script_path}")
+        result = run_command(['sudo', script_path, 'start'], check=False)
+        print(f"[WIFI] AP script output: {result.stdout}")
+        if result.stderr:
+            print(f"[WIFI] AP script stderr: {result.stderr}")
+        
+        if result.returncode == 0:
+            print("[WIFI] AP mode started successfully")
+            return True
+        else:
+            print(f"[WIFI] AP mode failed with code {result.returncode}")
+            return False
     except Exception as e:
         print(f"[WIFI] Failed to start AP mode: {e}")
         return False
@@ -167,7 +205,7 @@ def stop_ap_mode() -> bool:
     """Stop AP mode."""
     try:
         script_path = os.path.join(os.path.dirname(__file__), '..', 'scripts', 'wifi_ap_nmcli.sh')
-        result = run_command(['sudo', script_path, 'stop'])
+        result = run_command(['sudo', script_path, 'stop'], check=False)
         print("[WIFI] AP mode stopped")
         return True
     except Exception as e:
@@ -178,10 +216,11 @@ def stop_ap_mode() -> bool:
 def forget_wifi(ssid: str) -> bool:
     """Forget a saved WiFi network."""
     try:
-        result = run_command(['sudo', 'nmcli', 'connection', 'delete', ssid])
-        print(f"[WIFI] Forgot network: {ssid}")
-        return True
+        result = run_command(['sudo', 'nmcli', 'connection', 'delete', ssid], check=False)
+        if result.returncode == 0:
+            print(f"[WIFI] Forgot network: {ssid}")
+            return True
+        return False
     except Exception as e:
         print(f"[WIFI] Failed to forget {ssid}: {e}")
         return False
-
