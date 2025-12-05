@@ -442,6 +442,10 @@ async def lifespan(app: FastAPI):
     # Capture the running loop
     global_loop = asyncio.get_running_loop()
 
+    # Clear printer hardware buffer first to prevent startup garbage
+    if hasattr(printer, "clear_hardware_buffer"):
+        printer.clear_hardware_buffer()
+
     # Check for first boot and print welcome message
     asyncio.create_task(check_first_boot())
 

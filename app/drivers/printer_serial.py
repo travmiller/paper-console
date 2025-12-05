@@ -95,8 +95,11 @@ class PrinterDriver:
         # Handle USB Line Printer (/dev/usb/lp0) differently from Serial
         if port and "lp" in port and platform.system() == "Linux":
             try:
+                import time
+
                 self.usb_fd = os.open(port, os.O_RDWR)
                 self.usb_file = None
+                time.sleep(0.3)  # Let printer settle after port open
                 self._initialize_printer()
                 return
             except Exception:
@@ -140,19 +143,27 @@ class PrinterDriver:
         except Exception:
             pass
 
-    def _initialize_printer(self):
-        """Send initialization commands to ensure ASCII-only mode."""
+    def clear_hardware_buffer(self):
+        """Clear the printer's hardware buffer - call at startup to prevent garbage."""
         import time
 
         try:
-            # Clear any garbage in the printer buffer
-            self._write(b"\x00\x00\x00\x00\x00")
-            time.sleep(0.1)
+            # Cancel any in-progress print job
+            self._write(b"\x18")  # CAN - Cancel print data in page mode
+            time.sleep(0.05)
 
-            # ESC @ - Hardware reset (clears all settings)
+            # ESC @ - Hardware reset (clears all settings and buffer)
             self._write(b"\x1b\x40")
             time.sleep(0.3)
 
+            # Re-apply ASCII mode settings after reset
+            self._apply_ascii_settings()
+        except Exception:
+            pass
+
+    def _apply_ascii_settings(self):
+        """Apply ASCII-only mode settings."""
+        try:
             # CRITICAL: Disable all Chinese/Asian character modes
             self._write(b"\x1c\x2e")  # FS . - Cancel Chinese mode
             self._write(b"\x1b\x52\x00")  # ESC R 0 - USA character set
@@ -167,6 +178,24 @@ class PrinterDriver:
 
             if self.invert:
                 self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
+        except Exception:
+            pass
+
+    def _initialize_printer(self):
+        """Send initialization commands to ensure ASCII-only mode."""
+        import time
+
+        try:
+            # Clear any garbage in the printer buffer
+            self._write(b"\x00\x00\x00\x00\x00")
+            time.sleep(0.1)
+
+            # ESC @ - Hardware reset (clears all settings)
+            self._write(b"\x1b\x40")
+            time.sleep(0.3)
+
+            # Apply ASCII settings
+            self._apply_ascii_settings()
         except Exception:
             pass
 

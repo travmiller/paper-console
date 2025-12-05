@@ -41,6 +41,10 @@ class PrinterDriver:
         self.lines_printed = 0
         self.max_lines = max_lines
 
+    def clear_hardware_buffer(self):
+        """Clear hardware buffer (no-op for mock)."""
+        pass
+
     def is_max_lines_exceeded(self) -> bool:
         """Check if we've exceeded the maximum print length."""
         if self.max_lines <= 0:
