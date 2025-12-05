@@ -1,61 +1,62 @@
 """Shared utility functions for modules."""
+
 from app.hardware import printer, _is_raspberry_pi
 from app.config import PRINTER_WIDTH
+
 
 def wrap_text(text: str, width: int = 32, indent: int = 0) -> list[str]:
     """Wraps text to fit the printer width with optional indentation."""
     words = text.split()
     lines = []
     current_line = ""
-    
+
     for word in words:
         available_width = width - indent
-        
+
         if len(current_line) + len(word) + 1 <= available_width:
             current_line += word + " "
         else:
             if current_line:
                 lines.append(current_line.strip())
             current_line = word + " "
-            
+
     if current_line:
         lines.append(current_line.strip())
-        
+
     return lines
+
 
 def print_setup_instructions_sync():
     """
     Prints WiFi setup instructions to the thermal printer.
     This function is safe to call from background tasks.
     """
-    print("[SYSTEM] Printing Setup Instructions...")
     try:
-        printer.feed(1)  # Ensure printer is awake
+        printer.feed(1)
 
-        # Helper for centering text
         def center(text):
             padding = max(0, (PRINTER_WIDTH - len(text)) // 2)
             return " " * padding + text
-        
+
         printer.print_text(center("PC-1 SETUP MODE"))
         printer.print_text(center("=" * 20))
         printer.feed(1)
         printer.print_text(center("Connect to WiFi:"))
-        
+
         # Get device ID for SSID
         ssid_suffix = "XXXX"
         try:
             if _is_raspberry_pi:
-                with open('/proc/cpuinfo', 'r') as f:
+                with open("/proc/cpuinfo", "r") as f:
                     for line in f:
-                        if line.startswith('Serial'):
+                        if line.startswith("Serial"):
                             ssid_suffix = line.split(":")[1].strip()[-4:]
                             break
-        except:
+        except Exception:
             pass
-            
+
         ssid = f"PC-1-Setup-{ssid_suffix}"
-        
+
         printer.print_text(center(ssid))
         printer.print_text(center("Password: setup1234"))
         printer.feed(1)
@@ -64,13 +65,11 @@ def print_setup_instructions_sync():
         printer.print_text(center("OR"))
         printer.print_text(center("http://10.42.0.1"))
         printer.feed(3)
-        
-        # CRITICAL: If invert mode is on, we must flush the buffer to actually print
+
         if hasattr(printer, "flush_buffer") and getattr(printer, "invert", False):
             printer.flush_buffer()
-            # Add feed lines after flushing (direct feed)
             if hasattr(printer, "feed_direct"):
                 printer.feed_direct(3)
-        
-    except Exception as e:
-        print(f"[ERROR] Failed to print setup instructions: {e}")
+
+    except Exception:
+        pass

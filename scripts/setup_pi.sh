@@ -146,16 +146,21 @@ cat > /etc/systemd/system/pc-1.service <<EOL
 [Unit]
 Description=PC-1 Paper Console
 After=network.target
+# Start limit: max 5 restarts per 300 seconds (5 min), then stop trying
+StartLimitIntervalSec=300
+StartLimitBurst=5
 
 [Service]
 User=$USER_NAME
 WorkingDirectory=$PROJECT_DIR
 ExecStart=/bin/bash $PROJECT_DIR/run.sh
 Restart=always
-RestartSec=5
+RestartSec=10
 KillSignal=SIGINT
 TimeoutStopSec=10
 Environment=PYTHONUNBUFFERED=1
+# Memory limits to prevent runaway processes (256MB is generous for this app)
+MemoryMax=256M
 
 [Install]
 WantedBy=multi-user.target

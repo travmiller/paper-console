@@ -51,6 +51,22 @@ async def save_settings_background(settings_snapshot: Settings):
 
 email_polling_task = None
 scheduler_task = None
+task_monitor_task = None
+
+
+async def task_watchdog():
+    """Monitor background tasks and restart them if they die unexpectedly."""
+    global email_polling_task, scheduler_task
+
+    while True:
+        await asyncio.sleep(60)  # Check every minute
+
+        # Silently restart any dead tasks
+        if email_polling_task is not None and email_polling_task.done():
+            email_polling_task = asyncio.create_task(email_polling_loop())
+
+        if scheduler_task is not None and scheduler_task.done():
+            scheduler_task = asyncio.create_task(scheduler_loop())
 
 
 async def email_polling_loop():
@@ -69,36 +85,30 @@ async def email_polling_loop():
                     email_config = EmailConfig(**(module.config or {}))
                     if email_config.auto_print_new:
                         email_modules.append(module)
-                        # Use the shortest interval if multiple email modules exist (future proofing)
                         if email_config.polling_interval < min_interval:
                             min_interval = email_config.polling_interval
 
-            # Wait for the interval
             await asyncio.sleep(min_interval)
 
             if not email_modules:
                 continue
 
-            # Check each email module
+            # Check each email module silently
             for module in email_modules:
                 try:
                     emails = email_client.fetch_emails(module.config)
                     if emails:
-                        print(
-                            f"[AUTO-POLL] Found {len(emails)} new email(s) in module '{module.name}'. Printing..."
-                        )
                         email_client.format_email_receipt(
                             printer,
                             messages=emails,
                             config=module.config,
                             module_name=module.name,
                         )
-                except Exception as e:
-                    print(f"[AUTO-POLL] Error checking email module {module.id}: {e}")
+                except Exception:
+                    pass  # Silently skip failed email checks
 
-        except Exception as e:
-            print(f"[AUTO-POLL] Error: {e}")
-            await asyncio.sleep(60)  # Wait 1 minute before retrying on error
+        except Exception:
+            await asyncio.sleep(60)  # Wait before retrying on error
 
 
 async def scheduler_loop():
@@ -109,7 +119,6 @@ async def scheduler_loop():
 
     while True:
         try:
-            # Check every 10 seconds to be precise enough but not wasteful
             await asyncio.sleep(10)
 
             now = datetime.now()
@@ -124,13 +133,9 @@ async def scheduler_loop():
             # Check all channels for matching schedule
             for pos, channel in settings.channels.items():
                 if channel.schedule and current_time in channel.schedule:
-                    print(
-                        f"[SCHEDULE] Channel {pos} scheduled for {current_time}. Triggering..."
-                    )
                     await trigger_channel(pos)
 
-        except Exception as e:
-            print(f"[SCHEDULE] Error: {e}")
+        except Exception:
             await asyncio.sleep(60)
 
 
@@ -141,21 +146,13 @@ def on_button_press():
     """
     Callback for when the physical button is pressed.
     Calls the async trigger_current_channel function.
-    Since this runs in a separate thread (from the driver), we need to schedule it on the main event loop.
     """
-    print("[EVENT] Button Press Detected!")
     try:
-        # Create a task in the running loop
         loop = asyncio.get_running_loop()
         loop.create_task(trigger_current_channel())
     except RuntimeError:
-        # Fallback if loop interaction fails (or if called from outside loop context)
-        # For the driver thread, we might need a reference to the loop
         pass
 
-
-# We need to pass the loop to the callback if possible, or set it up during startup.
-# A better way: The button driver calls a simple function, which uses `asyncio.run_coroutine_threadsafe`.
 
 global_loop = None
 
@@ -164,20 +161,14 @@ def on_button_press_threadsafe():
     """Callback that schedules the trigger on the main event loop."""
     global global_loop
     if global_loop and global_loop.is_running():
-        print("[EVENT] Button Press -> Scheduling Trigger")
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
-    else:
-        print("[ERROR] Event loop not available for button press")
 
 
 def on_button_long_press_threadsafe():
     """Callback for long press (5 seconds) - triggers AP mode."""
     global global_loop
     if global_loop and global_loop.is_running():
-        print("[EVENT] Button Long Press -> Activating AP Mode")
         asyncio.run_coroutine_threadsafe(manual_ap_mode_trigger(), global_loop)
-    else:
-        print("[ERROR] Event loop not available for button long press")
 
 
 from app.utils import print_setup_instructions_sync
@@ -190,38 +181,46 @@ async def print_setup_instructions():
 
 async def check_wifi_startup():
     """Check WiFi status on startup and enter AP mode if needed."""
-    print("[SYSTEM] Checking WiFi status...")
-    # Give system some time to connect to saved WiFi
+    # Give system time to connect to saved WiFi
     await asyncio.sleep(10)
 
     status = wifi_manager.get_wifi_status()
-    print(
-        f"[SYSTEM] WiFi status: connected={status.get('connected')}, mode={status.get('mode')}, ssid={status.get('ssid')}"
-    )
 
     if not status["connected"] and status["mode"] != "ap":
-        print("[SYSTEM] No WiFi connection detected. Starting AP mode...")
-        success = wifi_manager.start_ap_mode()
+        success = wifi_manager.start_ap_mode(retries=3)
 
         if success:
-            # Wait for AP to start
             await asyncio.sleep(5)
             await print_setup_instructions()
         else:
-            print("[SYSTEM] Failed to start AP mode!")
-    else:
-        print("[SYSTEM] WiFi connected or AP mode already active - skipping AP setup")
+            # Schedule periodic retry in the background
+            asyncio.create_task(periodic_wifi_recovery())
+
+
+async def periodic_wifi_recovery():
+    """Periodically check if we need to recover WiFi/AP mode."""
+    retry_interval = 300  # 5 minutes
+    max_retries = 12  # Try for 1 hour total
+
+    for attempt in range(max_retries):
+        await asyncio.sleep(retry_interval)
+
+        status = wifi_manager.get_wifi_status()
+
+        if status["connected"] or status["mode"] == "ap":
+            return
+
+        success = wifi_manager.start_ap_mode(retries=2)
+        if success:
+            await asyncio.sleep(5)
+            await print_setup_instructions()
+            return
 
 
 async def manual_ap_mode_trigger():
     """Manually trigger AP mode (e.g. via button hold)."""
-    print("[SYSTEM] Manual AP mode trigger...")
-
     # Print instructions BEFORE switching network mode
-    # This ensures the user gets the info even if the network switch is messy
     await print_setup_instructions()
-
-    print("[SYSTEM] Instructions printed. Switching to AP mode...")
 
     # Give a small delay for the printer buffer to flush/finish
     await asyncio.sleep(2)
@@ -232,50 +231,33 @@ async def manual_ap_mode_trigger():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    global email_polling_task, scheduler_task, global_loop
+    global email_polling_task, scheduler_task, task_monitor_task, global_loop
 
     # Capture the running loop
     global_loop = asyncio.get_running_loop()
 
-    # Startup
-    print("[SYSTEM] Starting PC-1...")
-
-    # Log Config Path
-    import app.config as config_module
-
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(config_module.__file__)))
-    config_path = os.path.join(base_dir, "config.json")
-    print(f"[SYSTEM] Loading configuration from: {config_path}")
-    if os.path.exists(config_path):
-        print("[SYSTEM] Config file found.")
-    else:
-        print("[SYSTEM] Config file NOT found. Using defaults.")
-
     # Check WiFi and start AP mode if needed
     asyncio.create_task(check_wifi_startup())
 
+    # Start background tasks
     email_polling_task = asyncio.create_task(email_polling_loop())
     scheduler_task = asyncio.create_task(scheduler_loop())
+    task_monitor_task = asyncio.create_task(task_watchdog())
 
     # Initialize Button Callbacks
     button.set_callback(on_button_press_threadsafe)
     button.set_long_press_callback(on_button_long_press_threadsafe)
 
     yield
-    # Shutdown
-    print("[SYSTEM] Shutting down PC-1...")
-    if email_polling_task:
-        email_polling_task.cancel()
-        try:
-            await email_polling_task
-        except asyncio.CancelledError:
-            pass
-    if scheduler_task:
-        scheduler_task.cancel()
-        try:
-            await scheduler_task
-        except asyncio.CancelledError:
-            pass
+
+    # Shutdown - cancel all background tasks
+    for task in [email_polling_task, scheduler_task, task_monitor_task]:
+        if task:
+            task.cancel()
+            try:
+                await task
+            except Exception:
+                pass
 
     # Cleanup hardware drivers
     if hasattr(printer, "close"):
@@ -328,6 +310,64 @@ async def read_root():
         "current_channel": pos,
         "current_module": module_info,
     }
+
+
+@app.get("/api/health")
+async def health_check():
+    """
+    Health check endpoint for monitoring.
+    Returns detailed status of all system components.
+    """
+    import os
+
+    health = {"status": "healthy", "components": {}}
+
+    # Check background tasks
+    health["components"]["email_polling"] = (
+        "running" if email_polling_task and not email_polling_task.done() else "stopped"
+    )
+    health["components"]["scheduler"] = (
+        "running" if scheduler_task and not scheduler_task.done() else "stopped"
+    )
+    health["components"]["task_monitor"] = (
+        "running" if task_monitor_task and not task_monitor_task.done() else "stopped"
+    )
+
+    # Check WiFi status
+    try:
+        wifi_status = wifi_manager.get_wifi_status()
+        health["components"]["wifi"] = wifi_status.get("mode", "unknown")
+        health["wifi_connected"] = wifi_status.get("connected", False)
+    except Exception as e:
+        health["components"]["wifi"] = f"error: {e}"
+
+    # Check hardware drivers
+    health["components"]["printer"] = "available" if printer else "unavailable"
+    health["components"]["dial"] = "available" if dial else "unavailable"
+    health["components"]["button"] = "available" if button else "unavailable"
+    health["components"]["gpio"] = "available" if _is_raspberry_pi else "mock"
+
+    # Check config file
+    import app.config as config_module
+
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(config_module.__file__)))
+    config_path = os.path.join(base_dir, "config.json")
+    health["components"]["config"] = (
+        "exists" if os.path.exists(config_path) else "missing"
+    )
+
+    # Overall status
+    critical_issues = []
+    if health["components"]["email_polling"] == "stopped":
+        critical_issues.append("email_polling stopped")
+    if health["components"]["scheduler"] == "stopped":
+        critical_issues.append("scheduler stopped")
+
+    if critical_issues:
+        health["status"] = "degraded"
+        health["issues"] = critical_issues
+
+    return health
 
 
 @app.get("/status")
@@ -641,99 +681,69 @@ async def update_channel_schedule(
 # --- EVENT ROUTER ---
 
 
-def execute_module(module: ModuleInstance):
-    """Execute a single module instance."""
+def execute_module(module: ModuleInstance) -> bool:
+    """Execute a single module instance. Returns True if successful, False if failed."""
     module_type = module.type
-    config = module.config
+    config = module.config or {}
     module_name = module.name or module_type.upper()
 
-    print(f"[MODULE] Executing {module.name or module_type} (type: {module_type})")
-
-    # Dispatch Logic
-    if module_type == "webhook":
-        try:
+    try:
+        # Dispatch Logic
+        if module_type == "webhook":
             action_config = WebhookConfig(**config)
             webhook.run_webhook(action_config, printer, module_name)
-        except Exception as e:
-            print(f"[ERROR] Webhook config invalid: {e}")
-            printer.print_text("Webhook Configuration Error")
-        return
 
-    if module_type == "text":
-        try:
+        elif module_type == "text":
             text_config = TextConfig(**config)
             text.format_text_receipt(printer, text_config, module_name)
-        except Exception as e:
-            print(f"[ERROR] Text config invalid: {e}")
-            printer.print_text("Text Configuration Error")
-        return
 
-    if module_type == "calendar":
-        try:
+        elif module_type == "calendar":
             cal_config = CalendarConfig(**config)
             calendar.format_calendar_receipt(printer, cal_config, module_name)
-        except Exception as e:
-            print(f"[ERROR] Calendar config invalid: {e}")
-            printer.print_text("Calendar Configuration Error")
-        return
 
-    if module_type == "news":
-        try:
+        elif module_type == "news":
             news.format_news_receipt(printer, config, module_name)
-        except Exception as e:
-            print(f"[ERROR] NewsAPI config invalid: {e}")
-            printer.print_text("NewsAPI Configuration Error")
-        return
 
-    if module_type == "rss":
-        try:
+        elif module_type == "rss":
             rss.format_rss_receipt(printer, config, module_name)
-        except Exception as e:
-            print(f"[ERROR] RSS config invalid: {e}")
-            printer.print_text("RSS Configuration Error")
-        return
 
-    if module_type == "email":
-        try:
-            email_config = EmailConfig(**config)
+        elif module_type == "email":
             emails = email_client.fetch_emails(config)
             email_client.format_email_receipt(
                 printer, messages=emails, config=config, module_name=module_name
             )
-        except Exception as e:
-            print(f"[ERROR] Email module failed: {e}")
-            printer.print_text(f"Email Error: {e}")
-        return
 
-    if module_type == "games":
-        try:
+        elif module_type == "games":
             sudoku.format_sudoku_receipt(printer, config, module_name)
-        except Exception as e:
-            print(f"[ERROR] Sudoku module failed: {e}")
-            printer.print_text(f"Sudoku Error: {e}")
-        return
 
-    if module_type == "astronomy":
-        try:
+        elif module_type == "astronomy":
             astronomy.format_astronomy_receipt(printer, module_name=module_name)
-        except Exception as e:
-            print(f"[ERROR] Astronomy module failed: {e}")
-            printer.print_text(f"Astronomy Error: {e}")
-        return
 
-    if module_type == "weather":
-        try:
+        elif module_type == "weather":
             weather.format_weather_receipt(printer, config, module_name)
-        except Exception as e:
-            print(f"[ERROR] Weather module failed: {e}")
-            printer.print_text(f"Weather Error: {e}")
-        return
 
-    if module_type == "off":
-        print("[SYSTEM] Module is disabled. Skipping.")
-        return
+        elif module_type == "off":
+            return True  # Disabled modules are "successful" (intentionally empty)
 
-    print(f"[SYSTEM] Unknown module type '{module_type}'")
+        else:
+            # Unknown module type
+            printer.print_text(f"{module_name}")
+            printer.print_line()
+            printer.print_text("This module type is not")
+            printer.print_text("recognized. Please check")
+            printer.print_text("your settings.")
+            return False
+
+        return True
+
+    except Exception:
+        # Print a friendly error message
+        printer.print_text(f"{module_name}")
+        printer.print_line()
+        printer.print_text("Could not load this content.")
+        printer.print_text("Please check your settings")
+        printer.print_text("or try again later.")
+        return False
 
 
 async def trigger_channel(position: int):
@@ -744,35 +754,19 @@ async def trigger_channel(position: int):
     if hasattr(printer, "reset_buffer"):
         printer.reset_buffer()
 
-    # Get the full ChannelConfig object
     channel = settings.channels.get(position)
 
-    if not channel:
-        print(f"[SYSTEM] Invalid channel config for position {position}")
-        return
+    # Handle empty or unconfigured channels
+    if not channel or not channel.modules:
+        printer.print_text(f"CHANNEL {position}")
+        printer.print_line()
+        printer.print_text("This channel is empty.")
+        printer.print_text("")
+        printer.print_text("Visit http://pc-1.local")
+        printer.print_text("to set it up.")
+        printer.feed(1)
 
-    # New format: multiple modules
-    if channel.modules:
-        print(
-            f"[EVENT] Triggered Channel {position} -> {len(channel.modules)} module(s)"
-        )
-
-        # Sort modules by order
-        sorted_modules = sorted(channel.modules, key=lambda m: m.order)
-
-        for assignment in sorted_modules:
-            module = settings.modules.get(assignment.module_id)
-            if module:
-                execute_module(module)
-                # Add a separator between modules
-                if assignment != sorted_modules[-1]:
-                    printer.feed(1)
-            else:
-                print(
-                    f"[ERROR] Module {assignment.module_id} not found in module registry"
-                )
-
-        # If invert is enabled, flush buffer to actually print (in reverse order)
+        # Flush and feed for invert mode
         if (
             hasattr(printer, "invert")
             and printer.invert
@@ -780,14 +774,34 @@ async def trigger_channel(position: int):
         ):
             printer.flush_buffer()
 
-        # Add cutter feed lines at the end of the print job
         feed_lines = getattr(settings, "cutter_feed_lines", 3)
         if feed_lines > 0:
             printer.feed_direct(feed_lines)
-            print(f"[SYSTEM] Added {feed_lines} feed line(s) to clear cutter")
         return
 
-    print(f"[SYSTEM] Channel {position} has no modules assigned")
+    # Sort modules by order and execute each
+    sorted_modules = sorted(channel.modules, key=lambda m: m.order)
+
+    for assignment in sorted_modules:
+        module = settings.modules.get(assignment.module_id)
+        if module:
+            execute_module(module)
+            # Add a separator between modules
+            if assignment != sorted_modules[-1]:
+                printer.feed(1)
+
+    # If invert is enabled, flush buffer to actually print (in reverse order)
+    if (
+        hasattr(printer, "invert")
+        and printer.invert
+        and hasattr(printer, "flush_buffer")
+    ):
+        printer.flush_buffer()
+
+    # Add cutter feed lines at the end of the print job
+    feed_lines = getattr(settings, "cutter_feed_lines", 3)
+    if feed_lines > 0:
+        printer.feed_direct(feed_lines)
 
 
 async def trigger_current_channel():

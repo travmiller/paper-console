@@ -25,15 +25,11 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
         headers = action.headers or {}
 
         if action.method.upper() == "POST":
-            # Parse body if it exists
             json_body = None
             if action.body:
                 try:
                     json_body = json.loads(action.body)
                 except json.JSONDecodeError:
-                    # If plain text, send as is? Or just log warning.
-                    # For now assume user sends valid JSON string for body
-                    print(f"[WEBHOOK] Invalid JSON body, sending as dict")
                     json_body = {}
 
             response = requests.post(
@@ -95,6 +91,5 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
                 for wrapped_line in wrapped_lines:
                     printer.print_text(wrapped_line)
 
-    except Exception as e:
-        print(f"[WEBHOOK] Error: {e}")
-        printer.print_text(f"Connection Failed: {e}")
+    except Exception:
+        printer.print_text("Could not connect.")

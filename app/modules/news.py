@@ -8,31 +8,25 @@ def get_newsapi_articles(config: Dict[str, Any] = None):
     """Fetches news from NewsAPI."""
     if config is None:
         config = {}
-    
-    # Ensure API key is present
+
     news_api_key = config.get("news_api_key")
-    
+
     if not news_api_key:
-        print("[NEWSAPI] No API key configured.")
         return []
-    
+
     articles = []
-    
+
     try:
-        print("Fetching NewsAPI...")
         url = "https://newsapi.org/v2/top-headlines"
         params = {
             "country": "us",
             "apiKey": news_api_key,
-            "pageSize": 3,  # Limit to 3 from NewsAPI
+            "pageSize": 3,
         }
         response = requests.get(url, params=params, timeout=10)
         data = response.json()
 
         if data.get("status") == "ok":
-            if not data.get("articles"):
-                print(f"NewsAPI returned 'ok' but 0 articles. Response: {data}")
-            
             for item in data.get("articles", []):
                 articles.append(
                     {
@@ -41,11 +35,9 @@ def get_newsapi_articles(config: Dict[str, Any] = None):
                         "summary": item.get("description") or "",
                     }
                 )
-        else:
-            print(f"NewsAPI Error: {data.get('message')}")
-    except Exception as e:
-        print(f"Error fetching NewsAPI: {e}")
-    
+    except Exception:
+        pass
+
     return articles
 
 
@@ -55,7 +47,9 @@ def get_newsapi_articles(config: Dict[str, Any] = None):
 from app.utils import wrap_text
 
 
-def format_news_receipt(printer, config: Dict[str, Any] = None, module_name: str = None):
+def format_news_receipt(
+    printer, config: Dict[str, Any] = None, module_name: str = None
+):
     """Compiles and prints the NewsAPI receipt."""
     news_data = get_newsapi_articles(config)
 
@@ -91,7 +85,7 @@ def format_news_receipt(printer, config: Dict[str, Any] = None, module_name: str
                 # Limit summary lines to save paper
                 for line in wrapped_summary[:4]:
                     printer.print_text(line)
-                
+
                 if len(wrapped_summary) > 4:
                     printer.print_text("...")
 

@@ -53,18 +53,19 @@ def get_weather():
             "city": city_name,
         }
 
-    except Exception as e:
-        print(f"Weather connection error: {e}")
+    except Exception:
         return {
             "current": "--",
-            "condition": "Error",
+            "condition": "Unavailable",
             "high": "--",
             "low": "--",
-            "city": "Error",
+            "city": app.config.settings.city_name,
         }
 
 
-def format_weather_receipt(printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None):
+def format_weather_receipt(
+    printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None
+):
     """Prints the weather receipt."""
     weather = get_weather()
 
@@ -78,4 +79,3 @@ def format_weather_receipt(printer: PrinterDriver, config: Dict[str, Any] = None
     printer.print_text(f"NOW:  {weather['current']}F  {weather['condition']}")
     printer.print_text(f"H/L:  {weather['high']}F / {weather['low']}F")
     printer.print_line()
-

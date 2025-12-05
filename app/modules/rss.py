@@ -1,43 +1,48 @@
 import feedparser
+import requests
 from datetime import datetime
 from typing import Dict, Any
 from bs4 import BeautifulSoup
 import re
 from app.config import settings
 
+# Maximum size for RSS feed content (500KB)
+MAX_FEED_SIZE = 500 * 1024
+
 
 def clean_text(text: str) -> str:
     """Cleans text by removing HTML, normalizing encoding, and removing non-printable characters."""
     if not text:
         return ""
-    
+
     # Handle bytes - decode to string first
     if isinstance(text, bytes):
         try:
-            text = text.decode('utf-8', errors='replace')
+            text = text.decode("utf-8", errors="replace")
         except:
             try:
-                text = text.decode('latin-1', errors='replace')
+                text = text.decode("latin-1", errors="replace")
             except:
                 return ""
-    
+
     # Convert to string if needed
     if not isinstance(text, str):
         try:
             text = str(text)
         except:
             return ""
-    
+
     # Remove HTML tags using BeautifulSoup
     try:
         soup = BeautifulSoup(text, "html.parser")
         text = soup.get_text(separator=" ", strip=True)
     except:
         # Fallback: simple regex removal
-        text = re.sub(r'<[^>]+>', '', text)
-    
+        text = re.sub(r"<[^>]+>", "", text)
+
     # Remove HTML entities (decode common ones)
     import html
+
     try:
         text = html.unescape(text)
     except:
@@ -49,15 +54,17 @@ def clean_text(text: str) -> str:
         text = text.replace("&quot;", '"')
         text = text.replace("&#39;", "'")
         text = text.replace("&apos;", "'")
-    
+
     # Remove non-printable characters (keep only ASCII printable)
     # This will remove emojis, Japanese characters, and other multi-byte characters
     # that thermal printers can't handle properly
-    text = ''.join(char for char in text if (32 <= ord(char) < 127) or char in ['\n', '\t', '\r'])
-    
+    text = "".join(
+        char for char in text if (32 <= ord(char) < 127) or char in ["\n", "\t", "\r"]
+    )
+
     # Normalize whitespace
-    text = ' '.join(text.split())
-    
+    text = " ".join(text.split())
+
     return text.strip()
 
 
@@ -68,45 +75,46 @@ def get_rss_articles(config: Dict[str, Any] = None):
     """Fetches articles from RSS feeds."""
     if config is None:
         config = {"rss_feeds": []}
-    
+
     rss_feeds = config.get("rss_feeds", [])
-    
+
     # Filter out empty strings
     rss_feeds = [feed for feed in rss_feeds if feed and feed.strip()]
-    
+
     if not rss_feeds:
-        print("[RSS] No RSS feeds configured or all feeds are empty.")
         return []
-    
+
     articles = []
-    
-    print(f"[RSS] Fetching {len(rss_feeds)} RSS feeds...")
+
     for feed_url in rss_feeds:
-        print(f"[RSS] Parsing RSS: {feed_url[:60]}...")
         try:
-            feed = feedparser.parse(feed_url)
-            
-            # Check if feed has entries
+            # Use requests with timeout instead of feedparser directly
+            # This prevents hanging on slow/unresponsive feeds
+            response = requests.get(feed_url, timeout=10)
+            response.raise_for_status()
+
+            # Limit response size to prevent memory issues
+            content = response.content[:MAX_FEED_SIZE]
+
+            # Parse the fetched content
+            feed = feedparser.parse(content)
+
             if not feed.entries:
-                print(f"[RSS] No entries found in feed: {feed_url[:60]}...")
                 continue
-            
+
             # Get top 2 entries from each feed
             for entry in feed.entries[:2]:
-                # Clean up text - remove HTML, normalize encoding, remove emojis
                 title = clean_text(entry.get("title", "No Title"))
-                summary = clean_text(entry.get("summary", entry.get("description", "No summary.")))
+                summary = clean_text(
+                    entry.get("summary", entry.get("description", "No summary."))
+                )
                 source = clean_text(feed.feed.get("title", "RSS"))
-                
-                articles.append({
-                    "source": source,
-                    "title": title,
-                    "summary": summary
-                })
-        except Exception as e:
-            print(f"[RSS] Error fetching RSS {feed_url}: {e}")
-    
-    print(f"[RSS] Found {len(articles)} articles total")
+
+                articles.append({"source": source, "title": title, "summary": summary})
+        except Exception:
+            # Silently skip failed feeds
+            continue
+
     return articles[:10]  # Cap at 10 items total
 
 
@@ -145,9 +153,8 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
             # Limit summary lines to save paper
             for line in wrapped_summary[:4]:
                 printer.print_text(line)
-            
+
             if len(wrapped_summary) > 4:
                 printer.print_text("...")
 
             printer.print_line()  # Separator between articles
-

@@ -1,10 +1,14 @@
 import imaplib
 import email
+import socket
 from email.header import decode_header
 from bs4 import BeautifulSoup
 from typing import Dict, Any
 from app.config import EmailConfig
 import app.config
+
+# Set default socket timeout for IMAP operations (30 seconds)
+IMAP_TIMEOUT = 30
 
 
 def clean_text(text):
@@ -33,72 +37,64 @@ def strip_html(html_content):
 # --- REAL IMAP LOGIC ---
 def fetch_emails(config: Dict[str, Any] = None):
     """
-    Fetches unread emails from the 'pc-1' folder.
+    Fetches unread emails from the inbox.
     Returns a list of dicts: {'from', 'subject', 'body'}
     """
 
     # Backwards compatibility / Direct Call support
     if config is None:
-        # Try to find email config from channels (legacy support)
         for _, chan in app.config.settings.channels.items():
             if chan.type == "email":
                 config = chan.config
                 break
         if config is None:
-            # No config found, return empty
-            print("[EMAIL] No email configuration found.")
             return []
 
     try:
-        # Validate config has required fields
         if not config.get("email_user") or not config.get("email_password"):
-            print("[EMAIL] Missing email credentials in config.")
             return []
 
         email_config = EmailConfig(**config)
-    except Exception as e:
-        print(f"Invalid Email Config: {e}")
+    except Exception:
         return []
 
     if not email_config.email_user or not email_config.email_password:
-        print("No email credentials found.")
         return []
 
     mail = None
+    # Set socket timeout to prevent hanging forever
+    old_timeout = socket.getdefaulttimeout()
+    socket.setdefaulttimeout(IMAP_TIMEOUT)
+
     try:
         mail = imaplib.IMAP4_SSL(email_config.email_host)
         mail.login(email_config.email_user, email_config.email_password)
 
-        # Select Inbox (Dedicated Account Mode)
         status, _ = mail.select("inbox")
         if status != "OK":
-            print(f"[EMAIL] Failed to select inbox. Status: {status}")
             return []
 
-        # Search for all Unread emails
         status, messages = mail.search(None, "UNSEEN")
         if status != "OK":
-            print(f"[EMAIL] Failed to search for emails. Status: {status}")
             return []
-        
+
         if not messages[0]:
-            # No unread emails
             return []
-        
+
         msg_ids = messages[0].split()
         if not msg_ids:
             return []
 
         results = []
-        fetched_msg_ids = []  # Track which messages we fetched
-        
+        fetched_msg_ids = []
+
         # Limit to last 5
         for num in msg_ids[-5:]:
             try:
                 status, msg_data = mail.fetch(num, "(RFC822)")
                 if status != "OK":
                     continue
-                    
+
                 for response_part in msg_data:
                     if isinstance(response_part, tuple):
                         msg = email.message_from_bytes(response_part[1])
@@ -106,24 +102,20 @@ def fetch_emails(config: Dict[str, Any] = None):
                         subject = clean_text(msg["Subject"])
                         sender = clean_text(msg["From"])
 
-                        # Get Body
                         body = "No content."
                         if msg.is_multipart():
                             for part in msg.walk():
                                 content_type = part.get_content_type()
-                                content_disposition = str(part.get("Content-Disposition"))
 
                                 if "attachment" not in content_type:
                                     try:
                                         payload = part.get_payload(decode=True).decode()
                                         if content_type == "text/plain":
                                             body = payload
-                                            break  # Prefer plain text
+                                            break
                                         elif content_type == "text/html":
-                                            body = strip_html(
-                                                payload
-                                            )  # Fallback to stripped HTML
-                                    except:
+                                            body = strip_html(payload)
+                                    except Exception:
                                         pass
                         else:
                             try:
@@ -132,22 +124,20 @@ def fetch_emails(config: Dict[str, Any] = None):
                                     body = strip_html(payload)
                                 else:
                                     body = payload
-                            except:
+                            except Exception:
                                 pass
 
-                        # Clean up body (remove excessive whitespace)
                         body = " ".join(body.split())
 
                         results.append(
                             {
                                 "from": sender,
                                 "subject": subject,
-                                "body": body[:500],  # Truncate
+                                "body": body[:500],  # Truncate to prevent huge prints
                             }
                         )
                         fetched_msg_ids.append(num)
-            except Exception as e:
-                print(f"[EMAIL] Error fetching message {num}: {e}")
+            except Exception:
                 continue
 
         # Mark fetched emails as read
@@ -155,27 +145,27 @@ def fetch_emails(config: Dict[str, Any] = None):
             try:
                 for msg_id in fetched_msg_ids:
                     mail.store(msg_id, "+FLAGS", "\\Seen")
-            except Exception as e:
-                print(f"[EMAIL] Warning: Failed to mark emails as read: {e}")
+            except Exception:
+                pass
 
         return results
-    except Exception as e:
-        print(f"[EMAIL] IMAP Error: {e}")
-        import traceback
-        traceback.print_exc()
+    except Exception:
         return []
     finally:
-        # Close connection
+        # Restore socket timeout
+        socket.setdefaulttimeout(old_timeout)
         if mail:
             try:
                 mail.close()
                 mail.logout()
-            except:
+            except Exception:
                 pass
 
 
 # --- FORMATTER ---
-def format_email_receipt(printer, messages=None, config: Dict[str, Any] = None, module_name: str = None):
+def format_email_receipt(
+    printer, messages=None, config: Dict[str, Any] = None, module_name: str = None
+):
     """Prints the unread email queue.
 
     Args:
@@ -188,7 +178,7 @@ def format_email_receipt(printer, messages=None, config: Dict[str, Any] = None, 
         messages = fetch_emails(config)
 
     from datetime import datetime
-    
+
     header_name = (module_name or "EMAIL INBOX").upper()
 
     if not messages:

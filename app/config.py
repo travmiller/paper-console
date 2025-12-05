@@ -84,14 +84,21 @@ class ChannelConfig(BaseModel):
     schedule: List[str] = []
 
 
+from pydantic import field_validator
+
+
 class Settings(BaseModel):
     timezone: str = "America/New_York"
     latitude: float = 40.7128
     longitude: float = -74.0060
     city_name: str = "New York"
     time_format: str = "12h"  # "12h" for 12-hour format, "24h" for 24-hour format
-    cutter_feed_lines: int = 3  # Number of empty lines to add at end of print job to clear cutter
-    invert_print: bool = True  # Rotate print output 180 degrees (for upside-down printers)
+    cutter_feed_lines: int = (
+        3  # Number of empty lines to add at end of print job to clear cutter
+    )
+    invert_print: bool = (
+        True  # Rotate print output 180 degrees (for upside-down printers)
+    )
 
     # Global Weather API (shared across modules if needed)
     openweather_api_key: Optional[str] = os.getenv("OPENWEATHER_API_KEY")
@@ -105,6 +112,47 @@ class Settings(BaseModel):
     # Channels can have multiple modules assigned (new format)
     channels: Dict[int, ChannelConfig] = {}
 
+    @field_validator("latitude")
+    @classmethod
+    def validate_latitude(cls, v):
+        if not -90 <= v <= 90:
+            raise ValueError("Latitude must be between -90 and 90")
+        return v
+
+    @field_validator("longitude")
+    @classmethod
+    def validate_longitude(cls, v):
+        if not -180 <= v <= 180:
+            raise ValueError("Longitude must be between -180 and 180")
+        return v
+
+    @field_validator("cutter_feed_lines")
+    @classmethod
+    def validate_cutter_feed_lines(cls, v):
+        if v < 0:
+            return 0
+        if v > 20:
+            return 20
+        return v
+
+    @field_validator("time_format")
+    @classmethod
+    def validate_time_format(cls, v):
+        if v not in ("12h", "24h"):
+            return "12h"
+        return v
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone(cls, v):
+        try:
+            import pytz
+
+            pytz.timezone(v)
+        except Exception:
+            return "America/New_York"
+        return v
+
     class Config:
         pass
 
@@ -112,15 +160,12 @@ class Settings(BaseModel):
 def migrate_old_config(data: dict) -> dict:
     """Migrate old config format (channels with single type) to new format (modules + assignments)."""
     if "modules" in data and data["modules"]:
-        # Already in new format
         return data
 
-    # Check if this is the old format
     channels = data.get("channels", {})
     if not channels:
         return data
 
-    # Check if channel 1 has old format (type field directly)
     first_channel = channels.get("1") or channels.get(1)
     if (
         first_channel
@@ -128,9 +173,7 @@ def migrate_old_config(data: dict) -> dict:
         and "type" in first_channel
         and "modules" not in first_channel
     ):
-        print("[MIGRATION] Detected old config format. Migrating to modular format...")
-
-        # Create new structure
+        # Migrate old format
         new_modules = {}
         new_channels = {}
 
@@ -142,11 +185,8 @@ def migrate_old_config(data: dict) -> dict:
             if channel_type == "off":
                 new_channels[pos_int] = ChannelConfig(modules=[])
             elif channel_type == "news":
-                # Special handling: Split old "news" modules that had both NewsAPI and RSS
-                # into separate News API and RSS modules
                 module_assignments = []
 
-                # Check if it has NewsAPI config
                 has_newsapi = channel_config.get(
                     "enable_newsapi", True
                 ) and channel_config.get("news_api_key")
@@ -162,7 +202,6 @@ def migrate_old_config(data: dict) -> dict:
                         ChannelModuleAssignment(module_id=news_module_id, order=0)
                     )
 
-                # Check if it has RSS feeds
                 rss_feeds = channel_config.get("rss_feeds", [])
                 if rss_feeds:
                     rss_module_id = str(uuid.uuid4())
@@ -178,13 +217,11 @@ def migrate_old_config(data: dict) -> dict:
                         )
                     )
 
-                # If neither, create empty channel
                 if not module_assignments:
                     new_channels[pos_int] = ChannelConfig(modules=[])
                 else:
                     new_channels[pos_int] = ChannelConfig(modules=module_assignments)
             else:
-                # Create a module instance for this channel
                 module_id = str(uuid.uuid4())
                 module_name = channel_type.title()
 
@@ -195,74 +232,108 @@ def migrate_old_config(data: dict) -> dict:
                     config=channel_config,
                 )
 
-                # Assign module to channel
                 new_channels[pos_int] = ChannelConfig(
                     modules=[ChannelModuleAssignment(module_id=module_id, order=0)]
                 )
 
         data["modules"] = {mid: mod.model_dump() for mid, mod in new_modules.items()}
-        # Convert channel positions to int keys for Pydantic
         data["channels"] = {
             int(pos): ch.model_dump() for pos, ch in new_channels.items()
         }
 
-        print(
-            f"[MIGRATION] Created {len(new_modules)} module instances across {len(new_channels)} channels."
-        )
-
     return data
 
 
+def _try_load_config_file(config_path: str) -> Settings | None:
+    """Attempt to load config from a specific file path. Returns None on failure."""
+    if not os.path.exists(config_path):
+        return None
+
+    try:
+        with open(config_path, "r") as f:
+            data = json.load(f)
+
+            # Check if channel 1 is a string (very old format)
+            channels = data.get("channels", {})
+            if channels and isinstance(channels.get("1"), str):
+                return Settings()
+
+            # Migrate old format to new format if needed
+            data = migrate_old_config(data)
+
+            # Normalize channel keys to integers (JSON loads them as strings)
+            if "channels" in data and data["channels"]:
+                normalized_channels = {}
+                for key, value in data["channels"].items():
+                    try:
+                        normalized_channels[int(key)] = value
+                    except (ValueError, TypeError):
+                        normalized_channels[key] = value
+                data["channels"] = normalized_channels
+
+            return Settings(**data)
+    except Exception:
+        return None
+
+
 def load_config() -> Settings:
-    """Load settings from config.json or return defaults."""
-    # Get absolute path to config.json (one directory up from this file)
+    """Load settings from config.json or backup, or return defaults."""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, "config.json")
+    backup_path = os.path.join(base_dir, "config.json.bak")
 
-    if os.path.exists(config_path):
-        with open(config_path, "r") as f:
+    # Try main config first
+    settings = _try_load_config_file(config_path)
+    if settings is not None:
+        return settings
+
+    # Main config failed, try backup
+    if os.path.exists(backup_path):
+        settings = _try_load_config_file(backup_path)
+        if settings is not None:
             try:
-                data = json.load(f)
+                save_config(settings)
+            except Exception:
+                pass
+            return settings
 
-                # Check if channel 1 is a string (very old format)
-                channels = data.get("channels", {})
-                if channels and isinstance(channels.get("1"), str):
-                    print(
-                        "Detected very old config format. Migrating/Resetting to new default structure."
-                    )
-                    return Settings()
-
-                # Migrate old format to new format if needed
-                data = migrate_old_config(data)
-
-                # Normalize channel keys to integers (JSON loads them as strings)
-                if "channels" in data and data["channels"]:
-                    normalized_channels = {}
-                    for key, value in data["channels"].items():
-                        try:
-                            normalized_channels[int(key)] = value
-                        except (ValueError, TypeError):
-                            normalized_channels[key] = value
-                    data["channels"] = normalized_channels
-
-                return Settings(**data)
-            except Exception as e:
-                print(f"Error loading config: {e}")
-                import traceback
-
-                traceback.print_exc()
-
+    # Both failed, return defaults
     return Settings()
 
 
 def save_config(new_settings: Settings):
-    """Saves the settings object to config.json."""
-    # Get absolute path to config.json (one directory up from this file)
+    """Saves the settings object to config.json using atomic write to prevent corruption."""
     base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     config_path = os.path.join(base_dir, "config.json")
+    backup_path = os.path.join(base_dir, "config.json.bak")
+    temp_path = os.path.join(base_dir, "config.json.tmp")
 
-    with open(config_path, "w") as f:
-        json.dump(new_settings.model_dump(), f, indent=4)
+    try:
+        # Write to temp file first
+        with open(temp_path, "w") as f:
+            json.dump(new_settings.model_dump(), f, indent=4)
+            f.flush()
+            os.fsync(f.fileno())
+
+        # Backup existing config
+        if os.path.exists(config_path):
+            try:
+                if os.path.exists(backup_path):
+                    os.remove(backup_path)
+                os.rename(config_path, backup_path)
+            except Exception:
+                pass
+
+        # Atomic rename
+        os.rename(temp_path, config_path)
+
+    except Exception:
+        if os.path.exists(temp_path):
+            try:
+                os.remove(temp_path)
+            except Exception:
+                pass
+        raise
 
 
 def format_time(dt: datetime, time_format: Optional[str] = None) -> str:
