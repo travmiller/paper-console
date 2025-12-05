@@ -1002,11 +1002,21 @@ async def trigger_channel(position: int):
         for assignment in sorted_modules:
             # Check for cancellation before each module
             if cancel_print_requested:
-                # Clear buffer and print cancellation message
+                # Clear buffer (discard any buffered content)
                 if hasattr(printer, "reset_buffer"):
                     printer.reset_buffer()
+
+                # Print cancellation message
                 printer.print_text("--- PRINT CANCELLED ---")
                 printer.feed(1)
+
+                # In invert mode, flush the cancellation message
+                if (
+                    hasattr(printer, "invert")
+                    and printer.invert
+                    and hasattr(printer, "flush_buffer")
+                ):
+                    printer.flush_buffer()
 
                 # Feed to clear cutter
                 feed_lines = getattr(settings, "cutter_feed_lines", 3)
@@ -1023,11 +1033,7 @@ async def trigger_channel(position: int):
                     hasattr(printer, "is_max_lines_exceeded")
                     and printer.is_max_lines_exceeded()
                 ):
-                    printer.print_text("")
-                    printer.print_text("--- MAX LENGTH REACHED ---")
-                    printer.feed(1)
-
-                    # Flush and feed
+                    # Flush buffer first (for invert mode) so content prints
                     if (
                         hasattr(printer, "invert")
                         and printer.invert
@@ -1035,6 +1041,12 @@ async def trigger_channel(position: int):
                     ):
                         printer.flush_buffer()
 
+                    # Print message AFTER flush so it appears at the end
+                    printer.print_text("")
+                    printer.print_text("--- MAX LENGTH REACHED ---")
+                    printer.feed(1)
+
+                    # Final feed for cutter
                     feed_lines = getattr(settings, "cutter_feed_lines", 3)
                     if feed_lines > 0:
                         printer.feed_direct(feed_lines)
@@ -1046,10 +1058,23 @@ async def trigger_channel(position: int):
 
         # Check for cancellation before final flush
         if cancel_print_requested:
+            # Clear any buffered content (don't print it)
             if hasattr(printer, "reset_buffer"):
                 printer.reset_buffer()
+
+            # Print cancellation message
+            printer.print_text("")
             printer.print_text("--- PRINT CANCELLED ---")
             printer.feed(1)
+
+            # In invert mode, need to flush the cancellation message
+            if (
+                hasattr(printer, "invert")
+                and printer.invert
+                and hasattr(printer, "flush_buffer")
+            ):
+                printer.flush_buffer()
+
             feed_lines = getattr(settings, "cutter_feed_lines", 3)
             if feed_lines > 0:
                 printer.feed_direct(feed_lines)
