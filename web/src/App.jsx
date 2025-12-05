@@ -16,11 +16,20 @@ const JsonTextarea = ({ value, onChange, onBlur, className }) => {
     }
   }, [value]);
 
+  // Parse JSON, treating empty/whitespace as empty object
+  const parseJson = (str) => {
+    const trimmed = str.trim();
+    if (trimmed === '') {
+      return {};
+    }
+    return JSON.parse(trimmed);
+  };
+
   const handleChange = (e) => {
     const newText = e.target.value;
     setText(newText);
     try {
-      const parsed = JSON.parse(newText);
+      const parsed = parseJson(newText);
       setIsValid(true);
       onChange(parsed);
     } catch {
@@ -31,8 +40,12 @@ const JsonTextarea = ({ value, onChange, onBlur, className }) => {
   const handleBlur = (e) => {
     isFocused.current = false;
     try {
-      const parsed = JSON.parse(text);
+      const parsed = parseJson(text);
       setIsValid(true);
+      // If empty, also clear the text display
+      if (text.trim() === '') {
+        setText('{}');
+      }
       onBlur(parsed);
     } catch {
       // Reset to valid JSON on blur if invalid
