@@ -148,6 +148,12 @@ class PrinterDriver:
         import time
 
         try:
+            # Clear software invert buffer first
+            if self.print_buffer is not None:
+                self.print_buffer.clear()
+            self.lines_printed = 0
+            self.max_lines = 0
+
             # Cancel any in-progress print job
             self._write(b"\x18")  # CAN - Cancel print data in page mode
             time.sleep(0.05)
