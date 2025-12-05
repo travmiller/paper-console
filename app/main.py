@@ -1013,13 +1013,16 @@ async def trigger_channel(position: int):
             module = settings.modules.get(assignment.module_id)
             if module:
                 execute_module(module)
-                
+
                 # Check for max lines exceeded after each module
-                if hasattr(printer, "is_max_lines_exceeded") and printer.is_max_lines_exceeded():
+                if (
+                    hasattr(printer, "is_max_lines_exceeded")
+                    and printer.is_max_lines_exceeded()
+                ):
                     printer.print_text("")
                     printer.print_text("--- MAX LENGTH REACHED ---")
                     printer.feed(1)
-                    
+
                     # Flush and feed
                     if (
                         hasattr(printer, "invert")
@@ -1027,12 +1030,12 @@ async def trigger_channel(position: int):
                         and hasattr(printer, "flush_buffer")
                     ):
                         printer.flush_buffer()
-                    
+
                     feed_lines = getattr(settings, "cutter_feed_lines", 3)
                     if feed_lines > 0:
                         printer.feed_direct(feed_lines)
                     return
-                
+
                 # Add a separator between modules
                 if assignment != sorted_modules[-1]:
                     printer.feed(1)

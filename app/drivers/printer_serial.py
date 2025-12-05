@@ -285,7 +285,7 @@ class PrinterDriver:
 
     def reset_buffer(self, max_lines: int = 0):
         """Reset/clear the print buffer (call at start of new print job).
-        
+
         Args:
             max_lines: Maximum lines for this print job (0 = no limit)
         """
