@@ -585,6 +585,11 @@ function App() {
       });
 
       if (immediate) {
+        // Cancel any pending debounced save for this module to prevent stale data overwrites
+        if (moduleUpdateTimers.current[moduleId]) {
+          clearTimeout(moduleUpdateTimers.current[moduleId]);
+          delete moduleUpdateTimers.current[moduleId];
+        }
         // For immediate updates (on blur), call updateModule directly
         updateModule(moduleId, updated, true);
       } else {
