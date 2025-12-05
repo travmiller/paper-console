@@ -18,6 +18,7 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
     printer.print_header(header_label)
     printer.print_text(datetime.now().strftime("%A, %b %d"))
     printer.print_line()
+    printer.print_text(f"Fetching: {action.url}")
 
     try:
         response = None
