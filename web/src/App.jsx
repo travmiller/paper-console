@@ -1,6 +1,58 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import WiFiSetup from './WiFiSetup';
 
+// Component for editing JSON in a textarea without losing cursor position
+const JsonTextarea = ({ value, onChange, onBlur, className }) => {
+  const [text, setText] = useState(JSON.stringify(value || {}, null, 2));
+  const [isValid, setIsValid] = useState(true);
+
+  // Update local text when external value changes (but only if we're not focused)
+  const textareaRef = useRef(null);
+  const isFocused = useRef(false);
+
+  useEffect(() => {
+    if (!isFocused.current) {
+      setText(JSON.stringify(value || {}, null, 2));
+    }
+  }, [value]);
+
+  const handleChange = (e) => {
+    const newText = e.target.value;
+    setText(newText);
+    try {
+      const parsed = JSON.parse(newText);
+      setIsValid(true);
+      onChange(parsed);
+    } catch {
+      setIsValid(false);
+    }
+  };
+
+  const handleBlur = (e) => {
+    isFocused.current = false;
+    try {
+      const parsed = JSON.parse(text);
+      setIsValid(true);
+      onBlur(parsed);
+    } catch {
+      // Reset to valid JSON on blur if invalid
+      setText(JSON.stringify(value || {}, null, 2));
+      setIsValid(true);
+    }
+  };
+
+  return (
+    <textarea
+      ref={textareaRef}
+      value={text}
+      onChange={handleChange}
+      onFocus={() => (isFocused.current = true)}
+      onBlur={handleBlur}
+      className={`${className} ${!isValid ? 'border-red-500' : ''}`}
+    />
+  );
+};
+
 const AVAILABLE_MODULE_TYPES = [
   { id: 'news', label: 'News API' },
   { id: 'rss', label: 'RSS Feeds' },
@@ -550,18 +602,10 @@ function App() {
           </div>
           <div>
             <label className={labelClass}>Headers (JSON)</label>
-            <textarea
-              value={JSON.stringify(config.headers || {}, null, 2)}
-              onChange={(e) => {
-                try {
-                  updateConfig('headers', JSON.parse(e.target.value));
-                } catch {}
-              }}
-              onBlur={(e) => {
-                try {
-                  updateConfig('headers', JSON.parse(e.target.value), true);
-                } catch {}
-              }}
+            <JsonTextarea
+              value={config.headers || {}}
+              onChange={(parsed) => updateConfig('headers', parsed)}
+              onBlur={(parsed) => updateConfig('headers', parsed, true)}
               className={`${inputClass} font-mono text-sm min-h-[80px]`}
             />
           </div>
