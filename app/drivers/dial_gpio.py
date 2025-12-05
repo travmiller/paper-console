@@ -91,7 +91,8 @@ class DialDriver:
             )
             self.monitor_thread.start()
 
-        except Exception:
+        except Exception as e:
+            print(f"[ERROR] Dial driver initialization failed: {e}")
             self.gpio_available = False
             self.cleanup()
 

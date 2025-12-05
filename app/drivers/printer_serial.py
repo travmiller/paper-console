@@ -152,7 +152,6 @@ class PrinterDriver:
 
             # CRITICAL: Disable all Chinese/Asian character modes
             self._write(b"\x1c\x2e")  # FS . - Cancel Chinese mode
-            self._write(b"\x1c\x26")  # FS & - Cancel Kanji mode
             self._write(b"\x1b\x52\x00")  # ESC R 0 - USA character set
             self._write(b"\x1b\x74\x00")  # ESC t 0 - Code page PC437 (US)
 
@@ -172,7 +171,6 @@ class PrinterDriver:
         """Re-send commands to ensure printer stays in ASCII mode."""
         try:
             self._write(b"\x1c\x2e")  # FS . - Cancel Chinese mode
-            self._write(b"\x1c\x26")  # FS & - Cancel Kanji mode
         except Exception:
             pass
 

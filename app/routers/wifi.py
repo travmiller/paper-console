@@ -21,26 +21,17 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
     """Background task to connect to WiFi."""
     import time
 
-    print(f"[WIFI] Background: Starting connection to {ssid}")
-
     # Stop AP mode first
     if wifi_manager.is_ap_mode_active():
-        print("[WIFI] Background: Stopping AP mode...")
         wifi_manager.stop_ap_mode()
         # Wait for WiFi adapter to switch back to client mode
-        print("[WIFI] Background: Waiting for adapter to reset...")
         time.sleep(5)
 
     # Connect to the new network
-    print(f"[WIFI] Background: Connecting to {ssid}...")
     success = wifi_manager.connect_to_wifi(ssid, password)
 
-    if success:
-        print(f"[WIFI] Background: Successfully connected to {ssid}")
-    else:
-        print(f"[WIFI] Background: Failed to connect to {ssid}")
+    if not success:
         # If connection failed, restart AP mode so user can try again
-        print("[WIFI] Background: Restarting AP mode for retry...")
         time.sleep(2)
         wifi_manager.start_ap_mode()
 
@@ -87,17 +78,10 @@ async def trigger_ap_mode(background_tasks: BackgroundTasks):
         # PRINT FIRST to ensure instructions are out before network disruption
         print_setup_instructions_sync()
 
-        print(
-            "[WIFI] Waiting 2 seconds before starting AP mode (to allow response to send)..."
-        )
+        # Wait for HTTP response to send before disrupting network
         time.sleep(2)
 
-        success = wifi_manager.start_ap_mode()
-
-        if success:
-            print("[WIFI] AP mode started.")
-        else:
-            print("[ERROR] Failed to start AP mode from background task")
+        wifi_manager.start_ap_mode()
 
     # Add to background tasks so we can return response immediately
     background_tasks.add_task(delayed_ap_start)

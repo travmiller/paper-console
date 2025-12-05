@@ -612,9 +612,6 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
 
     # Reinitialize printer if invert setting changed
     if old_invert != new_invert:
-        print(
-            f"[SYSTEM] Printer invert setting changed to {new_invert}, reinitializing printer..."
-        )
         if hasattr(hardware.printer, "close"):
             hardware.printer.close()
 
@@ -657,7 +654,6 @@ async def reload_settings():
     global settings, printer
     import app.config as config_module
 
-    print("[SYSTEM] Reloading settings from disk...")
     new_settings = load_config()
 
     # Check if invert_print setting changed
@@ -670,9 +666,6 @@ async def reload_settings():
 
     # Reinitialize printer if invert setting changed
     if old_invert != new_invert:
-        print(
-            f"[SYSTEM] Printer invert setting changed to {new_invert}, reinitializing printer..."
-        )
         if hasattr(printer, "close"):
             printer.close()
 
