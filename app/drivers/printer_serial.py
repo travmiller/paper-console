@@ -15,28 +15,30 @@ class PrinterDriver:
     MAX_BUFFER_SIZE = 1000
 
     # Character translation table: maps problematic Unicode chars to ASCII equivalents
+    # Using Unicode escapes to prevent formatter corruption
     CHAR_REPLACEMENTS = str.maketrans(
         {
-            '"': '"',
-            '"': '"',
-            """: "'", """: "'",  # Smart quotes
-            "–": "-",
-            "—": "-",  # Dashes
-            "…": "...",  # Ellipsis
-            "•": "*",  # Bullet
-            "°": "o",  # Degree
-            "©": "(c)",
-            "®": "(R)",
-            "™": "(TM)",  # Legal
-            "×": "x",
-            "÷": "/",  # Math
-            "€": "EUR",
-            "£": "GBP",
-            "¥": "JPY",  # Currency
+            "\u201c": '"',  # Left double quote "
+            "\u201d": '"',  # Right double quote "
+            "\u2018": "'",  # Left single quote '
+            "\u2019": "'",  # Right single quote '
+            "\u2013": "-",  # En dash –
+            "\u2014": "-",  # Em dash —
+            "\u2026": "...",  # Ellipsis …
+            "\u2022": "*",  # Bullet •
+            "\u00b0": "o",  # Degree °
+            "\u00a9": "(c)",  # Copyright ©
+            "\u00ae": "(R)",  # Registered ®
+            "\u2122": "(TM)",  # Trademark ™
+            "\u00d7": "x",  # Multiplication ×
+            "\u00f7": "/",  # Division ÷
+            "\u20ac": "EUR",  # Euro €
+            "\u00a3": "GBP",  # Pound £
+            "\u00a5": "JPY",  # Yen ¥
             "\u00a0": " ",  # Non-breaking space
             "\u200b": "",  # Zero-width space
-            "\u200c": "",
-            "\u200d": "",  # Zero-width joiners
+            "\u200c": "",  # Zero-width non-joiner
+            "\u200d": "",  # Zero-width joiner
             "\ufeff": "",  # BOM
         }
     )
