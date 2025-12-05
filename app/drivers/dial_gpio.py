@@ -108,7 +108,7 @@ class DialDriver:
         try:
             values = self.input_handle.get_values()
             # Debug: print raw values once on startup
-            if not hasattr(self, '_debug_printed'):
+            if not hasattr(self, "_debug_printed"):
                 print(f"[DIAL DEBUG] GPIO pins: {self.gpio_pins}")
                 print(f"[DIAL DEBUG] Raw values: {values}")
                 self._debug_printed = True
