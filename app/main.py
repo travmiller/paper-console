@@ -179,6 +179,125 @@ async def print_setup_instructions():
     print_setup_instructions_sync()
 
 
+def _get_welcome_marker_path() -> str:
+    """Get path to the welcome message marker file."""
+    import app.config as config_module
+
+    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(config_module.__file__)))
+    return os.path.join(base_dir, ".welcome_printed")
+
+
+async def check_first_boot():
+    """Check if this is first boot and print welcome message."""
+    marker_path = _get_welcome_marker_path()
+
+    # If marker exists, we've already printed welcome
+    if os.path.exists(marker_path):
+        return
+
+    # First boot! Print welcome message
+    await asyncio.sleep(2)  # Wait for printer to be ready
+
+    if hasattr(printer, "reset_buffer"):
+        printer.reset_buffer()
+
+    # Get device ID for SSID
+    ssid_suffix = "XXXX"
+    try:
+        if _is_raspberry_pi:
+            with open("/proc/cpuinfo", "r") as f:
+                for line in f:
+                    if line.startswith("Serial"):
+                        ssid_suffix = line.split(":")[1].strip()[-4:]
+                        break
+    except Exception:
+        pass
+
+    ssid = f"PC-1-Setup-{ssid_suffix}"
+
+    printer.feed(1)
+    printer.print_text("================================")
+    printer.print_text("")
+    printer.print_text("    Welcome to PC-1!")
+    printer.print_text("    Your Paper Console")
+    printer.print_text("")
+    printer.print_text("================================")
+    printer.feed(1)
+    printer.print_text("PC-1 prints weather, news,")
+    printer.print_text("puzzles, and more on paper.")
+    printer.print_text("")
+    printer.print_text("First, let's connect it to")
+    printer.print_text("your home WiFi so it can")
+    printer.print_text("fetch content from the internet.")
+    printer.feed(1)
+    printer.print_text("--------------------------------")
+    printer.print_text("STEP 1: CONNECT TO PC-1")
+    printer.print_text("--------------------------------")
+    printer.print_text("")
+    printer.print_text("On your phone or computer,")
+    printer.print_text("look for this WiFi network:")
+    printer.print_text("")
+    printer.print_text(f"  {ssid}")
+    printer.print_text("  Password: setup1234")
+    printer.feed(1)
+    printer.print_text("--------------------------------")
+    printer.print_text("STEP 2: OPEN SETUP PAGE")
+    printer.print_text("--------------------------------")
+    printer.print_text("")
+    printer.print_text("Your phone may open it")
+    printer.print_text("automatically. If not, visit:")
+    printer.print_text("")
+    printer.print_text("  http://10.42.0.1")
+    printer.feed(1)
+    printer.print_text("--------------------------------")
+    printer.print_text("STEP 3: CHOOSE YOUR WIFI")
+    printer.print_text("--------------------------------")
+    printer.print_text("")
+    printer.print_text("Select your home WiFi and")
+    printer.print_text("enter its password. PC-1 will")
+    printer.print_text("remember it and connect")
+    printer.print_text("automatically from now on.")
+    printer.feed(1)
+    printer.print_text("================================")
+    printer.print_text("AFTER SETUP")
+    printer.print_text("================================")
+    printer.print_text("")
+    printer.print_text("Turn the dial to choose:")
+    printer.print_text("  1 = Weather forecast")
+    printer.print_text("  2 = Moon & sunrise times")
+    printer.print_text("  3 = Sudoku puzzle")
+    printer.print_text("")
+    printer.print_text("Press the button to print!")
+    printer.print_text("")
+    printer.print_text("Customize channels anytime at:")
+    printer.print_text("  http://pc-1.local")
+    printer.feed(1)
+    printer.print_text("--------------------------------")
+    printer.print_text("NEED HELP LATER?")
+    printer.print_text("--------------------------------")
+    printer.print_text("Hold button 5 sec = WiFi setup")
+    printer.print_text("Hold button 15 sec = Reset all")
+    printer.print_text("================================")
+    printer.feed(2)
+
+    # Flush if invert mode
+    if (
+        hasattr(printer, "invert")
+        and printer.invert
+        and hasattr(printer, "flush_buffer")
+    ):
+        printer.flush_buffer()
+        if hasattr(printer, "feed_direct"):
+            printer.feed_direct(3)
+
+    # Create marker file so we don't print again
+    try:
+        with open(marker_path, "w") as f:
+            f.write("1")
+    except Exception:
+        pass
+
+
 async def check_wifi_startup():
     """Check WiFi status on startup and enter AP mode if needed."""
     # Give system time to connect to saved WiFi
@@ -198,18 +317,19 @@ async def check_wifi_startup():
 
 
 async def periodic_wifi_recovery():
-    """Periodically check if we need to recover WiFi/AP mode."""
+    """Periodically check if we need to recover WiFi/AP mode. Runs forever until success."""
     retry_interval = 300  # 5 minutes
-    max_retries = 12  # Try for 1 hour total
 
-    for attempt in range(max_retries):
+    while True:
         await asyncio.sleep(retry_interval)
 
         status = wifi_manager.get_wifi_status()
 
+        # Exit if we have connectivity
         if status["connected"] or status["mode"] == "ap":
             return
 
+        # Try to start AP mode
         success = wifi_manager.start_ap_mode(retries=2)
         if success:
             await asyncio.sleep(5)
@@ -218,7 +338,7 @@ async def periodic_wifi_recovery():
 
 
 async def manual_ap_mode_trigger():
-    """Manually trigger AP mode (e.g. via button hold)."""
+    """Manually trigger AP mode (e.g. via button hold 5-15 seconds)."""
     # Print instructions BEFORE switching network mode
     await print_setup_instructions()
 
@@ -228,6 +348,81 @@ async def manual_ap_mode_trigger():
     wifi_manager.start_ap_mode()
 
 
+async def factory_reset_trigger():
+    """Factory reset (button hold 15+ seconds) - deletes config and reboots."""
+    import subprocess
+
+    # Reset printer buffer
+    if hasattr(printer, "reset_buffer"):
+        printer.reset_buffer()
+
+    # Print factory reset message
+    printer.feed(1)
+    printer.print_text("=" * 32)
+    printer.print_text("")
+    printer.print_text("     FACTORY RESET")
+    printer.print_text("")
+    printer.print_text("  All settings will be")
+    printer.print_text("  cleared. Device will")
+    printer.print_text("  reboot in setup mode.")
+    printer.print_text("")
+    printer.print_text("=" * 32)
+    printer.feed(2)
+
+    # Flush if invert mode
+    if (
+        hasattr(printer, "invert")
+        and printer.invert
+        and hasattr(printer, "flush_buffer")
+    ):
+        printer.flush_buffer()
+        if hasattr(printer, "feed_direct"):
+            printer.feed_direct(3)
+
+    # Wait for print to complete
+    await asyncio.sleep(3)
+
+    # Delete config file and welcome marker
+    try:
+        import app.config as config_module
+
+        base_dir = os.path.dirname(
+            os.path.dirname(os.path.abspath(config_module.__file__))
+        )
+        config_path = os.path.join(base_dir, "config.json")
+        backup_path = os.path.join(base_dir, "config.json.bak")
+        welcome_marker = os.path.join(base_dir, ".welcome_printed")
+
+        if os.path.exists(config_path):
+            os.remove(config_path)
+        if os.path.exists(backup_path):
+            os.remove(backup_path)
+        if os.path.exists(welcome_marker):
+            os.remove(welcome_marker)
+    except Exception:
+        pass
+
+    # Forget all saved WiFi networks
+    try:
+        wifi_manager.forget_all_wifi()
+    except Exception:
+        pass
+
+    # Reboot the device
+    await asyncio.sleep(1)
+    try:
+        subprocess.run(["sudo", "reboot"], check=False)
+    except Exception:
+        pass
+
+
+def on_factory_reset_threadsafe():
+    """Callback for factory reset press (15+ seconds)."""
+    global global_loop
+    if global_loop and global_loop.is_running():
+        asyncio.run_coroutine_threadsafe(factory_reset_trigger(), global_loop)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
@@ -235,6 +430,9 @@ async def lifespan(app: FastAPI):
 
     # Capture the running loop
     global_loop = asyncio.get_running_loop()
+
+    # Check for first boot and print welcome message
+    asyncio.create_task(check_first_boot())
 
     # Check WiFi and start AP mode if needed
     asyncio.create_task(check_wifi_startup())
@@ -247,6 +445,7 @@ async def lifespan(app: FastAPI):
     # Initialize Button Callbacks
     button.set_callback(on_button_press_threadsafe)
     button.set_long_press_callback(on_button_long_press_threadsafe)
+    button.set_factory_reset_callback(on_factory_reset_threadsafe)
 
     yield
 

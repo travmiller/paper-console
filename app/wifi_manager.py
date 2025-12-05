@@ -242,3 +242,26 @@ def forget_wifi(ssid: str) -> bool:
         return result.returncode == 0
     except Exception:
         return False
+
+
+def forget_all_wifi() -> bool:
+    """Forget all saved WiFi networks (for factory reset)."""
+    try:
+        # Get all saved connections
+        result = run_command(
+            ["nmcli", "-t", "-f", "NAME,TYPE", "connection", "show"], check=False
+        )
+
+        for line in result.stdout.splitlines():
+            parts = line.split(":")
+            if len(parts) >= 2:
+                name, conn_type = parts[0], parts[1]
+                # Delete WiFi connections (but not the AP hotspot)
+                if conn_type == "802-11-wireless" and name != "PC-1-Hotspot":
+                    run_command(
+                        ["sudo", "nmcli", "connection", "delete", name], check=False
+                    )
+
+        return True
+    except Exception:
+        return False

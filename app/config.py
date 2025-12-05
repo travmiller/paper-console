@@ -84,7 +84,57 @@ class ChannelConfig(BaseModel):
     schedule: List[str] = []
 
 
-from pydantic import field_validator
+from pydantic import field_validator, Field
+
+
+# Default module IDs (fixed UUIDs for predictable defaults)
+DEFAULT_WEATHER_ID = "default-weather-001"
+DEFAULT_ASTRONOMY_ID = "default-astronomy-001"
+DEFAULT_SUDOKU_ID = "default-sudoku-001"
+
+
+def _default_modules() -> Dict[str, ModuleInstance]:
+    """Create default offline modules for out-of-box experience."""
+    return {
+        DEFAULT_WEATHER_ID: ModuleInstance(
+            id=DEFAULT_WEATHER_ID,
+            type="weather",
+            name="Weather",
+            config={},
+        ),
+        DEFAULT_ASTRONOMY_ID: ModuleInstance(
+            id=DEFAULT_ASTRONOMY_ID,
+            type="astronomy",
+            name="Astronomy",
+            config={},
+        ),
+        DEFAULT_SUDOKU_ID: ModuleInstance(
+            id=DEFAULT_SUDOKU_ID,
+            type="games",
+            name="Sudoku",
+            config={"difficulty": "medium"},
+        ),
+    }
+
+
+def _default_channels() -> Dict[int, ChannelConfig]:
+    """Create default channel assignments for out-of-box experience."""
+    return {
+        1: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_WEATHER_ID, order=0)]
+        ),
+        2: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_ASTRONOMY_ID, order=0)]
+        ),
+        3: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_SUDOKU_ID, order=0)]
+        ),
+        4: ChannelConfig(modules=[]),
+        5: ChannelConfig(modules=[]),
+        6: ChannelConfig(modules=[]),
+        7: ChannelConfig(modules=[]),
+        8: ChannelConfig(modules=[]),
+    }
 
 
 class Settings(BaseModel):
@@ -105,12 +155,13 @@ class Settings(BaseModel):
 
     # Module Instances: Dictionary of module_id -> ModuleInstance
     # These are reusable module configurations that can be assigned to channels
-    modules: Dict[str, ModuleInstance] = {}
+    # Default includes offline modules for out-of-box experience
+    modules: Dict[str, ModuleInstance] = Field(default_factory=_default_modules)
 
     # Universal Channel Configuration
     # Key is position (1-8), Value is the configuration for that channel
-    # Channels can have multiple modules assigned (new format)
-    channels: Dict[int, ChannelConfig] = {}
+    # Default: Ch1=Weather, Ch2=Astronomy, Ch3=Sudoku, Ch4-8=Empty
+    channels: Dict[int, ChannelConfig] = Field(default_factory=_default_channels)
 
     @field_validator("latitude")
     @classmethod

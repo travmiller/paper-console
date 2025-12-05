@@ -25,14 +25,19 @@ class ButtonDriver:
     """
     Driver for a momentary push button connected to GPIO.
     Uses edge detection for both press and release.
-    Supports short press and long press (5 seconds) callbacks.
+    Supports:
+      - Short press (< 5 seconds)
+      - Long press (5-15 seconds) - triggers AP mode
+      - Factory reset (15+ seconds) - resets device to defaults
     """
 
     def __init__(self, pin: int = 18):
         self.pin = pin
         self.callback = None
         self.long_press_callback = None
-        self.long_press_duration = 5.0  # 5 seconds for long press
+        self.factory_reset_callback = None
+        self.long_press_duration = 5.0  # 5 seconds for long press (AP mode)
+        self.factory_reset_duration = 15.0  # 15 seconds for factory reset
         self.monitoring = False
         self.monitor_thread = None
         self.gpio_available = GPIO_AVAILABLE
@@ -153,13 +158,23 @@ class ButtonDriver:
                         duration = current_time - press_start_time
                         press_start_time = None
 
-                        if duration >= self.long_press_duration:
+                        # Check duration thresholds (longest first)
+                        if duration >= self.factory_reset_duration:
+                            # 15+ seconds = factory reset
+                            if self.factory_reset_callback:
+                                try:
+                                    self.factory_reset_callback()
+                                except Exception:
+                                    pass
+                        elif duration >= self.long_press_duration:
+                            # 5-15 seconds = AP mode
                             if self.long_press_callback:
                                 try:
                                     self.long_press_callback()
                                 except Exception:
                                     pass
                         else:
+                            # < 5 seconds = normal press
                             if self.callback:
                                 try:
                                     self.callback()
@@ -175,8 +190,12 @@ class ButtonDriver:
         self.callback = callback
 
     def set_long_press_callback(self, callback: Callable[[], None]):
-        """Register a function to be called on long press (5+ seconds)."""
+        """Register a function to be called on long press (5-15 seconds)."""
         self.long_press_callback = callback
+
+    def set_factory_reset_callback(self, callback: Callable[[], None]):
+        """Register a function to be called on factory reset press (15+ seconds)."""
+        self.factory_reset_callback = callback
 
     def cleanup(self):
         self.monitoring = False
