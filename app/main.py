@@ -141,6 +141,10 @@ async def scheduler_loop():
 
 # --- HARDWARE CALLBACKS ---
 
+# Print state tracking for cancellation
+print_in_progress = False
+cancel_print_requested = False
+
 
 def on_button_press():
     """
@@ -158,9 +162,16 @@ global_loop = None
 
 
 def on_button_press_threadsafe():
-    """Callback that schedules the trigger on the main event loop."""
-    global global_loop
-    if global_loop and global_loop.is_running():
+    """Callback that schedules the trigger on the main event loop.
+    
+    If a print is already in progress, this will cancel it instead.
+    """
+    global global_loop, print_in_progress, cancel_print_requested
+    
+    if print_in_progress:
+        # Cancel the current print job
+        cancel_print_requested = True
+    elif global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
 
 
@@ -941,24 +952,81 @@ def execute_module(module: ModuleInstance) -> bool:
 async def trigger_channel(position: int):
     """
     Executes all modules assigned to a specific channel position.
+    Can be cancelled by pressing the button again during printing.
     """
-    # Reset printer buffer at start of print job (for invert mode)
-    if hasattr(printer, "reset_buffer"):
-        printer.reset_buffer()
+    global print_in_progress, cancel_print_requested
+    
+    # Mark print as in progress
+    print_in_progress = True
+    cancel_print_requested = False
+    
+    try:
+        # Reset printer buffer at start of print job (for invert mode)
+        if hasattr(printer, "reset_buffer"):
+            printer.reset_buffer()
 
-    channel = settings.channels.get(position)
+        channel = settings.channels.get(position)
 
-    # Handle empty or unconfigured channels
-    if not channel or not channel.modules:
-        printer.print_text(f"CHANNEL {position}")
-        printer.print_line()
-        printer.print_text("This channel is empty.")
-        printer.print_text("")
-        printer.print_text("Visit http://pc-1.local")
-        printer.print_text("to set it up.")
-        printer.feed(1)
+        # Handle empty or unconfigured channels
+        if not channel or not channel.modules:
+            printer.print_text(f"CHANNEL {position}")
+            printer.print_line()
+            printer.print_text("This channel is empty.")
+            printer.print_text("")
+            printer.print_text("Visit http://pc-1.local")
+            printer.print_text("to set it up.")
+            printer.feed(1)
 
-        # Flush and feed for invert mode
+            # Flush and feed for invert mode
+            if (
+                hasattr(printer, "invert")
+                and printer.invert
+                and hasattr(printer, "flush_buffer")
+            ):
+                printer.flush_buffer()
+
+            feed_lines = getattr(settings, "cutter_feed_lines", 3)
+            if feed_lines > 0:
+                printer.feed_direct(feed_lines)
+            return
+
+        # Sort modules by order and execute each
+        sorted_modules = sorted(channel.modules, key=lambda m: m.order)
+
+        for assignment in sorted_modules:
+            # Check for cancellation before each module
+            if cancel_print_requested:
+                # Clear buffer and print cancellation message
+                if hasattr(printer, "reset_buffer"):
+                    printer.reset_buffer()
+                printer.print_text("--- PRINT CANCELLED ---")
+                printer.feed(1)
+                
+                # Feed to clear cutter
+                feed_lines = getattr(settings, "cutter_feed_lines", 3)
+                if feed_lines > 0:
+                    printer.feed_direct(feed_lines)
+                return
+            
+            module = settings.modules.get(assignment.module_id)
+            if module:
+                execute_module(module)
+                # Add a separator between modules
+                if assignment != sorted_modules[-1]:
+                    printer.feed(1)
+
+        # Check for cancellation before final flush
+        if cancel_print_requested:
+            if hasattr(printer, "reset_buffer"):
+                printer.reset_buffer()
+            printer.print_text("--- PRINT CANCELLED ---")
+            printer.feed(1)
+            feed_lines = getattr(settings, "cutter_feed_lines", 3)
+            if feed_lines > 0:
+                printer.feed_direct(feed_lines)
+            return
+
+        # If invert is enabled, flush buffer to actually print (in reverse order)
         if (
             hasattr(printer, "invert")
             and printer.invert
@@ -966,34 +1034,15 @@ async def trigger_channel(position: int):
         ):
             printer.flush_buffer()
 
+        # Add cutter feed lines at the end of the print job
         feed_lines = getattr(settings, "cutter_feed_lines", 3)
         if feed_lines > 0:
             printer.feed_direct(feed_lines)
-        return
-
-    # Sort modules by order and execute each
-    sorted_modules = sorted(channel.modules, key=lambda m: m.order)
-
-    for assignment in sorted_modules:
-        module = settings.modules.get(assignment.module_id)
-        if module:
-            execute_module(module)
-            # Add a separator between modules
-            if assignment != sorted_modules[-1]:
-                printer.feed(1)
-
-    # If invert is enabled, flush buffer to actually print (in reverse order)
-    if (
-        hasattr(printer, "invert")
-        and printer.invert
-        and hasattr(printer, "flush_buffer")
-    ):
-        printer.flush_buffer()
-
-    # Add cutter feed lines at the end of the print job
-    feed_lines = getattr(settings, "cutter_feed_lines", 3)
-    if feed_lines > 0:
-        printer.feed_direct(feed_lines)
+    
+    finally:
+        # Always mark print as complete
+        print_in_progress = False
+        cancel_print_requested = False
 
 
 async def trigger_current_channel():
