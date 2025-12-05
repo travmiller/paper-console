@@ -904,6 +904,11 @@ async def captive_other():
 if os.path.exists("web/dist"):
     app.mount("/assets", StaticFiles(directory="web/dist/assets"), name="assets")
 
+    # Serve favicon explicitly
+    @app.get("/favicon.svg")
+    async def serve_favicon():
+        return FileResponse("web/dist/favicon.svg", media_type="image/svg+xml")
+
     # Serve index.html for the root and any client-side routes
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
