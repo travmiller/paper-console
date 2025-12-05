@@ -149,6 +149,7 @@ class Settings(BaseModel):
     invert_print: bool = (
         True  # Rotate print output 180 degrees (for upside-down printers)
     )
+    max_print_lines: int = 200  # Maximum lines per print job (0 = no limit)
 
     # Global Weather API (shared across modules if needed)
     openweather_api_key: Optional[str] = os.getenv("OPENWEATHER_API_KEY")

@@ -58,6 +58,9 @@ class PrinterDriver:
         # Buffer for print operations when invert is enabled
         # Each item is a tuple: ('text', line) or ('feed', count)
         self.print_buffer = [] if invert else None
+        # Line tracking for max print length
+        self.lines_printed = 0
+        self.max_lines = 0  # 0 = no limit, set by reset_buffer
 
         # Auto-detect serial port if not specified
         if port is None:
@@ -208,8 +211,15 @@ class PrinterDriver:
 
             self._write(encoded)
             self._write(b"\n")
+            self.lines_printed += 1
         except Exception:
             pass
+
+    def is_max_lines_exceeded(self) -> bool:
+        """Check if we've exceeded the maximum print length."""
+        if self.max_lines <= 0:
+            return False
+        return self.lines_printed >= self.max_lines
 
     def print_text(self, text: str):
         """Print a line of text. Handles multi-line strings by splitting them."""
@@ -218,6 +228,8 @@ class PrinterDriver:
             if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
                 self.flush_buffer()
             self.print_buffer.append(("text", text))
+            # Track lines for max length check (count newlines + 1)
+            self.lines_printed += text.count("\n") + 1
             return
 
         lines = text.split("\n")
@@ -271,10 +283,17 @@ class PrinterDriver:
             elif op_type == "feed":
                 self._write_feed(op_data)
 
-    def reset_buffer(self):
-        """Reset/clear the print buffer (call at start of new print job)."""
+    def reset_buffer(self, max_lines: int = 0):
+        """Reset/clear the print buffer (call at start of new print job).
+        
+        Args:
+            max_lines: Maximum lines for this print job (0 = no limit)
+        """
         if self.print_buffer is not None:
             self.print_buffer.clear()
+        # Reset line counter
+        self.lines_printed = 0
+        self.max_lines = max_lines
         # Re-assert ASCII mode at start of each print job
         self._ensure_ascii_mode()
 

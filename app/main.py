@@ -163,11 +163,11 @@ global_loop = None
 
 def on_button_press_threadsafe():
     """Callback that schedules the trigger on the main event loop.
-    
+
     If a print is already in progress, this will cancel it instead.
     """
     global global_loop, print_in_progress, cancel_print_requested
-    
+
     if print_in_progress:
         # Cancel the current print job
         cancel_print_requested = True
@@ -955,15 +955,17 @@ async def trigger_channel(position: int):
     Can be cancelled by pressing the button again during printing.
     """
     global print_in_progress, cancel_print_requested
-    
+
     # Mark print as in progress
     print_in_progress = True
     cancel_print_requested = False
-    
+
     try:
         # Reset printer buffer at start of print job (for invert mode)
+        # Also set max lines limit
+        max_lines = getattr(settings, "max_print_lines", 200)
         if hasattr(printer, "reset_buffer"):
-            printer.reset_buffer()
+            printer.reset_buffer(max_lines)
 
         channel = settings.channels.get(position)
 
@@ -1001,16 +1003,36 @@ async def trigger_channel(position: int):
                     printer.reset_buffer()
                 printer.print_text("--- PRINT CANCELLED ---")
                 printer.feed(1)
-                
+
                 # Feed to clear cutter
                 feed_lines = getattr(settings, "cutter_feed_lines", 3)
                 if feed_lines > 0:
                     printer.feed_direct(feed_lines)
                 return
-            
+
             module = settings.modules.get(assignment.module_id)
             if module:
                 execute_module(module)
+                
+                # Check for max lines exceeded after each module
+                if hasattr(printer, "is_max_lines_exceeded") and printer.is_max_lines_exceeded():
+                    printer.print_text("")
+                    printer.print_text("--- MAX LENGTH REACHED ---")
+                    printer.feed(1)
+                    
+                    # Flush and feed
+                    if (
+                        hasattr(printer, "invert")
+                        and printer.invert
+                        and hasattr(printer, "flush_buffer")
+                    ):
+                        printer.flush_buffer()
+                    
+                    feed_lines = getattr(settings, "cutter_feed_lines", 3)
+                    if feed_lines > 0:
+                        printer.feed_direct(feed_lines)
+                    return
+                
                 # Add a separator between modules
                 if assignment != sorted_modules[-1]:
                     printer.feed(1)
@@ -1038,7 +1060,7 @@ async def trigger_channel(position: int):
         feed_lines = getattr(settings, "cutter_feed_lines", 3)
         if feed_lines > 0:
             printer.feed_direct(feed_lines)
-    
+
     finally:
         # Always mark print as complete
         print_in_progress = False
