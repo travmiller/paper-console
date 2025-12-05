@@ -98,11 +98,20 @@ class DialDriver:
 
     def _read_gpio_position(self) -> int:
         """Read the current dial position from GPIO pins."""
-        if not self.gpio_available or not self.input_handle:
+        if not self.gpio_available:
+            print(f"[DIAL DEBUG] gpio_available is False")
+            return self.current_position
+        if not self.input_handle:
+            print(f"[DIAL DEBUG] input_handle is None")
             return self.current_position
 
         try:
             values = self.input_handle.get_values()
+            # Debug: print raw values once on startup
+            if not hasattr(self, '_debug_printed'):
+                print(f"[DIAL DEBUG] GPIO pins: {self.gpio_pins}")
+                print(f"[DIAL DEBUG] Raw values: {values}")
+                self._debug_printed = True
 
             for i, val in enumerate(values, start=1):
                 if val == 0:
@@ -110,7 +119,8 @@ class DialDriver:
 
             return self.current_position
 
-        except Exception:
+        except Exception as e:
+            print(f"[DIAL DEBUG] Read exception: {e}")
             return self.current_position
 
     def _monitor_position(self):
