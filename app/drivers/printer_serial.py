@@ -64,16 +64,17 @@ class PrinterDriver:
         if port is None:
             # Common ports for thermal printers
             if platform.system() == "Linux":
-                # Check specifically for USB Printer device first
+                # Check specifically for USB Printer device first (most common)
                 if os.path.exists("/dev/usb/lp0"):
                     port = "/dev/usb/lp0"
                 else:
-                    # Try common Linux serial ports
+                    # Try USB serial adapters only - avoid /dev/serial0 and /dev/ttyAMA0
+                    # as those are often the system console
                     possible_ports = [
                         "/dev/ttyUSB0",
+                        "/dev/ttyUSB1",
                         "/dev/ttyACM0",
-                        "/dev/serial0",
-                        "/dev/ttyAMA0",
+                        "/dev/ttyACM1",
                     ]
                     # Use the first one that exists
                     for p in possible_ports:
