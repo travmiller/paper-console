@@ -68,13 +68,15 @@ class PrinterDriver:
                 if os.path.exists("/dev/usb/lp0"):
                     port = "/dev/usb/lp0"
                 else:
-                    # Try USB serial adapters only - avoid /dev/serial0 and /dev/ttyAMA0
-                    # as those are often the system console
+                    # Try ports in order of preference:
+                    # 1. USB serial adapters (safest)
+                    # 2. GPIO serial (requires console to be disabled)
                     possible_ports = [
                         "/dev/ttyUSB0",
                         "/dev/ttyUSB1",
                         "/dev/ttyACM0",
                         "/dev/ttyACM1",
+                        "/dev/serial0",  # GPIO serial - needs console disabled
                     ]
                     # Use the first one that exists
                     for p in possible_ports:
@@ -82,7 +84,7 @@ class PrinterDriver:
                             port = p
                             break
                     if not port:
-                        port = "/dev/ttyUSB0"  # Default fallback
+                        port = "/dev/serial0"  # Default for GPIO serial
             elif platform.system() == "Windows":
                 # Windows COM ports
                 possible_ports = [f"COM{i}" for i in range(1, 10)]
