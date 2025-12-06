@@ -98,6 +98,7 @@ function App() {
   const [activeTab, setActiveTab] = useState('channels'); // 'general', 'channels'
   const [showAddModuleModal, setShowAddModuleModal] = useState(null); // channel position or null
   const [showEditModuleModal, setShowEditModuleModal] = useState(null); // module ID or null
+  const [editingModule, setEditingModule] = useState(null); // Local copy of module being edited
   const [showScheduleModal, setShowScheduleModal] = useState(null); // channel position or null
   const [showAPInstructions, setShowAPInstructions] = useState(false);
   // Track where mouse down occurred to prevent accidental modal closes
@@ -449,6 +450,7 @@ function App() {
       // Close edit modal if open
       if (showEditModuleModal === moduleId) {
         setShowEditModuleModal(null);
+        setEditingModule(null);
       }
     } catch (err) {
       console.error('Error deleting module:', err);
@@ -557,46 +559,10 @@ function App() {
 
   // --- Module Configuration Rendering ---
 
-  const renderModuleConfig = (module, onUpdate) => {
+  const renderModuleConfig = (module, updateConfig) => {
     const config = module.config || {};
     const inputClass = 'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none';
     const labelClass = 'block mb-2 text-sm text-gray-400';
-
-    // Capture the module ID to ensure we always update the correct module
-    const moduleId = module.id;
-    const moduleType = module.type;
-
-    const updateConfig = (field, value, immediate = false) => {
-      // Always use the latest module.config to avoid stale closures
-      const currentConfig = module.config || {};
-      // Only update the config, preserving the module ID and type from closure
-      const updated = {
-        id: moduleId,
-        type: moduleType,
-        name: module.name,
-        config: { ...currentConfig, [field]: value },
-      };
-
-      // Always update local state immediately for responsive UI
-      setModules((prev) => {
-        const mod = prev[moduleId];
-        if (!mod) return prev;
-        return { ...prev, [moduleId]: { ...mod, ...updated } };
-      });
-
-      if (immediate) {
-        // Cancel any pending debounced save for this module to prevent stale data overwrites
-        if (moduleUpdateTimers.current[moduleId]) {
-          clearTimeout(moduleUpdateTimers.current[moduleId]);
-          delete moduleUpdateTimers.current[moduleId];
-        }
-        // For immediate updates (on blur), call updateModule directly
-        updateModule(moduleId, updated, true);
-      } else {
-        // For typing, use debounced update (but local state already updated above)
-        onUpdate(updated);
-      }
-    };
 
     if (module.type === 'webhook') {
       return (
@@ -623,7 +589,7 @@ function App() {
             <JsonTextarea
               value={config.headers || {}}
               onChange={(parsed) => updateConfig('headers', parsed)}
-              onBlur={(parsed) => updateConfig('headers', parsed, true)}
+              onBlur={(parsed) => updateConfig('headers', parsed)}
               className={`${inputClass} font-mono text-sm min-h-[80px]`}
             />
           </div>
@@ -634,6 +600,7 @@ function App() {
               value={config.json_path || ''}
               onChange={(e) => updateConfig('json_path', e.target.value)}
               className={inputClass}
+              placeholder='e.g. data.message or items[0].text'
             />
           </div>
         </div>
@@ -1120,7 +1087,10 @@ function App() {
                         <div
                           key={item.module_id}
                           className='flex items-center justify-between p-2 bg-[#1a1a1a] rounded border border-gray-800 group hover:border-gray-600 transition-colors cursor-pointer'
-                          onClick={() => setShowEditModuleModal(item.module_id)}>
+                          onClick={() => {
+                            setShowEditModuleModal(item.module_id);
+                            setEditingModule(JSON.parse(JSON.stringify(modules[item.module_id])));
+                          }}>
                           <div className='flex-1 min-w-0 mr-2'>
                             <div className='text-sm font-medium text-white truncate'>{item.module.name}</div>
                             <div className='text-xs text-gray-400 truncate'>
@@ -1210,6 +1180,7 @@ function App() {
                         await assignModuleToChannel(showAddModuleModal, newModule.id);
                         setShowAddModuleModal(null);
                         setShowEditModuleModal(newModule.id);
+                        setEditingModule(JSON.parse(JSON.stringify(newModule)));
                       }
                     }}
                     className='flex flex-col items-center p-4 bg-[#1a1a1a] border border-gray-700 hover:border-white rounded-lg transition-colors text-center group'>
@@ -1223,7 +1194,7 @@ function App() {
         )}
 
         {/* Edit Module Modal */}
-        {showEditModuleModal !== null && modules[showEditModuleModal] && (
+        {showEditModuleModal !== null && editingModule && (
           <div
             className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4'
             onMouseDown={(e) => {
@@ -1233,17 +1204,13 @@ function App() {
               }
             }}
             onClick={(e) => {
-              // Only close if both mousedown and click were on the backdrop
+              // Close on backdrop click - save changes
               if (e.target === e.currentTarget && modalMouseDownTarget.current === 'backdrop') {
-                // Save any pending changes before closing
-                const moduleId = showEditModuleModal;
-                if (moduleUpdateTimers.current[moduleId]) {
-                  clearTimeout(moduleUpdateTimers.current[moduleId]);
-                  delete moduleUpdateTimers.current[moduleId];
-                  // Force immediate save of current state
-                  updateModule(moduleId, modules[moduleId], true);
+                if (editingModule) {
+                  updateModule(showEditModuleModal, editingModule, true);
                 }
                 setShowEditModuleModal(null);
+                setEditingModule(null);
               }
               modalMouseDownTarget.current = null;
             }}>
@@ -1255,20 +1222,17 @@ function App() {
                   <h3 className='text-xl font-bold text-white mb-1'>Edit Module</h3>
                   <div className='text-sm text-gray-400 flex gap-4'>
                     <span>ID: {showEditModuleModal}</span>
-                    <span>Type: {AVAILABLE_MODULE_TYPES.find((t) => t.id === modules[showEditModuleModal].type)?.label}</span>
+                    <span>Type: {AVAILABLE_MODULE_TYPES.find((t) => t.id === editingModule?.type)?.label}</span>
                   </div>
                 </div>
                 <button
                   onClick={() => {
-                    // Save any pending changes before closing
-                    const moduleId = showEditModuleModal;
-                    if (moduleUpdateTimers.current[moduleId]) {
-                      clearTimeout(moduleUpdateTimers.current[moduleId]);
-                      delete moduleUpdateTimers.current[moduleId];
-                      // Force immediate save of current state
-                      updateModule(moduleId, modules[moduleId], true);
+                    // Save changes on close
+                    if (editingModule) {
+                      updateModule(showEditModuleModal, editingModule, true);
                     }
                     setShowEditModuleModal(null);
+                    setEditingModule(null);
                   }}
                   className='text-gray-400 hover:text-white text-2xl'>
                   &times;
@@ -1279,36 +1243,20 @@ function App() {
                 <label className='block mb-2 text-sm text-gray-400'>Module Name</label>
                 <input
                   type='text'
-                  value={modules[showEditModuleModal].name}
+                  value={editingModule?.name || ''}
                   onChange={(e) => {
-                    const moduleId = showEditModuleModal;
-                    const newName = e.target.value;
-                    // Update local state immediately for responsive UI
-                    setModules((prev) => {
-                      const mod = prev[moduleId];
-                      if (!mod) return prev;
-                      return { ...prev, [moduleId]: { ...mod, name: newName } };
-                    });
-                    // Debounce the API call
-                    updateModuleDebounced(moduleId, { name: newName });
-                  }}
-                  onBlur={(e) => {
-                    // Save immediately on blur with a short delay
-                    const moduleId = showEditModuleModal;
-                    if (moduleUpdateTimers.current[moduleId]) {
-                      clearTimeout(moduleUpdateTimers.current[moduleId]);
-                    }
-                    setTimeout(() => updateModule(moduleId, { name: e.target.value }, true), 300);
+                    setEditingModule((prev) => prev ? { ...prev, name: e.target.value } : prev);
                   }}
                   className='w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none'
                 />
               </div>
 
-              {renderModuleConfig(modules[showEditModuleModal], (updated) => {
-                // Always use the module ID from the current module, not from updated object
-                const moduleId = modules[showEditModuleModal].id;
-                console.log('[UPDATE] Updating module:', moduleId, 'Type:', modules[showEditModuleModal].type, 'Config:', updated.config);
-                updateModuleDebounced(moduleId, updated);
+              {editingModule && renderModuleConfig(editingModule, (field, value) => {
+                // Update local editing state only - no API calls until close
+                setEditingModule((prev) => prev ? {
+                  ...prev,
+                  config: { ...prev.config, [field]: value },
+                } : prev);
               })}
 
               <div className='mt-8 pt-6 border-t border-gray-700 flex justify-end gap-3'>
@@ -1320,7 +1268,14 @@ function App() {
                 </button>
                 <button
                   type='button'
-                  onClick={() => setShowEditModuleModal(null)}
+                  onClick={() => {
+                    // Save changes on Done
+                    if (editingModule) {
+                      updateModule(showEditModuleModal, editingModule, true);
+                    }
+                    setShowEditModuleModal(null);
+                    setEditingModule(null);
+                  }}
                   className='px-6 py-2 bg-white text-black font-medium rounded hover:bg-gray-200 transition-colors'>
                   Done
                 </button>

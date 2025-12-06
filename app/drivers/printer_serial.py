@@ -107,7 +107,6 @@ class PrinterDriver:
 
         # Fallback to Serial
         try:
-            print(f"[PRINTER] Opening serial port: {port}")
             self.ser = serial.Serial(
                 port=port,
                 baudrate=baudrate,
@@ -116,7 +115,6 @@ class PrinterDriver:
                 stopbits=serial.STOPBITS_ONE,
                 timeout=1,
             )
-            print(f"[PRINTER] Serial port opened successfully: {self.ser.name}")
 
             if self.ser.in_waiting:
                 self.ser.reset_input_buffer()
@@ -127,10 +125,8 @@ class PrinterDriver:
             time.sleep(0.5)
 
             self._initialize_printer()
-            print("[PRINTER] Initialization complete")
 
-        except serial.SerialException as e:
-            print(f"[PRINTER] Serial error: {e}")
+        except serial.SerialException:
             self.ser = None
 
     def _write(self, data: bytes):
@@ -144,10 +140,8 @@ class PrinterDriver:
             elif self.ser:
                 self.ser.write(data)
                 self.ser.flush()
-            else:
-                print("[PRINTER] _write called but no connection available!")
-        except Exception as e:
-            print(f"[PRINTER] Write error: {e}")
+        except Exception:
+            pass
 
     def clear_hardware_buffer(self):
         """Clear the printer's hardware buffer - call at startup to prevent garbage."""
