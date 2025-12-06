@@ -135,7 +135,7 @@ class PrinterDriver:
             elif self.usb_file:
                 self.usb_file.write(data)
                 self.usb_file.flush()
-            elif self.ser:
+            elif self.ser and self.ser.is_open:
                 self.ser.write(data)
                 self.ser.flush()
         except Exception:
@@ -203,9 +203,10 @@ class PrinterDriver:
             pass
 
     def _ensure_ascii_mode(self):
-        """Re-send commands to ensure printer stays in ASCII mode."""
+        """Re-send commands to ensure printer stays in ASCII mode and rotated."""
         try:
             self._write(b"\x1c\x2e")  # FS . - Cancel Chinese mode
+            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
         except Exception:
             pass
 
@@ -288,6 +289,9 @@ class PrinterDriver:
         if len(self.print_buffer) == 0:
             return
 
+        # Ensure we're in the right mode before printing
+        self._ensure_ascii_mode()
+
         # Reverse the entire sequence of operations
         reversed_ops = list(reversed(self.print_buffer))
         self.print_buffer.clear()
@@ -308,12 +312,11 @@ class PrinterDriver:
         Args:
             max_lines: Maximum lines for this print job (0 = no limit)
         """
-        if self.print_buffer is not None:
-            self.print_buffer.clear()
+        self.print_buffer.clear()
         # Reset line counter
         self.lines_printed = 0
         self.max_lines = max_lines
-        # Re-assert ASCII mode at start of each print job
+        # Re-assert ASCII mode and rotation at start of each print job
         self._ensure_ascii_mode()
 
     def feed_direct(self, lines: int = 3):
