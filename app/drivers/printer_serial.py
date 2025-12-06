@@ -182,8 +182,8 @@ class PrinterDriver:
             # Set default line spacing (confirmed in QR204 manual)
             self._write(b"\x1b\x32")  # ESC 2 (1B 32) - Default line spacing
 
-            # Note: 180° rotation is done in SOFTWARE by reversing line order
-            # The ESC { command is NOT supported by QR204
+            # Enable 180° rotation (standard ESC/POS, required for this unit despite missing from manual)
+            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
         except Exception:
             pass
 
@@ -210,6 +210,8 @@ class PrinterDriver:
         try:
             # Cancel Chinese mode (confirmed in QR204 manual)
             self._write(b"\x1c\x2e")  # FS . (1C 2E)
+            # Re-apply rotation (required for correct orientation)
+            self._write(b"\x1b\x7b\x01")  # ESC { 1
         except Exception:
             pass
 
