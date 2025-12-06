@@ -168,22 +168,22 @@ class PrinterDriver:
             pass
 
     def _apply_ascii_settings(self):
-        """Apply ASCII-only mode settings."""
+        """Apply ASCII-only mode settings (QR204 confirmed commands only)."""
         try:
-            # CRITICAL: Disable all Chinese/Asian character modes
-            self._write(b"\x1c\x2e")  # FS . - Cancel Chinese mode
-            self._write(b"\x1b\x52\x00")  # ESC R 0 - USA character set
-            self._write(b"\x1b\x74\x00")  # ESC t 0 - Code page PC437 (US)
+            # Cancel Chinese character mode (confirmed in QR204 manual)
+            self._write(b"\x1c\x2e")  # FS . (1C 2E) - Cancel Chinese mode
 
-            # Set single-byte character mode explicitly
-            self._write(b"\x1c\x43\x00")  # FS C 0 - Disable Chinese mode
+            # Select USA character set (confirmed in QR204 manual)
+            self._write(b"\x1b\x52\x00")  # ESC R 0 (1B 52 00) - USA character set
 
-            # Standard settings
-            self._write(b"\x1b\x32")  # ESC 2 - Default line spacing
-            self._write(b"\x1b\x4d\x00")  # ESC M 0 - Standard font
+            # Select code page PC437 (confirmed in QR204 manual)
+            self._write(b"\x1b\x74\x00")  # ESC t 0 (1B 74 00) - Code page PC437 (US)
 
-            # Always use 180° rotation for inverted printing
-            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
+            # Set default line spacing (confirmed in QR204 manual)
+            self._write(b"\x1b\x32")  # ESC 2 (1B 32) - Default line spacing
+
+            # Note: 180° rotation is done in SOFTWARE by reversing line order
+            # The ESC { command is NOT supported by QR204
         except Exception:
             pass
 
@@ -206,10 +206,10 @@ class PrinterDriver:
             pass
 
     def _ensure_ascii_mode(self):
-        """Re-send commands to ensure printer stays in ASCII mode and rotated."""
+        """Re-send commands to ensure printer stays in ASCII mode."""
         try:
-            self._write(b"\x1c\x2e")  # FS . - Cancel Chinese mode
-            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
+            # Cancel Chinese mode (confirmed in QR204 manual)
+            self._write(b"\x1c\x2e")  # FS . (1C 2E)
         except Exception:
             pass
 
