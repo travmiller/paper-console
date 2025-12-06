@@ -48,16 +48,14 @@ class PrinterDriver:
         width: int = 32,
         port: Optional[str] = None,
         baudrate: int = 9600,
-        invert: bool = False,
     ):
         self.width = width
-        self.invert = invert
         self.ser = None
         self.usb_file = None
         self.usb_fd = None
-        # Buffer for print operations when invert is enabled
+        # Buffer for print operations (prints are always inverted/reversed)
         # Each item is a tuple: ('text', line) or ('feed', count)
-        self.print_buffer = [] if invert else None
+        self.print_buffer = []
         # Line tracking for max print length
         self.lines_printed = 0
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
@@ -148,9 +146,8 @@ class PrinterDriver:
         import time
 
         try:
-            # Clear software invert buffer first
-            if self.print_buffer is not None:
-                self.print_buffer.clear()
+            # Clear software buffer
+            self.print_buffer.clear()
             self.lines_printed = 0
             self.max_lines = 0
 
@@ -182,8 +179,8 @@ class PrinterDriver:
             self._write(b"\x1b\x32")  # ESC 2 - Default line spacing
             self._write(b"\x1b\x4d\x00")  # ESC M 0 - Standard font
 
-            if self.invert:
-                self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
+            # Always use 180° rotation for inverted printing
+            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
         except Exception:
             pass
 
@@ -257,19 +254,13 @@ class PrinterDriver:
         return self.lines_printed >= self.max_lines
 
     def print_text(self, text: str):
-        """Print a line of text. Handles multi-line strings by splitting them."""
-        if self.invert and self.print_buffer is not None:
-            # Safety: prevent unbounded buffer growth
-            if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
-                self.flush_buffer()
-            self.print_buffer.append(("text", text))
-            # Track lines for max length check (count newlines + 1)
-            self.lines_printed += text.count("\n") + 1
-            return
-
-        lines = text.split("\n")
-        for line in lines:
-            self._write_text_line(line)
+        """Print a line of text. Buffers for reverse-order printing."""
+        # Safety: prevent unbounded buffer growth
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("text", text))
+        # Track lines for max length check (count newlines + 1)
+        self.lines_printed += text.count("\n") + 1
 
     def print_line(self):
         """Print a separator line."""
@@ -285,23 +276,16 @@ class PrinterDriver:
             pass
 
     def feed(self, lines: int = 3):
-        """Feed paper (advance lines)."""
-        # If invert is enabled, buffer the operation instead of printing immediately
-        if self.invert and self.print_buffer is not None:
-            self.print_buffer.append(("feed", lines))
-            return
-
-        # Normal feed (when not inverted)
-        self._write_feed(lines)
+        """Feed paper (advance lines). Buffers for reverse-order printing."""
+        self.print_buffer.append(("feed", lines))
 
     def flush_buffer(self):
-        """Flush the print buffer in reverse order (for invert mode).
+        """Flush the print buffer in reverse order for inverted printing.
 
-        For 180° rotation:
-        - Hardware handles character rotation (ESC { 1)
-        - Software reverses line order (print last line first)
+        Hardware handles character rotation (ESC { 1),
+        software reverses line order (print last line first).
         """
-        if not self.invert or self.print_buffer is None or len(self.print_buffer) == 0:
+        if len(self.print_buffer) == 0:
             return
 
         # Reverse the entire sequence of operations

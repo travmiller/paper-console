@@ -146,9 +146,6 @@ class Settings(BaseModel):
     cutter_feed_lines: int = (
         3  # Number of empty lines to add at end of print job to clear cutter
     )
-    invert_print: bool = (
-        True  # Rotate print output 180 degrees (for upside-down printers)
-    )
     max_print_lines: int = 200  # Maximum lines per print job (0 = no limit)
 
     # Global Weather API (shared across modules if needed)

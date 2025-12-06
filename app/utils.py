@@ -66,10 +66,11 @@ def print_setup_instructions_sync():
         printer.print_text(center("http://10.42.0.1"))
         printer.feed(3)
 
-        if hasattr(printer, "flush_buffer") and getattr(printer, "invert", False):
+        # Flush buffer to print
+        if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
-            if hasattr(printer, "feed_direct"):
-                printer.feed_direct(3)
+        if hasattr(printer, "feed_direct"):
+            printer.feed_direct(3)
 
     except Exception:
         pass

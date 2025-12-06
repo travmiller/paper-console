@@ -2,12 +2,10 @@ class PrinterDriver:
     def __init__(
         self,
         width: int = 32,
-        invert: bool = False,
         port: str = None,
         baudrate: int = 9600,
     ):
         self.width = width
-        self.invert = invert
         self.lines_printed = 0
         self.max_lines = 0
 

@@ -990,19 +990,6 @@ function App() {
                 </p>
               </div>
 
-              <div className='mb-4'>
-                <label className={labelClass}>Invert Print</label>
-                <div className='flex items-center gap-2'>
-                  <input
-                    type='checkbox'
-                    checked={settings.invert_print || false}
-                    onChange={(e) => saveGlobalSettings({ invert_print: e.target.checked })}
-                    className='w-4 h-4'
-                  />
-                  <span className='text-sm text-gray-300'>Rotate output 180°</span>
-                </div>
-              </div>
-
               <div className='mb-4 pt-4 border-t border-gray-700'>
                 <label className={labelClass}>WiFi Configuration</label>
                 <button

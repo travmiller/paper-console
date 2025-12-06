@@ -22,8 +22,6 @@ else:
     from app.drivers.button_mock import ButtonDriver
 
 # Global Hardware Instances
-printer = PrinterDriver(
-    width=PRINTER_WIDTH, invert=getattr(settings, "invert_print", False)
-)
+printer = PrinterDriver(width=PRINTER_WIDTH)
 dial = DialDriver()
 button = ButtonDriver(pin=18)

@@ -291,15 +291,11 @@ async def check_first_boot():
     printer.print_text("================================")
     printer.feed(2)
 
-    # Flush if invert mode
-    if (
-        hasattr(printer, "invert")
-        and printer.invert
-        and hasattr(printer, "flush_buffer")
-    ):
+    # Flush buffer to print (prints are reversed for tear-off orientation)
+    if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
-        if hasattr(printer, "feed_direct"):
-            printer.feed_direct(3)
+    if hasattr(printer, "feed_direct"):
+        printer.feed_direct(3)
 
     # Create marker file so we don't print again
     try:
@@ -380,15 +376,11 @@ async def factory_reset_trigger():
     printer.print_text("=" * 32)
     printer.feed(2)
 
-    # Flush if invert mode
-    if (
-        hasattr(printer, "invert")
-        and printer.invert
-        and hasattr(printer, "flush_buffer")
-    ):
+    # Flush buffer to print
+    if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
-        if hasattr(printer, "feed_direct"):
-            printer.feed_direct(3)
+    if hasattr(printer, "feed_direct"):
+        printer.feed_direct(3)
 
     # Wait for print to complete
     await asyncio.sleep(3)
@@ -610,12 +602,8 @@ async def get_settings():
 @app.post("/api/settings")
 async def update_settings(new_settings: Settings, background_tasks: BackgroundTasks):
     """Updates the configuration and saves it to disk."""
-    global settings, printer
+    global settings
     import app.config as config_module
-
-    # Check if invert_print setting changed
-    old_invert = getattr(settings, "invert_print", False)
-    new_invert = getattr(new_settings, "invert_print", False)
 
     # Update in-memory - create new settings object
     settings = new_settings
@@ -624,27 +612,6 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
 
     # Save to disk
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
-
-    # Reinitialize printer if invert setting changed
-    if old_invert != new_invert:
-        if hasattr(hardware.printer, "close"):
-            hardware.printer.close()
-
-        # Create new instance
-        if _is_raspberry_pi:
-            from app.drivers.printer_serial import PrinterDriver
-        else:
-            from app.drivers.printer_mock import PrinterDriver
-
-        hardware.printer = PrinterDriver(width=PRINTER_WIDTH, invert=new_invert)
-        # Update local reference if used elsewhere in this file (it is used in background tasks)
-        # Note: modules importing 'printer' from hardware will still have the OLD reference!
-        # This is a limitation of Python imports.
-        # To fix this, we should probably make 'printer' a proxy or always access it via hardware.printer
-
-        # Update global reference for this module
-        global printer
-        printer = hardware.printer
 
     return {"message": "Settings saved", "config": settings}
 
@@ -666,30 +633,14 @@ async def reset_settings(background_tasks: BackgroundTasks):
 @app.post("/api/settings/reload")
 async def reload_settings():
     """Reloads settings from config.json on disk."""
-    global settings, printer
+    global settings
     import app.config as config_module
 
     new_settings = load_config()
 
-    # Check if invert_print setting changed
-    old_invert = getattr(settings, "invert_print", False)
-    new_invert = getattr(new_settings, "invert_print", False)
-
     # Update in-memory globals
     settings = new_settings
     config_module.settings = settings
-
-    # Reinitialize printer if invert setting changed
-    if old_invert != new_invert:
-        if hasattr(printer, "close"):
-            printer.close()
-
-        if _is_raspberry_pi:
-            from app.drivers.printer_serial import PrinterDriver
-        else:
-            from app.drivers.printer_mock import PrinterDriver
-
-        printer = PrinterDriver(width=PRINTER_WIDTH, invert=new_invert)
 
     return {"message": "Settings reloaded from disk", "config": settings}
 
@@ -983,12 +934,8 @@ async def trigger_channel(position: int):
             printer.print_text("to set it up.")
             printer.feed(1)
 
-            # Flush and feed for invert mode
-            if (
-                hasattr(printer, "invert")
-                and printer.invert
-                and hasattr(printer, "flush_buffer")
-            ):
+            # Flush buffer to print
+            if hasattr(printer, "flush_buffer"):
                 printer.flush_buffer()
 
             feed_lines = getattr(settings, "cutter_feed_lines", 3)
@@ -1010,12 +957,8 @@ async def trigger_channel(position: int):
                 printer.print_text("--- PRINT CANCELLED ---")
                 printer.feed(1)
 
-                # In invert mode, flush the cancellation message
-                if (
-                    hasattr(printer, "invert")
-                    and printer.invert
-                    and hasattr(printer, "flush_buffer")
-                ):
+                # Flush to print
+                if hasattr(printer, "flush_buffer"):
                     printer.flush_buffer()
 
                 # Feed to clear cutter
@@ -1033,12 +976,8 @@ async def trigger_channel(position: int):
                     hasattr(printer, "is_max_lines_exceeded")
                     and printer.is_max_lines_exceeded()
                 ):
-                    # Flush buffer first (for invert mode) so content prints
-                    if (
-                        hasattr(printer, "invert")
-                        and printer.invert
-                        and hasattr(printer, "flush_buffer")
-                    ):
+                    # Flush buffer first so content prints
+                    if hasattr(printer, "flush_buffer"):
                         printer.flush_buffer()
 
                     # Print message AFTER flush so it appears at the end
@@ -1046,7 +985,9 @@ async def trigger_channel(position: int):
                     printer.print_text("--- MAX LENGTH REACHED ---")
                     printer.feed(1)
 
-                    # Final feed for cutter
+                    # Flush again for the message, then feed for cutter
+                    if hasattr(printer, "flush_buffer"):
+                        printer.flush_buffer()
                     feed_lines = getattr(settings, "cutter_feed_lines", 3)
                     if feed_lines > 0:
                         printer.feed_direct(feed_lines)
@@ -1067,12 +1008,8 @@ async def trigger_channel(position: int):
             printer.print_text("--- PRINT CANCELLED ---")
             printer.feed(1)
 
-            # In invert mode, need to flush the cancellation message
-            if (
-                hasattr(printer, "invert")
-                and printer.invert
-                and hasattr(printer, "flush_buffer")
-            ):
+            # Flush to print
+            if hasattr(printer, "flush_buffer"):
                 printer.flush_buffer()
 
             feed_lines = getattr(settings, "cutter_feed_lines", 3)
@@ -1080,12 +1017,8 @@ async def trigger_channel(position: int):
                 printer.feed_direct(feed_lines)
             return
 
-        # If invert is enabled, flush buffer to actually print (in reverse order)
-        if (
-            hasattr(printer, "invert")
-            and printer.invert
-            and hasattr(printer, "flush_buffer")
-        ):
+        # Flush buffer to actually print (in reverse order for tear-off orientation)
+        if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
 
         # Add cutter feed lines at the end of the print job
