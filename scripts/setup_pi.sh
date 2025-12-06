@@ -28,7 +28,25 @@ else
     echo "Hostname is already $HOSTNAME."
 fi
 
-# 2. Install dependencies
+# 2. Configure Serial Port for Printer
+# The thermal printer uses GPIO serial (/dev/serial0 -> /dev/ttyS0)
+# We need to disable the serial console but keep the hardware enabled
+echo "Configuring serial port for printer..."
+
+# Disable serial console login service
+systemctl stop serial-getty@ttyS0.service 2>/dev/null || true
+systemctl disable serial-getty@ttyS0.service 2>/dev/null || true
+systemctl mask serial-getty@ttyS0.service 2>/dev/null || true
+
+# Use raspi-config non-interactively to:
+# - Disable serial console (do_serial_cons 1 = disabled)
+# - Enable serial hardware (do_serial_hw 0 = enabled)
+raspi-config nonint do_serial_cons 1
+raspi-config nonint do_serial_hw 0
+
+echo "Serial port configured for printer use."
+
+# 3. Install dependencies
 echo "Installing dependencies..."
 apt-get update
 apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager dnsmasq-base
@@ -56,7 +74,7 @@ systemctl restart NetworkManager
 echo "Adding $SUDO_USER to 'lp' and 'dialout' groups for printer access..."
 usermod -a -G lp,dialout "$SUDO_USER"
 
-# 3. Configure Nginx Reverse Proxy
+# 4. Configure Nginx Reverse Proxy
 echo "Configuring Nginx..."
 cat > /etc/nginx/sites-available/paper-console <<EOL
 server {
@@ -83,7 +101,7 @@ ln -sf /etc/nginx/sites-available/paper-console /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl restart nginx
 
-# 4. Create Systemd Service
+# 5. Create Systemd Service
 # Attempt to locate the project directory based on script location
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PROJECT_DIR=$(dirname "$SCRIPT_DIR")
