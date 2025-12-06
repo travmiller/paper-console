@@ -1,0 +1,57 @@
+import React, { useRef } from 'react';
+import { AVAILABLE_MODULE_TYPES } from '../constants';
+
+const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModule, onOpenEdit }) => {
+  const modalMouseDownTarget = useRef(null);
+
+  if (channelPosition === null) return null;
+
+  return (
+    <div
+      className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4'
+      onMouseDown={(e) => {
+        if (e.target === e.currentTarget) {
+          modalMouseDownTarget.current = 'backdrop';
+        }
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && modalMouseDownTarget.current === 'backdrop') {
+          onClose();
+        }
+        modalMouseDownTarget.current = null;
+      }}>
+      <div
+        className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto'
+        onClick={(e) => e.stopPropagation()}>
+        <div className='flex justify-between items-center mb-6'>
+          <h3 className='text-xl font-bold text-white'>Add Module to Channel {channelPosition}</h3>
+          <button onClick={onClose} className='text-gray-400 hover:text-white text-2xl'>
+            &times;
+          </button>
+        </div>
+
+        <div className='grid grid-cols-2 md:grid-cols-3 gap-3'>
+          {AVAILABLE_MODULE_TYPES.map((type) => (
+            <button
+              key={type.id}
+              type='button'
+              onClick={async () => {
+                const newModule = await onCreateModule(type.id);
+                if (newModule) {
+                  await onAssignModule(channelPosition, newModule.id);
+                  onClose();
+                  onOpenEdit(newModule.id, newModule);
+                }
+              }}
+              className='flex flex-col items-center p-4 bg-[#1a1a1a] border border-gray-700 hover:border-white rounded-lg transition-colors text-center group'>
+              <span className='font-bold text-white group-hover:text-blue-300 mb-1'>{type.label}</span>
+              <span className='text-xs text-gray-500'>Create new</span>
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default AddModuleModal;
