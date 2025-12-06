@@ -1245,19 +1245,24 @@ function App() {
                   type='text'
                   value={editingModule?.name || ''}
                   onChange={(e) => {
-                    setEditingModule((prev) => prev ? { ...prev, name: e.target.value } : prev);
+                    setEditingModule((prev) => (prev ? { ...prev, name: e.target.value } : prev));
                   }}
                   className='w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none'
                 />
               </div>
 
-              {editingModule && renderModuleConfig(editingModule, (field, value) => {
-                // Update local editing state only - no API calls until close
-                setEditingModule((prev) => prev ? {
-                  ...prev,
-                  config: { ...prev.config, [field]: value },
-                } : prev);
-              })}
+              {editingModule &&
+                renderModuleConfig(editingModule, (field, value) => {
+                  // Update local editing state only - no API calls until close
+                  setEditingModule((prev) =>
+                    prev
+                      ? {
+                          ...prev,
+                          config: { ...prev.config, [field]: value },
+                        }
+                      : prev,
+                  );
+                })}
 
               <div className='mt-8 pt-6 border-t border-gray-700 flex justify-end gap-3'>
                 <button
