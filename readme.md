@@ -34,7 +34,7 @@ run.bat
 **Frontend (Settings UI):**
 ```bash
 cd web
-npm install  # First time only
+npm install
 npm run dev
 ```
 * **URL:** [http://localhost:5173](http://localhost:5173)
@@ -53,7 +53,7 @@ npm run dev
 
 2. **Run the Server:**
    ```bash
-   ./run.sh  # or run.bat on Windows
+   ./run.sh  # or run.bat on Windows test
    ```
 
 ### Raspberry Pi Deployment
@@ -114,7 +114,6 @@ Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **
 * **OS:** Raspberry Pi OS Lite (64-bit)
 * **Backend:** Python 3.12 + FastAPI
 * **Frontend:** React + Vite + Tailwind CSS v4
-* **Storage:** `config.json` (see `requirements.txt` for dependencies)
 
 ### Directory Structure
 ```
@@ -145,8 +144,6 @@ paper-console/
 ├── requirements.txt       # Python dependencies
 └── readme.md              # This file
 ```
-
-**Note:** `config.json` and `.env` are gitignored (user-specific configuration).
 
 ### Module Details
 
@@ -199,7 +196,7 @@ paper-console/
 
 ### Prerequisites
 1. **Raspberry Pi Zero 2 W** with Raspberry Pi OS Lite installed
-2. **Thermal Printer** (QR204/CSN-A2 or compatible 58mm TTL/USB thermal printer)
+2. **Thermal Printer** (QR204/CSN-A2 or compatible 58mm TTL thermal printer)
 3. **1-Pole 8-Position Rotary Switch**
 4. **Momentary Push Button** (x2)
 5. **Power Supply:** 5V 5A Power Supply (Barrel Jack) -> Terminal Adapter
@@ -282,7 +279,7 @@ paper-console/
 - Use a 5V 5A power supply with a terminal adapter
 - Split power in parallel: one branch to Pi, one branch to Printer
 - Connect data lines separately
-- **Important:** Do not power printer through Pi GPIO pins (insufficient current)
+- **Important:** Do not power printer through Pi GPIO pins (insufficient current for printer)
 
 ---
 
@@ -297,9 +294,13 @@ paper-console/
   * Ensure user is in `dialout` group: `groups`
   * Add user: `sudo usermod -a -G dialout $USER` (then log out/in)
 * **Nothing Prints:**
-  * Check paper orientation (thermal side down)
   * Verify power supply is adequate (5A minimum)
+  * Confirm printer is connected to correct GPIO pins using the wiring table above
+  * Make sure the printer is powered on (indicator lights as expected)
+  * Check for error/status lights or messages on the printer itself (if available)
+  * Test the printer with a simple echo command: `echo "test" > /dev/serial0`
   * Check service logs: `sudo journalctl -u pc-1.service -f`
+  * Confirm no other application is holding the serial port open (use `lsof /dev/serial0`)
 
 ### Service Issues
 * **Restart Loop:**

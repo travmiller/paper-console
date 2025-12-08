@@ -12,6 +12,7 @@ import { AVAILABLE_MODULE_TYPES } from './constants';
 
 function App() {
   const [wifiMode, setWifiMode] = useState(null); // null = checking, 'client' = normal, 'ap' = setup mode
+  const [wifiStatus, setWifiStatus] = useState(null); // WiFi connection status
   const [settings, setSettings] = useState({
     timezone: '',
     latitude: 0,
@@ -39,31 +40,49 @@ function App() {
 
   // Check WiFi status on mount
   useEffect(() => {
-    fetch('/api/wifi/status')
-      .then((res) => res.json())
-      .then((data) => {
+    let isFirstLoad = true;
+
+    const fetchWifiStatus = async () => {
+      try {
+        const response = await fetch('/api/wifi/status');
+        const data = await response.json();
+        setWifiStatus(data);
         setWifiMode(data.mode);
+
         // If in AP mode, don't fetch settings yet
         if (data.mode === 'ap') {
-          setLoading(false);
+          if (isFirstLoad) setLoading(false);
           return;
         }
-        // Otherwise, fetch normal settings
-        return Promise.all([fetch('/api/settings').then((res) => res.json()), fetch('/api/modules').then((res) => res.json())]);
-      })
-      .then((results) => {
-        if (results) {
-          const [settingsData, modulesData] = results;
-          setSettings(settingsData);
-          setModules(modulesData.modules || {});
+
+        // On first load, fetch settings
+        if (isFirstLoad) {
+          try {
+            const [settingsData, modulesData] = await Promise.all([
+              fetch('/api/settings').then((res) => res.json()),
+              fetch('/api/modules').then((res) => res.json()),
+            ]);
+            setSettings(settingsData);
+            setModules(modulesData.modules || {});
+            setLoading(false);
+          } catch (err) {
+            console.error('Error fetching data:', err);
+            setStatus({ type: 'error', message: 'Failed to load settings. Is the backend running?' });
+            setLoading(false);
+          }
+          isFirstLoad = false;
         }
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error('Error fetching data:', err);
-        setStatus({ type: 'error', message: 'Failed to load settings. Is the backend running?' });
-        setLoading(false);
-      });
+      } catch (err) {
+        console.error('Error fetching WiFi status:', err);
+        if (isFirstLoad) setLoading(false);
+      }
+    };
+
+    fetchWifiStatus();
+
+    // Update WiFi status every 10 seconds
+    const interval = setInterval(fetchWifiStatus, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleSearch = async (term) => {
@@ -487,6 +506,7 @@ function App() {
             settings={settings}
             saveGlobalSettings={saveGlobalSettings}
             triggerAPMode={triggerAPMode}
+            wifiStatus={wifiStatus}
           />
         )}
 

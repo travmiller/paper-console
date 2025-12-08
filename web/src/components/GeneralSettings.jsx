@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from 'react';
 
-const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocation, settings, saveGlobalSettings, triggerAPMode }) => {
+const GeneralSettings = ({
+  searchTerm,
+  searchResults,
+  handleSearch,
+  selectLocation,
+  settings,
+  saveGlobalSettings,
+  triggerAPMode,
+  wifiStatus,
+}) => {
   const inputClass =
     'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none box-border';
   const labelClass = 'block mb-2 font-bold text-gray-200';
@@ -69,6 +78,28 @@ const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocati
 
   return (
     <>
+      {/* WiFi Status Display */}
+      {wifiStatus && (
+        <div className='mb-6 p-4 bg-[#2a2a2a] rounded border border-gray-700'>
+          <div className='flex items-center justify-between'>
+            <div>
+              <div className='text-sm text-gray-400 mb-1'>Network Connection</div>
+              <div className='flex items-center gap-2'>
+                <div className={`w-3 h-3 rounded-full ${wifiStatus.connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <span className='font-bold text-white'>
+                  {wifiStatus.connected && wifiStatus.ssid
+                    ? wifiStatus.ssid
+                    : wifiStatus.mode === 'ap'
+                    ? 'Setup Mode (AP)'
+                    : 'Not Connected'}
+                </span>
+              </div>
+              {wifiStatus.connected && wifiStatus.ip && <div className='text-xs text-gray-500 mt-1'>IP: {wifiStatus.ip}</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className='mb-6'>
         <div className='mb-6 text-left relative'>
           <label className={labelClass}>Search City / Location</label>
@@ -151,48 +182,88 @@ const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocati
               </div>
             </div>
 
-            <button
-              type='button'
-              onClick={async () => {
-                if (!manualDate || !manualTime) {
-                  setTimeStatus({ type: 'error', message: 'Please enter both date and time' });
-                  return;
-                }
+            <div className='flex gap-2'>
+              {wifiStatus?.connected && (
+                <button
+                  type='button'
+                  onClick={async () => {
+                    setTimeStatus({ type: '', message: '' });
+                    try {
+                      const response = await fetch('/api/system/time/sync', {
+                        method: 'POST',
+                      });
 
-                try {
-                  // Convert time to HH:MM:SS format
-                  const timeParts = manualTime.split(':');
-                  const timeStr = timeParts.length === 2 ? `${manualTime}:00` : manualTime;
+                      const data = await response.json();
 
-                  const response = await fetch('/api/system/time', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ date: manualDate, time: timeStr }),
-                  });
-
-                  const data = await response.json();
-
-                  if (data.success) {
-                    setTimeStatus({ type: 'success', message: data.message });
-                    // Refresh current time
-                    const timeResponse = await fetch('/api/system/time');
-                    const timeData = await timeResponse.json();
-                    if (timeData.datetime) {
-                      setCurrentTime(timeData);
+                      if (data.success) {
+                        setTimeStatus({ type: 'success', message: data.message || 'Time synchronized successfully' });
+                        // Refresh current time
+                        const timeResponse = await fetch('/api/system/time');
+                        const timeData = await timeResponse.json();
+                        if (timeData.datetime) {
+                          setCurrentTime(timeData);
+                          setManualDate(timeData.date);
+                          setManualTime(timeData.time.substring(0, 5));
+                        }
+                      } else {
+                        setTimeStatus({ type: 'error', message: data.message || data.error || 'Failed to sync time' });
+                      }
+                    } catch (err) {
+                      setTimeStatus({ type: 'error', message: 'Error syncing time: ' + err.message });
                     }
-                  } else {
-                    setTimeStatus({ type: 'error', message: data.message || data.error || 'Failed to set system time' });
-                  }
-                } catch (err) {
-                  setTimeStatus({ type: 'error', message: 'Error setting system time: ' + err.message });
-                }
 
-                // Clear status after 5 seconds
-                setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
-              }}
-              className='w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors'>
-              Set System Time
-            </button>
+                    // Clear status after 5 seconds
+                    setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+                  }}
+                  className='flex-1 py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors'>
+                  Auto Set Time
+                </button>
+              )}
+              <button
+                type='button'
+                onClick={async () => {
+                  if (!manualDate || !manualTime) {
+                    setTimeStatus({ type: 'error', message: 'Please enter both date and time' });
+                    return;
+                  }
+
+                  try {
+                    // Convert time to HH:MM:SS format
+                    const timeParts = manualTime.split(':');
+                    const timeStr = timeParts.length === 2 ? `${manualTime}:00` : manualTime;
+
+                    const response = await fetch('/api/system/time', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ date: manualDate, time: timeStr }),
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                      setTimeStatus({ type: 'success', message: data.message });
+                      // Refresh current time
+                      const timeResponse = await fetch('/api/system/time');
+                      const timeData = await timeResponse.json();
+                      if (timeData.datetime) {
+                        setCurrentTime(timeData);
+                      }
+                    } else {
+                      setTimeStatus({ type: 'error', message: data.message || data.error || 'Failed to set system time' });
+                    }
+                  } catch (err) {
+                    setTimeStatus({ type: 'error', message: 'Error setting system time: ' + err.message });
+                  }
+
+                  // Clear status after 5 seconds
+                  setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+                }}
+                className={`${
+                  wifiStatus?.connected ? 'flex-1' : 'w-full'
+                } py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors`}>
+                Set System Time
+              </button>
+            </div>
 
             {timeStatus.message && (
               <div

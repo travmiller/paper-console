@@ -860,6 +860,103 @@ async def set_system_time(request: SetTimeRequest):
         }
 
 
+@app.post("/api/system/time/sync")
+async def sync_system_time():
+    """
+    Automatically synchronize system time using NTP.
+    Requires internet connection.
+    """
+    try:
+        if platform.system() == "Linux":
+            # Use timedatectl to sync with NTP
+            result = subprocess.run(
+                ["sudo", "timedatectl", "set-ntp", "true"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode != 0:
+                # Try alternative: ntpdate (if available)
+                try:
+                    result2 = subprocess.run(
+                        ["sudo", "ntpdate", "-s", "pool.ntp.org"],
+                        capture_output=True,
+                        text=True,
+                        timeout=10,
+                    )
+                    if result2.returncode == 0:
+                        # Sync hardware clock
+                        subprocess.run(
+                            ["sudo", "hwclock", "--systohc"], timeout=5, check=False
+                        )
+                        return {
+                            "success": True,
+                            "message": "Time synchronized with NTP servers",
+                        }
+                except Exception:
+                    pass
+
+                return {
+                    "success": False,
+                    "error": result.stderr or "Failed to sync time with NTP",
+                    "message": "Could not synchronize time. Ensure NTP is configured or try manual time setting.",
+                }
+
+            # Sync hardware clock
+            try:
+                subprocess.run(["sudo", "hwclock", "--systohc"], timeout=5, check=False)
+            except Exception:
+                pass
+
+            return {
+                "success": True,
+                "message": "Time synchronization enabled. System will sync with NTP servers.",
+            }
+
+        elif platform.system() == "Windows":
+            # On Windows, use w32tm to sync
+            result = subprocess.run(
+                ["w32tm", "/resync"],
+                shell=True,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode != 0:
+                return {
+                    "success": False,
+                    "error": result.stderr or "Failed to sync time",
+                    "message": "Could not synchronize time. May require admin privileges.",
+                }
+
+            return {
+                "success": True,
+                "message": "Time synchronized with Windows Time service",
+            }
+
+        else:
+            return {
+                "success": False,
+                "error": f"Time sync not supported on {platform.system()}",
+                "message": "Automatic time synchronization is only supported on Linux and Windows.",
+            }
+
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "error": "Command timed out",
+            "message": "Time synchronization timed out. Please try again.",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "An error occurred while synchronizing time.",
+        }
+
+
 # --- LOCATION SEARCH API ---
 
 
