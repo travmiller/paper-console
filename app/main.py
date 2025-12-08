@@ -166,22 +166,17 @@ def on_button_press_threadsafe():
     """Callback that schedules the trigger on the main event loop."""
     global global_loop, print_in_progress
 
-    # Use lock to make check+set atomic
+    # Use lock to make entire check+set+call atomic
     with print_lock:
         if print_in_progress:
             # Already printing, ignore button press
             return
 
-        # Check if printer is actually busy (hardware status)
-        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
-            # Printer is busy, ignore button press
-            return
-
         # Set flag immediately to lock state and prevent race condition
         print_in_progress = True
 
-    if global_loop and global_loop.is_running():
-        asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
+        if global_loop and global_loop.is_running():
+            asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
 
 
 def on_button_long_press_threadsafe():
@@ -982,16 +977,31 @@ async def trigger_channel(position: int):
         # Even if two requests got through, this will catch the second one
         if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
             # Printer is busy, reset flag and abort
-            print_in_progress = False
+            with print_lock:
+                print_in_progress = False
             return
 
         # Instant tactile feedback - tiny paper blip
         if hasattr(printer, "blip"):
             printer.blip()
 
+        # Check hardware status again after first command
+        # Printer should go busy once we start sending data
+        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
+            # Printer went busy (another print started), reset flag and abort
+            with print_lock:
+                print_in_progress = False
+            return
+
         # Clear hardware buffer (reset) before starting new job to kill any ghosts
         if hasattr(printer, "clear_hardware_buffer"):
             printer.clear_hardware_buffer()
+            
+        # Final check after clearing buffer
+        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
+            with print_lock:
+                print_in_progress = False
+            return
 
         # Reset printer buffer at start of print job (for invert mode)
         # Also set max lines limit
@@ -1084,8 +1094,9 @@ async def trigger_channel(position: int):
             await asyncio.sleep(wait_time)
 
     finally:
-        # Always mark print as complete
-        print_in_progress = False
+        # Always mark print as complete (use lock to be safe)
+        with print_lock:
+            print_in_progress = False
 
 
 async def trigger_current_channel():
@@ -1106,10 +1117,6 @@ async def manual_trigger():
     with print_lock:
         if print_in_progress:
             raise HTTPException(status_code=409, detail="Print already in progress")
-
-        # Check if printer is actually busy (hardware status)
-        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
-            raise HTTPException(status_code=409, detail="Printer is busy")
 
         # Set flag immediately to lock state
         print_in_progress = True
@@ -1140,10 +1147,6 @@ async def print_channel(position: int):
     with print_lock:
         if print_in_progress:
             raise HTTPException(status_code=409, detail="Print already in progress")
-
-        # Check if printer is actually busy (hardware status)
-        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
-            raise HTTPException(status_code=409, detail="Printer is busy")
 
         # Set flag immediately to lock state
         print_in_progress = True
