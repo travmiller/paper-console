@@ -202,16 +202,28 @@ async def check_first_boot():
     """Check if this is first boot and print welcome message."""
     marker_path = _get_welcome_marker_path()
 
-    # If marker exists, we've already printed welcome
-    if os.path.exists(marker_path):
-        return
-
-    # First boot! Print welcome message
-    await asyncio.sleep(2)  # Wait for printer to be ready
+    # Wait for printer to be ready (applies to all boots)
+    await asyncio.sleep(2)
 
     if hasattr(printer, "reset_buffer"):
         printer.reset_buffer()
 
+    # If marker exists, just print ready message
+    if os.path.exists(marker_path):
+        printer.feed(1)
+        printer.print_text("=" * 32)
+        printer.print_text("       SYSTEM READY")
+        printer.print_text("=" * 32)
+        printer.feed(1)
+
+        # Flush buffer
+        if hasattr(printer, "flush_buffer"):
+            printer.flush_buffer()
+        if hasattr(printer, "feed_direct"):
+            printer.feed_direct(3)
+        return
+
+    # First boot! Print welcome message (if marker doesn't exist)
     # Get device ID for SSID
     ssid_suffix = "XXXX"
     try:
