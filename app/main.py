@@ -162,7 +162,11 @@ global_loop = None
 
 def on_button_press_threadsafe():
     """Callback that schedules the trigger on the main event loop."""
-    global global_loop
+    global global_loop, print_in_progress
+
+    # Simple check to prevent double prints
+    if print_in_progress:
+        return
 
     if global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
@@ -1081,6 +1085,11 @@ async def trigger_current_channel():
 @app.post("/action/trigger")
 async def manual_trigger():
     """Simulates pressing the big brass button."""
+    global print_in_progress
+    
+    if print_in_progress:
+        raise HTTPException(status_code=409, detail="Print already in progress")
+    
     await trigger_current_channel()
     return {"message": "Triggered"}
 
@@ -1098,8 +1107,13 @@ async def set_dial(position: int):
 @app.post("/action/print-channel/{position}")
 async def print_channel(position: int):
     """Set dial position and trigger print atomically."""
+    global print_in_progress
+    
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
+    
+    if print_in_progress:
+        raise HTTPException(status_code=409, detail="Print already in progress")
 
     # Don't need to set dial.set_position since we're passing position directly
     await trigger_channel(position)
