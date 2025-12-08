@@ -154,9 +154,7 @@ class PrinterDriver:
             if os.path.exists("/dev/gpiochip0"):
                 chip = GpioChip("/dev/gpiochip0")
                 self.dtr_handle = chip.request_lines(
-                    [self.DTR_PIN],
-                    GPIOHANDLE_REQUEST_OUTPUT,
-                    label="printer_dtr"
+                    [self.DTR_PIN], GPIOHANDLE_REQUEST_OUTPUT, label="printer_dtr"
                 )
                 # Set DTR high (ready to receive)
                 self.dtr_handle.set_values([1])

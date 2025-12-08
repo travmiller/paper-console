@@ -229,7 +229,7 @@ paper-console/
 ### Rotary Switch (8-Position Dial)
 
 **Wiring:**
-- **Common terminal** → GND
+- **Common terminal** → GND (Pin 39)
 - **Position 1** → GPIO 5 (Pin 29)
 - **Position 2** → GPIO 6 (Pin 31)
 - **Position 3** → GPIO 13 (Pin 33)
