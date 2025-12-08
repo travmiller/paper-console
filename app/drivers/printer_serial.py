@@ -141,33 +141,45 @@ class PrinterDriver:
             self.ser = None
 
     def _init_dtr_gpio(self):
-        """Initialize DTR GPIO pin for hardware flow control."""
+        """Initialize DTR GPIO pin for hardware flow control (INPUT to read printer busy)."""
         if platform.system() != "Linux":
             return
 
         try:
             from app.drivers.gpio_ioctl import (
                 GpioChip,
-                GPIOHANDLE_REQUEST_OUTPUT,
+                GPIOHANDLE_REQUEST_INPUT,
             )
 
             if os.path.exists("/dev/gpiochip0"):
                 chip = GpioChip("/dev/gpiochip0")
                 self.dtr_handle = chip.request_lines(
-                    [self.DTR_PIN], GPIOHANDLE_REQUEST_OUTPUT, label="printer_dtr"
+                    [self.DTR_PIN], GPIOHANDLE_REQUEST_INPUT, label="printer_dtr"
                 )
-                # Set DTR high (ready to receive)
-                self.dtr_handle.set_values([1])
         except Exception:
             self.dtr_handle = None
 
-    def _set_dtr(self, state: bool):
-        """Set DTR pin state (True = high/ready, False = low/busy)."""
-        if self.dtr_handle:
-            try:
-                self.dtr_handle.set_values([1 if state else 0])
-            except Exception:
-                pass
+    def _is_printer_ready(self) -> bool:
+        """Check if printer is ready (DTR HIGH = ready, LOW = busy)."""
+        if not self.dtr_handle:
+            return True  # No DTR, assume ready
+        try:
+            values = self.dtr_handle.get_values()
+            return values[0] == 1
+        except Exception:
+            return True  # On error, assume ready
+
+    def _wait_for_printer_ready(self, timeout: float = 5.0) -> bool:
+        """Wait for printer to be ready (DTR HIGH). Returns False if aborted or timeout."""
+        import time
+        start = time.time()
+        while not self._is_printer_ready():
+            if self._abort:
+                return False
+            if time.time() - start > timeout:
+                return True  # Timeout - proceed anyway
+            time.sleep(0.01)  # Check every 10ms
+        return True
 
     def _write(self, data: bytes):
         """Internal helper to write bytes to the correct interface."""
@@ -294,6 +306,10 @@ class PrinterDriver:
     def _write_text_line(self, line: str):
         """Internal method to write a single line of text to the printer."""
         try:
+            # Wait for printer to be ready (DTR-based flow control)
+            if not self._wait_for_printer_ready():
+                return  # Aborted while waiting
+
             # Sanitize to pure ASCII - prevents Chinese characters
             clean_line = self._sanitize_text(line)
 
@@ -334,6 +350,9 @@ class PrinterDriver:
         """Internal method to feed paper."""
         try:
             for _ in range(count):
+                # Wait for printer to be ready before each feed
+                if not self._wait_for_printer_ready():
+                    return  # Aborted
                 self._write(b"\n")
         except Exception:
             pass
