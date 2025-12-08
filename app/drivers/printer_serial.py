@@ -185,7 +185,7 @@ class PrinterDriver:
             if time.time() - start > timeout:
                 return True  # Timeout - proceed anyway
             time.sleep(0.01)  # Check every 10ms
-        
+
         # Check abort again after waiting
         if self._abort:
             return False
@@ -376,8 +376,9 @@ class PrinterDriver:
         Hardware handles character rotation (ESC { 1),
         software reverses line order (print last line first).
         """
-        # Reset abort flag at start of flush
-        self._abort = False
+        # Check if already aborted before starting
+        if self._abort:
+            return
 
         if len(self.print_buffer) == 0:
             return
