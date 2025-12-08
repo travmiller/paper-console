@@ -266,20 +266,15 @@ paper-console/
 
 ### Thermal Printer
 
-**USB Connection (Recommended):**
-1. Connect printer to USB port on Raspberry Pi
-2. Device appears as `/dev/usb/lp0` (USB Line Printer)
-3. Permissions handled automatically by `setup_pi.sh`
-
-**TTL Serial Connection (Advanced):**
+**TTL Serial Connection:**
 1. Wire according to table above
 2. Enable serial in `raspi-config` → Interface Options → Serial Port
 3. Device appears as `/dev/serial0`
 
-**Note:** The system auto-detects printers in this order:
-1. `/dev/usb/lp0` (Direct USB)
-2. `/dev/ttyUSB0` (Serial to USB)
-3. `/dev/serial0` (GPIO Serial)
+**Note:** The system auto-detects serial ports in this order:
+1. `/dev/serial0` (GPIO Serial - primary)
+2. `/dev/ttyUSB0` (USB-to-Serial adapter)
+3. `/dev/ttyUSB1` (USB-to-Serial adapter)
 
 ### Power Supply
 
@@ -295,12 +290,12 @@ paper-console/
 
 ### Printer Issues
 * **Device Not Found:**
-  * Check if `/dev/usb/lp0` exists: `ls -l /dev/usb/lp*`
-  * Ensure `usblp` kernel module is loaded: `lsmod | grep usblp`
-  * Test manually: `echo "Hello" | sudo tee /dev/usb/lp0`
+  * Check if `/dev/serial0` exists: `ls -l /dev/serial*`
+  * Verify serial is enabled: `raspi-config` → Interface Options → Serial Port
+  * Check if console is disabled on serial: `sudo raspi-config` → Advanced → Serial
 * **Permission Denied:**
-  * Ensure user is in `lp` group: `groups`
-  * Add user: `sudo usermod -a -G lp $USER` (then log out/in)
+  * Ensure user is in `dialout` group: `groups`
+  * Add user: `sudo usermod -a -G dialout $USER` (then log out/in)
 * **Nothing Prints:**
   * Check paper orientation (thermal side down)
   * Verify power supply is adequate (5A minimum)

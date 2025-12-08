@@ -9,7 +9,7 @@ from typing import Optional
 class PrinterDriver:
     """
     Real hardware driver for thermal receipt printer (QR204/CSN-A2).
-    Uses serial communication (TTL/USB) or direct USB device file.
+    Uses serial communication via GPIO pins or USB-to-serial adapters.
     """
 
     # Maximum buffer size to prevent memory issues (roughly 1000 lines)
@@ -52,8 +52,6 @@ class PrinterDriver:
     ):
         self.width = width
         self.ser = None
-        self.usb_file = None
-        self.usb_fd = None
         # Buffer for print operations (prints are always inverted/reversed)
         # Each item is a tuple: ('text', line) or ('feed', count)
         self.print_buffer = []
@@ -64,29 +62,22 @@ class PrinterDriver:
 
         # Auto-detect serial port if not specified
         if port is None:
-            # Common ports for thermal printers
             if platform.system() == "Linux":
-                # Check specifically for USB Printer device first (most common)
-                if os.path.exists("/dev/usb/lp0"):
-                    port = "/dev/usb/lp0"
-                else:
-                    # Try ports in order of preference:
-                    # 1. USB serial adapters (safest)
-                    # 2. GPIO serial (requires console to be disabled)
-                    possible_ports = [
-                        "/dev/ttyUSB0",
-                        "/dev/ttyUSB1",
-                        "/dev/ttyACM0",
-                        "/dev/ttyACM1",
-                        "/dev/serial0",  # GPIO serial - needs console disabled
-                    ]
-                    # Use the first one that exists
-                    for p in possible_ports:
-                        if os.path.exists(p):
-                            port = p
-                            break
-                    if not port:
-                        port = "/dev/serial0"  # Default for GPIO serial
+                # Try GPIO serial first (primary interface)
+                possible_ports = [
+                    "/dev/serial0",  # GPIO serial - needs console disabled
+                    "/dev/ttyUSB0",
+                    "/dev/ttyUSB1",
+                    "/dev/ttyACM0",
+                    "/dev/ttyACM1",
+                ]
+                # Use the first one that exists
+                for p in possible_ports:
+                    if os.path.exists(p):
+                        port = p
+                        break
+                if not port:
+                    port = "/dev/serial0"  # Default for GPIO serial
             elif platform.system() == "Windows":
                 # Windows COM ports
                 possible_ports = [f"COM{i}" for i in range(1, 10)]
@@ -95,20 +86,7 @@ class PrinterDriver:
                 possible_ports = ["/dev/tty.usbserial", "/dev/ttyUSB0"]
                 port = possible_ports[0]
 
-        # Handle USB Line Printer (/dev/usb/lp0) differently from Serial
-        if port and "lp" in port and platform.system() == "Linux":
-            try:
-                import time
-
-                self.usb_fd = os.open(port, os.O_RDWR)
-                self.usb_file = None
-                time.sleep(0.3)  # Let printer settle after port open
-                self._initialize_printer()
-                return
-            except Exception:
-                return
-
-        # Fallback to Serial
+        # Initialize serial connection
         try:
             self.ser = serial.Serial(
                 port=port,
@@ -133,29 +111,17 @@ class PrinterDriver:
             self.ser = None
 
     def _write(self, data: bytes):
-        """Internal helper to write bytes to the correct interface."""
+        """Internal helper to write bytes to serial interface."""
         try:
-            if hasattr(self, "usb_fd") and self.usb_fd is not None:
-                os.write(self.usb_fd, data)
-            elif self.usb_file:
-                self.usb_file.write(data)
-                self.usb_file.flush()
-            elif self.ser and self.ser.is_open:
+            if self.ser and self.ser.is_open:
                 self.ser.write(data)
                 self.ser.flush()
         except Exception:
             pass
 
     def _read(self, size: int = 1, timeout: float = 1.0) -> bytes:
-        """Read bytes from serial interface. Returns empty bytes on error or USB."""
+        """Read bytes from serial interface. Returns empty bytes on error."""
         try:
-            # USB printer doesn't support reading
-            if hasattr(self, "usb_fd") and self.usb_fd is not None:
-                return b""
-            if self.usb_file:
-                return b""
-            
-            # Serial interface
             if self.ser and self.ser.is_open:
                 old_timeout = self.ser.timeout
                 self.ser.timeout = timeout
@@ -168,7 +134,7 @@ class PrinterDriver:
 
     def check_paper_status(self) -> dict:
         """Check paper sensor status using GS r 1 command.
-        
+
         Returns:
             dict with keys:
                 - 'paper_adequate': bool (True if paper is adequate)
@@ -177,45 +143,41 @@ class PrinterDriver:
                 - 'error': bool (True if error reading status)
         """
         result = {
-            'paper_adequate': True,
-            'paper_near_end': False,
-            'paper_out': False,
-            'error': False
+            "paper_adequate": True,
+            "paper_near_end": False,
+            "paper_out": False,
+            "error": False,
         }
-        
+
         try:
-            # USB printers don't support status queries
-            if hasattr(self, "usb_fd") and self.usb_fd is not None or self.usb_file:
-                return result
-            
             # Send GS r 1 - Transmit paper sensor status
             self._write(b"\x1d\x72\x01")  # GS r 1
-            
+
             # Read response (1 byte)
             response = self._read(1, timeout=0.5)
-            
+
             if len(response) == 0:
-                result['error'] = True
+                result["error"] = True
                 return result
-            
+
             status_byte = response[0]
-            
+
             # Parse status byte (bits 2-3 indicate paper status)
             # Bits 2-3: 00 = paper adequate, 0C (12) = paper near end
             paper_bits = (status_byte >> 2) & 0x03
-            
+
             if paper_bits == 0x03:  # 0C = 12 decimal = 0b1100, bits 2-3 = 0b11
-                result['paper_near_end'] = True
-                result['paper_adequate'] = False
+                result["paper_near_end"] = True
+                result["paper_adequate"] = False
             elif paper_bits == 0x00:
-                result['paper_adequate'] = True
+                result["paper_adequate"] = True
             else:
                 # Unknown status, assume adequate
-                result['paper_adequate'] = True
-                
+                result["paper_adequate"] = True
+
         except Exception:
-            result['error'] = True
-            
+            result["error"] = True
+
         return result
 
     def clear_hardware_buffer(self):
@@ -461,16 +423,6 @@ class PrinterDriver:
         self.print_line()
 
     def close(self):
-        """Close the connection."""
+        """Close the serial connection."""
         if self.ser and self.ser.is_open:
             self.ser.close()
-        if self.usb_file:
-            try:
-                self.usb_file.close()
-            except Exception:
-                pass
-        if hasattr(self, "usb_fd") and self.usb_fd is not None:
-            try:
-                os.close(self.usb_fd)
-            except Exception:
-                pass
