@@ -172,6 +172,7 @@ class PrinterDriver:
     def _wait_for_printer_ready(self, timeout: float = 5.0) -> bool:
         """Wait for printer to be ready (DTR HIGH). Returns False if aborted or timeout."""
         import time
+
         start = time.time()
         while not self._is_printer_ready():
             if self._abort:

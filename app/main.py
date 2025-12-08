@@ -1037,7 +1037,7 @@ async def trigger_channel(position: int):
         for assignment in sorted_modules:
             # Check for cancellation before each module
             if cancel_print_requested:
-                # Clear buffer (discard any buffered content)
+                # Reset buffer and abort flag so we can print cancellation message
                 if hasattr(printer, "reset_buffer"):
                     printer.reset_buffer()
 
