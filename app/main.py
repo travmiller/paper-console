@@ -177,6 +177,10 @@ def on_button_press_threadsafe():
 
     elif global_loop and global_loop.is_running():
         # User wants to PRINT
+        # Instant tactile feedback - feed paper immediately in this thread
+        if hasattr(printer, "feed_direct"):
+            printer.feed_direct(1)
+
         # Set flag immediately to lock state and prevent race condition
         print_in_progress = True
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
@@ -996,10 +1000,6 @@ async def trigger_channel(position: int):
     cancel_print_requested = False
 
     try:
-        # Immediate tactile feedback - tiny paper feed so printer feels responsive
-        if hasattr(printer, "feed_direct"):
-            printer.feed_direct(1)
-
         # Clear hardware buffer (reset) before starting new job to kill any ghosts
         if hasattr(printer, "clear_hardware_buffer"):
             printer.clear_hardware_buffer()
