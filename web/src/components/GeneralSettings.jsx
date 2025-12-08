@@ -89,6 +89,21 @@ const GeneralSettings = ({
           </p>
         </div>
 
+        <div className='mb-4'>
+          <label className={labelClass}>Maximum Print Lines</label>
+          <input
+            type='number'
+            min='0'
+            max='1000'
+            value={settings.max_print_lines ?? 200}
+            onChange={(e) => saveGlobalSettings({ max_print_lines: parseInt(e.target.value) || 0 })}
+            className={inputClass}
+          />
+          <p className='text-xs text-gray-500 mt-1'>
+            Maximum lines per print job to prevent endless prints. Set to 0 for no limit (default: 200)
+          </p>
+        </div>
+
         <div className='mb-4 pt-4 border-t border-gray-700'>
           <label className={labelClass}>WiFi Configuration</label>
           <button
