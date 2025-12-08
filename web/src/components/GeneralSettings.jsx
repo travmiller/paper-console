@@ -20,6 +20,11 @@ const GeneralSettings = ({
   const [manualTime, setManualTime] = useState('');
   const [timeStatus, setTimeStatus] = useState({ type: '', message: '' });
 
+  // System timezone state
+  const [systemTimezone, setSystemTimezone] = useState(null);
+  const [availableTimezones, setAvailableTimezones] = useState([]);
+  const [timezoneStatus, setTimezoneStatus] = useState({ type: '', message: '' });
+
   // Fetch current system time on mount and periodically
   useEffect(() => {
     const fetchTime = async () => {
@@ -41,6 +46,29 @@ const GeneralSettings = ({
     const interval = setInterval(fetchTime, 1000); // Update every second
     return () => clearInterval(interval);
   }, []); // Only run on mount
+
+  // Fetch system timezone and available timezones
+  useEffect(() => {
+    const fetchTimezone = async () => {
+      try {
+        const [tzResponse, listResponse] = await Promise.all([fetch('/api/system/timezone'), fetch('/api/system/timezone/list')]);
+
+        const tzData = await tzResponse.json();
+        const listData = await listResponse.json();
+
+        if (tzData.found) {
+          setSystemTimezone(tzData.timezone);
+        }
+        if (listData.timezones) {
+          setAvailableTimezones(listData.timezones);
+        }
+      } catch (err) {
+        console.error('Error fetching timezone:', err);
+      }
+    };
+
+    fetchTimezone();
+  }, []);
 
   // Format timezone to a more readable format
   const formatTimezone = (tz) => {
@@ -102,7 +130,30 @@ const GeneralSettings = ({
 
       <div className='mb-6'>
         <div className='mb-6 text-left relative'>
-          <label className={labelClass}>Search City / Location</label>
+          <div className='flex items-center justify-between mb-2'>
+            <label className={labelClass}>Search City / Location</label>
+            <button
+              type='button'
+              onClick={async () => {
+                try {
+                  const response = await fetch('/api/location/system-default');
+                  const data = await response.json();
+
+                  if (data.found && data.location) {
+                    selectLocation(data.location);
+                  } else {
+                    setTimeStatus({ type: 'error', message: data.message || 'Could not detect system location' });
+                    setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+                  }
+                } catch (err) {
+                  setTimeStatus({ type: 'error', message: 'Error detecting system location: ' + err.message });
+                  setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+                }
+              }}
+              className='text-sm px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded transition-colors'>
+              Use System Timezone
+            </button>
+          </div>
           <input
             type='text'
             value={searchTerm}
@@ -150,6 +201,86 @@ const GeneralSettings = ({
 
         <div className='mb-4 pt-4 border-t border-gray-700'>
           <label className={labelClass}>System Time & Date</label>
+
+          <div className='mb-4'>
+            <label className='block mb-2 text-sm text-gray-400'>System Timezone</label>
+            <div className='flex gap-2'>
+              <select
+                value={systemTimezone || ''}
+                onChange={async (e) => {
+                  const newTimezone = e.target.value;
+                  if (!newTimezone) return;
+
+                  try {
+                    const response = await fetch('/api/system/timezone', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ timezone: newTimezone }),
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                      setSystemTimezone(newTimezone);
+                      setTimezoneStatus({ type: 'success', message: data.message });
+                      // Also update the location timezone if it matches
+                      if (settings.timezone === systemTimezone) {
+                        saveGlobalSettings({ timezone: newTimezone });
+                      }
+                    } else {
+                      setTimezoneStatus({ type: 'error', message: data.message || data.error || 'Failed to set timezone' });
+                    }
+                  } catch (err) {
+                    setTimezoneStatus({ type: 'error', message: 'Error setting timezone: ' + err.message });
+                  }
+
+                  // Clear status after 5 seconds
+                  setTimeout(() => setTimezoneStatus({ type: '', message: '' }), 5000);
+                }}
+                className={inputClass}>
+                <option value=''>Select timezone...</option>
+                {availableTimezones.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    {tz.label} {tz.region ? `(${tz.region})` : ''}
+                  </option>
+                ))}
+              </select>
+              {systemTimezone && (
+                <button
+                  type='button'
+                  onClick={async () => {
+                    try {
+                      const response = await fetch('/api/location/system-default');
+                      const data = await response.json();
+
+                      if (data.found && data.location) {
+                        selectLocation(data.location);
+                        setTimezoneStatus({ type: 'success', message: 'Location updated from system timezone' });
+                      } else {
+                        setTimezoneStatus({ type: 'error', message: data.message || 'Could not detect location' });
+                      }
+                    } catch (err) {
+                      setTimezoneStatus({ type: 'error', message: 'Error: ' + err.message });
+                    }
+                    setTimeout(() => setTimezoneStatus({ type: '', message: '' }), 5000);
+                  }}
+                  className='px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm font-medium transition-colors whitespace-nowrap'>
+                  Use for Location
+                </button>
+              )}
+            </div>
+            {systemTimezone && <p className='text-xs text-gray-500 mt-1'>Current system timezone: {systemTimezone}</p>}
+            {timezoneStatus.message && (
+              <div
+                className={`mt-2 p-2 rounded text-sm ${
+                  timezoneStatus.type === 'success'
+                    ? 'bg-green-900/30 text-green-300 border border-green-900/50'
+                    : 'bg-red-900/30 text-red-300 border border-red-900/50'
+                }`}>
+                {timezoneStatus.message}
+              </div>
+            )}
+          </div>
 
           <div className='mb-4'>
             <label className='block mb-2 text-sm text-gray-400'>Time Format</label>

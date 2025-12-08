@@ -708,6 +708,206 @@ async def reload_settings():
 # --- SYSTEM TIME API ---
 
 
+@app.get("/api/system/timezone")
+async def get_system_timezone():
+    """
+    Get the current system timezone.
+    """
+    try:
+        if platform.system() == "Linux":
+            # Try timedatectl first
+            try:
+                result = subprocess.run(
+                    ["timedatectl", "show", "-p", "Timezone", "--value"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    return {
+                        "timezone": result.stdout.strip(),
+                        "found": True,
+                    }
+            except Exception:
+                pass
+
+            # Fallback to /etc/timezone
+            try:
+                with open("/etc/timezone", "r") as f:
+                    timezone = f.read().strip()
+                    if timezone:
+                        return {
+                            "timezone": timezone,
+                            "found": True,
+                        }
+            except Exception:
+                pass
+
+        # Fallback to environment variable
+        timezone = os.environ.get("TZ")
+        if timezone:
+            return {
+                "timezone": timezone,
+                "found": True,
+            }
+
+        return {
+            "timezone": None,
+            "found": False,
+            "message": "Could not detect system timezone",
+        }
+
+    except Exception as e:
+        return {
+            "timezone": None,
+            "found": False,
+            "error": str(e),
+        }
+
+
+@app.get("/api/system/timezone/list")
+async def list_timezones():
+    """
+    Get a list of available timezones.
+    Returns common US timezones and a few others.
+    """
+    # Common timezones organized by region
+    timezones = {
+        "US Eastern": [
+            "America/New_York",
+            "America/Detroit",
+            "America/Indiana/Indianapolis",
+            "America/Indiana/Vevay",
+            "America/Indiana/Vincennes",
+            "America/Indiana/Winamac",
+            "America/Kentucky/Louisville",
+            "America/Kentucky/Monticello",
+        ],
+        "US Central": [
+            "America/Chicago",
+            "America/Indiana/Knox",
+            "America/Indiana/Tell_City",
+            "America/Menominee",
+            "America/North_Dakota/Center",
+            "America/North_Dakota/New_Salem",
+            "America/North_Dakota/Beulah",
+        ],
+        "US Mountain": [
+            "America/Denver",
+            "America/Boise",
+        ],
+        "US Arizona": [
+            "America/Phoenix",
+        ],
+        "US Pacific": [
+            "America/Los_Angeles",
+            "America/Anchorage",
+            "America/Juneau",
+            "America/Sitka",
+            "America/Metlakatla",
+            "America/Yakutat",
+            "America/Nome",
+        ],
+        "US Territories": [
+            "Pacific/Honolulu",
+            "America/Puerto_Rico",
+            "America/St_Thomas",
+            "Pacific/Guam",
+            "Pacific/Saipan",
+            "Pacific/Pago_Pago",
+        ],
+        "Other": [
+            "UTC",
+            "Europe/London",
+            "Europe/Paris",
+            "Asia/Tokyo",
+            "Australia/Sydney",
+        ],
+    }
+
+    # Flatten into a simple list with labels
+    timezone_list = []
+    for region, tz_list in timezones.items():
+        for tz in tz_list:
+            timezone_list.append({"value": tz, "label": tz, "region": region})
+
+    return {"timezones": timezone_list}
+
+
+class SetTimezoneRequest(BaseModel):
+    timezone: str
+
+
+@app.post("/api/system/timezone")
+async def set_system_timezone(request: SetTimezoneRequest):
+    """
+    Set the system timezone.
+    Requires root/admin privileges on Linux.
+    """
+    timezone = request.timezone
+    try:
+        # Validate timezone format
+        try:
+            pytz.timezone(timezone)
+        except Exception:
+            return {
+                "success": False,
+                "error": f"Invalid timezone: {timezone}",
+                "message": "The specified timezone is not valid.",
+            }
+
+        if platform.system() == "Linux":
+            # Use timedatectl to set timezone
+            result = subprocess.run(
+                ["sudo", "timedatectl", "set-timezone", timezone],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+            if result.returncode != 0:
+                return {
+                    "success": False,
+                    "error": result.stderr or "Failed to set timezone",
+                    "message": "Could not set system timezone. Ensure the application has sudo privileges.",
+                }
+
+            return {
+                "success": True,
+                "message": f"System timezone set to {timezone}",
+                "timezone": timezone,
+            }
+
+        elif platform.system() == "Windows":
+            # Windows doesn't easily support timezone changes via command line
+            # Would need to use tzutil or registry edits
+            return {
+                "success": False,
+                "error": "Timezone setting not supported on Windows",
+                "message": "Please set timezone through Windows settings.",
+            }
+
+        else:
+            return {
+                "success": False,
+                "error": f"Timezone setting not supported on {platform.system()}",
+                "message": "System timezone setting is only supported on Linux.",
+            }
+
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "error": "Command timed out",
+            "message": "Setting timezone timed out. Please try again.",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "An error occurred while setting timezone.",
+        }
+
+
 @app.get("/api/system/time")
 async def get_system_time():
     """
@@ -958,6 +1158,156 @@ async def sync_system_time():
 
 
 # --- LOCATION SEARCH API ---
+
+
+@app.get("/api/location/system-default")
+async def get_system_default_location():
+    """
+    Get default location based on system timezone.
+    Reads the system timezone and suggests a location in that timezone.
+    """
+    try:
+        system_timezone = None
+
+        if platform.system() == "Linux":
+            # Try timedatectl first (most reliable)
+            try:
+                result = subprocess.run(
+                    ["timedatectl", "show", "-p", "Timezone", "--value"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    system_timezone = result.stdout.strip()
+            except Exception:
+                pass
+
+            # Fallback to /etc/timezone
+            if not system_timezone:
+                try:
+                    with open("/etc/timezone", "r") as f:
+                        system_timezone = f.read().strip()
+                except Exception:
+                    pass
+
+        # Fallback to environment variable
+        if not system_timezone:
+            system_timezone = os.environ.get("TZ")
+
+        if not system_timezone:
+            return {
+                "found": False,
+                "message": "Could not detect system timezone",
+            }
+
+        # Find a default location for this timezone
+        # Use major cities in each timezone as defaults
+        timezone_to_default_location = {
+            "America/New_York": {"city": "New York", "state": "NY", "zipcode": "10001"},
+            "America/Chicago": {"city": "Chicago", "state": "IL", "zipcode": "60601"},
+            "America/Denver": {"city": "Denver", "state": "CO", "zipcode": "80201"},
+            "America/Phoenix": {"city": "Phoenix", "state": "AZ", "zipcode": "85001"},
+            "America/Los_Angeles": {
+                "city": "Los Angeles",
+                "state": "CA",
+                "zipcode": "90001",
+            },
+            "America/Anchorage": {
+                "city": "Anchorage",
+                "state": "AK",
+                "zipcode": "99501",
+            },
+            "Pacific/Honolulu": {"city": "Honolulu", "state": "HI", "zipcode": "96801"},
+            "America/Puerto_Rico": {
+                "city": "San Juan",
+                "state": "PR",
+                "zipcode": "00901",
+            },
+        }
+
+        # Try exact match first
+        default = timezone_to_default_location.get(system_timezone)
+
+        # If no exact match, try to find any location in the timezone
+        if not default:
+            # Search for locations in the timezone by looking up a common city
+            # We'll use the timezone name to infer a location
+            timezone_parts = system_timezone.split("/")
+            if len(timezone_parts) >= 2:
+                location_name = timezone_parts[-1].replace("_", " ")
+                # Try searching for the location name
+                results = location_lookup.search_locations(location_name, limit=1)
+                if results:
+                    result = results[0]
+                    return {
+                        "found": True,
+                        "timezone": system_timezone,
+                        "location": {
+                            "name": result["name"],
+                            "city": result["city"],
+                            "state": result["state"],
+                            "zipcode": result["zipcode"],
+                            "latitude": result["latitude"],
+                            "longitude": result["longitude"],
+                            "timezone": result["timezone"],
+                        },
+                    }
+
+            return {
+                "found": False,
+                "timezone": system_timezone,
+                "message": f"Found timezone {system_timezone} but no default location available",
+            }
+
+        # Get full location details for the default
+        location_result = location_lookup.get_location_by_zip(default["zipcode"])
+        if location_result:
+            return {
+                "found": True,
+                "timezone": system_timezone,
+                "location": {
+                    "name": location_result["name"],
+                    "city": location_result["city"],
+                    "state": location_result["state"],
+                    "zipcode": location_result["zipcode"],
+                    "latitude": location_result["latitude"],
+                    "longitude": location_result["longitude"],
+                    "timezone": location_result["timezone"],
+                },
+            }
+        else:
+            # Fallback: create location from default data
+            state = default["state"]
+
+            # Import the constants from location_lookup
+            from app.location_lookup import STATE_TO_TIMEZONE, STATE_COORDINATES
+
+            # Get timezone and coordinates from state
+            timezone = STATE_TO_TIMEZONE.get(state, "America/New_York")
+            coords = STATE_COORDINATES.get(state, (40.7128, -74.0060))
+            lat, lon = coords
+
+            return {
+                "found": True,
+                "timezone": system_timezone,
+                "location": {
+                    "name": default["city"],
+                    "city": default["city"],
+                    "state": state,
+                    "zipcode": default["zipcode"],
+                    "latitude": lat,
+                    "longitude": lon,
+                    "timezone": timezone,
+                },
+            }
+
+    except Exception as e:
+        return {
+            "found": False,
+            "error": str(e),
+            "message": "Error detecting system location",
+        }
 
 
 @app.get("/api/location/search")
