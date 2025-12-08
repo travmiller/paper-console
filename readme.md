@@ -225,7 +225,7 @@ paper-console/
 | Signal | GPIO | Physical Pin |
 |--------|------|--------------|
 | Signal | GPIO 3 | Pin 5 |
-| GND | Ground | Pin 9 |
+| GND | Ground | Pin 6 |
 
 #### Rotary Dial (8-Position)
 | Position | GPIO | Physical Pin |
@@ -244,9 +244,9 @@ paper-console/
 ```
                     3V3  (1)  (2)  5V [Printer VCC]
                   GPIO2  (3)  (4)  5V
-      [Power Btn] GPIO3  (5)  (6)  GND
+      [Power Btn] GPIO3  (5)  (6)  GND [Power Btn]
                   GPIO4  (7)  (8)  GPIO14/TXD [→ Printer RX]
-      [Power Btn] GND    (9)  (10) GPIO15/RXD [← Printer TX]
+                    GND  (9)  (10) GPIO15/RXD [← Printer TX]
                  GPIO17 (11)  (12) GPIO18 [Printer DTR]
                  GPIO27 (13)  (14) GND    [Printer GND]
                  GPIO22 (15)  (16) GPIO23
