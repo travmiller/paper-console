@@ -170,25 +170,8 @@ class PrinterDriver:
         except Exception:
             return True  # On error, assume ready
 
-    def _wait_for_printer_ready(self, timeout: float = 0.01) -> bool:
-        """Wait for printer to be ready. Returns False if aborted.
-
-        Very short timeout (10ms) - main purpose is abort checking, not flow control.
-        """
-        import time
-
-        # Check abort FIRST
-        if self._abort:
-            return False
-
-        start = time.time()
-        while not self._is_printer_ready():
-            if self._abort:
-                return False
-            if time.time() - start > timeout:
-                break  # Timeout - proceed anyway
-            time.sleep(0.001)  # Check every 1ms
-
+    def _check_abort(self) -> bool:
+        """Check if abort was requested. Returns True if should continue, False if aborted."""
         return not self._abort
 
     def _write(self, data: bytes):
@@ -319,14 +302,6 @@ class PrinterDriver:
             return
 
         try:
-            # Wait for printer to be ready (DTR-based flow control)
-            if not self._wait_for_printer_ready():
-                return  # Aborted while waiting
-
-            # Check again after wait
-            if self._abort:
-                return
-
             # Sanitize to pure ASCII - prevents Chinese characters
             clean_line = self._sanitize_text(line)
 
@@ -371,9 +346,6 @@ class PrinterDriver:
             for _ in range(count):
                 if self._abort:
                     return
-                # Wait for printer to be ready before each feed
-                if not self._wait_for_printer_ready():
-                    return  # Aborted
                 self._write(b"\n")
         except Exception:
             pass
