@@ -433,14 +433,9 @@ class PrinterDriver:
             pass
 
     def blip(self):
-        """Tiny paper feed for tactile feedback - double blip for intentional sound."""
+        """Tiny paper feed for tactile feedback."""
         try:
-            import time
-
             # ESC J n - Feed paper n dots (n/203 inches on most printers)
-            # Double blip: 1 dot, 200ms pause, 1 dot - minimum for distinct sounds
-            self._write(b"\x1b\x4a\x01")
-            time.sleep(0.2)
             self._write(b"\x1b\x4a\x01")
         except Exception:
             pass
