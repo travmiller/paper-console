@@ -76,7 +76,7 @@ function App() {
     setIsSearching(true);
     try {
       const response = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(term)}&count=5&language=en&format=json`
+        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(term)}&count=5&language=en&format=json`,
       );
       const data = await response.json();
       if (data.results) {
@@ -238,7 +238,7 @@ function App() {
 
       if (updates.type && updates.type !== targetModule.type) {
         console.error(
-          `[UPDATE] Type mismatch! Target module is ${targetModule.type}, but update has type ${updates.type}. Rejecting update.`
+          `[UPDATE] Type mismatch! Target module is ${targetModule.type}, but update has type ${updates.type}. Rejecting update.`,
         );
         return;
       }
@@ -353,12 +353,9 @@ function App() {
 
   const assignModuleToChannel = async (position, moduleId, order = null) => {
     try {
-      const response = await fetch(
-        `/api/channels/${position}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`,
-        {
-          method: 'POST',
-        }
-      );
+      const response = await fetch(`/api/channels/${position}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`, {
+        method: 'POST',
+      });
 
       if (!response.ok) throw new Error('Failed to assign module');
 
@@ -456,7 +453,7 @@ function App() {
   }
 
   return (
-    <div className='max-w-[1000px] w-full px-2 py-4 sm:p-8 mx-auto'>
+    <div className='max-w-[400px] w-full px-2 py-4 sm:p-8 mx-auto'>
       <h1 className='text-3xl sm:text-4xl mb-6 sm:mb-8 text-center leading-tight font-bold'>PC-1 Settings</h1>
       <p className='text-center text-gray-500 mb-6 sm:mb-8 text-sm sm:text-base'>Configure your Paper Console</p>
 
