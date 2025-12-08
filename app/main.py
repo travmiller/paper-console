@@ -177,9 +177,9 @@ def on_button_press_threadsafe():
 
     elif global_loop and global_loop.is_running():
         # User wants to PRINT
-        # Instant tactile feedback - feed paper immediately in this thread
-        if hasattr(printer, "feed_direct"):
-            printer.feed_direct(1)
+        # Instant tactile feedback - tiny paper blip in this thread
+        if hasattr(printer, "blip"):
+            printer.blip()
 
         # Set flag immediately to lock state and prevent race condition
         print_in_progress = True
