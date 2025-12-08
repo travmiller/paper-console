@@ -4,7 +4,6 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from contextlib import asynccontextmanager
 import asyncio
-import threading
 import uuid
 import os
 from typing import Dict, Optional, List
@@ -144,7 +143,6 @@ async def scheduler_loop():
 
 # Print state tracking
 print_in_progress = False
-print_lock = threading.Lock()  # Lock to prevent race conditions
 
 
 def on_button_press():
@@ -164,15 +162,7 @@ global_loop = None
 
 def on_button_press_threadsafe():
     """Callback that schedules the trigger on the main event loop."""
-    global global_loop, print_in_progress
-
-    # Check and set flag atomically to prevent multiple async calls from being scheduled
-    with print_lock:
-        if print_in_progress:
-            # Already printing, ignore button press
-            return
-        # Set flag immediately to prevent another button press from scheduling
-        print_in_progress = True
+    global global_loop
 
     if global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
@@ -971,47 +961,17 @@ async def trigger_channel(position: int):
     """
     global print_in_progress
 
-    # Flag should already be set by entry point (button handler or API endpoint)
-    # Entry point is the gatekeeper - if we got here, we own the flag
+    # Mark print as in progress
+    print_in_progress = True
 
     try:
-        # Double-check hardware status here to prevent race conditions
-        # Even if two requests got through, this will catch the second one
-        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
-            # Printer is busy, reset flag and abort
-            with print_lock:
-                print_in_progress = False
-            return
-
-        # Final check before doing any printer work
-        # Double-check we're still the only one (defensive programming)
-        with print_lock:
-            # Flag should be True (we set it), but verify no one else is printing
-            if not print_in_progress:
-                # Flag was somehow cleared, abort
-                return
-
         # Instant tactile feedback - tiny paper blip
         if hasattr(printer, "blip"):
             printer.blip()
 
-        # Check hardware status again after first command
-        # Printer should go busy once we start sending data
-        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
-            # Printer went busy (another print started), reset flag and abort
-            with print_lock:
-                print_in_progress = False
-            return
-
         # Clear hardware buffer (reset) before starting new job to kill any ghosts
         if hasattr(printer, "clear_hardware_buffer"):
             printer.clear_hardware_buffer()
-
-        # Final check after clearing buffer
-        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
-            with print_lock:
-                print_in_progress = False
-            return
 
         # Reset printer buffer at start of print job (for invert mode)
         # Also set max lines limit
@@ -1092,41 +1052,19 @@ async def trigger_channel(position: int):
         if feed_lines > 0:
             printer.feed_direct(feed_lines)
 
-        # --- WAIT FOR PRINTER TO FINISH ---
-        # Poll printer status until it's done printing
-        # This keeps 'print_in_progress' True while physical printer is actually printing
-        if hasattr(printer, "is_printer_busy"):
-            max_wait = 60  # Maximum 60 seconds
-            poll_interval = 0.1  # Check every 100ms
-            confirmation_duration = 0.3  # Must be online for 300ms to confirm done
-            waited = 0.0
-            online_since = None
-
-            while waited < max_wait:
-                if not printer.is_printer_busy():
-                    # Printer is online - start tracking how long it's been online
-                    if online_since is None:
-                        online_since = waited
-                    elif waited - online_since >= confirmation_duration:
-                        # Printer has been online for confirmation period - truly done
-                        break
-                else:
-                    # Printer went busy again - reset confirmation timer
-                    online_since = None
-
-                await asyncio.sleep(poll_interval)
-                waited += poll_interval
-        else:
-            # Fallback: use estimated delay if status checking not available
-            if hasattr(printer, "lines_printed"):
-                wait_time = printer.lines_printed / 20.0
-                wait_time = max(2.0, min(wait_time, 30.0))
-                await asyncio.sleep(wait_time)
+        # --- SIMULATE HARDWARE PRINTING TIME ---
+        # Keep 'print_in_progress' True while physical printer catches up
+        if hasattr(printer, "lines_printed"):
+            # lines_printed is double-counted (buffer + flush), so roughly 2x real lines
+            # Safe estimate: lines_printed / 20 ~= 10 real lines/sec
+            wait_time = printer.lines_printed / 20.0
+            # Clamp between 2s and 30s
+            wait_time = max(2.0, min(wait_time, 30.0))
+            await asyncio.sleep(wait_time)
 
     finally:
-        # Always mark print as complete (use lock to be safe)
-        with print_lock:
-            print_in_progress = False
+        # Always mark print as complete
+        print_in_progress = False
 
 
 async def trigger_current_channel():
@@ -1141,15 +1079,6 @@ async def trigger_current_channel():
 @app.post("/action/trigger")
 async def manual_trigger():
     """Simulates pressing the big brass button."""
-    global print_in_progress
-
-    # Check and set flag atomically to prevent multiple calls
-    with print_lock:
-        if print_in_progress:
-            raise HTTPException(status_code=409, detail="Print already in progress")
-        # Set flag immediately to prevent another call from proceeding
-        print_in_progress = True
-
     await trigger_current_channel()
     return {"message": "Triggered"}
 
@@ -1167,17 +1096,8 @@ async def set_dial(position: int):
 @app.post("/action/print-channel/{position}")
 async def print_channel(position: int):
     """Set dial position and trigger print atomically."""
-    global print_in_progress
-
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
-
-    # Check and set flag atomically to prevent multiple calls
-    with print_lock:
-        if print_in_progress:
-            raise HTTPException(status_code=409, detail="Print already in progress")
-        # Set flag immediately to prevent another call from proceeding
-        print_in_progress = True
 
     # Don't need to set dial.set_position since we're passing position directly
     await trigger_channel(position)
