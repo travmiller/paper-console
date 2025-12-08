@@ -168,6 +168,11 @@ def on_button_press_threadsafe():
         # Already printing, ignore button press
         return
 
+    # Check if printer is actually busy (hardware status)
+    if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
+        # Printer is busy, ignore button press
+        return
+
     if global_loop and global_loop.is_running():
         # Set flag immediately to lock state and prevent race condition
         print_in_progress = True
@@ -1087,6 +1092,15 @@ async def trigger_current_channel():
 @app.post("/action/trigger")
 async def manual_trigger():
     """Simulates pressing the big brass button."""
+    global print_in_progress
+    
+    if print_in_progress:
+        raise HTTPException(status_code=409, detail="Print already in progress")
+    
+    # Check if printer is actually busy (hardware status)
+    if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
+        raise HTTPException(status_code=409, detail="Printer is busy")
+    
     await trigger_current_channel()
     return {"message": "Triggered"}
 
@@ -1104,8 +1118,17 @@ async def set_dial(position: int):
 @app.post("/action/print-channel/{position}")
 async def print_channel(position: int):
     """Set dial position and trigger print atomically."""
+    global print_in_progress
+    
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
+    
+    if print_in_progress:
+        raise HTTPException(status_code=409, detail="Print already in progress")
+    
+    # Check if printer is actually busy (hardware status)
+    if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
+        raise HTTPException(status_code=409, detail="Printer is busy")
 
     # Don't need to set dial.set_position since we're passing position directly
     await trigger_channel(position)

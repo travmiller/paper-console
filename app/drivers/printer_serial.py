@@ -132,6 +132,33 @@ class PrinterDriver:
             pass
         return b""
 
+    def is_printer_busy(self) -> bool:
+        """Check if printer is currently busy/printing using DLE EOT 1.
+        
+        Returns:
+            True if printer is busy (offline), False if ready (online)
+            Returns False on error (assume ready to allow printing)
+        """
+        try:
+            # Send DLE EOT 1 - Real-time printer status
+            self._write(b"\x10\x04\x01")  # DLE EOT 1
+            
+            # Read response (1 byte)
+            response = self._read(1, timeout=0.5)
+            
+            if len(response) == 0:
+                return False  # No response, assume ready
+            
+            status_byte = response[0]
+            
+            # Bit 3: 0 = Online (ready), 1 = Offline (busy/printing)
+            is_offline = (status_byte & 0x08) != 0
+            
+            return is_offline
+            
+        except Exception:
+            return False  # On error, assume ready
+
     def check_paper_status(self) -> dict:
         """Check paper sensor status using GS r 1 command.
 
