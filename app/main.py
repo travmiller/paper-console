@@ -984,7 +984,14 @@ async def trigger_channel(position: int):
     """
     global print_in_progress, cancel_print_requested
 
-    # Mark print as in progress (redundant but safe)
+    # Check if cancel was requested during scheduling (race condition protection)
+    if cancel_print_requested:
+        # Reset flags and exit immediately
+        cancel_print_requested = False
+        print_in_progress = False
+        return
+
+    # Mark print as in progress
     print_in_progress = True
     cancel_print_requested = False
 
@@ -1102,6 +1109,23 @@ async def trigger_channel(position: int):
         feed_lines = getattr(settings, "cutter_feed_lines", 3)
         if feed_lines > 0:
             printer.feed_direct(feed_lines)
+
+        # --- SIMULATE HARDWARE PRINTING TIME ---
+        # Keep 'print_in_progress' True while physical printer catches up
+        # to prevent accidental double-triggers/queuing if user presses button during physical print
+        if hasattr(printer, "lines_printed"):
+            # lines_printed is double-counted (buffer + flush), so roughly 2x real lines
+            # Safe estimate: lines_printed / 20 ~= 10 real lines/sec
+            wait_time = printer.lines_printed / 20.0
+            # Clamp between 2s and 30s
+            wait_time = max(2.0, min(wait_time, 30.0))
+
+            # Sleep in intervals to allow cancellation
+            steps = int(wait_time * 5)  # Check every 0.2s
+            for _ in range(steps):
+                if cancel_print_requested:
+                    break
+                await asyncio.sleep(0.2)
 
     finally:
         # Always mark print as complete
