@@ -60,7 +60,7 @@ class PrinterDriver:
         # Line tracking for max print length
         self.lines_printed = 0
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
-        self._abort = False # Flag to abort printing immediately
+        self._abort = False  # Flag to abort printing immediately
 
         # Auto-detect serial port if not specified
         if port is None:
@@ -151,7 +151,7 @@ class PrinterDriver:
         self._abort = True
         try:
             # CAN - Cancel print data in page mode
-            self._write(b"\x18") 
+            self._write(b"\x18")
             # ESC @ - Hardware reset (clears all settings and buffer)
             self._write(b"\x1b\x40")
         except Exception:

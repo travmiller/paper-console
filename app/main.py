@@ -174,7 +174,7 @@ def on_button_press_threadsafe():
         # Abort printer hardware immediately (clears buffer and resets)
         if hasattr(printer, "abort"):
             printer.abort()
-            
+
     elif global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
 
@@ -506,7 +506,7 @@ async def lifespan(app: FastAPI):
     # Initialize Main Button Callbacks (Printing Only)
     button.set_callback(on_button_press_threadsafe)
     # Long press no longer needed for cancel (moved to short press toggle)
-    # button.set_long_press_callback(on_button_cancel_press_threadsafe) 
+    # button.set_long_press_callback(on_button_cancel_press_threadsafe)
 
     # Initialize Power Button Callbacks (Shutdown, AP Mode, Factory Reset)
     power_button.set_callback(
