@@ -971,14 +971,8 @@ async def trigger_channel(position: int):
     """
     global print_in_progress
 
-    # CRITICAL: Check flag first thing - if already printing, abort immediately
-    # Flag may already be set by button handler, so if it's True we're a duplicate
-    with print_lock:
-        if print_in_progress:
-            # Another print is already in progress (or we're a duplicate), abort
-            return
-        # Ensure flag is set (defensive - should already be set by entry point)
-        print_in_progress = True
+    # Flag should already be set by entry point (button handler or API endpoint)
+    # Entry point is the gatekeeper - if we got here, we own the flag
 
     try:
         # Double-check hardware status here to prevent race conditions
