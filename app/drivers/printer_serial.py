@@ -44,6 +44,9 @@ class PrinterDriver:
         }
     )
 
+    # DTR pin for hardware flow control (GPIO 18, Pin 12)
+    DTR_PIN = 18
+
     def __init__(
         self,
         width: int = 32,
@@ -54,6 +57,7 @@ class PrinterDriver:
         self.ser = None
         self.usb_file = None
         self.usb_fd = None
+        self.dtr_handle = None  # GPIO handle for DTR pin
         # Buffer for print operations (prints are always inverted/reversed)
         # Each item is a tuple: ('text', line) or ('feed', count)
         self.print_buffer = []
@@ -62,6 +66,9 @@ class PrinterDriver:
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
         self._abort = False  # Flag to abort printing immediately
         self._max_lines_hit = False  # Flag set when max lines exceeded during flush
+
+        # Initialize DTR GPIO pin
+        self._init_dtr_gpio()
 
         # Auto-detect serial port if not specified
         if port is None:
@@ -132,6 +139,37 @@ class PrinterDriver:
 
         except serial.SerialException:
             self.ser = None
+
+    def _init_dtr_gpio(self):
+        """Initialize DTR GPIO pin for hardware flow control."""
+        if platform.system() != "Linux":
+            return
+
+        try:
+            from app.drivers.gpio_ioctl import (
+                GpioChip,
+                GPIOHANDLE_REQUEST_OUTPUT,
+            )
+
+            if os.path.exists("/dev/gpiochip0"):
+                chip = GpioChip("/dev/gpiochip0")
+                self.dtr_handle = chip.request_lines(
+                    [self.DTR_PIN],
+                    GPIOHANDLE_REQUEST_OUTPUT,
+                    label="printer_dtr"
+                )
+                # Set DTR high (ready to receive)
+                self.dtr_handle.set_values([1])
+        except Exception:
+            self.dtr_handle = None
+
+    def _set_dtr(self, state: bool):
+        """Set DTR pin state (True = high/ready, False = low/busy)."""
+        if self.dtr_handle:
+            try:
+                self.dtr_handle.set_values([1 if state else 0])
+            except Exception:
+                pass
 
     def _write(self, data: bytes):
         """Internal helper to write bytes to the correct interface."""
@@ -416,5 +454,10 @@ class PrinterDriver:
         if hasattr(self, "usb_fd") and self.usb_fd is not None:
             try:
                 os.close(self.usb_fd)
+            except Exception:
+                pass
+        if self.dtr_handle:
+            try:
+                self.dtr_handle.close()
             except Exception:
                 pass

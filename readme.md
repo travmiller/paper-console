@@ -213,10 +213,11 @@ paper-console/
 
 **TTL Serial Connection (Advanced):**
 1. Connect:
+   - **TX** → GPIO 14 (TXD, Pin 8)
+   - **RX** → GPIO 15 (RXD, Pin 10)
+   - **DTR** → GPIO 18 (Pin 12)
+   - **GND** → Ground (Pin 14)
    - **VCC** → 5V (Pin 2 or 4)
-   - **GND** → Ground (Pin 6)
-   - **RX** → GPIO 14 (TXD, Pin 8)
-   - **TX** → GPIO 15 (RXD, Pin 10)
 2. Enable serial in `raspi-config` → Interface Options → Serial Port
 3. Device appears as `/dev/serial0`
 
@@ -240,12 +241,19 @@ paper-console/
 
 **Note:** GPIO pins can be customized in `app/drivers/dial_gpio.py`.
 
-### Push Button
+### Push Button (Main - Print/Cancel)
 
 **Wiring:**
-- **One terminal** → GPIO 18 (Pin 12)
-- **Other terminal** → GND
-- Add 10kΩ pull-up resistor between GPIO 18 and 3.3V (or use internal pull-up)
+- **One terminal** → GND (Pin 20)
+- **Other terminal** → GPIO 25 (Pin 22)
+- Uses internal pull-up resistor
+
+### Power Button (Shutdown/Wake)
+
+**Wiring:**
+- **One terminal** → GPIO 3 (Pin 5)
+- **Other terminal** → GND (Pin 9)
+- GPIO 3 has special hardware wake-from-halt capability
 
 ### Power Supply
 
