@@ -320,20 +320,35 @@ class PrinterDriver:
         reversed_ops = list(reversed(self.print_buffer))
         self.print_buffer.clear()
 
+        max_lines_hit = False
         for op_type, op_data in reversed_ops:
-            if self._abort or self.is_max_lines_exceeded():
+            if self._abort:
                 return
+            if self.is_max_lines_exceeded():
+                max_lines_hit = True
+                break
 
             if op_type == "text":
                 # Handle multi-line text by splitting and reversing lines
                 lines = op_data.split("\n")
                 reversed_lines = list(reversed(lines))
                 for line in reversed_lines:
-                    if self._abort or self.is_max_lines_exceeded():
+                    if self._abort:
                         return
+                    if self.is_max_lines_exceeded():
+                        max_lines_hit = True
+                        break
                     self._write_text_line(line)
+                if max_lines_hit:
+                    break
             elif op_type == "feed":
                 self._write_feed(op_data)
+
+        # Print cutoff message right at the cutoff point
+        if max_lines_hit:
+            self._write(b"\n")
+            self._write(b"--- MAX LENGTH REACHED ---\n")
+            self._write(b"\n")
 
     def reset_buffer(self, max_lines: int = 0):
         """Reset/clear the print buffer (call at start of new print job).
