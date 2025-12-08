@@ -1,10 +1,48 @@
-import React from 'react';
+import React, { useState } from 'react';
 import JsonTextarea from './JsonTextarea';
 
 const ModuleConfig = ({ module, updateConfig }) => {
   const config = module.config || {};
   const inputClass = 'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none';
   const labelClass = 'block mb-2 text-sm text-gray-400';
+
+  // Location search state for weather module
+  const [searchTerm, setSearchTerm] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+
+  const handleLocationSearch = async (term) => {
+    setSearchTerm(term);
+    if (term.length < 2) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=10`);
+      const data = await response.json();
+      if (data.results) {
+        setSearchResults(data.results);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (err) {
+      console.error('Error fetching locations:', err);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const selectLocation = (location) => {
+    updateConfig('city_name', location.name);
+    updateConfig('latitude', location.latitude);
+    updateConfig('longitude', location.longitude);
+    updateConfig('timezone', location.timezone);
+    setSearchTerm('');
+    setSearchResults([]);
+  };
 
   if (module.type === 'webhook') {
     return (
@@ -131,8 +169,73 @@ const ModuleConfig = ({ module, updateConfig }) => {
 
   if (module.type === 'weather') {
     return (
-      <div className='text-gray-400 text-sm'>
-        Weather uses the global location settings configured in the General tab. No additional configuration needed.
+      <div className='space-y-3'>
+        <div>
+          <label className={labelClass}>OpenWeather API Key (Optional)</label>
+          <input
+            type='password'
+            value={config.openweather_api_key || ''}
+            onChange={(e) => updateConfig('openweather_api_key', e.target.value)}
+            className={inputClass}
+            placeholder='Enter your OpenWeather API key (optional)'
+          />
+          <p className='text-xs text-gray-500 mt-1'>
+            Optional: Get your free API key from openweathermap.org. If not provided, uses free Open-Meteo API.
+          </p>
+        </div>
+
+        <div className='pt-4 border-t border-gray-700'>
+          <label className={labelClass}>Location</label>
+          <div className='mb-6 text-left relative'>
+            <input
+              type='text'
+              value={searchTerm}
+              onChange={(e) => handleLocationSearch(e.target.value)}
+              placeholder='Type zip code or city name (e.g. 10001 or New York)'
+              autoComplete='off'
+              className={inputClass}
+            />
+            {searchResults.length > 0 && (
+              <ul className='absolute w-full z-10 max-h-[200px] overflow-y-auto bg-[#333] border border-[#444] border-t-0 rounded-b shadow-lg list-none p-0 m-0'>
+                {searchResults.map((result) => (
+                  <li
+                    key={result.id}
+                    onClick={() => selectLocation(result)}
+                    className='p-3 cursor-pointer border-b border-[#444] last:border-0 hover:bg-[#444] transition-colors'>
+                    <strong>{result.name}</strong>
+                    <span className='text-xs text-gray-400 ml-2'>
+                      {result.state} {result.zipcode ? `(${result.zipcode})` : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          {config.city_name && (
+            <div className='bg-[#1a1a1a] p-3 rounded border border-gray-800 space-y-2'>
+              <div className='flex justify-between'>
+                <span className='text-xs text-gray-400'>City</span>
+                <span className='text-sm text-white font-medium'>{config.city_name}</span>
+              </div>
+              <div className='flex justify-between'>
+                <span className='text-xs text-gray-400'>Timezone</span>
+                <span className='text-sm text-white'>{config.timezone || 'Not set'}</span>
+              </div>
+              <div className='flex justify-between'>
+                <span className='text-xs text-gray-400'>Coordinates</span>
+                <span className='text-sm text-white'>
+                  {config.latitude?.toFixed(4)}, {config.longitude?.toFixed(4)}
+                </span>
+              </div>
+            </div>
+          )}
+          {!config.city_name && (
+            <p className='text-xs text-gray-500 mt-1'>
+              Search and select a location above. If not set, will use global location settings as fallback.
+            </p>
+          )}
+        </div>
       </div>
     );
   }

@@ -43,6 +43,14 @@ class TextConfig(BaseModel):
     content: str = ""
 
 
+class WeatherConfig(BaseModel):
+    openweather_api_key: Optional[str] = None
+    city_name: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    timezone: Optional[str] = None
+
+
 class CalendarSource(BaseModel):
     label: str
     url: str
@@ -147,9 +155,6 @@ class Settings(BaseModel):
         3  # Number of empty lines to add at end of print job to clear cutter
     )
     max_print_lines: int = 200  # Maximum lines per print job (0 = no limit)
-
-    # Global Weather API (shared across modules if needed)
-    openweather_api_key: Optional[str] = os.getenv("OPENWEATHER_API_KEY")
 
     # Module Instances: Dictionary of module_id -> ModuleInstance
     # These are reusable module configurations that can be assigned to channels

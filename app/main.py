@@ -37,6 +37,7 @@ from app.routers import wifi
 import app.wifi_manager as wifi_manager
 import app.hardware as hardware
 from app.hardware import printer, dial, button, power_button, _is_raspberry_pi
+import app.location_lookup as location_lookup
 
 # --- BACKGROUND TASKS ---
 
@@ -698,6 +699,22 @@ async def reload_settings():
     config_module.settings = settings
 
     return {"message": "Settings reloaded from disk", "config": settings}
+
+
+# --- LOCATION SEARCH API ---
+
+
+@app.get("/api/location/search")
+async def search_location(q: str, limit: int = 10):
+    """
+    Search for locations by zip code or city name using offline ZIP_Locale_Detail.csv.
+    Returns location data with timezone and coordinates.
+    """
+    if not q or len(q.strip()) < 2:
+        return {"results": []}
+
+    results = location_lookup.search_locations(q.strip(), limit=limit)
+    return {"results": results}
 
 
 # --- MODULE MANAGEMENT API ---

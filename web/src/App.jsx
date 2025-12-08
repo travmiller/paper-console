@@ -68,16 +68,14 @@ function App() {
 
   const handleSearch = async (term) => {
     setSearchTerm(term);
-    if (term.length < 3) {
+    if (term.length < 2) {
       setSearchResults([]);
       return;
     }
 
     setIsSearching(true);
     try {
-      const response = await fetch(
-        `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(term)}&count=5&language=en&format=json`,
-      );
+      const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=10`);
       const data = await response.json();
       if (data.results) {
         setSearchResults(data.results);
@@ -86,6 +84,7 @@ function App() {
       }
     } catch (err) {
       console.error('Error fetching locations:', err);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }

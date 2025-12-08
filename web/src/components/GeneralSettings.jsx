@@ -14,7 +14,7 @@ const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocati
             type='text'
             value={searchTerm}
             onChange={(e) => handleSearch(e.target.value)}
-            placeholder='Type to search (e.g. London)'
+            placeholder='Type zip code or city name (e.g. 10001 or New York)'
             autoComplete='off'
             className={inputClass}
           />
@@ -27,7 +27,7 @@ const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocati
                   className='p-3 cursor-pointer border-b border-[#444] last:border-0 hover:bg-[#444] transition-colors'>
                   <strong>{result.name}</strong>
                   <span className='text-xs text-gray-400 ml-2'>
-                    {result.admin1} {result.country}
+                    {result.state} {result.zipcode ? `(${result.zipcode})` : ''}
                   </span>
                 </li>
               ))}
