@@ -141,38 +141,10 @@ class PrinterDriver:
             self.ser = None
 
     def _init_dtr_gpio(self):
-        """Initialize DTR GPIO pin for hardware flow control (INPUT to read printer busy)."""
-        if platform.system() != "Linux":
-            return
-
-        try:
-            from app.drivers.gpio_ioctl import (
-                GpioChip,
-                GPIOHANDLE_REQUEST_INPUT,
-            )
-
-            if os.path.exists("/dev/gpiochip0"):
-                chip = GpioChip("/dev/gpiochip0")
-                self.dtr_handle = chip.request_lines(
-                    [self.DTR_PIN], GPIOHANDLE_REQUEST_INPUT, label="printer_dtr"
-                )
-        except Exception:
-            self.dtr_handle = None
-
-    def _is_printer_ready(self) -> bool:
-        """Check if printer is ready (DTR HIGH = ready, LOW = busy)."""
-        if not self.dtr_handle:
-            return True  # No DTR, assume ready
-        try:
-            values = self.dtr_handle.get_values()
-            # HIGH (1) = ready, LOW (0) = busy
-            return values[0] == 1
-        except Exception:
-            return True  # On error, assume ready
-
-    def _check_abort(self) -> bool:
-        """Check if abort was requested. Returns True if should continue, False if aborted."""
-        return not self._abort
+        """Initialize DTR GPIO pin (reserved for future use)."""
+        # DTR not used for flow control on this printer
+        # Kept for potential status queries in the future
+        pass
 
     def _write(self, data: bytes):
         """Internal helper to write bytes to the correct interface."""
