@@ -8,6 +8,10 @@ import uuid
 import os
 from typing import Dict, Optional, List
 from datetime import datetime
+from pydantic import BaseModel
+import subprocess
+import platform
+import pytz
 from app.config import (
     settings,
     Settings,
@@ -699,6 +703,145 @@ async def reload_settings():
     config_module.settings = settings
 
     return {"message": "Settings reloaded from disk", "config": settings}
+
+
+# --- SYSTEM TIME API ---
+
+
+@app.get("/api/system/time")
+async def get_system_time():
+    """
+    Get the current system time and date.
+    Returns time in the configured timezone.
+    """
+    try:
+        tz = pytz.timezone(settings.timezone)
+        now = datetime.now(tz)
+
+        return {
+            "datetime": now.isoformat(),
+            "date": now.strftime("%Y-%m-%d"),
+            "time": now.strftime("%H:%M:%S"),
+            "timezone": settings.timezone,
+            "formatted": now.strftime("%Y-%m-%d %H:%M:%S"),
+        }
+    except Exception as e:
+        # Fallback to UTC if timezone is invalid
+        now = datetime.now(pytz.UTC)
+        return {
+            "datetime": now.isoformat(),
+            "date": now.strftime("%Y-%m-%d"),
+            "time": now.strftime("%H:%M:%S"),
+            "timezone": "UTC",
+            "formatted": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "error": str(e),
+        }
+
+
+class SetTimeRequest(BaseModel):
+    date: str
+    time: str
+
+
+@app.post("/api/system/time")
+async def set_system_time(request: SetTimeRequest):
+    """
+    Set the system time and date.
+    Requires root/admin privileges on Linux/Raspberry Pi.
+
+    Args:
+        date: Date in YYYY-MM-DD format
+        time: Time in HH:MM:SS format
+    """
+    date = request.date
+    time = request.time
+    try:
+        # Validate date and time format
+        datetime.strptime(date, "%Y-%m-%d")
+        datetime.strptime(time, "%H:%M:%S")
+
+        # Combine date and time
+        datetime_str = f"{date} {time}"
+
+        if platform.system() == "Linux":
+            # On Linux/Raspberry Pi, use 'date' command with sudo
+            # Format: sudo date -s "YYYY-MM-DD HH:MM:SS"
+            result = subprocess.run(
+                ["sudo", "date", "-s", datetime_str],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+
+            if result.returncode != 0:
+                return {
+                    "success": False,
+                    "error": result.stderr
+                    or "Failed to set system time. May require root privileges.",
+                    "message": "Could not set system time. Ensure the application has sudo privileges or run as root.",
+                }
+
+            # Also sync hardware clock if available
+            try:
+                subprocess.run(["sudo", "hwclock", "--systohc"], timeout=5, check=False)
+            except Exception:
+                pass  # Ignore hwclock errors
+
+            return {
+                "success": True,
+                "message": f"System time set to {datetime_str}",
+                "datetime": datetime_str,
+            }
+        elif platform.system() == "Windows":
+            # On Windows, use 'date' and 'time' commands
+            # Note: This may require admin privileges
+            date_cmd = f'date {date.replace("-", "/")}'
+            time_cmd = f"time {time}"
+
+            result1 = subprocess.run(
+                date_cmd, shell=True, capture_output=True, text=True, timeout=5
+            )
+            result2 = subprocess.run(
+                time_cmd, shell=True, capture_output=True, text=True, timeout=5
+            )
+
+            if result1.returncode != 0 or result2.returncode != 0:
+                return {
+                    "success": False,
+                    "error": "Failed to set system time on Windows. May require admin privileges.",
+                    "message": "Could not set system time. Run as administrator.",
+                }
+
+            return {
+                "success": True,
+                "message": f"System time set to {datetime_str}",
+                "datetime": datetime_str,
+            }
+        else:
+            return {
+                "success": False,
+                "error": f"Setting system time not supported on {platform.system()}",
+                "message": "System time setting is only supported on Linux and Windows.",
+            }
+
+    except ValueError as e:
+        return {
+            "success": False,
+            "error": f"Invalid date or time format: {str(e)}",
+            "message": "Date must be YYYY-MM-DD and time must be HH:MM:SS",
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "error": "Command timed out",
+            "message": "Setting system time timed out. Please try again.",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "An error occurred while setting system time.",
+        }
 
 
 # --- LOCATION SEARCH API ---

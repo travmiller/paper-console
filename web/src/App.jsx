@@ -174,6 +174,7 @@ function App() {
   const selectLocation = (location) => {
     const updates = {
       city_name: location.name,
+      state: location.state,
       latitude: location.latitude,
       longitude: location.longitude,
       timezone: location.timezone,

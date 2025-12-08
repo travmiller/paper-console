@@ -1,9 +1,71 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocation, settings, saveGlobalSettings, triggerAPMode }) => {
   const inputClass =
     'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none box-border';
   const labelClass = 'block mb-2 font-bold text-gray-200';
+
+  // System time state
+  const [currentTime, setCurrentTime] = useState(null);
+  const [manualDate, setManualDate] = useState('');
+  const [manualTime, setManualTime] = useState('');
+  const [timeStatus, setTimeStatus] = useState({ type: '', message: '' });
+
+  // Fetch current system time on mount and periodically
+  useEffect(() => {
+    const fetchTime = async () => {
+      try {
+        const response = await fetch('/api/system/time');
+        const data = await response.json();
+        if (data.datetime) {
+          setCurrentTime(data);
+          // Pre-fill manual inputs with current time only once
+          setManualDate((prev) => prev || data.date);
+          setManualTime((prev) => prev || data.time.substring(0, 5)); // HH:MM format for input
+        }
+      } catch (err) {
+        console.error('Error fetching system time:', err);
+      }
+    };
+
+    fetchTime();
+    const interval = setInterval(fetchTime, 1000); // Update every second
+    return () => clearInterval(interval);
+  }, []); // Only run on mount
+
+  // Format timezone to a more readable format
+  const formatTimezone = (tz) => {
+    if (!tz) return 'Not Set';
+
+    const timezoneMap = {
+      'America/New_York': 'Eastern Time (ET)',
+      'America/Chicago': 'Central Time (CT)',
+      'America/Denver': 'Mountain Time (MT)',
+      'America/Phoenix': 'Mountain Time (MT)',
+      'America/Los_Angeles': 'Pacific Time (PT)',
+      'America/Anchorage': 'Alaska Time (AKT)',
+      'Pacific/Honolulu': 'Hawaii Time (HST)',
+      'America/Puerto_Rico': 'Atlantic Time (AST)',
+      'America/St_Thomas': 'Atlantic Time (AST)',
+      'Pacific/Guam': 'Chamorro Time (ChST)',
+      'Pacific/Pago_Pago': 'Samoa Time (SST)',
+      'Pacific/Saipan': 'Chamorro Time (ChST)',
+    };
+
+    // Check for exact match first
+    if (timezoneMap[tz]) {
+      return timezoneMap[tz];
+    }
+
+    // Try to extract timezone name from IANA format
+    const parts = tz.split('/');
+    if (parts.length >= 2) {
+      const location = parts[parts.length - 1].replace(/_/g, ' ');
+      return `${location} (${tz})`;
+    }
+
+    return tz;
+  };
 
   return (
     <>
@@ -37,12 +99,15 @@ const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocati
 
         <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 bg-[#2a2a2a] p-4 rounded border border-gray-700 mb-6'>
           <div className='flex flex-col'>
-            <span className='text-xs text-gray-400 mb-1 uppercase'>Selected City</span>
-            <span className='font-bold text-white'>{settings.city_name || 'Not Set'}</span>
+            <span className='text-xs text-gray-400 mb-1 uppercase'>Location</span>
+            <span className='font-bold text-white'>
+              {settings.city_name || 'Not Set'}
+              {settings.state && `, ${settings.state}`}
+            </span>
           </div>
           <div className='flex flex-col'>
             <span className='text-xs text-gray-400 mb-1 uppercase'>Timezone</span>
-            <span className='font-bold text-white'>{settings.timezone || 'Not Set'}</span>
+            <span className='font-bold text-white'>{formatTimezone(settings.timezone)}</span>
           </div>
           <div className='flex flex-col'>
             <span className='text-xs text-gray-400 mb-1 uppercase'>Coordinates</span>
@@ -94,6 +159,89 @@ const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocati
           <p className='text-xs text-gray-500 mt-1'>
             Maximum lines per print job to prevent endless prints. Set to 0 for no limit (default: 200)
           </p>
+        </div>
+
+        <div className='mb-4 pt-4 border-t border-gray-700'>
+          <label className={labelClass}>System Time & Date</label>
+
+          {currentTime && (
+            <div className='mb-4 p-3 bg-[#1a1a1a] rounded border border-gray-800'>
+              <div className='text-sm text-gray-400 mb-1'>Current System Time</div>
+              <div className='text-lg font-bold text-white'>{currentTime.formatted}</div>
+              <div className='text-xs text-gray-500 mt-1'>{currentTime.timezone}</div>
+            </div>
+          )}
+
+          <div className='mb-4'>
+            <div className='grid grid-cols-2 gap-3 mb-3'>
+              <div>
+                <label className='block mb-1 text-sm text-gray-400'>Date</label>
+                <input type='date' value={manualDate} onChange={(e) => setManualDate(e.target.value)} className={inputClass} />
+              </div>
+              <div>
+                <label className='block mb-1 text-sm text-gray-400'>Time</label>
+                <input type='time' value={manualTime} onChange={(e) => setManualTime(e.target.value)} className={inputClass} step='1' />
+              </div>
+            </div>
+
+            <button
+              type='button'
+              onClick={async () => {
+                if (!manualDate || !manualTime) {
+                  setTimeStatus({ type: 'error', message: 'Please enter both date and time' });
+                  return;
+                }
+
+                try {
+                  // Convert time to HH:MM:SS format
+                  const timeParts = manualTime.split(':');
+                  const timeStr = timeParts.length === 2 ? `${manualTime}:00` : manualTime;
+
+                  const response = await fetch('/api/system/time', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ date: manualDate, time: timeStr }),
+                  });
+
+                  const data = await response.json();
+
+                  if (data.success) {
+                    setTimeStatus({ type: 'success', message: data.message });
+                    // Refresh current time
+                    const timeResponse = await fetch('/api/system/time');
+                    const timeData = await timeResponse.json();
+                    if (timeData.datetime) {
+                      setCurrentTime(timeData);
+                    }
+                  } else {
+                    setTimeStatus({ type: 'error', message: data.message || data.error || 'Failed to set system time' });
+                  }
+                } catch (err) {
+                  setTimeStatus({ type: 'error', message: 'Error setting system time: ' + err.message });
+                }
+
+                // Clear status after 5 seconds
+                setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+              }}
+              className='w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors'>
+              Set System Time
+            </button>
+
+            {timeStatus.message && (
+              <div
+                className={`mt-2 p-2 rounded text-sm ${
+                  timeStatus.type === 'success'
+                    ? 'bg-green-900/30 text-green-300 border border-green-900/50'
+                    : 'bg-red-900/30 text-red-300 border border-red-900/50'
+                }`}>
+                {timeStatus.message}
+              </div>
+            )}
+
+            <p className='text-xs text-gray-500 mt-2'>
+              Manually set the system time and date when offline. Requires admin/root privileges on Linux.
+            </p>
+          </div>
         </div>
 
         <div className='mb-4 pt-4 border-t border-gray-700'>

@@ -150,6 +150,7 @@ class Settings(BaseModel):
     latitude: float = 40.7128
     longitude: float = -74.0060
     city_name: str = "New York"
+    state: Optional[str] = None
     time_format: str = "12h"  # "12h" for 12-hour format, "24h" for 24-hour format
     cutter_feed_lines: int = (
         3  # Number of empty lines to add at end of print job to clear cutter
