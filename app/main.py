@@ -1086,10 +1086,10 @@ async def trigger_current_channel():
 async def manual_trigger():
     """Simulates pressing the big brass button."""
     global print_in_progress
-    
+
     if print_in_progress:
         raise HTTPException(status_code=409, detail="Print already in progress")
-    
+
     await trigger_current_channel()
     return {"message": "Triggered"}
 
@@ -1108,10 +1108,10 @@ async def set_dial(position: int):
 async def print_channel(position: int):
     """Set dial position and trigger print atomically."""
     global print_in_progress
-    
+
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
-    
+
     if print_in_progress:
         raise HTTPException(status_code=409, detail="Print already in progress")
 
