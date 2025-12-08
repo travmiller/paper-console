@@ -1094,12 +1094,22 @@ async def trigger_channel(position: int):
         if hasattr(printer, "is_printer_busy"):
             max_wait = 60  # Maximum 60 seconds
             poll_interval = 0.1  # Check every 100ms
+            confirmation_duration = 0.3  # Must be online for 300ms to confirm done
             waited = 0.0
-            
+            online_since = None
+
             while waited < max_wait:
                 if not printer.is_printer_busy():
-                    # Printer is online/ready - printing is complete
-                    break
+                    # Printer is online - start tracking how long it's been online
+                    if online_since is None:
+                        online_since = waited
+                    elif waited - online_since >= confirmation_duration:
+                        # Printer has been online for confirmation period - truly done
+                        break
+                else:
+                    # Printer went busy again - reset confirmation timer
+                    online_since = None
+                    
                 await asyncio.sleep(poll_interval)
                 waited += poll_interval
         else:
