@@ -281,8 +281,8 @@ class PrinterDriver:
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
         self.print_buffer.append(("text", text))
-        # Track lines for max length check (count newlines + 1)
-        self.lines_printed += text.count("\n") + 1
+        # Note: lines_printed is incremented in _write_text_line() when actually printed
+        # to avoid double-counting
 
     def print_line(self):
         """Print a separator line."""
@@ -321,7 +321,7 @@ class PrinterDriver:
         self.print_buffer.clear()
 
         for op_type, op_data in reversed_ops:
-            if self._abort:
+            if self._abort or self.is_max_lines_exceeded():
                 return
 
             if op_type == "text":
@@ -329,7 +329,7 @@ class PrinterDriver:
                 lines = op_data.split("\n")
                 reversed_lines = list(reversed(lines))
                 for line in reversed_lines:
-                    if self._abort:
+                    if self._abort or self.is_max_lines_exceeded():
                         return
                     self._write_text_line(line)
             elif op_type == "feed":

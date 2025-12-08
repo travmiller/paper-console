@@ -12,6 +12,7 @@ class PrinterDriver:
     def print_text(self, text: str):
         """Simulates printing a line of text."""
         print(f"[PRINT] {text}")
+        # Count actual lines (newlines + 1 for the line itself)
         self.lines_printed += text.count("\n") + 1
 
     def print_line(self):
