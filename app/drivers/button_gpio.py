@@ -45,7 +45,9 @@ class ButtonDriver:
         self._initialization_failed = False
         self.is_pressed = False
         self.press_start_time = None
-        self.action_triggered = False  # Track if a long-press action already fired
+        self.triggered_actions = (
+            set()
+        )  # Track which hold actions have fired for this press
 
         self.chip = None
         self.event_handle = None
@@ -154,30 +156,30 @@ class ButtonDriver:
         while self.monitoring:
             time.sleep(0.1)  # Check every 100ms
 
-            if self.is_pressed and self.press_start_time and not self.action_triggered:
+            if self.is_pressed and self.press_start_time:
                 duration = time.time() - self.press_start_time
 
-                # Check for Factory Reset (15s)
-                if duration >= self.factory_reset_duration:
-                    if self.factory_reset_callback:
-                        self.action_triggered = True  # Prevent double trigger
+                # Check for Long Press (5s)
+                if (
+                    duration >= self.long_press_duration
+                    and "long_press" not in self.triggered_actions
+                ):
+                    if self.long_press_callback:
+                        self.triggered_actions.add("long_press")
                         try:
-                            self.factory_reset_callback()
+                            self.long_press_callback()
                         except Exception:
                             pass
 
-                # Check for Long Press (5s) - Only if we haven't triggered factory reset yet
-                # Note: This means Long Press fires at 5s, and then Factory Reset won't fire at 15s
-                # unless we change logic.
-                # Usually you want one OR the other.
-                # If we want both (e.g. hold 5s for one thing, keep holding for another),
-                # we need more complex logic.
-                # For now, let's assume we want the first matching action to fire.
-                elif duration >= self.long_press_duration:
-                    if self.long_press_callback:
-                        self.action_triggered = True  # Prevent double trigger
+                # Check for Factory Reset (15s)
+                if (
+                    duration >= self.factory_reset_duration
+                    and "factory_reset" not in self.triggered_actions
+                ):
+                    if self.factory_reset_callback:
+                        self.triggered_actions.add("factory_reset")
                         try:
-                            self.long_press_callback()
+                            self.factory_reset_callback()
                         except Exception:
                             pass
 
@@ -200,13 +202,13 @@ class ButtonDriver:
                     # Press started
                     self.is_pressed = True
                     self.press_start_time = current_time
-                    self.action_triggered = False
+                    self.triggered_actions = set()
 
                 elif event_id == GPIOEVENT_EVENT_RISING_EDGE:
                     # Released
                     if self.is_pressed:
                         # Only trigger short press if no long action was triggered
-                        if not self.action_triggered and self.callback:
+                        if not self.triggered_actions and self.callback:
                             try:
                                 self.callback()
                             except Exception:
@@ -214,7 +216,7 @@ class ButtonDriver:
 
                         self.is_pressed = False
                         self.press_start_time = None
-                        self.action_triggered = False
+                        self.triggered_actions = set()
 
             except Exception:
                 if self.monitoring:

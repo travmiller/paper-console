@@ -169,10 +169,19 @@ def on_button_press_threadsafe():
     global global_loop, print_in_progress, cancel_print_requested
 
     if print_in_progress:
-        # Cancel the current print job
-        cancel_print_requested = True
+        # Don't do anything on short press if printing (long press handles cancel)
+        pass
     elif global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
+
+
+def on_button_cancel_press_threadsafe():
+    """Callback for long press on main button - cancels print job."""
+    global global_loop, print_in_progress, cancel_print_requested
+
+    if print_in_progress and global_loop and global_loop.is_running():
+        cancel_print_requested = True
+        # We don't need to run a coroutine here, the print loop checks the flag
 
 
 def on_button_long_press_threadsafe():
@@ -298,8 +307,8 @@ async def check_first_boot():
     printer.print_text("--------------------------------")
     printer.print_text("NEED HELP LATER?")
     printer.print_text("--------------------------------")
-    printer.print_text("Hold button 5 sec = WiFi setup")
-    printer.print_text("Hold button 15 sec = Reset all")
+    printer.print_text("Power Btn 5s = WiFi setup")
+    printer.print_text("Power Btn 15s = Reset all")
     printer.print_text("================================")
     printer.feed(2)
 
@@ -463,8 +472,8 @@ async def shutdown_trigger():
         pass
 
 
-def on_power_button_long_press_threadsafe():
-    """Callback for power button hold (shutdown)."""
+def on_power_button_callback_threadsafe():
+    """Callback for power button short press (shutdown)."""
     global global_loop
     if global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(shutdown_trigger(), global_loop)
@@ -493,15 +502,21 @@ async def lifespan(app: FastAPI):
     scheduler_task = asyncio.create_task(scheduler_loop())
     task_monitor_task = asyncio.create_task(task_watchdog())
 
-    # Initialize Button Callbacks
+    # Initialize Main Button Callbacks (Printing Only)
     button.set_callback(on_button_press_threadsafe)
-    button.set_long_press_callback(on_button_long_press_threadsafe)
-    button.set_factory_reset_callback(on_factory_reset_threadsafe)
+    # Set long press on main button to cancel print
+    button.set_long_press_callback(on_button_cancel_press_threadsafe)
 
-    # Initialize Power Button Callbacks (Shutdown logic)
-    # Using long_press (5s) for shutdown to prevent accidental shutdowns
-    power_button.set_long_press_callback(on_power_button_long_press_threadsafe)
-    # Note: Short press does nothing (just wakes if off)
+    # Initialize Power Button Callbacks (Shutdown, AP Mode, Factory Reset)
+    power_button.set_callback(
+        on_power_button_callback_threadsafe
+    )  # Short press = Shutdown
+    power_button.set_long_press_callback(
+        on_button_long_press_threadsafe
+    )  # 5s = AP Mode (reusing function name)
+    power_button.set_factory_reset_callback(
+        on_factory_reset_threadsafe
+    )  # 15s = Factory Reset
 
     yield
 
