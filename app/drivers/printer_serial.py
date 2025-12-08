@@ -436,8 +436,8 @@ class PrinterDriver:
         """Tiny paper feed for tactile feedback - just a small movement."""
         try:
             # ESC J n - Feed paper n dots (n/203 inches on most printers)
-            # 20 dots ≈ 2.5mm - enough to feel/hear but minimal paper waste
-            self._write(b"\x1b\x4a\x14")
+            # 1 dot = minimum movement, just enough to hear the motor
+            self._write(b"\x1b\x4a\x01")
         except Exception:
             pass
 
