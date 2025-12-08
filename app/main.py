@@ -176,6 +176,9 @@ def on_button_press_threadsafe():
             printer.abort()
 
     elif global_loop and global_loop.is_running():
+        # User wants to PRINT
+        # Set flag immediately to lock state and prevent race condition
+        print_in_progress = True
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
 
 
@@ -981,11 +984,15 @@ async def trigger_channel(position: int):
     """
     global print_in_progress, cancel_print_requested
 
-    # Mark print as in progress
+    # Mark print as in progress (redundant but safe)
     print_in_progress = True
     cancel_print_requested = False
 
     try:
+        # Clear hardware buffer (reset) before starting new job to kill any ghosts
+        if hasattr(printer, "clear_hardware_buffer"):
+            printer.clear_hardware_buffer()
+
         # Reset printer buffer at start of print job (for invert mode)
         # Also set max lines limit
         max_lines = getattr(settings, "max_print_lines", 200)
