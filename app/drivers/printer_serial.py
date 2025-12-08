@@ -170,15 +170,14 @@ class PrinterDriver:
         except Exception:
             return True  # On error, assume ready
 
-    def _wait_for_printer_ready(self, timeout: float = 0.05) -> bool:
+    def _wait_for_printer_ready(self, timeout: float = 0.01) -> bool:
         """Wait for printer to be ready. Returns False if aborted.
-        
-        Short timeout (50ms) - if DTR doesn't respond, proceed anyway.
-        The abort checks are the main purpose of this function.
+
+        Very short timeout (10ms) - main purpose is abort checking, not flow control.
         """
         import time
 
-        # Check abort FIRST before any waiting
+        # Check abort FIRST
         if self._abort:
             return False
 
@@ -188,12 +187,9 @@ class PrinterDriver:
                 return False
             if time.time() - start > timeout:
                 break  # Timeout - proceed anyway
-            time.sleep(0.005)  # Check every 5ms
+            time.sleep(0.001)  # Check every 1ms
 
-        # Check abort again after waiting
-        if self._abort:
-            return False
-        return True
+        return not self._abort
 
     def _write(self, data: bytes):
         """Internal helper to write bytes to the correct interface."""
@@ -318,8 +314,6 @@ class PrinterDriver:
 
     def _write_text_line(self, line: str):
         """Internal method to write a single line of text to the printer."""
-        import time
-
         # Check abort before doing anything
         if self._abort:
             return
@@ -342,9 +336,6 @@ class PrinterDriver:
             self._write(encoded)
             self._write(b"\n")
             self.lines_printed += 1
-
-            # Small yield to allow abort flag to be set from button thread
-            time.sleep(0.001)
         except Exception:
             pass
 
