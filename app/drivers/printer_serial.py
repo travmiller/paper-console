@@ -146,6 +146,78 @@ class PrinterDriver:
         except Exception:
             pass
 
+    def _read(self, size: int = 1, timeout: float = 1.0) -> bytes:
+        """Read bytes from serial interface. Returns empty bytes on error or USB."""
+        try:
+            # USB printer doesn't support reading
+            if hasattr(self, "usb_fd") and self.usb_fd is not None:
+                return b""
+            if self.usb_file:
+                return b""
+            
+            # Serial interface
+            if self.ser and self.ser.is_open:
+                old_timeout = self.ser.timeout
+                self.ser.timeout = timeout
+                data = self.ser.read(size)
+                self.ser.timeout = old_timeout
+                return data
+        except Exception:
+            pass
+        return b""
+
+    def check_paper_status(self) -> dict:
+        """Check paper sensor status using GS r 1 command.
+        
+        Returns:
+            dict with keys:
+                - 'paper_adequate': bool (True if paper is adequate)
+                - 'paper_near_end': bool (True if paper is near end)
+                - 'paper_out': bool (True if paper is out)
+                - 'error': bool (True if error reading status)
+        """
+        result = {
+            'paper_adequate': True,
+            'paper_near_end': False,
+            'paper_out': False,
+            'error': False
+        }
+        
+        try:
+            # USB printers don't support status queries
+            if hasattr(self, "usb_fd") and self.usb_fd is not None or self.usb_file:
+                return result
+            
+            # Send GS r 1 - Transmit paper sensor status
+            self._write(b"\x1d\x72\x01")  # GS r 1
+            
+            # Read response (1 byte)
+            response = self._read(1, timeout=0.5)
+            
+            if len(response) == 0:
+                result['error'] = True
+                return result
+            
+            status_byte = response[0]
+            
+            # Parse status byte (bits 2-3 indicate paper status)
+            # Bits 2-3: 00 = paper adequate, 0C (12) = paper near end
+            paper_bits = (status_byte >> 2) & 0x03
+            
+            if paper_bits == 0x03:  # 0C = 12 decimal = 0b1100, bits 2-3 = 0b11
+                result['paper_near_end'] = True
+                result['paper_adequate'] = False
+            elif paper_bits == 0x00:
+                result['paper_adequate'] = True
+            else:
+                # Unknown status, assume adequate
+                result['paper_adequate'] = True
+                
+        except Exception:
+            result['error'] = True
+            
+        return result
+
     def clear_hardware_buffer(self):
         """Clear the printer's hardware buffer - call at startup to prevent garbage."""
         import time

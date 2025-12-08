@@ -986,6 +986,15 @@ async def trigger_channel(position: int):
         if hasattr(printer, "reset_buffer"):
             printer.reset_buffer(max_lines)
 
+        # Check paper status before printing
+        if hasattr(printer, "check_paper_status"):
+            paper_status = printer.check_paper_status()
+            if paper_status.get("paper_near_end"):
+                printer.print_text("")
+                printer.print_text("*** PAPER LOW ***")
+                printer.print_text("")
+                printer.feed(1)
+
         channel = settings.channels.get(position)
 
         # Handle empty or unconfigured channels
