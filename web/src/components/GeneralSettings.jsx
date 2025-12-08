@@ -1,14 +1,6 @@
 import React from 'react';
 
-const GeneralSettings = ({
-  searchTerm,
-  searchResults,
-  handleSearch,
-  selectLocation,
-  settings,
-  saveGlobalSettings,
-  triggerAPMode,
-}) => {
+const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocation, settings, saveGlobalSettings, triggerAPMode }) => {
   const inputClass =
     'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none box-border';
   const labelClass = 'block mb-2 font-bold text-gray-200';
