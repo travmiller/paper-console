@@ -67,4 +67,6 @@ raspberry_pi/*.img
 *.tmp
 *.temp
 .cache/
+nul
+NUL
 
