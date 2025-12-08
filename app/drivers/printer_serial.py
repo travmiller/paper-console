@@ -160,13 +160,13 @@ class PrinterDriver:
             self.dtr_handle = None
 
     def _is_printer_ready(self) -> bool:
-        """Check if printer is ready (DTR LOW = ready, HIGH = busy on most thermal printers)."""
+        """Check if printer is ready (DTR HIGH = ready, LOW = busy)."""
         if not self.dtr_handle:
             return True  # No DTR, assume ready
         try:
             values = self.dtr_handle.get_values()
-            # Most thermal printers: LOW (0) = ready, HIGH (1) = busy
-            return values[0] == 0
+            # HIGH (1) = ready, LOW (0) = busy
+            return values[0] == 1
         except Exception:
             return True  # On error, assume ready
 
