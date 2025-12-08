@@ -996,6 +996,10 @@ async def trigger_channel(position: int):
     cancel_print_requested = False
 
     try:
+        # Immediate tactile feedback - tiny paper feed so printer feels responsive
+        if hasattr(printer, "feed_direct"):
+            printer.feed_direct(1)
+
         # Clear hardware buffer (reset) before starting new job to kill any ghosts
         if hasattr(printer, "clear_hardware_buffer"):
             printer.clear_hardware_buffer()
