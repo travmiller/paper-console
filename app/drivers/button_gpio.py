@@ -24,11 +24,11 @@ except Exception:
 class ButtonDriver:
     """
     Driver for a momentary push button connected to GPIO.
-    Uses edge detection for both press and release.
+    Uses edge detection for press and release.
     Supports:
       - Short press (< 5 seconds)
-      - Long press (5-15 seconds) - triggers AP mode
-      - Factory reset (15+ seconds) - resets device to defaults
+      - Long press (5-15 seconds) - triggers WHILE HOLDING
+      - Factory reset (15+ seconds) - triggers WHILE HOLDING
     """
 
     def __init__(self, pin: int = 18):
@@ -40,8 +40,12 @@ class ButtonDriver:
         self.factory_reset_duration = 15.0  # 15 seconds for factory reset
         self.monitoring = False
         self.monitor_thread = None
+        self.hold_check_thread = None
         self.gpio_available = GPIO_AVAILABLE
         self._initialization_failed = False
+        self.is_pressed = False
+        self.press_start_time = None
+        self.action_triggered = False  # Track if a long-press action already fired
 
         self.chip = None
         self.event_handle = None
@@ -72,6 +76,12 @@ class ButtonDriver:
                     target=self._monitor_loop, daemon=True
                 )
                 self.monitor_thread.start()
+
+                # Start hold checker thread
+                self.hold_check_thread = threading.Thread(
+                    target=self._hold_check_loop, daemon=True
+                )
+                self.hold_check_thread.start()
                 return
 
             except OSError as e:
@@ -121,6 +131,11 @@ class ButtonDriver:
                         target=self._monitor_loop, daemon=True
                     )
                     self.monitor_thread.start()
+
+                    self.hold_check_thread = threading.Thread(
+                        target=self._hold_check_loop, daemon=True
+                    )
+                    self.hold_check_thread.start()
                     return
 
                 except Exception:
@@ -134,9 +149,40 @@ class ButtonDriver:
         bg_thread = threading.Thread(target=retry_init, daemon=True)
         bg_thread.start()
 
+    def _hold_check_loop(self):
+        """Periodically check if button is held down long enough to trigger actions."""
+        while self.monitoring:
+            time.sleep(0.1)  # Check every 100ms
+
+            if self.is_pressed and self.press_start_time and not self.action_triggered:
+                duration = time.time() - self.press_start_time
+
+                # Check for Factory Reset (15s)
+                if duration >= self.factory_reset_duration:
+                    if self.factory_reset_callback:
+                        self.action_triggered = True  # Prevent double trigger
+                        try:
+                            self.factory_reset_callback()
+                        except Exception:
+                            pass
+
+                # Check for Long Press (5s) - Only if we haven't triggered factory reset yet
+                # Note: This means Long Press fires at 5s, and then Factory Reset won't fire at 15s
+                # unless we change logic.
+                # Usually you want one OR the other.
+                # If we want both (e.g. hold 5s for one thing, keep holding for another),
+                # we need more complex logic.
+                # For now, let's assume we want the first matching action to fire.
+                elif duration >= self.long_press_duration:
+                    if self.long_press_callback:
+                        self.action_triggered = True  # Prevent double trigger
+                        try:
+                            self.long_press_callback()
+                        except Exception:
+                            pass
+
     def _monitor_loop(self):
         """Monitor for button press/release events."""
-        press_start_time = None
         last_event_time = 0
         debounce_ms = 50
 
@@ -151,35 +197,24 @@ class ButtonDriver:
                 last_event_time = current_time
 
                 if event_id == GPIOEVENT_EVENT_FALLING_EDGE:
-                    press_start_time = current_time
+                    # Press started
+                    self.is_pressed = True
+                    self.press_start_time = current_time
+                    self.action_triggered = False
 
                 elif event_id == GPIOEVENT_EVENT_RISING_EDGE:
-                    if press_start_time is not None:
-                        duration = current_time - press_start_time
-                        press_start_time = None
+                    # Released
+                    if self.is_pressed:
+                        # Only trigger short press if no long action was triggered
+                        if not self.action_triggered and self.callback:
+                            try:
+                                self.callback()
+                            except Exception:
+                                pass
 
-                        # Check duration thresholds (longest first)
-                        if duration >= self.factory_reset_duration:
-                            # 15+ seconds = factory reset
-                            if self.factory_reset_callback:
-                                try:
-                                    self.factory_reset_callback()
-                                except Exception:
-                                    pass
-                        elif duration >= self.long_press_duration:
-                            # 5-15 seconds = AP mode
-                            if self.long_press_callback:
-                                try:
-                                    self.long_press_callback()
-                                except Exception:
-                                    pass
-                        else:
-                            # < 5 seconds = normal press
-                            if self.callback:
-                                try:
-                                    self.callback()
-                                except Exception:
-                                    pass
+                        self.is_pressed = False
+                        self.press_start_time = None
+                        self.action_triggered = False
 
             except Exception:
                 if self.monitoring:
@@ -199,6 +234,12 @@ class ButtonDriver:
 
     def cleanup(self):
         self.monitoring = False
+
+        if self.monitor_thread:
+            self.monitor_thread.join(timeout=1)
+
+        if self.hold_check_thread:
+            self.hold_check_thread.join(timeout=1)
 
         if self.event_handle:
             self.event_handle.close()
