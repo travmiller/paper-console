@@ -303,11 +303,11 @@ paper-console/
   * Confirm no other application is holding the serial port open (use `lsof /dev/serial0`)
 
 ### Service Issues
-* **Restart Loop:**
+  * **Restart Loop:**
   * Service uses `run.sh` to handle port conflicts automatically
   * Restart: `sudo systemctl restart pc-1.service`
   * Check logs: `sudo journalctl -u pc-1.service -f`
-* **Port Already in Use:**
+  * **Port Already in Use:**
   * `run.sh` automatically kills zombie processes
   * If persistent, reboot: `sudo reboot`
 
