@@ -1088,16 +1088,26 @@ async def trigger_channel(position: int):
         if feed_lines > 0:
             printer.feed_direct(feed_lines)
 
-        # --- SIMULATE HARDWARE PRINTING TIME ---
-        # Keep 'print_in_progress' True while physical printer catches up
-        # to prevent accidental double-triggers/queuing if user presses button during physical print
-        if hasattr(printer, "lines_printed"):
-            # lines_printed is double-counted (buffer + flush), so roughly 2x real lines
-            # Safe estimate: lines_printed / 20 ~= 10 real lines/sec
-            wait_time = printer.lines_printed / 20.0
-            # Clamp between 2s and 30s
-            wait_time = max(2.0, min(wait_time, 30.0))
-            await asyncio.sleep(wait_time)
+        # --- WAIT FOR PRINTER TO FINISH ---
+        # Poll printer status until it's done printing
+        # This keeps 'print_in_progress' True while physical printer is actually printing
+        if hasattr(printer, "is_printer_busy"):
+            max_wait = 60  # Maximum 60 seconds
+            poll_interval = 0.1  # Check every 100ms
+            waited = 0.0
+            
+            while waited < max_wait:
+                if not printer.is_printer_busy():
+                    # Printer is online/ready - printing is complete
+                    break
+                await asyncio.sleep(poll_interval)
+                waited += poll_interval
+        else:
+            # Fallback: use estimated delay if status checking not available
+            if hasattr(printer, "lines_printed"):
+                wait_time = printer.lines_printed / 20.0
+                wait_time = max(2.0, min(wait_time, 30.0))
+                await asyncio.sleep(wait_time)
 
     finally:
         # Always mark print as complete (use lock to be safe)
