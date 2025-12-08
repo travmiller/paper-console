@@ -207,10 +207,10 @@ paper-console/
 ### Complete Wiring Tables
 
 #### Thermal Printer (TTL Serial)
-| Signal | GPIO | Physical Pin |
-|--------|------|--------------|
-| RX | GPIO 14 | Pin 8 |
-| TX | GPIO 15 | Pin 10 |
+| Printer Wire | Pi GPIO | Physical Pin |
+|--------------|---------|--------------|
+| RX | GPIO 14 (TXD) | Pin 8 |
+| TX | GPIO 15 (RXD) | Pin 10 |
 | DTR | GPIO 18 | Pin 12 |
 | GND | Ground | Pin 14 |
 | VCC | 5V | Pin 2 or 4 |
@@ -245,8 +245,8 @@ paper-console/
                     3V3  (1)  (2)  5V [Printer VCC]
                   GPIO2  (3)  (4)  5V
       [Power Btn] GPIO3  (5)  (6)  GND
-                  GPIO4  (7)  (8)  GPIO14 [Printer RX]
-      [Power Btn] GND    (9)  (10) GPIO15 [Printer TX]
+                  GPIO4  (7)  (8)  GPIO14/TXD [→ Printer RX]
+      [Power Btn] GND    (9)  (10) GPIO15/RXD [← Printer TX]
                  GPIO17 (11)  (12) GPIO18 [Printer DTR]
                  GPIO27 (13)  (14) GND    [Printer GND]
                  GPIO22 (15)  (16) GPIO23
