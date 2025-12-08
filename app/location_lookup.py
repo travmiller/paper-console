@@ -146,7 +146,7 @@ def _load_csv_data() -> List[Dict[str, str]]:
         return _csv_cache
 
     base_dir = Path(__file__).parent
-    csv_path = base_dir / "ZIP_Locale_Detail.csv"
+    csv_path = base_dir / "data" / "ZIP_Locale_Detail.csv"
 
     if not csv_path.exists():
         return []
