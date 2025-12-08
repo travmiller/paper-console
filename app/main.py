@@ -1037,7 +1037,7 @@ async def trigger_channel(position: int):
         for assignment in sorted_modules:
             # Check for cancellation before each module
             if cancel_print_requested:
-                # Reset buffer and abort flag so we can print cancellation message
+                # Clear buffer (discard any buffered content)
                 if hasattr(printer, "reset_buffer"):
                     printer.reset_buffer()
 
@@ -1108,6 +1108,20 @@ async def trigger_channel(position: int):
         # Flush buffer to actually print (in reverse order for tear-off orientation)
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
+
+        # Check if print was aborted mid-flush
+        if hasattr(printer, "was_aborted") and printer.was_aborted():
+            # Print cancellation message
+            printer.reset_buffer()
+            printer.print_text("")
+            printer.print_text("--- PRINT CANCELLED ---")
+            printer.feed(1)
+            if hasattr(printer, "flush_buffer"):
+                printer.flush_buffer()
+            feed_lines = getattr(settings, "cutter_feed_lines", 3)
+            if feed_lines > 0:
+                printer.feed_direct(feed_lines)
+            return
 
         # Add cutter feed lines at the end of the print job
         feed_lines = getattr(settings, "cutter_feed_lines", 3)

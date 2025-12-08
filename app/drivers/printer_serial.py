@@ -160,12 +160,13 @@ class PrinterDriver:
             self.dtr_handle = None
 
     def _is_printer_ready(self) -> bool:
-        """Check if printer is ready (DTR HIGH = ready, LOW = busy)."""
+        """Check if printer is ready (DTR LOW = ready, HIGH = busy on most thermal printers)."""
         if not self.dtr_handle:
             return True  # No DTR, assume ready
         try:
             values = self.dtr_handle.get_values()
-            return values[0] == 1
+            # Most thermal printers: LOW (0) = ready, HIGH (1) = busy
+            return values[0] == 0
         except Exception:
             return True  # On error, assume ready
 
@@ -199,13 +200,12 @@ class PrinterDriver:
     def abort(self):
         """Abort current printing operation immediately."""
         self._abort = True
-        try:
-            # CAN - Cancel print data in page mode
-            self._write(b"\x18")
-            # ESC @ - Hardware reset (clears all settings and buffer)
-            self._write(b"\x1b\x40")
-        except Exception:
-            pass
+        # Clear software buffer
+        self.print_buffer.clear()
+
+    def was_aborted(self) -> bool:
+        """Check if last print was aborted."""
+        return self._abort
 
     def clear_hardware_buffer(self):
         """Clear the printer's hardware buffer - call at startup to prevent garbage."""
