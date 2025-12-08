@@ -20,6 +20,7 @@ class WiFiConnectRequest(BaseModel):
 def do_wifi_connect(ssid: str, password: Optional[str]):
     """Background task to connect to WiFi."""
     import time
+    from app.hardware import printer
 
     # Stop AP mode first
     if wifi_manager.is_ap_mode_active():
@@ -30,8 +31,53 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
     # Connect to the new network
     success = wifi_manager.connect_to_wifi(ssid, password)
 
-    if not success:
+    if success:
+        # Wait for IP address
+        time.sleep(3)
+        status = wifi_manager.get_wifi_status()
+        ip_address = status.get("ip", "unknown")
+
+        if hasattr(printer, "beep"):
+            printer.beep(2)
+
+        printer.feed(1)
+        printer.print_text("=" * 32)
+        printer.print_text("      WIFI CONNECTED!")
+        printer.print_text("=" * 32)
+        printer.feed(1)
+        printer.print_text(f"Network: {ssid}")
+        printer.print_text(f"IP Addr: {ip_address}")
+        printer.print_text("")
+        printer.print_text("Manage device at:")
+        printer.print_text("  http://pc-1.local")
+        printer.feed(2)
+
+        if hasattr(printer, "flush_buffer"):
+            printer.flush_buffer()
+        if hasattr(printer, "feed_direct"):
+            printer.feed_direct(3)
+
+    else:
         # If connection failed, restart AP mode so user can try again
+        if hasattr(printer, "beep"):
+            printer.beep(3)
+            
+        printer.feed(1)
+        printer.print_text("=" * 32)
+        printer.print_text("   CONNECTION FAILED")
+        printer.print_text("=" * 32)
+        printer.feed(1)
+        printer.print_text(f"Could not join:")
+        printer.print_text(f"{ssid}")
+        printer.print_text("")
+        printer.print_text("Restoring Setup Mode...")
+        printer.feed(2)
+        
+        if hasattr(printer, "flush_buffer"):
+            printer.flush_buffer()
+        if hasattr(printer, "feed_direct"):
+            printer.feed_direct(3)
+
         time.sleep(2)
         wifi_manager.start_ap_mode()
 
