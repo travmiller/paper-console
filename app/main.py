@@ -4,6 +4,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, Response
 from contextlib import asynccontextmanager
 import asyncio
+import threading
 import uuid
 import os
 from typing import Dict, Optional, List
@@ -143,6 +144,7 @@ async def scheduler_loop():
 
 # Print state tracking
 print_in_progress = False
+print_lock = threading.Lock()  # Lock to prevent race conditions
 
 
 def on_button_press():
@@ -164,18 +166,21 @@ def on_button_press_threadsafe():
     """Callback that schedules the trigger on the main event loop."""
     global global_loop, print_in_progress
 
-    if print_in_progress:
-        # Already printing, ignore button press
-        return
+    # Use lock to make check+set atomic
+    with print_lock:
+        if print_in_progress:
+            # Already printing, ignore button press
+            return
 
-    # Check if printer is actually busy (hardware status)
-    if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
-        # Printer is busy, ignore button press
-        return
+        # Check if printer is actually busy (hardware status)
+        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
+            # Printer is busy, ignore button press
+            return
 
-    if global_loop and global_loop.is_running():
         # Set flag immediately to lock state and prevent race condition
         print_in_progress = True
+
+    if global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
 
 
@@ -969,14 +974,17 @@ def execute_module(module: ModuleInstance) -> bool:
 async def trigger_channel(position: int):
     """
     Executes all modules assigned to a specific channel position.
-    Can be cancelled by pressing the button again during printing.
     """
     global print_in_progress
 
-    # Mark print as in progress
-    print_in_progress = True
-
     try:
+        # Double-check hardware status here to prevent race conditions
+        # Even if two requests got through, this will catch the second one
+        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
+            # Printer is busy, reset flag and abort
+            print_in_progress = False
+            return
+
         # Instant tactile feedback - tiny paper blip
         if hasattr(printer, "blip"):
             printer.blip()
@@ -1093,14 +1101,19 @@ async def trigger_current_channel():
 async def manual_trigger():
     """Simulates pressing the big brass button."""
     global print_in_progress
-    
-    if print_in_progress:
-        raise HTTPException(status_code=409, detail="Print already in progress")
-    
-    # Check if printer is actually busy (hardware status)
-    if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
-        raise HTTPException(status_code=409, detail="Printer is busy")
-    
+
+    # Use lock to make check+set atomic
+    with print_lock:
+        if print_in_progress:
+            raise HTTPException(status_code=409, detail="Print already in progress")
+
+        # Check if printer is actually busy (hardware status)
+        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
+            raise HTTPException(status_code=409, detail="Printer is busy")
+
+        # Set flag immediately to lock state
+        print_in_progress = True
+
     await trigger_current_channel()
     return {"message": "Triggered"}
 
@@ -1119,16 +1132,21 @@ async def set_dial(position: int):
 async def print_channel(position: int):
     """Set dial position and trigger print atomically."""
     global print_in_progress
-    
+
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
-    
-    if print_in_progress:
-        raise HTTPException(status_code=409, detail="Print already in progress")
-    
-    # Check if printer is actually busy (hardware status)
-    if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
-        raise HTTPException(status_code=409, detail="Printer is busy")
+
+    # Use lock to make check+set atomic
+    with print_lock:
+        if print_in_progress:
+            raise HTTPException(status_code=409, detail="Print already in progress")
+
+        # Check if printer is actually busy (hardware status)
+        if hasattr(printer, "is_printer_busy") and printer.is_printer_busy():
+            raise HTTPException(status_code=409, detail="Printer is busy")
+
+        # Set flag immediately to lock state
+        print_in_progress = True
 
     # Don't need to set dial.set_position since we're passing position directly
     await trigger_channel(position)
