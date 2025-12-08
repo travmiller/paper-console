@@ -321,6 +321,20 @@ class PrinterDriver:
         # Ensure we're in the right mode before printing
         self._ensure_ascii_mode()
 
+        # Count total lines in buffer to see if we'll exceed max
+        total_buffered_lines = 0
+        for op_type, op_data in self.print_buffer:
+            if op_type == "text":
+                total_buffered_lines += op_data.count("\n") + 1
+
+        # If we'll exceed max lines, print message FIRST (tear-off edge)
+        will_truncate = self.max_lines > 0 and total_buffered_lines > self.max_lines
+        if will_truncate:
+            self._write(b"\n")
+            self._write(b"--- MAX LENGTH REACHED ---\n")
+            self._write(b"\n")
+            self._max_lines_hit = True
+
         # Reverse the entire sequence of operations
         reversed_ops = list(reversed(self.print_buffer))
         self.print_buffer.clear()
@@ -329,7 +343,6 @@ class PrinterDriver:
             if self._abort:
                 return
             if self.is_max_lines_exceeded():
-                self._max_lines_hit = True
                 return
 
             if op_type == "text":
@@ -340,7 +353,6 @@ class PrinterDriver:
                     if self._abort:
                         return
                     if self.is_max_lines_exceeded():
-                        self._max_lines_hit = True
                         return
                     self._write_text_line(line)
             elif op_type == "feed":
