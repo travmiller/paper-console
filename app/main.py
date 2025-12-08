@@ -1105,6 +1105,14 @@ async def trigger_channel(position: int):
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
 
+        # Check if print was truncated due to max lines
+        if hasattr(printer, "was_truncated") and printer.was_truncated():
+            # Print message at bottom of receipt (tear-off edge)
+            printer.feed_direct(1)
+            if hasattr(printer, "_write"):
+                printer._write(b"--- MAX LENGTH REACHED ---\n")
+            printer.feed_direct(1)
+
         # Add cutter feed lines at the end of the print job
         feed_lines = getattr(settings, "cutter_feed_lines", 3)
         if feed_lines > 0:

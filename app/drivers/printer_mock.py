@@ -50,6 +50,10 @@ class PrinterDriver:
             return False
         return self.lines_printed >= self.max_lines
 
+    def was_truncated(self) -> bool:
+        """Check if the last print was truncated due to max lines."""
+        return False  # Mock doesn't track this
+
     def feed_direct(self, lines: int = 3):
         """Feed paper directly, bypassing the buffer."""
         self.feed(lines)
