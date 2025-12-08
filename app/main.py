@@ -712,28 +712,45 @@ async def reload_settings():
 async def get_system_time():
     """
     Get the current system time and date.
-    Returns time in the configured timezone.
+    Returns time in the configured timezone and format.
     """
     try:
+        from app.config import format_time
+
         tz = pytz.timezone(settings.timezone)
         now = datetime.now(tz)
 
+        # Format time according to user's preference
+        time_formatted = format_time(now, settings.time_format)
+        date_str = now.strftime("%Y-%m-%d")
+
+        # Format full datetime string with date and formatted time
+        formatted = f"{date_str} {time_formatted}"
+
         return {
             "datetime": now.isoformat(),
-            "date": now.strftime("%Y-%m-%d"),
+            "date": date_str,
             "time": now.strftime("%H:%M:%S"),
             "timezone": settings.timezone,
-            "formatted": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "formatted": formatted,
+            "time_formatted": time_formatted,
         }
     except Exception as e:
         # Fallback to UTC if timezone is invalid
+        from app.config import format_time
+
         now = datetime.now(pytz.UTC)
+        time_formatted = format_time(now, settings.time_format)
+        date_str = now.strftime("%Y-%m-%d")
+        formatted = f"{date_str} {time_formatted}"
+
         return {
             "datetime": now.isoformat(),
-            "date": now.strftime("%Y-%m-%d"),
+            "date": date_str,
             "time": now.strftime("%H:%M:%S"),
             "timezone": "UTC",
-            "formatted": now.strftime("%Y-%m-%d %H:%M:%S"),
+            "formatted": formatted,
+            "time_formatted": time_formatted,
             "error": str(e),
         }
 
@@ -747,7 +764,6 @@ class SetTimeRequest(BaseModel):
 async def set_system_time(request: SetTimeRequest):
     """
     Set the system time and date.
-    Requires root/admin privileges on Linux/Raspberry Pi.
 
     Args:
         date: Date in YYYY-MM-DD format

@@ -116,59 +116,26 @@ const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocati
             </span>
           </div>
         </div>
-      </div>
-
-      <div className='mb-6'>
-        <div className='mb-4'>
-          <label className={labelClass}>Time Format</label>
-          <select
-            value={settings.time_format || '12h'}
-            onChange={(e) => saveGlobalSettings({ time_format: e.target.value })}
-            className={inputClass}>
-            <option value='12h'>12-hour (3:45 PM)</option>
-            <option value='24h'>24-hour (15:45)</option>
-          </select>
-          <p className='text-xs text-gray-500 mt-1'>Choose how times are displayed across all modules</p>
-        </div>
-
-        <div className='mb-4'>
-          <label className={labelClass}>Cutter Feed Lines</label>
-          <input
-            type='number'
-            min='0'
-            max='20'
-            value={settings.cutter_feed_lines ?? 3}
-            onChange={(e) => saveGlobalSettings({ cutter_feed_lines: parseInt(e.target.value) || 0 })}
-            className={inputClass}
-          />
-          <p className='text-xs text-gray-500 mt-1'>
-            Number of empty lines to add at the end of each print job to clear the cutter (default: 3)
-          </p>
-        </div>
-
-        <div className='mb-4'>
-          <label className={labelClass}>Maximum Print Lines</label>
-          <input
-            type='number'
-            min='0'
-            max='1000'
-            value={settings.max_print_lines ?? 200}
-            onChange={(e) => saveGlobalSettings({ max_print_lines: parseInt(e.target.value) || 0 })}
-            className={inputClass}
-          />
-          <p className='text-xs text-gray-500 mt-1'>
-            Maximum lines per print job to prevent endless prints. Set to 0 for no limit (default: 200)
-          </p>
-        </div>
 
         <div className='mb-4 pt-4 border-t border-gray-700'>
           <label className={labelClass}>System Time & Date</label>
+
+          <div className='mb-4'>
+            <label className='block mb-2 text-sm text-gray-400'>Time Format</label>
+            <select
+              value={settings.time_format || '12h'}
+              onChange={(e) => saveGlobalSettings({ time_format: e.target.value })}
+              className={inputClass}>
+              <option value='12h'>12-hour (3:45 PM)</option>
+              <option value='24h'>24-hour (15:45)</option>
+            </select>
+            <p className='text-xs text-gray-500 mt-1'>Choose how times are displayed across all modules</p>
+          </div>
 
           {currentTime && (
             <div className='mb-4 p-3 bg-[#1a1a1a] rounded border border-gray-800'>
               <div className='text-sm text-gray-400 mb-1'>Current System Time</div>
               <div className='text-lg font-bold text-white'>{currentTime.formatted}</div>
-              <div className='text-xs text-gray-500 mt-1'>{currentTime.timezone}</div>
             </div>
           )}
 
@@ -238,10 +205,40 @@ const GeneralSettings = ({ searchTerm, searchResults, handleSearch, selectLocati
               </div>
             )}
 
-            <p className='text-xs text-gray-500 mt-2'>
-              Manually set the system time and date when offline. Requires admin/root privileges on Linux.
-            </p>
+            <p className='text-xs text-gray-500 mt-2'>Manually set the system time and date when offline.</p>
           </div>
+        </div>
+      </div>
+
+      <div className='mb-6'>
+        <div className='mb-4'>
+          <label className={labelClass}>Cutter Feed Lines</label>
+          <input
+            type='number'
+            min='0'
+            max='20'
+            value={settings.cutter_feed_lines ?? 3}
+            onChange={(e) => saveGlobalSettings({ cutter_feed_lines: parseInt(e.target.value) || 0 })}
+            className={inputClass}
+          />
+          <p className='text-xs text-gray-500 mt-1'>
+            Number of empty lines to add at the end of each print job to clear the cutter (default: 3)
+          </p>
+        </div>
+
+        <div className='mb-4'>
+          <label className={labelClass}>Maximum Print Lines</label>
+          <input
+            type='number'
+            min='0'
+            max='1000'
+            value={settings.max_print_lines ?? 200}
+            onChange={(e) => saveGlobalSettings({ max_print_lines: parseInt(e.target.value) || 0 })}
+            className={inputClass}
+          />
+          <p className='text-xs text-gray-500 mt-1'>
+            Maximum lines per print job to prevent endless prints. Set to 0 for no limit (default: 200)
+          </p>
         </div>
 
         <div className='mb-4 pt-4 border-t border-gray-700'>
