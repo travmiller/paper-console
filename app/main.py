@@ -169,10 +169,6 @@ def on_button_press_threadsafe():
         return
 
     if global_loop and global_loop.is_running():
-        # Instant tactile feedback - tiny paper blip
-        if hasattr(printer, "blip"):
-            printer.blip()
-
         # Set flag immediately to lock state and prevent race condition
         print_in_progress = True
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
@@ -976,6 +972,10 @@ async def trigger_channel(position: int):
     print_in_progress = True
 
     try:
+        # Instant tactile feedback - tiny paper blip
+        if hasattr(printer, "blip"):
+            printer.blip()
+
         # Clear hardware buffer (reset) before starting new job to kill any ghosts
         if hasattr(printer, "clear_hardware_buffer"):
             printer.clear_hardware_buffer()
