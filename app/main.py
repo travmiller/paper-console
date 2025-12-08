@@ -169,19 +169,20 @@ def on_button_press_threadsafe():
     global global_loop, print_in_progress, cancel_print_requested
 
     if print_in_progress:
-        # Don't do anything on short press if printing (long press handles cancel)
-        pass
+        # Immediate cancellation on short press
+        cancel_print_requested = True
+        # Abort printer hardware immediately (clears buffer and resets)
+        if hasattr(printer, "abort"):
+            printer.abort()
+            
     elif global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
 
 
 def on_button_cancel_press_threadsafe():
-    """Callback for long press on main button - cancels print job."""
-    global global_loop, print_in_progress, cancel_print_requested
-
-    if print_in_progress and global_loop and global_loop.is_running():
-        cancel_print_requested = True
-        # We don't need to run a coroutine here, the print loop checks the flag
+    """Callback for long press on main button - now unused/placeholder."""
+    # Logic moved to short press
+    pass
 
 
 def on_button_long_press_threadsafe():
@@ -504,8 +505,8 @@ async def lifespan(app: FastAPI):
 
     # Initialize Main Button Callbacks (Printing Only)
     button.set_callback(on_button_press_threadsafe)
-    # Set long press on main button to cancel print
-    button.set_long_press_callback(on_button_cancel_press_threadsafe)
+    # Long press no longer needed for cancel (moved to short press toggle)
+    # button.set_long_press_callback(on_button_cancel_press_threadsafe) 
 
     # Initialize Power Button Callbacks (Shutdown, AP Mode, Factory Reset)
     power_button.set_callback(

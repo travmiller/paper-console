@@ -60,6 +60,7 @@ class PrinterDriver:
         # Line tracking for max print length
         self.lines_printed = 0
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
+        self._abort = False # Flag to abort printing immediately
 
         # Auto-detect serial port if not specified
         if port is None:
@@ -145,11 +146,25 @@ class PrinterDriver:
         except Exception:
             pass
 
+    def abort(self):
+        """Abort current printing operation immediately."""
+        self._abort = True
+        try:
+            # CAN - Cancel print data in page mode
+            self._write(b"\x18") 
+            # ESC @ - Hardware reset (clears all settings and buffer)
+            self._write(b"\x1b\x40")
+        except Exception:
+            pass
+
     def clear_hardware_buffer(self):
         """Clear the printer's hardware buffer - call at startup to prevent garbage."""
         import time
 
         try:
+            # Reset abort flag on clear
+            self._abort = False
+
             # Clear software buffer
             self.print_buffer.clear()
             self.lines_printed = 0
@@ -292,6 +307,9 @@ class PrinterDriver:
         Hardware handles character rotation (ESC { 1),
         software reverses line order (print last line first).
         """
+        # Reset abort flag at start of flush
+        self._abort = False
+
         if len(self.print_buffer) == 0:
             return
 
@@ -303,11 +321,16 @@ class PrinterDriver:
         self.print_buffer.clear()
 
         for op_type, op_data in reversed_ops:
+            if self._abort:
+                return
+
             if op_type == "text":
                 # Handle multi-line text by splitting and reversing lines
                 lines = op_data.split("\n")
                 reversed_lines = list(reversed(lines))
                 for line in reversed_lines:
+                    if self._abort:
+                        return
                     self._write_text_line(line)
             elif op_type == "feed":
                 self._write_feed(op_data)
@@ -322,6 +345,7 @@ class PrinterDriver:
         # Reset line counter
         self.lines_printed = 0
         self.max_lines = max_lines
+        self._abort = False
         # Re-assert ASCII mode and rotation at start of each print job
         self._ensure_ascii_mode()
 
