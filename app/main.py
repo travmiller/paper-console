@@ -172,6 +172,12 @@ def on_button_press_threadsafe():
         # Don't do anything on short press if printing (long press handles cancel)
         pass
     elif global_loop and global_loop.is_running():
+        # Immediate feedback
+        try:
+            if hasattr(printer, "beep"):
+                printer.beep(1)
+        except Exception:
+            pass
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
 
 
@@ -180,6 +186,12 @@ def on_button_cancel_press_threadsafe():
     global global_loop, print_in_progress, cancel_print_requested
 
     if print_in_progress and global_loop and global_loop.is_running():
+        # Immediate feedback
+        try:
+            if hasattr(printer, "beep"):
+                printer.beep(2)
+        except Exception:
+            pass
         cancel_print_requested = True
         # We don't need to run a coroutine here, the print loop checks the flag
 
@@ -219,6 +231,8 @@ async def check_first_boot():
 
     # If marker exists, just print ready message
     if os.path.exists(marker_path):
+        if hasattr(printer, "beep"):
+            printer.beep(1)
         printer.feed(1)
         printer.print_text("=" * 32)
         printer.print_text("       SYSTEM READY")
@@ -367,6 +381,9 @@ async def periodic_wifi_recovery():
 
 async def manual_ap_mode_trigger():
     """Manually trigger AP mode (e.g. via button hold 5-15 seconds)."""
+    if hasattr(printer, "beep"):
+        printer.beep(3)
+
     # Print instructions BEFORE switching network mode
     await print_setup_instructions()
 
@@ -379,6 +396,9 @@ async def manual_ap_mode_trigger():
 async def factory_reset_trigger():
     """Factory reset (button hold 15+ seconds) - deletes config and reboots."""
     import subprocess
+
+    if hasattr(printer, "beep"):
+        printer.beep(5)
 
     # Reset printer buffer
     if hasattr(printer, "reset_buffer"):
@@ -476,6 +496,12 @@ def on_power_button_callback_threadsafe():
     """Callback for power button short press (shutdown)."""
     global global_loop
     if global_loop and global_loop.is_running():
+        # Immediate feedback
+        try:
+            if hasattr(printer, "beep"):
+                printer.beep(1)
+        except Exception:
+            pass
         asyncio.run_coroutine_threadsafe(shutdown_trigger(), global_loop)
 
 
