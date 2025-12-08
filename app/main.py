@@ -36,7 +36,7 @@ from app.modules import (
 from app.routers import wifi
 import app.wifi_manager as wifi_manager
 import app.hardware as hardware
-from app.hardware import printer, dial, button, _is_raspberry_pi
+from app.hardware import printer, dial, button, power_button, _is_raspberry_pi
 
 # --- BACKGROUND TASKS ---
 
@@ -426,6 +426,38 @@ def on_factory_reset_threadsafe():
         asyncio.run_coroutine_threadsafe(factory_reset_trigger(), global_loop)
 
 
+async def shutdown_trigger():
+    """Shutdown the device safely."""
+    import subprocess
+
+    # Print shutdown message
+    printer.feed(1)
+    printer.print_text("=" * 32)
+    printer.print_text("       SHUTTING DOWN")
+    printer.print_text("=" * 32)
+    printer.feed(1)
+
+    # Flush buffer
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+    if hasattr(printer, "feed_direct"):
+        printer.feed_direct(3)
+
+    await asyncio.sleep(2)
+
+    try:
+        subprocess.run(["sudo", "shutdown", "-h", "now"], check=False)
+    except Exception:
+        pass
+
+
+def on_power_button_long_press_threadsafe():
+    """Callback for power button hold (shutdown)."""
+    global global_loop
+    if global_loop and global_loop.is_running():
+        asyncio.run_coroutine_threadsafe(shutdown_trigger(), global_loop)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
@@ -454,6 +486,11 @@ async def lifespan(app: FastAPI):
     button.set_long_press_callback(on_button_long_press_threadsafe)
     button.set_factory_reset_callback(on_factory_reset_threadsafe)
 
+    # Initialize Power Button Callbacks (Shutdown logic)
+    # Using long_press (5s) for shutdown to prevent accidental shutdowns
+    power_button.set_long_press_callback(on_power_button_long_press_threadsafe)
+    # Note: Short press does nothing (just wakes if off)
+
     yield
 
     # Shutdown - cancel all background tasks
@@ -472,6 +509,8 @@ async def lifespan(app: FastAPI):
         dial.cleanup()
     if hasattr(button, "cleanup"):
         button.cleanup()
+    if hasattr(power_button, "cleanup"):
+        power_button.cleanup()
 
 
 app = FastAPI(
@@ -551,6 +590,9 @@ async def health_check():
     health["components"]["printer"] = "available" if printer else "unavailable"
     health["components"]["dial"] = "available" if dial else "unavailable"
     health["components"]["button"] = "available" if button else "unavailable"
+    health["components"]["power_button"] = (
+        "available" if power_button else "unavailable"
+    )
     health["components"]["gpio"] = "available" if _is_raspberry_pi else "mock"
 
     # Check config file

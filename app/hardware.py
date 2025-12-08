@@ -24,4 +24,11 @@ else:
 # Global Hardware Instances
 printer = PrinterDriver(width=PRINTER_WIDTH)
 dial = DialDriver()
+
+# Main Interface Button (Print / WiFi Setup / Reset) - GPIO 18
 button = ButtonDriver(pin=18)
+
+# dedicated Power Button (Shutdown / Wake) - GPIO 3
+# Note: Waking from halt is a hardware feature of GPIO 3.
+# We only need to handle the shutdown logic here.
+power_button = ButtonDriver(pin=3)
