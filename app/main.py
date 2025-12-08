@@ -166,11 +166,13 @@ def on_button_press_threadsafe():
     """Callback that schedules the trigger on the main event loop."""
     global global_loop, print_in_progress
 
-    # Check if already printing (don't set flag here - trigger_channel will do it atomically)
+    # Check and set flag atomically to prevent multiple async calls from being scheduled
     with print_lock:
         if print_in_progress:
             # Already printing, ignore button press
             return
+        # Set flag immediately to prevent another button press from scheduling
+        print_in_progress = True
 
     if global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
@@ -970,12 +972,12 @@ async def trigger_channel(position: int):
     global print_in_progress
 
     # CRITICAL: Check flag first thing - if already printing, abort immediately
-    # This catches any race conditions where two calls got through
+    # Flag may already be set by button handler, so if it's True we're a duplicate
     with print_lock:
         if print_in_progress:
-            # Another print is already in progress, abort
+            # Another print is already in progress (or we're a duplicate), abort
             return
-        # Claim the flag for this execution
+        # Ensure flag is set (defensive - should already be set by entry point)
         print_in_progress = True
 
     try:
@@ -986,6 +988,14 @@ async def trigger_channel(position: int):
             with print_lock:
                 print_in_progress = False
             return
+
+        # Final check before doing any printer work
+        # Double-check we're still the only one (defensive programming)
+        with print_lock:
+            # Flag should be True (we set it), but verify no one else is printing
+            if not print_in_progress:
+                # Flag was somehow cleared, abort
+                return
 
         # Instant tactile feedback - tiny paper blip
         if hasattr(printer, "blip"):
@@ -1139,10 +1149,12 @@ async def manual_trigger():
     """Simulates pressing the big brass button."""
     global print_in_progress
 
-    # Check if already printing (don't set flag here - trigger_channel will do it atomically)
+    # Check and set flag atomically to prevent multiple calls
     with print_lock:
         if print_in_progress:
             raise HTTPException(status_code=409, detail="Print already in progress")
+        # Set flag immediately to prevent another call from proceeding
+        print_in_progress = True
 
     await trigger_current_channel()
     return {"message": "Triggered"}
@@ -1166,10 +1178,12 @@ async def print_channel(position: int):
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
 
-    # Check if already printing (don't set flag here - trigger_channel will do it atomically)
+    # Check and set flag atomically to prevent multiple calls
     with print_lock:
         if print_in_progress:
             raise HTTPException(status_code=409, detail="Print already in progress")
+        # Set flag immediately to prevent another call from proceeding
+        print_in_progress = True
 
     # Don't need to set dial.set_position since we're passing position directly
     await trigger_channel(position)
