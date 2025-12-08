@@ -314,10 +314,20 @@ class PrinterDriver:
 
     def _write_text_line(self, line: str):
         """Internal method to write a single line of text to the printer."""
+        import time
+
+        # Check abort before doing anything
+        if self._abort:
+            return
+
         try:
             # Wait for printer to be ready (DTR-based flow control)
             if not self._wait_for_printer_ready():
                 return  # Aborted while waiting
+
+            # Check again after wait
+            if self._abort:
+                return
 
             # Sanitize to pure ASCII - prevents Chinese characters
             clean_line = self._sanitize_text(line)
@@ -328,6 +338,9 @@ class PrinterDriver:
             self._write(encoded)
             self._write(b"\n")
             self.lines_printed += 1
+
+            # Small yield to allow abort flag to be set from button thread
+            time.sleep(0.001)
         except Exception:
             pass
 
@@ -357,8 +370,12 @@ class PrinterDriver:
 
     def _write_feed(self, count: int):
         """Internal method to feed paper."""
+        if self._abort:
+            return
         try:
             for _ in range(count):
+                if self._abort:
+                    return
                 # Wait for printer to be ready before each feed
                 if not self._wait_for_printer_ready():
                     return  # Aborted
