@@ -1109,7 +1109,7 @@ async def trigger_channel(position: int):
                 else:
                     # Printer went busy again - reset confirmation timer
                     online_since = None
-                    
+
                 await asyncio.sleep(poll_interval)
                 waited += poll_interval
         else:
