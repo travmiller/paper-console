@@ -1056,18 +1056,6 @@ async def trigger_channel(position: int):
         if feed_lines > 0:
             printer.feed_direct(feed_lines)
 
-        # --- SIMULATE HARDWARE PRINTING TIME ---
-        # Keep 'print_in_progress' True while physical printer catches up
-        if hasattr(printer, "lines_printed"):
-            # lines_printed is double-counted (buffer + flush), so roughly 2x real lines
-            # Calibrated: 19 real lines (38 lines_printed) takes ~6 seconds actual printing
-            # (7 seconds total includes ~1 second prep/API time)
-            # Rate: 38 lines_printed / 6 seconds = ~6.33 lines_printed/sec
-            wait_time = printer.lines_printed / 6.33
-            # Clamp between 2s and 30s
-            wait_time = max(2.0, min(wait_time, 30.0))
-            await asyncio.sleep(wait_time)
-
     finally:
         # Always mark print as complete
         print_in_progress = False
