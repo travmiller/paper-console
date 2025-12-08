@@ -321,19 +321,31 @@ class PrinterDriver:
         # Ensure we're in the right mode before printing
         self._ensure_ascii_mode()
 
-        # Count total lines in buffer to see if we'll exceed max
-        total_buffered_lines = 0
-        for op_type, op_data in self.print_buffer:
-            if op_type == "text":
-                total_buffered_lines += op_data.count("\n") + 1
+        # If max_lines is set, trim content from END of buffer (preserves header at start)
+        if self.max_lines > 0:
+            # Count lines and trim from end until under limit
+            total_lines = 0
+            trim_index = len(self.print_buffer)
+            
+            for i, (op_type, op_data) in enumerate(self.print_buffer):
+                if op_type == "text":
+                    lines_in_item = op_data.count("\n") + 1
+                    if total_lines + lines_in_item > self.max_lines:
+                        # This item would exceed limit - trim here
+                        trim_index = i
+                        self._max_lines_hit = True
+                        break
+                    total_lines += lines_in_item
 
-        # If we'll exceed max lines, print message FIRST (tear-off edge)
-        will_truncate = self.max_lines > 0 and total_buffered_lines > self.max_lines
-        if will_truncate:
+            # Trim buffer if needed
+            if self._max_lines_hit:
+                self.print_buffer = self.print_buffer[:trim_index]
+
+        # If truncated, print message FIRST (tear-off edge)
+        if self._max_lines_hit:
             self._write(b"\n")
             self._write(b"--- MAX LENGTH REACHED ---\n")
             self._write(b"\n")
-            self._max_lines_hit = True
 
         # Reverse the entire sequence of operations
         reversed_ops = list(reversed(self.print_buffer))
@@ -342,8 +354,6 @@ class PrinterDriver:
         for op_type, op_data in reversed_ops:
             if self._abort:
                 return
-            if self.is_max_lines_exceeded():
-                return
 
             if op_type == "text":
                 # Handle multi-line text by splitting and reversing lines
@@ -351,8 +361,6 @@ class PrinterDriver:
                 reversed_lines = list(reversed(lines))
                 for line in reversed_lines:
                     if self._abort:
-                        return
-                    if self.is_max_lines_exceeded():
                         return
                     self._write_text_line(line)
             elif op_type == "feed":
