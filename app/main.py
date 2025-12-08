@@ -141,9 +141,8 @@ async def scheduler_loop():
 
 # --- HARDWARE CALLBACKS ---
 
-# Print state tracking for cancellation
+# Print state tracking
 print_in_progress = False
-cancel_print_requested = False
 
 
 def on_button_press():
@@ -162,34 +161,21 @@ global_loop = None
 
 
 def on_button_press_threadsafe():
-    """Callback that schedules the trigger on the main event loop.
-
-    If a print is already in progress, this will cancel it instead.
-    """
-    global global_loop, print_in_progress, cancel_print_requested
+    """Callback that schedules the trigger on the main event loop."""
+    global global_loop, print_in_progress
 
     if print_in_progress:
-        # Immediate cancellation on short press
-        cancel_print_requested = True
-        # Abort printer hardware immediately (clears buffer and resets)
-        if hasattr(printer, "abort"):
-            printer.abort()
+        # Already printing, ignore button press
+        return
 
-    elif global_loop and global_loop.is_running():
-        # User wants to PRINT
-        # Instant tactile feedback - tiny paper blip in this thread
+    if global_loop and global_loop.is_running():
+        # Instant tactile feedback - tiny paper blip
         if hasattr(printer, "blip"):
             printer.blip()
 
         # Set flag immediately to lock state and prevent race condition
         print_in_progress = True
         asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
-
-
-def on_button_cancel_press_threadsafe():
-    """Callback for long press on main button - now unused/placeholder."""
-    # Logic moved to short press
-    pass
 
 
 def on_button_long_press_threadsafe():
@@ -512,8 +498,6 @@ async def lifespan(app: FastAPI):
 
     # Initialize Main Button Callbacks (Printing Only)
     button.set_callback(on_button_press_threadsafe)
-    # Long press no longer needed for cancel (moved to short press toggle)
-    # button.set_long_press_callback(on_button_cancel_press_threadsafe)
 
     # Initialize Power Button Callbacks (Shutdown, AP Mode, Factory Reset)
     power_button.set_callback(
@@ -986,18 +970,10 @@ async def trigger_channel(position: int):
     Executes all modules assigned to a specific channel position.
     Can be cancelled by pressing the button again during printing.
     """
-    global print_in_progress, cancel_print_requested
-
-    # Check if cancel was requested during scheduling (race condition protection)
-    if cancel_print_requested:
-        # Reset flags and exit immediately
-        cancel_print_requested = False
-        print_in_progress = False
-        return
+    global print_in_progress
 
     # Mark print as in progress
     print_in_progress = True
-    cancel_print_requested = False
 
     try:
         # Clear hardware buffer (reset) before starting new job to kill any ghosts
@@ -1035,26 +1011,6 @@ async def trigger_channel(position: int):
         sorted_modules = sorted(channel.modules, key=lambda m: m.order)
 
         for assignment in sorted_modules:
-            # Check for cancellation before each module
-            if cancel_print_requested:
-                # Clear buffer (discard any buffered content)
-                if hasattr(printer, "reset_buffer"):
-                    printer.reset_buffer()
-
-                # Print cancellation message
-                printer.print_text("--- PRINT CANCELLED ---")
-                printer.feed(1)
-
-                # Flush to print
-                if hasattr(printer, "flush_buffer"):
-                    printer.flush_buffer()
-
-                # Feed to clear cutter
-                feed_lines = getattr(settings, "cutter_feed_lines", 3)
-                if feed_lines > 0:
-                    printer.feed_direct(feed_lines)
-                return
-
             module = settings.modules.get(assignment.module_id)
             if module:
                 execute_module(module)
@@ -1085,43 +1041,9 @@ async def trigger_channel(position: int):
                 if assignment != sorted_modules[-1]:
                     printer.feed(1)
 
-        # Check for cancellation before final flush
-        if cancel_print_requested:
-            # Clear any buffered content (don't print it)
-            if hasattr(printer, "reset_buffer"):
-                printer.reset_buffer()
-
-            # Print cancellation message
-            printer.print_text("")
-            printer.print_text("--- PRINT CANCELLED ---")
-            printer.feed(1)
-
-            # Flush to print
-            if hasattr(printer, "flush_buffer"):
-                printer.flush_buffer()
-
-            feed_lines = getattr(settings, "cutter_feed_lines", 3)
-            if feed_lines > 0:
-                printer.feed_direct(feed_lines)
-            return
-
         # Flush buffer to actually print (in reverse order for tear-off orientation)
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
-
-        # Check if print was aborted mid-flush
-        if hasattr(printer, "was_aborted") and printer.was_aborted():
-            # Print cancellation message
-            printer.reset_buffer()
-            printer.print_text("")
-            printer.print_text("--- PRINT CANCELLED ---")
-            printer.feed(1)
-            if hasattr(printer, "flush_buffer"):
-                printer.flush_buffer()
-            feed_lines = getattr(settings, "cutter_feed_lines", 3)
-            if feed_lines > 0:
-                printer.feed_direct(feed_lines)
-            return
 
         # Add cutter feed lines at the end of the print job
         feed_lines = getattr(settings, "cutter_feed_lines", 3)
@@ -1137,18 +1059,11 @@ async def trigger_channel(position: int):
             wait_time = printer.lines_printed / 20.0
             # Clamp between 2s and 30s
             wait_time = max(2.0, min(wait_time, 30.0))
-
-            # Sleep in intervals to allow cancellation
-            steps = int(wait_time * 5)  # Check every 0.2s
-            for _ in range(steps):
-                if cancel_print_requested:
-                    break
-                await asyncio.sleep(0.2)
+            await asyncio.sleep(wait_time)
 
     finally:
         # Always mark print as complete
         print_in_progress = False
-        cancel_print_requested = False
 
 
 async def trigger_current_channel():
