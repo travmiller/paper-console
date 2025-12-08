@@ -322,20 +322,26 @@ class PrinterDriver:
         self._ensure_ascii_mode()
 
         # If max_lines is set, trim content from END of buffer (preserves header at start)
+        total_lines_in_buffer = 0
         if self.max_lines > 0:
-            # Count lines and trim from end until under limit
-            total_lines = 0
+            # First, count total lines in buffer
+            for op_type, op_data in self.print_buffer:
+                if op_type == "text":
+                    total_lines_in_buffer += op_data.count("\n") + 1
+
+            # Then find trim point
+            lines_counted = 0
             trim_index = len(self.print_buffer)
-            
+
             for i, (op_type, op_data) in enumerate(self.print_buffer):
                 if op_type == "text":
                     lines_in_item = op_data.count("\n") + 1
-                    if total_lines + lines_in_item > self.max_lines:
+                    if lines_counted + lines_in_item > self.max_lines:
                         # This item would exceed limit - trim here
                         trim_index = i
                         self._max_lines_hit = True
                         break
-                    total_lines += lines_in_item
+                    lines_counted += lines_in_item
 
             # Trim buffer if needed
             if self._max_lines_hit:
@@ -344,7 +350,8 @@ class PrinterDriver:
         # If truncated, print message FIRST (tear-off edge)
         if self._max_lines_hit:
             self._write(b"\n")
-            self._write(b"--- MAX LENGTH REACHED ---\n")
+            msg = f"-- MAX LENGTH ({self.max_lines}/{total_lines_in_buffer}) --\n"
+            self._write(msg.encode("ascii", errors="replace"))
             self._write(b"\n")
 
         # Reverse the entire sequence of operations
