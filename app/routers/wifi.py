@@ -37,9 +37,6 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
         status = wifi_manager.get_wifi_status()
         ip_address = status.get("ip", "unknown")
 
-        if hasattr(printer, "beep"):
-            printer.beep(2)
-
         printer.feed(1)
         printer.print_text("=" * 32)
         printer.print_text("      WIFI CONNECTED!")
@@ -59,9 +56,6 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
 
     else:
         # If connection failed, restart AP mode so user can try again
-        if hasattr(printer, "beep"):
-            printer.beep(3)
-            
         printer.feed(1)
         printer.print_text("=" * 32)
         printer.print_text("   CONNECTION FAILED")
@@ -72,7 +66,7 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
         printer.print_text("")
         printer.print_text("Restoring Setup Mode...")
         printer.feed(2)
-        
+
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
         if hasattr(printer, "feed_direct"):

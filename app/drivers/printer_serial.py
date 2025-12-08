@@ -333,21 +333,6 @@ class PrinterDriver:
         except Exception:
             pass
 
-    def beep(self, count: int = 1):
-        """
-        Make a sound by feeding a tiny amount of paper.
-        Useful for haptic/audio feedback without a speaker.
-        """
-        try:
-            for _ in range(count):
-                # Feed 1 line (smallest audible step)
-                self._write(b"\n")
-                # Wait briefly between 'beeps'
-                if count > 1:
-                    time.sleep(0.15)
-        except Exception:
-            pass
-
     def print_header(self, text: str):
         """Print centered header text."""
         # Simple centering logic
