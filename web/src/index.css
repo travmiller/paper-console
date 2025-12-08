@@ -23,3 +23,7 @@ body {
   min-height: 100vh;
   justify-content: center;
 }
+
+#root {
+  width: 100%;
+}
