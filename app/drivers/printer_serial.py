@@ -438,9 +438,9 @@ class PrinterDriver:
             import time
 
             # ESC J n - Feed paper n dots (n/203 inches on most printers)
-            # Double blip: 1 dot, 175ms pause, 1 dot - distinct sounds
+            # Double blip: 1 dot, 200ms pause, 1 dot - minimum for distinct sounds
             self._write(b"\x1b\x4a\x01")
-            time.sleep(0.175)
+            time.sleep(0.2)
             self._write(b"\x1b\x4a\x01")
         except Exception:
             pass
