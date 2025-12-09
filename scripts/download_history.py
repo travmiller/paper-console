@@ -84,15 +84,46 @@ def build_history_database():
     print("This will take 10-15 minutes (respecting rate limits)...")
     print("Progress will be saved incrementally.\n")
 
+    # Load existing data if it exists
     history = {}
+    start_date = datetime(2024, 1, 1)  # Use 2024 for leap year (Feb 29)
+    
+    if OUTPUT_FILE.exists():
+        try:
+            with open(OUTPUT_FILE, "r", encoding="utf-8") as f:
+                history = json.load(f)
+            print(f"Loaded existing database with {len(history)} months of data")
+            
+            # Find the last processed date
+            last_month = max([int(m) for m in history.keys()]) if history else 0
+            if last_month > 0:
+                last_day = max([int(d) for d in history[str(last_month)].keys()]) if str(last_month) in history else 0
+                if last_day > 0:
+                    # Start from the day after the last processed day
+                    start_date = datetime(2024, last_month, last_day) + timedelta(days=1)
+                    print(f"Resuming from {start_date.strftime('%B %d')}...")
+        except Exception as e:
+            print(f"Warning: Could not load existing database: {e}")
+            print("Starting fresh...")
+            history = {}
 
-    # Start from January 1st
-    current_date = datetime(2024, 1, 1)  # Use 2024 for leap year (Feb 29)
+    current_date = start_date
     end_date = datetime(2025, 1, 1)  # Go until end of year
 
-    total_days = (end_date - current_date).days
-    processed = 0
-    total_events = 0
+    total_days = (end_date - datetime(2024, 1, 1)).days
+    # Count already processed days
+    already_processed = sum(
+        len(month_data) 
+        for month_data in history.values()
+    ) if history else 0
+    total_events = sum(
+        len(events) 
+        for month_data in history.values() 
+        for events in month_data.values()
+    ) if history else 0
+    
+    print(f"Already processed: {already_processed} days, {total_events} events")
+    print(f"Remaining: {total_days - already_processed} days\n")
 
     while current_date < end_date:
         month = current_date.month
@@ -117,15 +148,15 @@ def build_history_database():
 
         # Move to next day
         current_date += timedelta(days=1)
-        processed += 1
+        already_processed += 1
 
         # Save progress every 30 days
-        if processed % 30 == 0:
+        if already_processed % 30 == 0:
             OUTPUT_FILE.parent.mkdir(parents=True, exist_ok=True)
             with open(OUTPUT_FILE, "w", encoding="utf-8") as f:
                 json.dump(history, f, indent=2, ensure_ascii=False)
             print(
-                f"  [Progress saved: {processed}/{total_days} days, {total_events} events so far]\n"
+                f"  [Progress saved: {already_processed}/{total_days} days, {total_events} events so far]\n"
             )
 
         # Rate limiting: be nice to Wikimedia's servers
@@ -138,9 +169,10 @@ def build_history_database():
         json.dump(history, f, indent=2, ensure_ascii=False)
 
     print(f"\nDatabase saved to {OUTPUT_FILE}")
-    print(f"  Total days processed: {processed}")
+    print(f"  Total days processed: {already_processed}")
     print(f"  Total events: {total_events}")
-    print(f"  Average events per day: {total_events/processed:.1f}")
+    if already_processed > 0:
+        print(f"  Average events per day: {total_events/already_processed:.1f}")
 
 
 if __name__ == "__main__":
