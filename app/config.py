@@ -99,6 +99,8 @@ from pydantic import field_validator, Field
 DEFAULT_WEATHER_ID = "default-weather-001"
 DEFAULT_ASTRONOMY_ID = "default-astronomy-001"
 DEFAULT_SUDOKU_ID = "default-sudoku-001"
+DEFAULT_MAZE_ID = "default-maze-001"
+
 
 
 def _default_modules() -> Dict[str, ModuleInstance]:
@@ -122,6 +124,12 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             name="Sudoku",
             config={"difficulty": "medium"},
         ),
+        DEFAULT_MAZE_ID: ModuleInstance(
+            id=DEFAULT_MAZE_ID,
+            type="maze",
+            name="Maze",
+            config={"difficulty": "medium"},
+        ),
     }
 
 
@@ -137,7 +145,9 @@ def _default_channels() -> Dict[int, ChannelConfig]:
         3: ChannelConfig(
             modules=[ChannelModuleAssignment(module_id=DEFAULT_SUDOKU_ID, order=0)]
         ),
-        4: ChannelConfig(modules=[]),
+        4: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_MAZE_ID, order=0)]
+        ),
         5: ChannelConfig(modules=[]),
         6: ChannelConfig(modules=[]),
         7: ChannelConfig(modules=[]),
