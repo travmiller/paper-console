@@ -4,6 +4,7 @@ import os
 import requests
 from typing import Dict, Any, List
 from pathlib import Path
+from app.utils import wrap_text
 
 # Curated list of quotes (approx 5k) - clean and reliable source
 # Using JamesFT/Database-Quotes-JSON
@@ -107,10 +108,11 @@ def format_quotes_receipt(
     printer.print_text(datetime.now().strftime("%A, %b %d"))
     printer.print_line()
 
-    # Print Quote Body
-    # We want it to look nice, maybe indented or centered?
-    # Standard left align is safest for wrapping.
-    printer.print_text(text)
+    # Print Quote Body - wrap text for proper reverse buffer handling
+    wrapped_lines = wrap_text(text, width=printer.width, indent=0)
+    for line in wrapped_lines:
+        printer.print_text(line)
+
     printer.feed(1)
 
     # Print Author (Right aligned if possible, or just indented)
