@@ -5,7 +5,7 @@ import logging
 from email.header import decode_header
 from bs4 import BeautifulSoup
 from typing import Dict, Any, List
-from app.config import EmailConfig
+from app.config import EmailConfig, PRINTER_WIDTH
 import app.config
 
 # Set default socket timeout for IMAP operations (30 seconds)
@@ -14,7 +14,7 @@ IMAP_TIMEOUT = 30
 logger = logging.getLogger(__name__)
 
 def clean_text(text):
-    """Decodes headers/body to a printable string."""
+    """Decodes headers/body to a printable string, removing newlines."""
     if not text:
         return ""
     try:
@@ -32,6 +32,11 @@ def clean_text(text):
                 decoded_str += chunk.decode("utf-8", errors="ignore")
         else:
             decoded_str += str(chunk)
+    
+    # Critical: Remove newlines and tabs to prevent printer driver issues
+    # Replace them with spaces so words don't get stuck together
+    decoded_str = " ".join(decoded_str.split())
+    
     return decoded_str
 
 
@@ -44,6 +49,29 @@ def strip_html(html_content):
         logger.error(f"Error stripping HTML: {e}")
         return html_content
 
+def wrap_text(text: str, width: int = 32) -> List[str]:
+    """Wraps text into lines of specified width."""
+    words = text.split()
+    lines = []
+    current_line = ""
+    
+    for word in words:
+        if len(current_line) + len(word) + 1 <= width:
+            current_line += (word + " ")
+        else:
+            if current_line:
+                lines.append(current_line.rstrip())
+            current_line = word + " "
+            
+            # Handle single words longer than width
+            while len(current_line) > width:
+                lines.append(current_line[:width])
+                current_line = current_line[width:]
+    
+    if current_line:
+        lines.append(current_line.rstrip())
+        
+    return lines
 
 # --- REAL IMAP LOGIC ---
 def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
@@ -155,7 +183,7 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
                             except Exception as e:
                                 logger.warning(f"Error extracting message body: {e}")
 
-                        # Clean up body whitespace
+                        # Clean up body whitespace (newlines to spaces)
                         body = " ".join(body.split())
 
                         results.append(
@@ -225,24 +253,23 @@ def format_email_receipt(
 
     for i, msg in enumerate(messages):
         # Header: FROM
-        printer.print_text(f"FROM: {msg['from']}")
+        # Manually wrap to ensure correct inverted order
+        from_lines = wrap_text(f"FROM: {msg['from']}", PRINTER_WIDTH)
+        for line in from_lines:
+            printer.print_text(line)
 
         # Header: SUBJECT
-        # Wrap subject if needed
-        printer.print_text(f"SUBJ: {msg['subject']}")
+        # Manually wrap to ensure correct inverted order
+        subj_lines = wrap_text(f"SUBJ: {msg['subject']}", PRINTER_WIDTH)
+        for line in subj_lines:
+            printer.print_text(line)
+            
         printer.print_line()
 
         # Body
-        # Simple wrapping
-        words = msg["body"].split()
-        line = ""
-        for word in words:
-            if len(line) + len(word) + 1 <= 32:  # PRINTER_WIDTH
-                line += word + " "
-            else:
-                printer.print_text(line)
-                line = word + " "
-        if line:
+        # Manually wrap
+        body_lines = wrap_text(msg["body"], PRINTER_WIDTH)
+        for line in body_lines:
             printer.print_text(line)
 
         printer.print_line()  # Separator between emails
