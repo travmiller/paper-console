@@ -520,7 +520,7 @@ function App() {
   }
 
   return (
-    <div className='max-w-[400px] w-full px-2 py-4 sm:p-8 mx-auto'>
+    <div className='max-w-[400px] w-full px-2 pt-4 pb-12 sm:px-8 sm:pt-8 sm:pb-16 mx-auto'>
       <h1 className='text-3xl sm:text-4xl mb-6 sm:mb-8 text-center leading-tight font-bold'>PC-1 Settings</h1>
       <p className='text-center text-gray-500 mb-6 sm:mb-8 text-sm sm:text-base'>Configure your Paper Console</p>
 
@@ -546,17 +546,20 @@ function App() {
 
       <div className='contents'>
         {activeTab === 'general' && (
-          <GeneralSettings
-            searchTerm={searchTerm}
-            searchResults={searchResults}
-            isSearching={isSearching}
-            handleSearch={handleSearch}
-            selectLocation={selectLocation}
-            settings={settings}
-            saveGlobalSettings={saveGlobalSettings}
-            triggerAPMode={triggerAPMode}
-            wifiStatus={wifiStatus}
-          />
+          <>
+            <GeneralSettings
+              searchTerm={searchTerm}
+              searchResults={searchResults}
+              isSearching={isSearching}
+              handleSearch={handleSearch}
+              selectLocation={selectLocation}
+              settings={settings}
+              saveGlobalSettings={saveGlobalSettings}
+              triggerAPMode={triggerAPMode}
+              wifiStatus={wifiStatus}
+            />
+            <ResetSettingsButton setSettings={setSettings} setModules={setModules} setStatus={setStatus} />
+          </>
         )}
 
         {activeTab === 'channels' && (
@@ -608,8 +611,6 @@ function App() {
 
         <StatusMessage status={status} />
       </div>
-
-      <ResetSettingsButton setSettings={setSettings} setModules={setModules} setStatus={setStatus} />
     </div>
   );
 }
