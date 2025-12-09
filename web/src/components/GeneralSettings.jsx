@@ -303,6 +303,15 @@ const GeneralSettings = ({
                     <div className='flex-1 min-w-0'>
                       <div className='flex items-center gap-2'>
                         <strong className='text-white group-hover:text-blue-300 transition-colors'>{result.name}</strong>
+                        {result.population && result.population > 0 && (
+                          <span className='text-xs text-gray-400'>
+                            {result.population >= 1000000
+                              ? `${(result.population / 1000000).toFixed(1)}M`
+                              : result.population >= 1000
+                              ? `${(result.population / 1000).toFixed(0)}K`
+                              : result.population}
+                          </span>
+                        )}
                         {result.country_code && result.country_code !== 'US' && (
                           <span className='text-xs px-1.5 py-0.5 bg-blue-900/30 text-blue-300 rounded'>{result.country_code}</span>
                         )}
