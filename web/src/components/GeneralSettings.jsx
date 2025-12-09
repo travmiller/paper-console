@@ -492,10 +492,15 @@ const GeneralSettings = ({
           {/* Manual Mode Inputs */}
           {!useAutoTime && (
             <div className='p-4 bg-green-900/5 border border-green-800/20 rounded-lg'>
-              <div className='grid grid-cols-2 gap-3 mb-3'>
+              <div className='grid grid-cols-1 min-[340px]:grid-cols-2 gap-3 mb-3'>
                 <div>
                   <label className='block mb-2 text-sm text-gray-300'>Date</label>
-                  <input type='date' value={manualDate} onChange={(e) => setManualDate(e.target.value)} className={inputClass} />
+                  <input
+                    type='date'
+                    value={manualDate}
+                    onChange={(e) => setManualDate(e.target.value)}
+                    className='w-full py-3 px-2 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none box-border'
+                  />
                 </div>
                 <div>
                   <label className='block mb-2 text-sm text-gray-300'>Time</label>
@@ -507,7 +512,7 @@ const GeneralSettings = ({
                       setManualTime(value);
                       console.log('Time input changed:', value, 'Type:', typeof value);
                     }}
-                    className={inputClass}
+                    className='w-full py-3 px-2 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none box-border'
                     step='1'
                     required
                   />
