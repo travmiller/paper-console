@@ -129,18 +129,9 @@ def format_crossword_receipt(printer, config: Dict[str, Any] = None, module_name
     printer.print_text(datetime.now().strftime("%A, %b %d"))
     printer.print_line()
     
-    # Print grid
-    # Create a grid with numbers for clue starts
-    clue_positions = {}
-    for clue in generator.clues:
-        key = (clue['row'], clue['col'])
-        if key not in clue_positions:
-            clue_positions[key] = []
-        clue_positions[key].append(clue['number'])
-    
     # Print grid with |_| for empty cells and |A| for filled cells
-    # Format: |1||H||E||L||L||O| for cells with content
-    #         |_||_||_||_||_||_| for empty cells
+    # Format: |H||E||L||L||O| for cells with content
+    #         |_||_||_||_||_| for empty cells
     max_width = getattr(printer, 'width', 32)
     
     # Calculate how many cells fit (each cell is 2 chars: |X| or |_|)
@@ -154,11 +145,7 @@ def format_crossword_receipt(printer, config: Dict[str, Any] = None, module_name
         for j in range(cells_per_row):
             cell = row[j] if j < len(row) else ' '
             
-            if (i, j) in clue_positions:
-                # Show clue number (single digit) in format |N|
-                nums = clue_positions[(i, j)]
-                content_line += f"|{nums[0]}|"
-            elif cell == ' ':
+            if cell == ' ':
                 # Empty cell: |_|
                 content_line += "|_|"
             else:
