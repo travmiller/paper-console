@@ -115,10 +115,8 @@ function App() {
     setIsSearching(true);
     locationSearchTimer.current = setTimeout(async () => {
       try {
-        // Pass use_api parameter based on settings
-        const useApi = settings.use_api_location_search || false;
-        // Increase limit for better results, backend will return top matches
-        const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=20&use_api=${useApi}`);
+        // Always use local database (no API)
+        const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=20&use_api=false`);
         const data = await response.json();
         if (data.results) {
           setSearchResults(data.results);

@@ -22,9 +22,6 @@ const GeneralSettings = ({
   const [timeStatus, setTimeStatus] = useState({ type: '', message: '' });
   const [useAutoTime, setUseAutoTime] = useState(true);
 
-  // Location state
-  const [locationStatus, setLocationStatus] = useState({ type: '', message: '' });
-
   // Fetch current system time on mount and periodically
   useEffect(() => {
     const fetchTime = async () => {
@@ -33,9 +30,9 @@ const GeneralSettings = ({
         const data = await response.json();
         if (data.datetime) {
           setCurrentTime(data);
-          // Pre-fill manual inputs with current time only once
-          if (!manualDate) setManualDate(data.date);
-          if (!manualTime) setManualTime(data.time.substring(0, 5)); // HH:MM format for input
+          // Pre-fill manual inputs with current time if they're empty
+          setManualDate((prev) => prev || data.date);
+          setManualTime((prev) => prev || data.time.substring(0, 5)); // HH:MM format for input
         }
       } catch (err) {
         console.error('Error fetching system time:', err);
@@ -81,27 +78,6 @@ const GeneralSettings = ({
     return tz;
   };
 
-  // Set location from system
-  const setLocationFromSystem = async () => {
-    setLocationStatus({ type: '', message: '' });
-    try {
-      const response = await fetch('/api/location/system-default');
-      const data = await response.json();
-
-      if (data.found && data.location) {
-        selectLocation(data.location);
-        setLocationStatus({ type: 'success', message: 'Location set from system timezone' });
-        setTimeout(() => setLocationStatus({ type: '', message: '' }), 5000);
-      } else {
-        setLocationStatus({ type: 'error', message: data.message || 'Could not detect system location' });
-        setTimeout(() => setLocationStatus({ type: '', message: '' }), 5000);
-      }
-    } catch (err) {
-      setLocationStatus({ type: 'error', message: 'Error detecting system location: ' + err.message });
-      setTimeout(() => setLocationStatus({ type: '', message: '' }), 5000);
-    }
-  };
-
   // Auto sync time
   const syncTimeAutomatically = async () => {
     if (!wifiStatus?.connected) {
@@ -140,16 +116,34 @@ const GeneralSettings = ({
 
   // Set time manually
   const setTimeManually = async () => {
+    // Validate inputs
     if (!manualDate || !manualTime) {
       setTimeStatus({ type: 'error', message: 'Please enter both date and time' });
       setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
       return;
     }
 
+    // Validate date format (YYYY-MM-DD)
+    const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+    if (!dateRegex.test(manualDate)) {
+      setTimeStatus({ type: 'error', message: 'Invalid date format. Please use YYYY-MM-DD format.' });
+      setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+      return;
+    }
+
+    // Validate time format (HH:MM)
+    const timeRegex = /^\d{2}:\d{2}$/;
+    if (!timeRegex.test(manualTime)) {
+      setTimeStatus({ type: 'error', message: 'Invalid time format. Please use HH:MM format.' });
+      setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+      return;
+    }
+
+    setTimeStatus({ type: '', message: '' }); // Clear previous status
+
     try {
-      // Convert time to HH:MM:SS format
-      const timeParts = manualTime.split(':');
-      const timeStr = timeParts.length === 2 ? `${manualTime}:00` : manualTime;
+      // Convert time to HH:MM:SS format (add seconds if missing)
+      const timeStr = manualTime.includes(':') && manualTime.split(':').length === 2 ? `${manualTime}:00` : manualTime;
 
       const response = await fetch('/api/system/time', {
         method: 'POST',
@@ -157,22 +151,42 @@ const GeneralSettings = ({
         body: JSON.stringify({ date: manualDate, time: timeStr }),
       });
 
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
       const data = await response.json();
 
       if (data.success) {
-        setTimeStatus({ type: 'success', message: data.message });
+        setTimeStatus({ type: 'success', message: data.message || 'System time set successfully' });
         setUseAutoTime(false);
-        // Refresh current time
-        const timeResponse = await fetch('/api/system/time');
-        const timeData = await timeResponse.json();
-        if (timeData.datetime) {
-          setCurrentTime(timeData);
-        }
+        // Refresh current time after a short delay
+        setTimeout(async () => {
+          try {
+            const timeResponse = await fetch('/api/system/time');
+            const timeData = await timeResponse.json();
+            if (timeData.datetime) {
+              setCurrentTime(timeData);
+              // Update manual inputs to match the set time
+              setManualDate(timeData.date);
+              setManualTime(timeData.time.substring(0, 5));
+            }
+          } catch (err) {
+            console.error('Error refreshing time:', err);
+          }
+        }, 500);
       } else {
-        setTimeStatus({ type: 'error', message: data.message || data.error || 'Failed to set system time' });
+        setTimeStatus({
+          type: 'error',
+          message: data.message || data.error || 'Failed to set system time. The application may need sudo privileges.',
+        });
       }
     } catch (err) {
-      setTimeStatus({ type: 'error', message: 'Error setting system time: ' + err.message });
+      console.error('Error setting system time:', err);
+      setTimeStatus({
+        type: 'error',
+        message: `Error setting system time: ${err.message}. Make sure the backend is running and has proper permissions.`,
+      });
     }
 
     setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
@@ -209,31 +223,6 @@ const GeneralSettings = ({
       <div className='mb-6'>
         <label className={labelClass}>Location</label>
 
-        {/* API Search Toggle */}
-        <div className='mb-4 p-3 bg-[#2a2a2a] rounded border border-gray-700'>
-          <div className='flex items-center justify-between mb-2'>
-            <div>
-              <label className='block text-sm font-medium text-gray-200 mb-1'>Enable Online Location Search</label>
-              <p className='text-xs text-gray-400'>Use OpenStreetMap API for better search results. Requires internet connection.</p>
-            </div>
-            <label className='relative inline-flex items-center cursor-pointer'>
-              <input
-                type='checkbox'
-                checked={settings.use_api_location_search || false}
-                onChange={(e) => saveGlobalSettings({ use_api_location_search: e.target.checked })}
-                className='sr-only peer'
-              />
-              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            </label>
-          </div>
-          {settings.use_api_location_search && (
-            <div className='mt-2 p-2 bg-blue-900/20 border border-blue-800/50 rounded text-xs text-blue-300'>
-              <strong>Note:</strong> Online search uses OpenStreetMap Nominatim API. Your search queries will be sent to their servers. This
-              feature requires an active internet connection.
-            </div>
-          )}
-        </div>
-
         {/* Search for location */}
         <div className='mb-4 text-left relative'>
           <label className='block mb-2 text-sm text-gray-400'>Search City / Location</label>
@@ -242,11 +231,7 @@ const GeneralSettings = ({
               type='text'
               value={searchTerm || ''}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder={
-                settings.use_api_location_search
-                  ? 'Type city name (e.g. Malden, London, Tokyo)'
-                  : 'Type city name (offline global database)'
-              }
+              placeholder='Type city name (e.g. Malden, London, Tokyo)'
               autoComplete='off'
               className={inputClass}
             />
@@ -292,30 +277,6 @@ const GeneralSettings = ({
             </ul>
           )}
         </div>
-
-        {/* Set from system timezone */}
-        <div className='mb-4'>
-          <button
-            type='button'
-            onClick={setLocationFromSystem}
-            className='w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors'>
-            Set Location from System Timezone
-          </button>
-          <p className='text-xs text-gray-500 mt-1'>
-            Use the Raspberry Pi's system timezone to automatically set your location (defaults to major city in timezone)
-          </p>
-        </div>
-
-        {locationStatus.message && (
-          <div
-            className={`mb-4 p-2 rounded text-sm ${
-              locationStatus.type === 'success'
-                ? 'bg-green-900/30 text-green-300 border border-green-900/50'
-                : 'bg-red-900/30 text-red-300 border border-red-900/50'
-            }`}>
-            {locationStatus.message}
-          </div>
-        )}
 
         <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 bg-[#2a2a2a] p-4 rounded border border-gray-700'>
           <div className='flex flex-col'>
@@ -374,6 +335,14 @@ const GeneralSettings = ({
                 setUseAutoTime(e.target.checked);
                 if (e.target.checked && wifiStatus?.connected) {
                   syncTimeAutomatically();
+                } else if (!e.target.checked && currentTime) {
+                  // When switching to manual, ensure inputs are populated
+                  if (!manualDate && currentTime.date) {
+                    setManualDate(currentTime.date);
+                  }
+                  if (!manualTime && currentTime.time) {
+                    setManualTime(currentTime.time.substring(0, 5));
+                  }
                 }
               }}
               className='w-4 h-4'

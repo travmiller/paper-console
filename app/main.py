@@ -1313,9 +1313,7 @@ async def get_system_default_location():
 @app.get("/api/location/search")
 async def search_location(q: str, limit: int = 20, use_api: Optional[str] = None):
     """
-    Search for locations by zip code or city name.
-    When online and use_api=True (or enabled in settings), tries OpenStreetMap Nominatim API first for better results.
-    Falls back to offline ZIP_Locale_Detail.csv if API fails or use_api=False.
+    Search for locations by city name using the local GeoNames database.
     Returns location data with timezone and coordinates.
     """
     if not q or len(q.strip()) < 2:
@@ -1324,16 +1322,14 @@ async def search_location(q: str, limit: int = 20, use_api: Optional[str] = None
     query = q.strip()
     results = []
 
-    # Check if API is enabled in settings (default to False for safety)
-    # Handle both string "true"/"false" from query params and boolean from settings
-    if use_api is None:
-        use_api_enabled = getattr(settings, "use_api_location_search", False)
-    else:
+    # Check if API is requested (default to False - always use local database)
+    use_api_enabled = False
+    if use_api is not None:
         use_api_enabled = (
             use_api.lower() == "true" if isinstance(use_api, str) else bool(use_api)
         )
 
-    # Try API first if requested and online
+    # Try API first if explicitly requested (for future use or testing)
     if use_api_enabled:
         try:
             import requests

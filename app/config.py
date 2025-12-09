@@ -156,9 +156,6 @@ class Settings(BaseModel):
         3  # Number of empty lines to add at end of print job to clear cutter
     )
     max_print_lines: int = 200  # Maximum lines per print job (0 = no limit)
-    use_api_location_search: bool = (
-        False  # Enable online API-based location search (requires internet, uses OpenStreetMap)
-    )
 
     # Module Instances: Dictionary of module_id -> ModuleInstance
     # These are reusable module configurations that can be assigned to channels
