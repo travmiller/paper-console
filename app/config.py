@@ -4,10 +4,6 @@ from datetime import datetime
 import json
 import os
 import uuid
-from dotenv import load_dotenv
-
-# Load .env file
-load_dotenv()
 
 # Constants
 PRINTER_WIDTH = 32  # Hardcoded printer width
@@ -23,7 +19,7 @@ class WebhookConfig(BaseModel):
 
 
 class NewsConfig(BaseModel):
-    news_api_key: Optional[str] = os.getenv("NEWS_API_KEY")
+    news_api_key: Optional[str] = None
 
 
 class RSSConfig(BaseModel):
@@ -32,8 +28,8 @@ class RSSConfig(BaseModel):
 
 class EmailConfig(BaseModel):
     email_host: str = "imap.gmail.com"
-    email_user: Optional[str] = os.getenv("EMAIL_USER")
-    email_password: Optional[str] = os.getenv("EMAIL_PW")
+    email_user: Optional[str] = None
+    email_password: Optional[str] = None
     polling_interval: int = 30  # Default to 30 seconds
     auto_print_new: bool = True  # Whether to automatically print new emails
 
@@ -109,7 +105,6 @@ DEFAULT_WEATHER_ID = "default-weather-001"
 DEFAULT_ASTRONOMY_ID = "default-astronomy-001"
 DEFAULT_SUDOKU_ID = "default-sudoku-001"
 DEFAULT_MAZE_ID = "default-maze-001"
-DEFAULT_CROSSWORD_ID = "default-crossword-001"
 DEFAULT_QUOTES_ID = "default-quotes-001"
 DEFAULT_HISTORY_ID = "default-history-001"
 DEFAULT_TEXT_ID = "default-text-001"
@@ -155,12 +150,6 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             name="On This Day",
             config={"count": 3},
         ),
-        DEFAULT_CROSSWORD_ID: ModuleInstance(
-            id=DEFAULT_CROSSWORD_ID,
-            type="crossword",
-            name="Crossword",
-            config={"size": 12, "num_words": 8},
-        ),
         DEFAULT_TEXT_ID: ModuleInstance(
             id=DEFAULT_TEXT_ID,
             type="text",
@@ -198,7 +187,7 @@ def _default_channels() -> Dict[int, ChannelConfig]:
             modules=[ChannelModuleAssignment(module_id=DEFAULT_HISTORY_ID, order=0)]
         ),
         7: ChannelConfig(
-            modules=[ChannelModuleAssignment(module_id=DEFAULT_CROSSWORD_ID, order=0)]
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_TEXT_ID, order=0)]
         ),
         8: ChannelConfig(
             modules=[ChannelModuleAssignment(module_id=DEFAULT_CHECKLIST_ID, order=0)]

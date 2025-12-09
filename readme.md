@@ -66,8 +66,8 @@ npm run dev
 2. **Run Setup Script:**
    ```bash
    cd ~/paper-console
-   chmod +x scripts/setup_pi.sh
-   sudo scripts/setup_pi.sh
+   chmod +x manufacturing/scripts/setup_pi.sh
+   sudo manufacturing/scripts/setup_pi.sh
    ```
    The script will:
    - Set hostname (default: `pc-1`)
@@ -100,7 +100,7 @@ Configuration is handled entirely via the **Web UI** at `http://pc-1.local` (or 
 
 Each module is an independent instance with its own configuration. See [Architecture & Modules](#4-architecture--modules) for detailed information.
 
-Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **Sudoku**, **Astronomy**, **Calendar**, **Webhook**, **Text / Note**.
+Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **Sudoku**, **Maze**, **Astronomy**, **Calendar**, **Webhook**, **Text / Note**, **Checklist**, **Quotes**, **History**.
 
 ### Settings Storage
 * **Settings File:** `config.json` (auto-saved, gitignored)
@@ -130,15 +130,20 @@ paper-console/
 │   │   ├── news.py        # NewsAPI Logic
 │   │   ├── rss.py         # RSS Feed Logic
 │   │   ├── weather.py     # Weather Logic (Open-Meteo)
-│   │   ├── astronomy.py   # Local Astronomy Logic
+│   │   ├── astronomy.py  # Local Astronomy Logic
 │   │   ├── email_client.py# IMAP Logic
 │   │   ├── sudoku.py      # Sudoku Logic
+│   │   ├── maze.py        # Maze Generation Logic
 │   │   ├── webhook.py     # Generic API/Webhook Logic
 │   │   ├── text.py        # Static Text Logic
-│   │   └── calendar.py    # iCal Calendar Parsing Logic
+│   │   ├── calendar.py    # iCal Calendar Parsing Logic
+│   │   ├── checklist.py   # Checklist Logic
+│   │   ├── quotes.py      # Quotes Logic
+│   │   └── history.py     # Historical Events Logic
 │   └── web/               # React + Vite + Tailwind CSS Frontend
-├── scripts/
-│   └── setup_pi.sh        # Setup script (Hostname, Nginx, Systemd)
+├── manufacturing/
+│   └── scripts/
+│       └── setup_pi.sh        # Setup script (Hostname, Nginx, Systemd)
 ├── run.sh                 # Development server launcher
 ├── run.bat                # Windows development launcher
 ├── requirements.txt       # Python dependencies
@@ -168,6 +173,11 @@ paper-console/
 * Difficulty: Medium or Hard
 * Algorithm: Backtracking solver with random generation
 
+**Maze:**
+* Difficulty: Medium or Hard
+* Algorithm: Recursive backtracking maze generation
+* Features: Printable maze with start/end markers
+
 **Astronomy:**
 * Features: Sunrise, Sunset, Moon Phase/Illumination
 * Uses: Global location from settings
@@ -189,6 +199,21 @@ paper-console/
 **Text / Note:**
 * Features: Static multi-line text storage
 * Use Cases: WiFi passwords, to-do lists, quick reference notes
+
+**Checklist:**
+* Features: Printable checklist with checkboxes
+* Use Cases: Daily tasks, shopping lists, reminders
+* Format: Each item prints with a checkbox `[ ]` for manual checking
+
+**Quotes:**
+* Sources: Curated database of ~5,000 quotes
+* Features: Random inspirational quotes
+* Database: Auto-downloads from GitHub if not present
+
+**History:**
+* Sources: Historical events database
+* Features: "On This Day" historical events
+* Database: Auto-downloads from GitHub if not present
 
 ---
 

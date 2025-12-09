@@ -17,10 +17,10 @@ import logging
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),  # Console output
-    ]
+    ],
 )
 from app.config import (
     settings,
@@ -50,7 +50,6 @@ from app.modules import (
     quotes,
     history,
     checklist,
-    crossword,
 )
 from app.routers import wifi
 import app.wifi_manager as wifi_manager
@@ -458,10 +457,6 @@ def on_factory_reset_threadsafe():
 async def shutdown_trigger():
     """Shutdown the device safely."""
     import subprocess
-    import logging
-
-    logger = logging.getLogger(__name__)
-    logger.info("Power button pressed - initiating shutdown")
 
     # Print shutdown message
     printer.feed(1)
@@ -479,39 +474,16 @@ async def shutdown_trigger():
     await asyncio.sleep(2)
 
     try:
-        logger.info("Executing shutdown command")
-        result = subprocess.run(
-            ["sudo", "shutdown", "-h", "now"],
-            check=False,
-            capture_output=True,
-            text=True,
-            timeout=10,
-        )
-        if result.returncode != 0:
-            logger.error(f"Shutdown command failed: {result.stderr}")
-            # Try alternative shutdown method
-            try:
-                subprocess.run(["sudo", "halt"], check=False, timeout=5)
-            except Exception as e:
-                logger.error(f"Alternative shutdown also failed: {e}")
-    except subprocess.TimeoutExpired:
-        logger.error("Shutdown command timed out")
-    except Exception as e:
-        logger.error(f"Error executing shutdown: {e}")
+        subprocess.run(["sudo", "shutdown", "-h", "now"], check=False)
+    except Exception:
+        pass
 
 
 def on_power_button_callback_threadsafe():
     """Callback for power button short press (shutdown)."""
-    import logging
-    logger = logging.getLogger(__name__)
-    logger.info("Power button callback triggered")
-    
     global global_loop
     if global_loop and global_loop.is_running():
-        logger.info("Scheduling shutdown trigger")
         asyncio.run_coroutine_threadsafe(shutdown_trigger(), global_loop)
-    else:
-        logger.error("Global loop not available - cannot shutdown")
 
 
 @asynccontextmanager
@@ -541,14 +513,6 @@ async def lifespan(app: FastAPI):
     button.set_callback(on_button_press_threadsafe)
 
     # Initialize Power Button Callbacks (Shutdown, AP Mode, Factory Reset)
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    logger.info(f"Setting up power button callbacks (GPIO {power_button.pin})")
-    logger.info(f"Power button GPIO available: {power_button.gpio_available}")
-    logger.info(f"Power button monitoring: {power_button.monitoring}")
-    logger.info(f"Power button initialization failed: {getattr(power_button, '_initialization_failed', False)}")
-    
     power_button.set_callback(
         on_power_button_callback_threadsafe
     )  # Short press = Shutdown
@@ -558,8 +522,6 @@ async def lifespan(app: FastAPI):
     power_button.set_factory_reset_callback(
         on_factory_reset_threadsafe
     )  # 15s = Factory Reset
-    
-    logger.info("Power button callbacks registered successfully")
 
     yield
 
@@ -664,17 +626,6 @@ async def health_check():
         "available" if power_button else "unavailable"
     )
     health["components"]["gpio"] = "available" if _is_raspberry_pi else "mock"
-    
-    # Detailed power button status
-    if power_button:
-        health["power_button"] = {
-            "pin": power_button.pin,
-            "gpio_available": getattr(power_button, "gpio_available", False),
-            "monitoring": getattr(power_button, "monitoring", False),
-            "initialization_failed": getattr(power_button, "_initialization_failed", False),
-            "has_callback": power_button.callback is not None,
-            "has_event_handle": power_button.event_handle is not None,
-        }
 
     # Check config file
     import app.config as config_module
@@ -1842,8 +1793,6 @@ def execute_module(module: ModuleInstance) -> bool:
         elif module_type == "checklist":
             checklist.format_checklist_receipt(printer, config, module_name)
 
-        elif module_type == "crossword":
-            crossword.format_crossword_receipt(printer, config, module_name)
 
         elif module_type == "astronomy":
             astronomy.format_astronomy_receipt(printer, module_name=module_name)
@@ -2046,123 +1995,6 @@ async def test_webhook(action: WebhookConfig):
     """
     webhook.run_webhook(action, printer, module_name=None)
     return {"message": "Webhook executed"}
-
-
-@app.post("/debug/test-power-button")
-async def test_power_button():
-    """
-    Manually trigger the power button shutdown sequence for testing.
-    """
-    await shutdown_trigger()
-    return {"message": "Power button shutdown triggered"}
-
-
-@app.get("/debug/power-button-status")
-async def get_power_button_status():
-    """
-    Get detailed status of the power button driver.
-    """
-    if not power_button:
-        return {"error": "Power button driver not initialized"}
-    
-    status = {
-        "pin": power_button.pin,
-        "gpio_available": getattr(power_button, "gpio_available", False),
-        "monitoring": getattr(power_button, "monitoring", False),
-        "initialization_failed": getattr(power_button, "_initialization_failed", False),
-        "has_callback": power_button.callback is not None,
-        "has_long_press_callback": power_button.long_press_callback is not None,
-        "has_factory_reset_callback": power_button.factory_reset_callback is not None,
-        "has_event_handle": power_button.event_handle is not None,
-        "has_chip": power_button.chip is not None,
-        "is_pressed": getattr(power_button, "is_pressed", False),
-    }
-    
-    # Check if I2C is enabled (GPIO 3 is I2C SDA)
-    if power_button.pin == 3:
-        try:
-            # Check /boot/config.txt for I2C
-            with open("/boot/config.txt", "r") as f:
-                config_content = f.read()
-                i2c_enabled = "dtparam=i2c_arm=on" in config_content or "dtparam=i2c1=on" in config_content
-                status["i2c_enabled"] = i2c_enabled
-                if i2c_enabled:
-                    status["warning"] = "GPIO 3 is shared with I2C SDA. I2C must be disabled for power button to work."
-        except Exception as e:
-            status["i2c_check_error"] = str(e)
-    
-    # Try to read GPIO value if possible
-    if power_button.event_handle:
-        try:
-            current_value = power_button.event_handle.read_value()
-            status["current_gpio_value"] = current_value
-            status["button_state"] = "pressed" if current_value == 0 else "released"
-        except Exception as e:
-            status["gpio_read_error"] = str(e)
-    
-    return status
-
-
-@app.post("/debug/power-button-reinit")
-async def reinit_power_button():
-    """
-    Manually reinitialize the power button driver.
-    Useful if initialization failed.
-    """
-    import logging
-    logger = logging.getLogger(__name__)
-    
-    if not power_button:
-        return {"error": "Power button driver not initialized"}
-    
-    if hasattr(power_button, "reinitialize"):
-        logger.info("Manual power button reinit requested")
-        success = power_button.reinitialize()
-        if success:
-            # Re-register callbacks
-            power_button.set_callback(on_power_button_callback_threadsafe)
-            power_button.set_long_press_callback(on_button_long_press_threadsafe)
-            power_button.set_factory_reset_callback(on_factory_reset_threadsafe)
-            logger.info("Power button reinitialized successfully")
-            return {"message": "Power button reinitialized successfully"}
-        else:
-            logger.error("Failed to reinitialize power button - GPIO may be busy")
-            return {
-                "error": "Failed to reinitialize power button",
-                "suggestion": "GPIO 3 may be in use. Try restarting the service: sudo systemctl restart pc-1.service"
-            }
-    else:
-        return {"error": "Reinitialize method not available"}
-
-
-@app.post("/debug/power-button-force-cleanup")
-async def force_cleanup_power_button():
-    """
-    Force cleanup of power button GPIO resources.
-    This will close all handles and wait for GPIO to be released.
-    """
-    import logging
-    import time
-    logger = logging.getLogger(__name__)
-    
-    if not power_button:
-        return {"error": "Power button driver not initialized"}
-    
-    logger.info("Force cleanup of power button GPIO resources")
-    
-    # Force cleanup
-    if hasattr(power_button, "cleanup"):
-        power_button.cleanup()
-        time.sleep(2.0)  # Wait for GPIO to be released
-    
-    # Reset state flags
-    power_button._initialization_failed = False
-    power_button.gpio_available = True
-    
-    return {
-        "message": "Power button GPIO resources cleaned up",
-        "next_step": "Call /debug/power-button-reinit to reinitialize"
-    }
 
 
 # --- CAPTIVE PORTAL (Auto-launch setup page) ---

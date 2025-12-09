@@ -2,7 +2,7 @@
 
 Welcome to your **PC-1 Paper Console**! 
 
-This device is a physical interface for your digital life. It prints news, weather, puzzles, emails, and more on thermal receipt paper—no screens, no subscriptions, just simple physical information on demand.
+This device is a physical interface for your digital life. It prints news, weather, puzzles, games, emails, calendars, quotes, historical events, and more on thermal receipt paper—no screens, no subscriptions, just simple physical information on demand.
 
 ---
 
@@ -59,10 +59,17 @@ You can change what prints on each channel using the web interface.
 3. Choose a module type:
    * **Weather:** Prints current forecast for your location.
    * **News:** Top headlines (requires a free API key).
-   * **Sudoku:** Generates a fresh puzzle.
-   * **Calendar:** Prints your daily agenda (supports Google/Apple Calendar).
    * **RSS:** Follow your favorite blogs or podcasts.
+   * **Email:** Prints unread emails from your inbox.
+   * **Sudoku:** Generates a fresh puzzle (Medium or Hard difficulty).
+   * **Maze:** Generates a printable maze puzzle.
+   * **Astronomy:** Sunrise, sunset, and moon phase information.
+   * **Calendar:** Prints your daily agenda (supports Google/Apple Calendar).
+   * **Webhook:** Connect to any API (Dad Jokes, Random Facts, IoT devices, etc.).
    * **Text:** Store a static note (like a WiFi password or shopping list).
+   * **Checklist:** Create a printable checklist with checkboxes.
+   * **Quotes:** Prints random inspirational quotes.
+   * **History:** Prints "On This Day" historical events.
 
 ### Scheduling (Alarm Clock)
 You can make the PC-1 print automatically at a specific time (e.g., print the news every morning at 8:00 AM).

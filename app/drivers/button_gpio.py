@@ -84,32 +84,21 @@ class ButtonDriver:
                     target=self._hold_check_loop, daemon=True
                 )
                 self.hold_check_thread.start()
-                
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.info(f"ButtonDriver initialized successfully on GPIO {self.pin}")
                 return
 
             except OSError as e:
-                import logging
-                logger = logging.getLogger(__name__)
                 if e.errno == 16 and attempt < max_retries - 1:  # EBUSY
-                    logger.warning(f"GPIO {self.pin} busy, retrying (attempt {attempt + 1}/{max_retries})")
                     time.sleep(retry_delay)
                     if self.chip:
                         self.chip.close()
                         self.chip = None
                 else:
-                    logger.error(f"Failed to initialize GPIO {self.pin}: {e}")
                     self._initialization_failed = True
                     self.gpio_available = False
                     self.cleanup()
                     self._schedule_background_reinit()
                     return
-            except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"Exception initializing GPIO {self.pin}: {e}", exc_info=True)
+            except Exception:
                 self._initialization_failed = True
                 self.gpio_available = False
                 self.cleanup()
@@ -224,9 +213,6 @@ class ButtonDriver:
 
                 if event_id == GPIOEVENT_EVENT_FALLING_EDGE:
                     # Press started
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.debug(f"Button on GPIO {self.pin} pressed")
                     self.is_pressed = True
                     self.press_start_time = current_time
                     self.triggered_actions = set()
@@ -237,14 +223,9 @@ class ButtonDriver:
                         # Only trigger short press if no long action was triggered
                         if not self.triggered_actions and self.callback:
                             try:
-                                import logging
-                                logger = logging.getLogger(__name__)
-                                logger.info(f"Button on GPIO {self.pin} released - triggering short press callback")
                                 self.callback()
-                            except Exception as e:
-                                import logging
-                                logger = logging.getLogger(__name__)
-                                logger.error(f"Error in button callback: {e}", exc_info=True)
+                            except Exception:
+                                pass
 
                         self.is_pressed = False
                         self.press_start_time = None
@@ -267,144 +248,24 @@ class ButtonDriver:
         self.factory_reset_callback = callback
 
     def cleanup(self):
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        logger.debug(f"Cleaning up button driver on GPIO {self.pin}")
         self.monitoring = False
 
-        # Wait for threads to finish
-        if self.monitor_thread and self.monitor_thread.is_alive():
-            self.monitor_thread.join(timeout=2)
+        if self.monitor_thread:
+            self.monitor_thread.join(timeout=1)
 
-        if self.hold_check_thread and self.hold_check_thread.is_alive():
-            self.hold_check_thread.join(timeout=2)
+        if self.hold_check_thread:
+            self.hold_check_thread.join(timeout=1)
 
-        # Close event handle first (this releases the GPIO line)
         if self.event_handle:
             try:
-                logger.debug(f"Closing event handle for GPIO {self.pin}")
                 self.event_handle.close()
-            except Exception as e:
-                logger.warning(f"Error closing event handle: {e}")
-            finally:
-                self.event_handle = None
+            except Exception:
+                pass
+            self.event_handle = None
 
-        # Then close chip handle
         if self.chip:
             try:
-                logger.debug(f"Closing chip handle for GPIO {self.pin}")
                 self.chip.close()
-            except Exception as e:
-                logger.warning(f"Error closing chip handle: {e}")
-            finally:
-                self.chip = None
-        
-        logger.debug(f"Cleanup complete for GPIO {self.pin}")
-    
-    def reinitialize(self):
-        """
-        Manually reinitialize the GPIO button driver.
-        Useful if initialization failed and background retry didn't work.
-        """
-        import logging
-        import time
-        logger = logging.getLogger(__name__)
-        
-        logger.info(f"Attempting to reinitialize button driver on GPIO {self.pin}")
-        
-        # Cleanup existing resources first - this is critical
-        # We need to ensure GPIO 3 is fully released
-        self.cleanup()
-        
-        # Wait longer to ensure GPIO is fully released by kernel
-        # GPIO lines can take a moment to be released after closing handles
-        time.sleep(1.0)
-        
-        # Reset state
-        self._initialization_failed = False
-        self.gpio_available = GPIO_AVAILABLE
-        
-        if not self.gpio_available:
-            logger.warning("GPIO not available - cannot reinitialize")
-            return False
-        
-        # Try to initialize again with retries
-        max_retries = 5
-        retry_delay = 1.0
-        
-        for attempt in range(max_retries):
-            try:
-                # Ensure everything is cleaned up first
-                if self.event_handle:
-                    try:
-                        self.event_handle.close()
-                    except Exception:
-                        pass
-                    self.event_handle = None
-                
-                if self.chip:
-                    try:
-                        self.chip.close()
-                    except Exception:
-                        pass
-                    self.chip = None
-                
-                # Wait a bit longer for GPIO to be released
-                if attempt > 0:
-                    time.sleep(retry_delay)
-                
-                # Try to open chip and request event handle
-                self.chip = GpioChip("/dev/gpiochip0")
-                
-                handle_flags = (
-                    GPIOHANDLE_REQUEST_INPUT | GPIOHANDLE_REQUEST_BIAS_PULL_UP
-                )
-                event_flags = GPIOEVENT_REQUEST_BOTH_EDGES
-                
-                # Try requesting the event handle
-                # This will fail if GPIO 3 is still in use
-                self.event_handle = self.chip.request_event(
-                    self.pin, handle_flags, event_flags, label=f"button-gpio{self.pin}"
-                )
-                
-                # Start monitoring thread
-                self.monitoring = True
-                self.monitor_thread = threading.Thread(
-                    target=self._monitor_loop, daemon=True
-                )
-                self.monitor_thread.start()
-                
-                # Start hold checker thread
-                self.hold_check_thread = threading.Thread(
-                    target=self._hold_check_loop, daemon=True
-                )
-                self.hold_check_thread.start()
-                
-                logger.info(f"Successfully reinitialized button driver on GPIO {self.pin}")
-                return True
-                
-            except OSError as e:
-                if e.errno == 16:  # EBUSY - Device or resource busy
-                    if attempt < max_retries - 1:
-                        logger.warning(f"GPIO {self.pin} busy, retrying in {retry_delay}s (attempt {attempt + 1}/{max_retries})")
-                        time.sleep(retry_delay)
-                        retry_delay *= 1.5  # Exponential backoff
-                        continue
-                    else:
-                        logger.error(f"GPIO {self.pin} still busy after {max_retries} attempts")
-                        logger.error("GPIO 3 may be in use by I2C. Check /boot/config.txt for dtparam=i2c_arm=on")
-                logger.error(f"Failed to reinitialize button driver: {e}", exc_info=True)
-                self._initialization_failed = True
-                self.gpio_available = False
-                return False
-            except Exception as e:
-                logger.error(f"Failed to reinitialize button driver: {e}", exc_info=True)
-                self._initialization_failed = True
-                self.gpio_available = False
-                if attempt < max_retries - 1:
-                    time.sleep(retry_delay)
-                    continue
-                return False
-        
-        return False
+            except Exception:
+                pass
+            self.chip = None
