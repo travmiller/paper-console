@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import JsonTextarea from './JsonTextarea';
 
 const ModuleConfig = ({ module, updateConfig }) => {
@@ -344,10 +344,23 @@ const ModuleConfig = ({ module, updateConfig }) => {
   }
 
   if (module.type === 'checklist') {
-    const addChecklistItem = () => {
+    const inputRefs = useRef({});
+
+    const addChecklistItem = (afterIndex = null) => {
       const currentConfig = module.config || {};
       const currentItems = currentConfig.items || [];
-      updateConfig('items', [...currentItems, { text: '' }]);
+      const newIndex = afterIndex !== null ? afterIndex + 1 : currentItems.length;
+      const newItems = [...currentItems];
+      newItems.splice(newIndex, 0, { text: '' });
+      updateConfig('items', newItems);
+      
+      // Focus the new input after it's rendered
+      setTimeout(() => {
+        const input = inputRefs.current[`item-${newIndex}`];
+        if (input) {
+          input.focus();
+        }
+      }, 0);
     };
 
     const updateChecklistItem = (index, value) => {
@@ -365,7 +378,41 @@ const ModuleConfig = ({ module, updateConfig }) => {
       const currentItems = [...(currentConfig.items || [])];
       currentItems.splice(index, 1);
       updateConfig('items', currentItems);
+      
+      // Focus the previous input or the next one if it was the first
+      setTimeout(() => {
+        const focusIndex = index > 0 ? index - 1 : 0;
+        if (currentItems.length > 0) {
+          const input = inputRefs.current[`item-${focusIndex}`];
+          if (input) {
+            input.focus();
+          }
+        }
+      }, 0);
     };
+
+    const handleKeyDown = (e, index) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        addChecklistItem(index);
+      } else if (e.key === 'Backspace' && e.target.value === '') {
+        e.preventDefault();
+        if ((config.items || []).length > 0) {
+          removeChecklistItem(index);
+        }
+      }
+    };
+
+    // Ensure at least one item exists on initial mount
+    useEffect(() => {
+      const currentItems = config.items || [];
+      if (currentItems.length === 0) {
+        const currentConfig = module.config || {};
+        const newItems = [{ text: '' }];
+        updateConfig('items', newItems);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     return (
       <div className='space-y-2'>
@@ -375,9 +422,11 @@ const ModuleConfig = ({ module, updateConfig }) => {
             {(config.items || []).map((item, index) => (
               <div key={index} className='bg-[#1a1a1a] p-2 rounded border border-gray-800 flex gap-2 items-center'>
                 <input
+                  ref={(el) => (inputRefs.current[`item-${index}`] = el)}
                   type='text'
                   value={item?.text || ''}
                   onChange={(e) => updateChecklistItem(index, e.target.value)}
+                  onKeyDown={(e) => handleKeyDown(e, index)}
                   placeholder='Enter item...'
                   className='flex-1 p-2 text-sm bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none'
                 />
@@ -391,7 +440,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
             ))}
             <button
               type='button'
-              onClick={addChecklistItem}
+              onClick={() => addChecklistItem()}
               className='w-full py-1.5 bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors text-sm'>
               + Add Item
             </button>
