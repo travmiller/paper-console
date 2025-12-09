@@ -520,7 +520,7 @@ function App() {
   }
 
   return (
-    <div className='max-w-[380px] w-full px-2 py-4 sm:p-8 mx-auto'>
+    <div className='max-w-[400px] w-full px-2 py-4 sm:p-8 mx-auto'>
       <h1 className='text-3xl sm:text-4xl mb-6 sm:mb-8 text-center leading-tight font-bold'>PC-1 Settings</h1>
       <p className='text-center text-gray-500 mb-6 sm:mb-8 text-sm sm:text-base'>Configure your Paper Console</p>
 
