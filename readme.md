@@ -249,7 +249,7 @@ paper-console/
 | GND | Ground | Pin 14 |
 | VCC | 5V | Pin 2 or 4 |
 
-#### Main Button (Print/Cancel)
+#### Main Button (Print)
 | Signal | GPIO | Physical Pin |
 |--------|------|--------------|
 | GND | Ground | Pin 20 |

@@ -35,9 +35,8 @@ The rotary dial has **8 positions** (Channels 1 through 8).
 * You can customize what each channel does in the settings (see Section 3).
 * Each channel can contain **multiple modules** that print in sequence (e.g., News followed by Weather followed by Sudoku).
 
-### The Main Button (Print/Cancel)
+### The Main Button (Print)
 * **Press Once:** Prints the content for the currently selected channel.
-* **Press During Printing:** **Cancels** the current print job immediately.
 
 ### The Power Button
 * **Short Press:** Safely shuts down the device.

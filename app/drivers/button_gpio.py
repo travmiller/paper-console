@@ -27,7 +27,7 @@ class ButtonDriver:
     Uses edge detection for press and release.
     Supports:
       - Short press (< 5 seconds)
-      - Long press (5-15 seconds) - triggers WHILE HOLDING
+      - Long press (5-15 seconds) - triggers ON RELEASE
       - Factory reset (15+ seconds) - triggers WHILE HOLDING
     """
 
@@ -167,19 +167,15 @@ class ButtonDriver:
             if self.is_pressed and self.press_start_time:
                 duration = time.time() - self.press_start_time
 
-                # Check for Long Press (5s)
+                # Mark that we've reached the long press threshold (5s)
+                # But don't trigger callback yet - wait for release
                 if (
                     duration >= self.long_press_duration
-                    and "long_press" not in self.triggered_actions
+                    and "long_press_threshold" not in self.triggered_actions
                 ):
-                    if self.long_press_callback:
-                        self.triggered_actions.add("long_press")
-                        try:
-                            self.long_press_callback()
-                        except Exception:
-                            pass
+                    self.triggered_actions.add("long_press_threshold")
 
-                # Check for Factory Reset (15s)
+                # Check for Factory Reset (15s) - triggers immediately while holding
                 if (
                     duration >= self.factory_reset_duration
                     and "factory_reset" not in self.triggered_actions
@@ -220,8 +216,28 @@ class ButtonDriver:
                 elif event_id == GPIOEVENT_EVENT_RISING_EDGE:
                     # Released
                     if self.is_pressed:
-                        # Only trigger short press if no long action was triggered
-                        if not self.triggered_actions and self.callback:
+                        # Calculate hold duration
+                        hold_duration = None
+                        if self.press_start_time:
+                            hold_duration = current_time - self.press_start_time
+
+                        # Check if we should trigger AP mode (long press)
+                        # Only trigger if:
+                        # - Hold duration was between 5-15 seconds
+                        # - Factory reset was NOT triggered
+                        if (
+                            hold_duration is not None
+                            and hold_duration >= self.long_press_duration
+                            and hold_duration < self.factory_reset_duration
+                            and "factory_reset" not in self.triggered_actions
+                            and self.long_press_callback
+                        ):
+                            try:
+                                self.long_press_callback()
+                            except Exception:
+                                pass
+                        # Otherwise, trigger short press if no actions were triggered
+                        elif not self.triggered_actions and self.callback:
                             try:
                                 self.callback()
                             except Exception:
