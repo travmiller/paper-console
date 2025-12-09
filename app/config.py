@@ -109,6 +109,7 @@ DEFAULT_QUOTES_ID = "default-quotes-001"
 DEFAULT_HISTORY_ID = "default-history-001"
 DEFAULT_TEXT_ID = "default-text-001"
 DEFAULT_CHECKLIST_ID = "default-checklist-001"
+DEFAULT_SYSTEM_MONITOR_ID = "default-system-monitor-001"
 
 
 def _default_modules() -> Dict[str, ModuleInstance]:
@@ -162,6 +163,12 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             name="Checklist",
             config={"items": []},
         ),
+        DEFAULT_SYSTEM_MONITOR_ID: ModuleInstance(
+            id=DEFAULT_SYSTEM_MONITOR_ID,
+            type="system_monitor",
+            name="System Monitor",
+            config={},
+        ),
     }
 
 
@@ -169,28 +176,28 @@ def _default_channels() -> Dict[int, ChannelConfig]:
     """Create default channel assignments for out-of-box experience."""
     return {
         1: ChannelConfig(
-            modules=[ChannelModuleAssignment(module_id=DEFAULT_WEATHER_ID, order=0)]
-        ),
-        2: ChannelConfig(
-            modules=[ChannelModuleAssignment(module_id=DEFAULT_ASTRONOMY_ID, order=0)]
-        ),
-        3: ChannelConfig(
-            modules=[ChannelModuleAssignment(module_id=DEFAULT_SUDOKU_ID, order=0)]
-        ),
-        4: ChannelConfig(
-            modules=[ChannelModuleAssignment(module_id=DEFAULT_MAZE_ID, order=0)]
-        ),
-        5: ChannelConfig(
-            modules=[ChannelModuleAssignment(module_id=DEFAULT_QUOTES_ID, order=0)]
-        ),
-        6: ChannelConfig(
             modules=[ChannelModuleAssignment(module_id=DEFAULT_HISTORY_ID, order=0)]
         ),
-        7: ChannelConfig(
+        2: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_QUOTES_ID, order=0)]
+        ),
+        3: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_ASTRONOMY_ID, order=0)]
+        ),
+        4: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_SUDOKU_ID, order=0)]
+        ),
+        5: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_MAZE_ID, order=0)]
+        ),
+        6: ChannelConfig(
             modules=[ChannelModuleAssignment(module_id=DEFAULT_TEXT_ID, order=0)]
         ),
-        8: ChannelConfig(
+        7: ChannelConfig(
             modules=[ChannelModuleAssignment(module_id=DEFAULT_CHECKLIST_ID, order=0)]
+        ),
+        8: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_SYSTEM_MONITOR_ID, order=0)]
         ),
     }
 
