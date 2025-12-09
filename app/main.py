@@ -40,6 +40,7 @@ from app.modules import (
     quotes,
     history,
     checklist,
+    crossword,
 )
 from app.routers import wifi
 import app.wifi_manager as wifi_manager
@@ -1782,6 +1783,9 @@ def execute_module(module: ModuleInstance) -> bool:
 
         elif module_type == "checklist":
             checklist.format_checklist_receipt(printer, config, module_name)
+
+        elif module_type == "crossword":
+            crossword.format_crossword_receipt(printer, config, module_name)
 
         elif module_type == "astronomy":
             astronomy.format_astronomy_receipt(printer, module_name=module_name)

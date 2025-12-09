@@ -298,6 +298,34 @@ const ModuleConfig = ({ module, updateConfig }) => {
     return <div className={commonClasses.textMuted}>Standard 15x15 maze. No configuration needed.</div>;
   }
 
+  if (module.type === 'crossword') {
+    return (
+      <div className='space-y-3'>
+        <div>
+          <label className={labelClass}>Grid Size</label>
+          <select value={config.size || 10} onChange={(e) => updateConfig('size', parseInt(e.target.value))} className={inputClass}>
+            <option value={8}>8x8 (Small)</option>
+            <option value={10}>10x10 (Medium)</option>
+            <option value={12}>12x12 (Large)</option>
+          </select>
+        </div>
+        <div>
+          <label className={labelClass}>Number of Words</label>
+          <select
+            value={config.num_words || 8}
+            onChange={(e) => updateConfig('num_words', parseInt(e.target.value))}
+            className={inputClass}>
+            <option value={5}>5 Words</option>
+            <option value={8}>8 Words</option>
+            <option value={10}>10 Words</option>
+            <option value={12}>12 Words</option>
+          </select>
+        </div>
+        <p className={commonClasses.textSubtle}>Generates a crossword puzzle with intersecting words.</p>
+      </div>
+    );
+  }
+
   if (module.type === 'quotes') {
     return (
       <div className={commonClasses.textMuted}>
