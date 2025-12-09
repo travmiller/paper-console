@@ -79,28 +79,27 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     printer.print_text("Start: Top | End: Bottom")
     printer.print_line()
     
-    # Render Maze
-    # We use block characters for walls
-    # Full block: █ (U+2588) might be too dark/heavy for thermal printer or not supported by codepage
-    # Let's try to use standard ASCII or box drawing if supported.
-    # Safe fallback: # for wall, space for path.
-    # Or cleaner: 
-    # Wall: █ or #
-    # Path:  
+    # Strategy for better visibility:
+    # 1. Use double characters for width if space allows (makes paths wider and clearer)
+    # 2. Use a denser character than '#' for walls (like 'X' or '@')
     
-    # Let's try to use a nicer look if possible, but '#' is safest for all thermal printers.
-    # To make it look square, we might need double characters for width?
-    # "##" for wall, "  " for path? 
-    # 21 width * 2 = 42 chars -> Too wide for 32 char printer.
-    # Single char representation:
+    use_double_width = (width * 2) <= 32
     
+    if use_double_width:
+        wall_char = "XX"
+        path_char = "  "
+    else:
+        # For hard mode (tight space), use single char
+        wall_char = "X"
+        path_char = " "
+
     for row in maze.grid:
         line = ""
         for cell in row:
             if cell == 1:
-                line += "#" # Wall
+                line += wall_char 
             else:
-                line += " " # Path
+                line += path_char
         
         # Center the maze
         padding = (32 - len(line)) // 2
