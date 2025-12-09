@@ -46,12 +46,112 @@ const ModuleConfig = ({ module, updateConfig }) => {
   };
 
   if (module.type === 'webhook') {
+    const [headersList, setHeadersList] = useState(() => {
+      const headers = config.headers || {};
+      return Object.entries(headers).map(([key, value]) => ({ key, value }));
+    });
+
+    // Sync headers when config changes externally
+    useEffect(() => {
+      const headers = config.headers || {};
+      const newList = Object.entries(headers).map(([key, value]) => ({ key, value }));
+      const currentList = headersList.map((h) => ({ key: h.key, value: h.value }));
+      if (JSON.stringify(newList) !== JSON.stringify(currentList)) {
+        setHeadersList(newList);
+      }
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [config.headers]);
+
+    const updateHeaders = (newHeadersList) => {
+      setHeadersList(newHeadersList);
+      const headersObj = {};
+      newHeadersList.forEach(({ key, value }) => {
+        if (key.trim()) {
+          headersObj[key.trim()] = value.trim();
+        }
+      });
+      updateConfig('headers', headersObj);
+    };
+
+    const addHeader = () => {
+      const newList = [...headersList, { key: '', value: '' }];
+      updateHeaders(newList);
+    };
+
+    const removeHeader = (index) => {
+      const newList = headersList.filter((_, i) => i !== index);
+      updateHeaders(newList);
+    };
+
+    const updateHeader = (index, field, value) => {
+      const newList = [...headersList];
+      newList[index] = { ...newList[index], [field]: value };
+      updateHeaders(newList);
+    };
+
+    const applyPreset = (preset) => {
+      if (preset === 'dad-joke') {
+        updateConfig('url', 'https://icanhazdadjoke.com/');
+        updateConfig('method', 'GET');
+        updateHeaders([{ key: 'Accept', value: 'application/json' }]);
+        updateConfig('json_path', 'joke');
+      } else if (preset === 'cat-fact') {
+        updateConfig('url', 'https://catfact.ninja/fact');
+        updateConfig('method', 'GET');
+        updateHeaders([]);
+        updateConfig('json_path', 'fact');
+      } else if (preset === 'random-fact') {
+        updateConfig('url', 'https://uselessfacts.jsph.pl/random.json?language=en');
+        updateConfig('method', 'GET');
+        updateHeaders([]);
+        updateConfig('json_path', 'text');
+      } else if (preset === 'clear') {
+        updateConfig('url', '');
+        updateConfig('method', 'GET');
+        updateHeaders([]);
+        updateConfig('json_path', '');
+        updateConfig('body', '');
+      }
+    };
+
     return (
-      <div className='space-y-3'>
+      <div className='space-y-4'>
         <div>
           <label className={labelClass}>Label</label>
-          <input type='text' value={config.label || ''} onChange={(e) => updateConfig('label', e.target.value)} className={inputClass} />
+          <input type='text' value={config.label || ''} onChange={(e) => updateConfig('label', e.target.value)} className={inputClass} placeholder='e.g. Dad Jokes' />
         </div>
+
+        <div>
+          <label className={labelClass}>Quick Presets</label>
+          <div className='flex flex-wrap gap-2'>
+            <button
+              type='button'
+              onClick={() => applyPreset('dad-joke')}
+              className={`${commonClasses.buttonGhost} text-xs`}>
+              Dad Joke
+            </button>
+            <button
+              type='button'
+              onClick={() => applyPreset('cat-fact')}
+              className={`${commonClasses.buttonGhost} text-xs`}>
+              Cat Fact
+            </button>
+            <button
+              type='button'
+              onClick={() => applyPreset('random-fact')}
+              className={`${commonClasses.buttonGhost} text-xs`}>
+              Random Fact
+            </button>
+            <button
+              type='button'
+              onClick={() => applyPreset('clear')}
+              className={`${commonClasses.buttonGhost} text-xs`}>
+              Clear
+            </button>
+          </div>
+          <p className={`${commonClasses.textSubtle} mt-1`}>Click a preset to auto-fill common APIs</p>
+        </div>
+
         <div className='flex gap-2'>
           <div className='w-1/4'>
             <label className={labelClass}>Method</label>
@@ -62,18 +162,65 @@ const ModuleConfig = ({ module, updateConfig }) => {
           </div>
           <div className='w-3/4'>
             <label className={labelClass}>URL</label>
-            <input type='text' value={config.url || ''} onChange={(e) => updateConfig('url', e.target.value)} className={inputClass} />
+            <input
+              type='text'
+              value={config.url || ''}
+              onChange={(e) => updateConfig('url', e.target.value)}
+              className={inputClass}
+              placeholder='https://api.example.com/endpoint'
+            />
           </div>
         </div>
+
         <div>
-          <label className={labelClass}>Headers (JSON)</label>
-          <JsonTextarea
-            value={config.headers || {}}
-            onChange={(parsed) => updateConfig('headers', parsed)}
-            onBlur={(parsed) => updateConfig('headers', parsed)}
-            className={`${inputClass} font-mono text-sm min-h-[80px]`}
-          />
+          <div className='flex justify-between items-center mb-2'>
+            <label className={labelClass}>Headers (Optional)</label>
+            <button type='button' onClick={addHeader} className={`${commonClasses.buttonGhost} text-xs`}>
+              + Add Header
+            </button>
+          </div>
+          {headersList.length === 0 ? (
+            <p className={`${commonClasses.textSubtle} text-xs`}>No headers. Click "+ Add Header" to add authentication or custom headers.</p>
+          ) : (
+            <div className='space-y-2'>
+              {headersList.map((header, index) => (
+                <div key={index} className='flex gap-2 items-center'>
+                  <input
+                    type='text'
+                    value={header.key}
+                    onChange={(e) => updateHeader(index, 'key', e.target.value)}
+                    placeholder='Header name'
+                    className={`${commonClasses.inputSmall} flex-1`}
+                  />
+                  <input
+                    type='text'
+                    value={header.value}
+                    onChange={(e) => updateHeader(index, 'value', e.target.value)}
+                    placeholder='Header value'
+                    className={`${commonClasses.inputSmall} flex-1`}
+                  />
+                  <button type='button' onClick={() => removeHeader(index)} className={`${commonClasses.buttonDanger} flex-shrink-0`}>
+                    ×
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
+
+        {config.method === 'POST' && (
+          <div>
+            <label className={labelClass}>POST Body (JSON, Optional)</label>
+            <textarea
+              value={config.body || ''}
+              onChange={(e) => updateConfig('body', e.target.value)}
+              className={`${inputClass} font-mono text-sm min-h-[80px]`}
+              placeholder='{"key": "value"}'
+            />
+            <p className={`${commonClasses.textSubtle} mt-1`}>Enter JSON body for POST requests</p>
+          </div>
+        )}
+
         <div>
           <label className={labelClass}>JSON Path (Optional)</label>
           <input
@@ -81,8 +228,11 @@ const ModuleConfig = ({ module, updateConfig }) => {
             value={config.json_path || ''}
             onChange={(e) => updateConfig('json_path', e.target.value)}
             className={inputClass}
-            placeholder='e.g. data.message or items[0].text'
+            placeholder='e.g. joke, fact, data.message, items[0].text'
           />
+          <p className={`${commonClasses.textSubtle} mt-1`}>
+            Extract a specific field from the JSON response. Leave empty to print the full response.
+          </p>
         </div>
       </div>
     );

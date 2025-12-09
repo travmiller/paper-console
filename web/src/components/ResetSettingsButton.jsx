@@ -20,7 +20,7 @@ const ResetSettingsButton = ({ setSettings, setModules, setStatus }) => {
     <div className='mt-8 pt-8 border-t border-gray-800 text-center'>
       <button
         onClick={handleReset}
-        className='bg-transparent text-red-900 text-sm hover:text-red-500 border border-red-900/30 hover:border-red-500/50 rounded px-4 py-2 transition-colors cursor-pointer'>
+        className='text-xs text-red-400 hover:text-red-300 border border-red-800/40 hover:border-red-700/60 rounded px-3 py-1.5 bg-transparent transition-colors cursor-pointer'>
         Reset All Settings to Default
       </button>
     </div>
