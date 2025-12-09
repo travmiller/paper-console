@@ -30,12 +30,15 @@ web/dist-ssr/
 
 # Configuration & Secrets
 config.json
+config.json.bak
 .env
 .env.local
 .env.*.local
+.welcome_printed
 
 # Manufacturing (internal production tools & images)
-manufacturing/
+manufacturing/*.img
+manufacturing/*.img.gz
 
 # IDE
 .vscode/

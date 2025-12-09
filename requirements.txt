@@ -12,5 +12,5 @@ beautifulsoup4
 
 # Hardware drivers (optional - only needed on Raspberry Pi)
 pyserial
-RPi.GPIO
+RPi.GPIO; sys_platform == "linux"  # Only install on Linux (Raspberry Pi)
 qrcode[pil]

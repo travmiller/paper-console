@@ -21,14 +21,21 @@
 Run the entire system on your PC without hardware to test logic and see "printer" output in the terminal.
 
 **Backend:**
+
 ```bash
-# Linux / macOS / Git Bash
+# Raspberry Pi / Linux (port 8000)
 ./run.sh
 
-# Windows CMD
+# Windows (port 8001 to avoid conflicts)
 run.bat
+
+# Or run directly
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
-* **API Docs:** [http://localhost:8000/docs](http://localhost:8000/docs)
+
+* **API Docs:** 
+  * Pi/Linux: [http://localhost:8000/docs](http://localhost:8000/docs)
+  * Windows: [http://localhost:8001/docs](http://localhost:8001/docs)
 * **Mock Output:** Watch your Terminal window. The "Printer" writes text there.
 
 **Frontend (Settings UI):**
@@ -53,7 +60,9 @@ npm run dev
 
 2. **Run the Server:**
    ```bash
-   ./run.sh  # or run.bat on Windows test
+   ./run.sh           # Raspberry Pi/Linux
+   run.bat            # Windows
+   # Or: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
 ### Raspberry Pi Deployment
@@ -335,6 +344,11 @@ paper-console/
   * **Port Already in Use:**
   * `run.sh` automatically kills zombie processes
   * If persistent, reboot: `sudo reboot`
+  * **Log Storage:**
+  * Logs are stored in systemd journal (not files). Journal rotates automatically.
+  * Check journal size: `journalctl --disk-usage`
+  * Clear old logs: `sudo journalctl --vacuum-time=7d` (keeps last 7 days)
+  * Limit journal size: Edit `/etc/systemd/journald.conf` and set `SystemMaxUse=50M`
 
 ### Module-Specific Issues
 * **NewsAPI Returns 0 Articles:** Check if API key is valid and on free tier
