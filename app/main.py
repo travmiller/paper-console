@@ -2078,6 +2078,19 @@ async def get_power_button_status():
         "is_pressed": getattr(power_button, "is_pressed", False),
     }
     
+    # Check if I2C is enabled (GPIO 3 is I2C SDA)
+    if power_button.pin == 3:
+        try:
+            # Check /boot/config.txt for I2C
+            with open("/boot/config.txt", "r") as f:
+                config_content = f.read()
+                i2c_enabled = "dtparam=i2c_arm=on" in config_content or "dtparam=i2c1=on" in config_content
+                status["i2c_enabled"] = i2c_enabled
+                if i2c_enabled:
+                    status["warning"] = "GPIO 3 is shared with I2C SDA. I2C must be disabled for power button to work."
+        except Exception as e:
+            status["i2c_check_error"] = str(e)
+    
     # Try to read GPIO value if possible
     if power_button.event_handle:
         try:
