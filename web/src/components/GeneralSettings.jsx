@@ -40,7 +40,7 @@ const GeneralSettings = ({
     };
 
     fetchTime();
-    const interval = setInterval(fetchTime, 1000); // Update every second
+    const interval = setInterval(fetchTime, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
   }, []); // Only run on mount
 
