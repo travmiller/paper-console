@@ -130,16 +130,16 @@ def format_crossword_receipt(printer, config: Dict[str, Any] = None, module_name
     printer.print_line()
     
     # Print grid with |_| for empty cells and |A| for filled cells
-    # Format: |H||E||L||L||O| for cells with content
+    # Format: |H||E||L||L||O| for cells with content (no spaces)
     #         |_||_||_||_||_| for empty cells
     max_width = getattr(printer, 'width', 32)
     
-    # Calculate how many cells fit (each cell is 2 chars: |X| or |_|)
-    # With 32 chars, we can fit 12 cells: |X||X||X|... = 24 chars
-    cells_per_row = min(size, max_width // 2)
+    # Calculate how many cells fit (each cell is 3 chars: |X| or |_|)
+    # With 32 chars, we can fit 10 cells: |X||X||X|... = 30 chars
+    cells_per_row = min(size, max_width // 3)
     
     for i, row in enumerate(generator.grid):
-        # Build content line
+        # Build content line without spaces
         content_line = ""
         
         for j in range(cells_per_row):
