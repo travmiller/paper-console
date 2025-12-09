@@ -34,20 +34,21 @@ const ChannelList = ({
                   <button
                     type='button'
                     onClick={() => triggerChannelPrint(pos)}
-                    className='flex items-center justify-center px-2 py-0.5 rounded border bg-transparent text-gray-300 border-gray-500 hover:text-white hover:border-gray-400 transition-colors'
+                    className='group flex items-center justify-center px-2 py-0.5 rounded border bg-transparent text-gray-300 border-gray-500 hover:text-white hover:border-gray-400 transition-colors'
                     title='Print Channel'>
-                    <img src='/print-icon.svg' alt='Print' className='w-4 h-4 opacity-60 hover:opacity-100 transition-opacity' />
+                    <img src='/print-icon.svg' alt='Print' className='w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity' />
                   </button>
                   <button
                     type='button'
                     onClick={() => setShowScheduleModal(pos)}
-                    className={`text-xs px-2 py-0.5 rounded border transition-colors ${
+                    className={`group flex items-center gap-1 px-2 py-0.5 rounded border transition-colors ${
                       channel.schedule && channel.schedule.length > 0
                         ? 'bg-blue-900/30 text-blue-300 border-blue-800 hover:bg-blue-900/50'
                         : 'bg-transparent text-gray-500 border-gray-700 hover:text-gray-300'
                     }`}
                     title='Configure Schedule'>
-                    ⏱ {channel.schedule?.length || 0}
+                    <img src='/schedule-icon.svg' alt='Schedule' className='w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity' />
+                    <span className='text-xs'>{channel.schedule?.length || 0}</span>
                   </button>
                 </div>
                 <div className='flex gap-1'>
