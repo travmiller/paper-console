@@ -117,12 +117,27 @@ async def email_polling_loop():
                 try:
                     emails = email_client.fetch_emails(module.config)
                     if emails:
+                        # Prepare printer for new job
+                        if hasattr(printer, "reset_buffer"):
+                            max_lines = getattr(settings, "max_print_lines", 200)
+                            printer.reset_buffer(max_lines)
+
                         email_client.format_email_receipt(
                             printer,
                             messages=emails,
                             config=module.config,
                             module_name=module.name,
                         )
+
+                        # Flush to hardware
+                        if hasattr(printer, "flush_buffer"):
+                            printer.flush_buffer()
+
+                        # Feed paper
+                        feed_lines = getattr(settings, "cutter_feed_lines", 3)
+                        if feed_lines > 0 and hasattr(printer, "feed_direct"):
+                            printer.feed_direct(feed_lines)
+
                 except Exception:
                     pass  # Silently skip failed email checks
 
