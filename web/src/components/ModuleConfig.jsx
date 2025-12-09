@@ -137,10 +137,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
               <div key={index} className={commonClasses.cardNested}>
                 <div className='flex justify-between items-start mb-2'>
                   <span className={`${commonClasses.textMuted} text-sm`}>Feed {index + 1}</span>
-                  <button
-                    type='button'
-                    onClick={() => removeRssFeed(index)}
-                    className={commonClasses.buttonDanger}>
+                  <button type='button' onClick={() => removeRssFeed(index)} className={commonClasses.buttonDanger}>
                     Remove
                   </button>
                 </div>
@@ -156,10 +153,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
                 </div>
               </div>
             ))}
-            <button
-              type='button'
-              onClick={addRssFeed}
-              className={`${commonClasses.buttonSecondary} w-full text-sm`}>
+            <button type='button' onClick={addRssFeed} className={`${commonClasses.buttonSecondary} w-full text-sm`}>
               + Add RSS Feed
             </button>
           </div>
@@ -185,7 +179,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
           </p>
         </div>
 
-        <div className={`pt-4 border-t ${commonClasses.border.default}`}>
+        <div className={`pt-4 border-t border-gray-700`}>
           <label className={labelClass}>Location</label>
           <div className='mb-6 text-left relative'>
             <input
@@ -197,12 +191,13 @@ const ModuleConfig = ({ module, updateConfig }) => {
               className={inputClass}
             />
             {searchResults.length > 0 && (
-              <ul className={`absolute w-full z-10 max-h-[200px] overflow-y-auto ${commonClasses.bg.input} border ${commonClasses.bg.hover} border-t-0 rounded-b shadow-lg list-none p-0 m-0`}>
+              <ul
+                className={`absolute w-full z-10 max-h-[200px] overflow-y-auto bg-bg-input border border-bg-hover border-t-0 rounded-b shadow-lg list-none p-0 m-0`}>
                 {searchResults.map((result) => (
                   <li
                     key={result.id}
                     onClick={() => selectLocation(result)}
-                    className={`p-3 cursor-pointer border-b ${commonClasses.bg.hover} last:border-0 hover:${commonClasses.bg.hover} transition-colors`}>
+                    className={`p-3 cursor-pointer border-b border-bg-hover last:border-0 hover:bg-bg-hover transition-colors`}>
                     <strong>{result.name}</strong>
                     <span className={`${commonClasses.textSubtle} text-xs ml-2`}>
                       {result.state} {result.zipcode ? `(${result.zipcode})` : ''}
@@ -280,7 +275,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
               onChange={(e) => updateConfig('auto_print_new', e.target.checked)}
               className='w-5 h-5 accent-blue-500 bg-[#333] border-gray-600 rounded focus:ring-blue-500 focus:ring-2'
             />
-            <span className={`${commonClasses.text.secondary} text-sm`}>Automatically print new emails as they arrive (checks every minute)</span>
+            <span className={`text-gray-300 text-sm`}>Automatically print new emails as they arrive (checks every minute)</span>
           </div>
         </div>
       </div>
@@ -305,7 +300,9 @@ const ModuleConfig = ({ module, updateConfig }) => {
 
   if (module.type === 'quotes') {
     return (
-      <div className={commonClasses.textMuted}>Prints a random quote from the offline database (5,000+ quotes). No configuration needed.</div>
+      <div className={commonClasses.textMuted}>
+        Prints a random quote from the offline database (5,000+ quotes). No configuration needed.
+      </div>
     );
   }
 
@@ -354,7 +351,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
       const newItems = [...currentItems];
       newItems.splice(newIndex, 0, { text: '' });
       updateConfig('items', newItems);
-      
+
       // Focus the new input after it's rendered
       setTimeout(() => {
         const input = inputRefs.current[`item-${newIndex}`];
@@ -379,7 +376,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
       const currentItems = [...(currentConfig.items || [])];
       currentItems.splice(index, 1);
       updateConfig('items', currentItems);
-      
+
       // Focus the previous input or the next one if it was the first
       setTimeout(() => {
         const focusIndex = index > 0 ? index - 1 : 0;
@@ -431,18 +428,12 @@ const ModuleConfig = ({ module, updateConfig }) => {
                   placeholder='Enter item...'
                   className={`${commonClasses.inputSmall} flex-1`}
                 />
-                <button
-                  type='button'
-                  onClick={() => removeChecklistItem(index)}
-                  className={`${commonClasses.buttonDanger} flex-shrink-0`}>
+                <button type='button' onClick={() => removeChecklistItem(index)} className={`${commonClasses.buttonDanger} flex-shrink-0`}>
                   ×
                 </button>
               </div>
             ))}
-            <button
-              type='button'
-              onClick={() => addChecklistItem()}
-              className={`${commonClasses.buttonSecondary} w-full py-1.5 text-sm`}>
+            <button type='button' onClick={() => addChecklistItem()} className={`${commonClasses.buttonSecondary} w-full py-1.5 text-sm`}>
               + Add Item
             </button>
           </div>
@@ -478,10 +469,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
               <div key={index} className={commonClasses.cardNested}>
                 <div className='flex justify-between items-start mb-2'>
                   <span className={`${commonClasses.textMuted} text-sm`}>Calendar {index + 1}</span>
-                  <button
-                    type='button'
-                    onClick={() => removeCalendarSource(index)}
-                    className={commonClasses.buttonDanger}>
+                  <button type='button' onClick={() => removeCalendarSource(index)} className={commonClasses.buttonDanger}>
                     Remove
                   </button>
                 </div>
@@ -509,10 +497,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
                 </div>
               </div>
             ))}
-            <button
-              type='button'
-              onClick={addCalendarSource}
-              className={`${commonClasses.buttonSecondary} w-full text-sm`}>
+            <button type='button' onClick={addCalendarSource} className={`${commonClasses.buttonSecondary} w-full text-sm`}>
               + Add Calendar
             </button>
           </div>

@@ -111,7 +111,7 @@ const ChannelList = ({
                 ))}
 
                 {channelModules.length === 0 && (
-                  <div className='text-center text-gray-500 py-8 text-sm border-2 border-dashed border-gray-800 rounded-md'>
+                  <div className='text-center text-gray-500 py-8 text-sm border-2 border-dashed border-gray-700 rounded-md'>
                     Empty Channel
                   </div>
                 )}
