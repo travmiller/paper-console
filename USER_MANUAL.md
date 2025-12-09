@@ -119,3 +119,34 @@ If the device becomes unresponsive or you want to sell it:
 2. Plug it back in.
 3. Press and **HOLD** the **Power Button** (not the main button) for **15 seconds**.
 4. The device will print a confirmation message, delete all settings and WiFi credentials, then reboot in Setup Mode.
+
+---
+
+## 6. Advanced: SSH Access
+
+For advanced users, you can access your PC-1 via SSH (Secure Shell) for command-line access.
+
+### Default Credentials
+- **Username:** `admin`
+- **Password:** `admin1234` (change this via the web UI for security)
+
+### Connecting via SSH
+1. Make sure your computer is on the same network as your PC-1.
+2. Open a terminal (Mac/Linux) or SSH client (Windows).
+3. Connect using:
+   ```bash
+   ssh admin@pc-1.local
+   ```
+   Or use the device's IP address if `.local` doesn't work:
+   ```bash
+   ssh admin@<device-ip-address>
+   ```
+
+### Changing Your SSH Password
+1. Open the web interface at `http://pc-1.local`
+2. Go to **General Settings** → **SSH Access**
+3. Click **Change Password**
+4. Enter and confirm your new password (minimum 8 characters)
+
+### Managing SSH Access
+You can enable or disable SSH entirely from the web UI under **General Settings** → **SSH Access**. Disabling SSH prevents remote command-line access but doesn't affect the web interface.

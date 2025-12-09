@@ -274,12 +274,12 @@ const GeneralSettings = ({
     <>
       {/* WiFi Status Display */}
       {wifiStatus && (
-        <div className='mb-6 p-4 bg-[#2a2a2a] rounded border border-gray-700'>
+        <div className='mb-6 p-4 bg-[#2a2a2a] rounded-lg border border-gray-700'>
           <div className='flex items-center justify-between'>
             <div className='flex-1'>
               <div className='text-sm text-gray-400 mb-1'>Network Connection</div>
               <div className='flex items-center gap-2'>
-                <div className={`w-3 h-3 rounded-full ${wifiStatus.connected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                <div className={`w-3 h-3 rounded-full ${wifiStatus.connected ? 'bg-green-600' : 'bg-red-600'}`}></div>
                 <span className='font-bold text-white'>
                   {wifiStatus.connected && wifiStatus.ssid
                     ? wifiStatus.ssid
@@ -287,7 +287,7 @@ const GeneralSettings = ({
                     ? 'Setup Mode (AP)'
                     : 'Not Connected'}
                 </span>
-                <button type='button' onClick={triggerAPMode} className='text-xs text-blue-400 hover:text-blue-300 underline ml-2'>
+                <button type='button' onClick={triggerAPMode} className='text-xs text-blue-500 hover:text-blue-400 underline ml-2'>
                   Reset WiFi
                 </button>
               </div>
@@ -309,13 +309,13 @@ const GeneralSettings = ({
               type='text'
               value={searchTerm || ''}
               onChange={(e) => handleSearch(e.target.value)}
-              placeholder='Type city name (e.g. Malden, London, Tokyo)'
+              placeholder='Type city name (e.g. Boston, London, Tokyo)'
               autoComplete='off'
               className={inputClass}
             />
             {isSearching && (
               <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
-                <div className='w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin'></div>
+                <div className='w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin'></div>
               </div>
             )}
           </div>
@@ -329,7 +329,7 @@ const GeneralSettings = ({
                   <div className='flex items-start justify-between'>
                     <div className='flex-1 min-w-0'>
                       <div className='flex items-center gap-2'>
-                        <strong className='text-white group-hover:text-blue-300 transition-colors'>{result.name}</strong>
+                        <strong className='text-white group-hover:text-blue-400 transition-colors'>{result.name}</strong>
                         {result.population && result.population > 0 && (
                           <span className='text-xs text-gray-400'>
                             {result.population >= 1000000
@@ -340,7 +340,7 @@ const GeneralSettings = ({
                           </span>
                         )}
                         {result.country_code && result.country_code !== 'US' && (
-                          <span className='text-xs px-1.5 py-0.5 bg-blue-900/30 text-blue-300 rounded'>{result.country_code}</span>
+                          <span className='text-xs px-1.5 py-0.5 bg-blue-900/20 text-blue-400 rounded'>{result.country_code}</span>
                         )}
                       </div>
                     </div>
@@ -391,14 +391,14 @@ const GeneralSettings = ({
 
         {/* Current System Time Display */}
         {currentTime && (
-          <div className='mb-6 p-4 bg-[#1a1a1a] rounded-lg border border-gray-800'>
+          <div className='mb-6 p-4 bg-[#2a2a2a] rounded-lg border border-gray-700'>
             <div className='flex items-center justify-between'>
               <div>
                 <div className='text-xs text-gray-400 mb-1 uppercase tracking-wide'>Current System Time</div>
                 <div className='text-2xl font-bold text-white font-mono'>{currentTime.formatted}</div>
               </div>
               <div
-                className={`w-3 h-3 rounded-full ${useAutoTime && wifiStatus?.connected ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}
+                className={`w-3 h-3 rounded-full ${useAutoTime && wifiStatus?.connected ? 'bg-green-600 animate-pulse' : 'bg-gray-500'}`}
                 title={useAutoTime && wifiStatus?.connected ? 'Auto-sync enabled' : 'Manual mode'}></div>
             </div>
           </div>
@@ -412,7 +412,7 @@ const GeneralSettings = ({
           <div className='grid grid-cols-2 gap-3 mb-4'>
             <label
               className={`relative flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                !useAutoTime ? 'border-green-500 bg-green-900/20' : 'border-gray-700 bg-[#2a2a2a] hover:border-gray-600'
+                !useAutoTime ? 'border-green-700 bg-green-900/10' : 'border-gray-700 bg-[#2a2a2a] hover:border-gray-600'
               }`}>
               <input
                 type='radio'
@@ -441,13 +441,13 @@ const GeneralSettings = ({
                 }}
                 className='sr-only'
               />
-              <span className={`text-sm font-medium ${!useAutoTime ? 'text-green-300' : 'text-gray-400'}`}>Manual</span>
+              <span className={`text-sm font-medium ${!useAutoTime ? 'text-green-400' : 'text-gray-400'}`}>Manual</span>
               <span className='text-xs text-gray-500 mt-1 text-center'>Set time manually</span>
             </label>
 
             <label
               className={`relative flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                useAutoTime ? 'border-blue-500 bg-blue-900/20' : 'border-gray-700 bg-[#2a2a2a] hover:border-gray-600'
+                useAutoTime ? 'border-blue-700 bg-blue-900/10' : 'border-gray-700 bg-[#2a2a2a] hover:border-gray-600'
               }`}>
               <input
                 type='radio'
@@ -461,14 +461,14 @@ const GeneralSettings = ({
                 }}
                 className='sr-only'
               />
-              <span className={`text-sm font-medium ${useAutoTime ? 'text-blue-300' : 'text-gray-400'}`}>Automatic</span>
+              <span className={`text-sm font-medium ${useAutoTime ? 'text-blue-400' : 'text-gray-400'}`}>Automatic</span>
               <span className='text-xs text-gray-500 mt-1 text-center'>Sync with NTP servers</span>
             </label>
           </div>
 
           {/* Automatic Mode Actions */}
           {useAutoTime && (
-            <div className='p-4 bg-blue-900/10 border border-blue-800/30 rounded-lg'>
+            <div className='p-4 bg-blue-900/5 border border-blue-800/20 rounded-lg'>
               {wifiStatus?.connected ? (
                 <div>
                   <p className='text-sm text-gray-300 mb-3'>
@@ -477,12 +477,12 @@ const GeneralSettings = ({
                   <button
                     type='button'
                     onClick={syncTimeAutomatically}
-                    className='w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors'>
+                    className='w-full py-2 px-4 bg-blue-700 hover:bg-blue-600 text-white rounded font-medium transition-colors'>
                     Sync Now
                   </button>
                 </div>
               ) : (
-                <p className='text-sm text-amber-300'>
+                <p className='text-sm text-amber-400'>
                   ⚠️ Internet connection required for automatic time synchronization. Connect to WiFi or use manual mode.
                 </p>
               )}
@@ -491,7 +491,7 @@ const GeneralSettings = ({
 
           {/* Manual Mode Inputs */}
           {!useAutoTime && (
-            <div className='p-4 bg-green-900/10 border border-green-800/30 rounded-lg'>
+            <div className='p-4 bg-green-900/5 border border-green-800/20 rounded-lg'>
               <div className='grid grid-cols-2 gap-3 mb-3'>
                 <div>
                   <label className='block mb-2 text-sm text-gray-300'>Date</label>
@@ -516,7 +516,7 @@ const GeneralSettings = ({
               <button
                 type='button'
                 onClick={setTimeManually}
-                className='w-full py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors'>
+                className='w-full py-2.5 px-4 bg-green-700 hover:bg-green-600 text-white rounded font-medium transition-colors'>
                 Set System Time
               </button>
               <p className='text-xs text-gray-400 mt-2 text-center'>Use this when offline or to set a specific time</p>
@@ -528,8 +528,8 @@ const GeneralSettings = ({
             <div
               className={`mt-4 p-3 rounded-lg text-sm ${
                 timeStatus.type === 'success'
-                  ? 'bg-green-900/30 text-green-300 border border-green-900/50'
-                  : 'bg-red-900/30 text-red-300 border border-red-900/50'
+                  ? 'bg-green-900/20 text-green-400 border border-green-800/30'
+                  : 'bg-red-900/20 text-red-400 border border-red-800/30'
               }`}>
               {timeStatus.message}
             </div>
@@ -572,7 +572,7 @@ const GeneralSettings = ({
 
       {/* SSH Management */}
       <div className='mb-6 pt-4 border-t border-gray-700'>
-        <h3 className='text-lg font-bold text-white mb-4'>SSH Access</h3>
+        <label className={labelClass}>SSH Access</label>
         <p className='text-sm text-gray-400 mb-4'>
           Manage SSH (Secure Shell) access to your PC-1 device. SSH allows advanced users to access the device via command line.
         </p>
@@ -586,8 +586,8 @@ const GeneralSettings = ({
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium ${
                     sshStatus.enabled && sshStatus.active
-                      ? 'bg-green-900/30 text-green-300 border border-green-900/50'
-                      : 'bg-red-900/30 text-red-300 border border-red-900/50'
+                      ? 'bg-green-900/20 text-green-400 border border-green-800/30'
+                      : 'bg-red-900/20 text-red-400 border border-red-800/30'
                   }`}>
                   {sshStatus.enabled && sshStatus.active ? 'Enabled & Active' : 'Disabled'}
                 </span>
@@ -632,7 +632,7 @@ const GeneralSettings = ({
                     }
                   }}
                   disabled={sshLoading}
-                  className='flex-1 py-2.5 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors'>
+                  className='flex-1 py-2.5 px-4 bg-green-700 hover:bg-green-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors'>
                   {sshLoading ? 'Enabling...' : 'Enable SSH'}
                 </button>
               ) : (
@@ -664,7 +664,7 @@ const GeneralSettings = ({
                     }
                   }}
                   disabled={sshLoading}
-                  className='flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors'>
+                  className='flex-1 py-2.5 px-4 bg-red-700 hover:bg-red-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors'>
                   {sshLoading ? 'Disabling...' : 'Disable SSH'}
                 </button>
               )}
@@ -672,7 +672,7 @@ const GeneralSettings = ({
                 <button
                   type='button'
                   onClick={() => setShowPasswordChange(!showPasswordChange)}
-                  className='flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors'>
+                  className='flex-1 py-2.5 px-4 bg-blue-700 hover:bg-blue-600 text-white rounded font-medium transition-colors'>
                   {showPasswordChange ? 'Cancel' : 'Change Password'}
                 </button>
               )}
@@ -680,7 +680,7 @@ const GeneralSettings = ({
 
             {/* Change Password Form */}
             {showPasswordChange && sshStatus.enabled && (
-              <div className='p-4 bg-blue-900/10 border border-blue-800/30 rounded-lg'>
+              <div className='p-4 bg-blue-900/5 border border-blue-800/20 rounded-lg'>
                 <h4 className='text-sm font-medium text-gray-300 mb-3'>Change SSH Password</h4>
                 <div className='space-y-3'>
                   <div>
@@ -743,7 +743,7 @@ const GeneralSettings = ({
                       }
                     }}
                     disabled={changingPassword || !newPassword || !confirmPassword}
-                    className='w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors'>
+                    className='w-full py-2.5 px-4 bg-blue-700 hover:bg-blue-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors'>
                     {changingPassword ? 'Changing...' : 'Change Password'}
                   </button>
                 </div>
@@ -755,18 +755,16 @@ const GeneralSettings = ({
               <div
                 className={`p-3 rounded-lg text-sm ${
                   sshMessage.type === 'success'
-                    ? 'bg-green-900/30 text-green-300 border border-green-900/50'
-                    : 'bg-red-900/30 text-red-300 border border-red-900/50'
+                    ? 'bg-green-900/20 text-green-400 border border-green-800/30'
+                    : 'bg-red-900/20 text-red-400 border border-red-800/30'
                 }`}>
                 {sshMessage.message}
               </div>
             )}
           </div>
         ) : (
-          <div className='p-4 bg-yellow-900/20 border border-yellow-800/30 rounded-lg'>
-            <p className='text-sm text-yellow-300'>
-              SSH management is only available on Linux systems (Raspberry Pi).
-            </p>
+          <div className='p-4 bg-yellow-900/10 border border-yellow-800/20 rounded-lg'>
+            <p className='text-sm text-yellow-400'>SSH management is only available on Linux systems (Raspberry Pi).</p>
           </div>
         )}
       </div>
