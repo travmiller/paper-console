@@ -99,12 +99,15 @@ def format_history_receipt(printer, config: Dict[str, Any] = None, module_name: 
         printer.print_text("No historical records")
         printer.print_text("found for today.")
     else:
-        for i, event in enumerate(selected_events):
+        # Reverse events list for reverse print order (invert mode)
+        # When buffer is reversed, events will print in correct chronological order
+        reversed_events = list(reversed(selected_events))
+        for i, event in enumerate(reversed_events):
             # The event strings often start with year: "1945 - Some event"
             # We print it as is, maybe cleaning up formatting if needed.
             printer.print_text(f"* {event}")
             
-            if i < len(selected_events) - 1:
+            if i < len(reversed_events) - 1:
                 printer.feed(1)
                 
     printer.print_line()
