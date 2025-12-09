@@ -4,6 +4,7 @@ export const AVAILABLE_MODULE_TYPES = [
   { id: 'weather', label: 'Weather' },
   { id: 'email', label: 'Email Inbox' },
   { id: 'games', label: 'Sudoku' },
+  { id: 'maze', label: 'Maze Generator' },
   { id: 'astronomy', label: 'Astronomy' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'webhook', label: 'Webhook' },

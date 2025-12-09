@@ -298,6 +298,22 @@ const ModuleConfig = ({ module, updateConfig }) => {
     );
   }
 
+  if (module.type === 'maze') {
+    return (
+      <div>
+        <label className={labelClass}>Difficulty</label>
+        <select
+          value={config.difficulty || 'medium'}
+          onChange={(e) => updateConfig('difficulty', e.target.value)}
+          className={inputClass}>
+          <option value='easy'>Easy (11x11)</option>
+          <option value='medium'>Medium (15x15)</option>
+          <option value='hard'>Hard (21x21)</option>
+        </select>
+      </div>
+    );
+  }
+
   if (module.type === 'text') {
     return (
       <div className='space-y-3'>
