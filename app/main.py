@@ -1275,7 +1275,7 @@ async def get_ssh_status():
         service_active = result_active.returncode == 0 and result_active.stdout.strip() == "active"
 
         # Get current username
-        username = os.environ.get("USER") or os.environ.get("USERNAME") or "pi"
+        username = os.environ.get("USER") or os.environ.get("USERNAME") or "admin"
 
         # Check if raspi-config SSH is enabled (if on Raspberry Pi)
         raspi_ssh_enabled = None
@@ -1448,7 +1448,7 @@ async def change_ssh_password(password_data: SSHPasswordChange):
                 "message": "SSH password change is only available on Linux systems",
             }
 
-        username = os.environ.get("USER") or os.environ.get("USERNAME") or "pi"
+        username = os.environ.get("USER") or os.environ.get("USERNAME") or "admin"
         new_password = password_data.new_password
 
         if not new_password or len(new_password) < 8:

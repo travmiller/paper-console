@@ -599,7 +599,7 @@ const GeneralSettings = ({
               )}
               {sshStatus.enabled && (
                 <p className='text-xs text-gray-400 mt-1'>
-                  Connect via: <span className='text-gray-300 font-mono'>ssh {sshStatus.username || 'pi'}@pc-1.local</span>
+                  Connect via: <span className='text-gray-300 font-mono'>ssh {sshStatus.username || 'admin'}@pc-1.local</span>
                 </p>
               )}
             </div>
