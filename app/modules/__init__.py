@@ -9,5 +9,6 @@ from . import (
     weather,
     webhook,
     maze,
+    quotes,
+    history,
 )
-

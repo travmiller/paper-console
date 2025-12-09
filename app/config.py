@@ -100,6 +100,8 @@ DEFAULT_WEATHER_ID = "default-weather-001"
 DEFAULT_ASTRONOMY_ID = "default-astronomy-001"
 DEFAULT_SUDOKU_ID = "default-sudoku-001"
 DEFAULT_MAZE_ID = "default-maze-001"
+DEFAULT_QUOTES_ID = "default-quotes-001"
+DEFAULT_HISTORY_ID = "default-history-001"
 
 
 
@@ -130,6 +132,18 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             name="Maze",
             config={"difficulty": "medium"},
         ),
+        DEFAULT_QUOTES_ID: ModuleInstance(
+            id=DEFAULT_QUOTES_ID,
+            type="quotes",
+            name="Daily Quote",
+            config={},
+        ),
+        DEFAULT_HISTORY_ID: ModuleInstance(
+            id=DEFAULT_HISTORY_ID,
+            type="history",
+            name="On This Day",
+            config={"count": 3},
+        ),
     }
 
 
@@ -148,8 +162,12 @@ def _default_channels() -> Dict[int, ChannelConfig]:
         4: ChannelConfig(
             modules=[ChannelModuleAssignment(module_id=DEFAULT_MAZE_ID, order=0)]
         ),
-        5: ChannelConfig(modules=[]),
-        6: ChannelConfig(modules=[]),
+        5: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_QUOTES_ID, order=0)]
+        ),
+        6: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_HISTORY_ID, order=0)]
+        ),
         7: ChannelConfig(modules=[]),
         8: ChannelConfig(modules=[]),
     }

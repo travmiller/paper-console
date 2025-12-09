@@ -300,16 +300,36 @@ const ModuleConfig = ({ module, updateConfig }) => {
 
   if (module.type === 'maze') {
     return (
-      <div>
-        <label className={labelClass}>Difficulty</label>
+      <div className='text-gray-400 text-sm'>
+        Standard 15x15 maze. No configuration needed.
+      </div>
+    );
+  }
+
+  if (module.type === 'quotes') {
+    return (
+      <div className='text-gray-400 text-sm'>
+        Prints a random quote from the offline database (5,000+ quotes). No configuration needed.
+      </div>
+    );
+  }
+
+  if (module.type === 'history') {
+    return (
+      <div className='space-y-3'>
+        <label className={labelClass}>Number of Events</label>
         <select
-          value={config.difficulty || 'medium'}
-          onChange={(e) => updateConfig('difficulty', e.target.value)}
+          value={config.count || 3}
+          onChange={(e) => updateConfig('count', parseInt(e.target.value))}
           className={inputClass}>
-          <option value='easy'>Easy (11x11)</option>
-          <option value='medium'>Medium (15x15)</option>
-          <option value='hard'>Hard (21x21)</option>
+          <option value={1}>1 Event</option>
+          <option value={3}>3 Events</option>
+          <option value={5}>5 Events</option>
+          <option value={10}>10 Events</option>
         </select>
+        <p className='text-xs text-gray-500'>
+          Prints random historical events that happened on today's date (from offline database).
+        </p>
       </div>
     );
   }

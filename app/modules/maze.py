@@ -55,18 +55,9 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     """Prints a Maze puzzle."""
     from datetime import datetime
     
-    # Configurable difficulty (size)
-    difficulty = "medium"
-    if config and "difficulty" in config:
-        difficulty = config["difficulty"]
-    
+    # Fixed size for best readability (15x15)
     width, height = 15, 15
-    if difficulty == "easy":
-        width, height = 11, 11
-    elif difficulty == "hard":
-        width, height = 21, 21 # Might be too wide for 32 chars? 
-        # 21 chars fits in 32.
-        
+    
     # Generate Maze
     maze = MazeGenerator(width, height)
     maze.generate()
@@ -75,7 +66,6 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     printer.print_header((module_name or "MAZE").upper())
     printer.print_text(datetime.now().strftime("%A, %b %d"))
     printer.print_line()
-    printer.print_text(f"Difficulty: {difficulty.title()}")
     printer.print_text("Start: Top | End: Bottom")
     printer.print_line()
     

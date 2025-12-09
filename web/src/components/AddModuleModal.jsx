@@ -45,7 +45,9 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
               }}
               className='flex flex-col items-center p-4 bg-[#1a1a1a] border border-gray-700 hover:border-white rounded-lg transition-colors text-center group'>
               <span className='font-bold text-white group-hover:text-blue-300 mb-1'>{type.label}</span>
-              <span className='text-xs text-gray-500'>Create new</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${type.offline ? 'bg-green-900/40 text-green-400' : 'bg-blue-900/40 text-blue-400'}`}>
+                {type.offline ? 'Offline' : 'Online'}
+              </span>
             </button>
           ))}
         </div>

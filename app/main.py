@@ -37,6 +37,8 @@ from app.modules import (
     calendar,
     weather,
     maze,
+    quotes,
+    history,
 )
 from app.routers import wifi
 import app.wifi_manager as wifi_manager
@@ -1768,6 +1770,12 @@ def execute_module(module: ModuleInstance) -> bool:
 
         elif module_type == "maze":
             maze.format_maze_receipt(printer, config, module_name)
+
+        elif module_type == "quotes":
+            quotes.format_quotes_receipt(printer, config, module_name)
+
+        elif module_type == "history":
+            history.format_history_receipt(printer, config, module_name)
 
         elif module_type == "astronomy":
             astronomy.format_astronomy_receipt(printer, module_name=module_name)
