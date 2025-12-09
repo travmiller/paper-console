@@ -20,7 +20,7 @@ const GeneralSettings = ({
   const [manualDate, setManualDate] = useState('');
   const [manualTime, setManualTime] = useState('');
   const [timeStatus, setTimeStatus] = useState({ type: '', message: '' });
-  const [useAutoTime, setUseAutoTime] = useState(true);
+  const [useAutoTime, setUseAutoTime] = useState(false);
 
   // Fetch current system time on mount and periodically
   useEffect(() => {
@@ -390,32 +390,6 @@ const GeneralSettings = ({
           <div className='grid grid-cols-2 gap-3 mb-4'>
             <label
               className={`relative flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
-                useAutoTime ? 'border-blue-500 bg-blue-900/20' : 'border-gray-700 bg-[#2a2a2a] hover:border-gray-600'
-              }`}>
-              <input
-                type='radio'
-                name='timeMode'
-                checked={useAutoTime}
-                onChange={() => {
-                  setUseAutoTime(true);
-                  if (wifiStatus?.connected) {
-                    syncTimeAutomatically();
-                  }
-                }}
-                className='sr-only'
-              />
-              <div
-                className={`w-5 h-5 rounded-full border-2 mb-2 flex items-center justify-center ${
-                  useAutoTime ? 'border-blue-500' : 'border-gray-600'
-                }`}>
-                {useAutoTime && <div className='w-3 h-3 rounded-full bg-blue-500'></div>}
-              </div>
-              <span className={`text-sm font-medium ${useAutoTime ? 'text-blue-300' : 'text-gray-400'}`}>Automatic</span>
-              <span className='text-xs text-gray-500 mt-1 text-center'>Sync with NTP servers</span>
-            </label>
-
-            <label
-              className={`relative flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
                 !useAutoTime ? 'border-green-500 bg-green-900/20' : 'border-gray-700 bg-[#2a2a2a] hover:border-gray-600'
               }`}>
               <input
@@ -453,6 +427,32 @@ const GeneralSettings = ({
               </div>
               <span className={`text-sm font-medium ${!useAutoTime ? 'text-green-300' : 'text-gray-400'}`}>Manual</span>
               <span className='text-xs text-gray-500 mt-1 text-center'>Set time manually</span>
+            </label>
+
+            <label
+              className={`relative flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                useAutoTime ? 'border-blue-500 bg-blue-900/20' : 'border-gray-700 bg-[#2a2a2a] hover:border-gray-600'
+              }`}>
+              <input
+                type='radio'
+                name='timeMode'
+                checked={useAutoTime}
+                onChange={() => {
+                  setUseAutoTime(true);
+                  if (wifiStatus?.connected) {
+                    syncTimeAutomatically();
+                  }
+                }}
+                className='sr-only'
+              />
+              <div
+                className={`w-5 h-5 rounded-full border-2 mb-2 flex items-center justify-center ${
+                  useAutoTime ? 'border-blue-500' : 'border-gray-600'
+                }`}>
+                {useAutoTime && <div className='w-3 h-3 rounded-full bg-blue-500'></div>}
+              </div>
+              <span className={`text-sm font-medium ${useAutoTime ? 'text-blue-300' : 'text-gray-400'}`}>Automatic</span>
+              <span className='text-xs text-gray-500 mt-1 text-center'>Sync with NTP servers</span>
             </label>
           </div>
 

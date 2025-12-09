@@ -215,8 +215,12 @@ function App() {
   };
 
   const selectLocation = (location) => {
+    // Use city field if available (just city name), otherwise use name (which may include state)
+    // This prevents double state abbreviations in display
+    const cityName = location.city || location.name;
+
     const updates = {
-      city_name: location.name,
+      city_name: cityName,
       state: location.state,
       latitude: location.latitude,
       longitude: location.longitude,
