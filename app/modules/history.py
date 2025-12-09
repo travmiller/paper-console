@@ -82,9 +82,9 @@ def format_history_receipt(
     events = get_events_for_today()
 
     # Filter/Select events
-    # The dataset might have MANY events. We should pick 3-5 random ones or top ones.
+    # The dataset might have MANY events. We should pick 1-5 random ones or top ones.
     # config could specify "count"
-    count = 3
+    count = 1
     if config and "count" in config:
         try:
             count = int(config["count"])

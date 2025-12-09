@@ -149,7 +149,7 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             id=DEFAULT_HISTORY_ID,
             type="history",
             name="On This Day",
-            config={"count": 3},
+            config={"count": 1},
         ),
         DEFAULT_TEXT_ID: ModuleInstance(
             id=DEFAULT_TEXT_ID,

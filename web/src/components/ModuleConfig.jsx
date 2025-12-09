@@ -50,43 +50,62 @@ const ModuleConfig = ({ module, updateConfig }) => {
       const headers = config.headers || {};
       return Object.entries(headers).map(([key, value]) => ({ key, value }));
     });
+    const isUpdatingRef = useRef(false);
 
-    // Sync headers when config changes externally
+    // Sync headers when config changes externally (but preserve empty headers being edited)
     useEffect(() => {
+      if (isUpdatingRef.current) {
+        return; // Skip sync if we're in the middle of a local update
+      }
+      
       const headers = config.headers || {};
-      const newList = Object.entries(headers).map(([key, value]) => ({ key, value }));
-      const currentList = headersList.map((h) => ({ key: h.key, value: h.value }));
-      if (JSON.stringify(newList) !== JSON.stringify(currentList)) {
-        setHeadersList(newList);
+      const configList = Object.entries(headers).map(([key, value]) => ({ key, value }));
+      
+      // Preserve empty headers from current list (user might be editing them)
+      const emptyHeaders = headersList.filter((h) => !h.key.trim() && !h.value.trim());
+      
+      // Merge: empty headers first, then config headers
+      const merged = [...emptyHeaders, ...configList];
+      
+      // Only update if actually different (to avoid infinite loops)
+      if (JSON.stringify(merged) !== JSON.stringify(headersList)) {
+        setHeadersList(merged);
       }
       // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [config.headers]);
 
-    const updateHeaders = (newHeadersList) => {
+    const updateHeaders = (newHeadersList, saveToConfig = true) => {
+      isUpdatingRef.current = true;
       setHeadersList(newHeadersList);
-      const headersObj = {};
-      newHeadersList.forEach(({ key, value }) => {
-        if (key.trim()) {
-          headersObj[key.trim()] = value.trim();
-        }
-      });
-      updateConfig('headers', headersObj);
+      if (saveToConfig) {
+        const headersObj = {};
+        newHeadersList.forEach(({ key, value }) => {
+          if (key.trim()) {
+            headersObj[key.trim()] = value.trim();
+          }
+        });
+        updateConfig('headers', headersObj);
+      }
+      // Reset flag after state update
+      setTimeout(() => {
+        isUpdatingRef.current = false;
+      }, 0);
     };
 
     const addHeader = () => {
       const newList = [...headersList, { key: '', value: '' }];
-      updateHeaders(newList);
+      updateHeaders(newList, false); // Don't save to config yet - wait for user to type
     };
 
     const removeHeader = (index) => {
       const newList = headersList.filter((_, i) => i !== index);
-      updateHeaders(newList);
+      updateHeaders(newList, true); // Save to config when removing
     };
 
     const updateHeader = (index, field, value) => {
       const newList = [...headersList];
       newList[index] = { ...newList[index], [field]: value };
-      updateHeaders(newList);
+      updateHeaders(newList, true); // Save to config when typing
     };
 
     const applyPreset = (preset) => {
@@ -460,7 +479,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
     return (
       <div className='space-y-3'>
         <label className={labelClass}>Number of Events</label>
-        <select value={config.count || 3} onChange={(e) => updateConfig('count', parseInt(e.target.value))} className={inputClass}>
+        <select value={config.count || 1} onChange={(e) => updateConfig('count', parseInt(e.target.value))} className={inputClass}>
           <option value={1}>1 Event</option>
           <option value={3}>3 Events</option>
           <option value={5}>5 Events</option>
