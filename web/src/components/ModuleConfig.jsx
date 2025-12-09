@@ -368,47 +368,31 @@ const ModuleConfig = ({ module, updateConfig }) => {
     };
 
     return (
-      <div className='space-y-3'>
+      <div className='space-y-2'>
         <div>
-          <label className={labelClass}>Title</label>
-          <input
-            type='text'
-            value={config.title || 'Checklist'}
-            onChange={(e) => updateConfig('title', e.target.value)}
-            className={inputClass}
-            placeholder='My Checklist'
-          />
-        </div>
-        <div>
-          <label className={labelClass}>Checklist Items</label>
-          <div className='space-y-3'>
+          <label className={labelClass}>Items</label>
+          <div className='space-y-2'>
             {(config.items || []).map((item, index) => (
-              <div key={index} className='bg-[#1a1a1a] p-3 rounded border border-gray-800'>
-                <div className='flex justify-between items-start mb-2'>
-                  <span className='text-sm text-gray-400'>Item {index + 1}</span>
-                  <button
-                    type='button'
-                    onClick={() => removeChecklistItem(index)}
-                    className='px-2 py-1 text-xs bg-red-900/30 text-red-300 rounded hover:bg-red-900/50 transition-colors'>
-                    Remove
-                  </button>
-                </div>
-                <div>
-                  <label className='block mb-1 text-xs text-gray-400'>Item Text</label>
-                  <input
-                    type='text'
-                    value={item?.text || ''}
-                    onChange={(e) => updateChecklistItem(index, e.target.value)}
-                    placeholder='Enter checklist item...'
-                    className={inputClass}
-                  />
-                </div>
+              <div key={index} className='bg-[#1a1a1a] p-2 rounded border border-gray-800 flex gap-2 items-center'>
+                <input
+                  type='text'
+                  value={item?.text || ''}
+                  onChange={(e) => updateChecklistItem(index, e.target.value)}
+                  placeholder='Enter item...'
+                  className='flex-1 p-2 text-sm bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none'
+                />
+                <button
+                  type='button'
+                  onClick={() => removeChecklistItem(index)}
+                  className='px-2 py-1 text-xs bg-red-900/30 text-red-300 rounded hover:bg-red-900/50 transition-colors flex-shrink-0'>
+                  ×
+                </button>
               </div>
             ))}
             <button
               type='button'
               onClick={addChecklistItem}
-              className='w-full py-2 bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors text-sm'>
+              className='w-full py-1.5 bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors text-sm'>
               + Add Item
             </button>
           </div>

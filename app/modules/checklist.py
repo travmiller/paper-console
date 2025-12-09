@@ -8,9 +8,8 @@ def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = No
     
     config = config or {}
     items = config.get("items", [])
-    title = config.get("title", "CHECKLIST")
     
-    printer.print_header((module_name or title).upper())
+    printer.print_header((module_name or "CHECKLIST").upper())
     printer.print_text(datetime.now().strftime("%A, %b %d"))
     printer.print_line()
     
@@ -20,7 +19,7 @@ def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = No
         return
     
     # Print each item with a checkbox
-    for i, item in enumerate(items, 1):
+    for item in items:
         # Format: [ ] Item text
         # Use a simple checkbox character that works on thermal printers
         checkbox = "[ ]"
@@ -29,14 +28,13 @@ def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = No
         if not item_text:
             continue
             
-        # Format: [ ] 1. Item text
-        line = f"{checkbox} {i}. {item_text}"
+        # Format: [ ] Item text
+        line = f"{checkbox} {item_text}"
         
         # Handle long items by wrapping
         if len(line) > printer.width:
-            # Print checkbox and number on first line
-            prefix = f"{checkbox} {i}."
-            printer.print_text(prefix)
+            # Print checkbox on first line
+            printer.print_text(checkbox)
             # Print the rest wrapped
             words = item_text.split()
             wrapped_line = "  "  # Indent continuation lines
@@ -53,6 +51,5 @@ def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = No
             printer.print_text(line)
     
     printer.print_line()
-    printer.print_text("Check off items as you complete them!")
     printer.feed(1)
 
