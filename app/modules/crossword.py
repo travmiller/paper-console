@@ -3,7 +3,7 @@ from typing import Dict, Any, List, Tuple, Optional
 
 
 class CrosswordGenerator:
-    def __init__(self, size: int = 10):
+    def __init__(self, size: int = 12):
         self.size = size
         self.grid = [[' ' for _ in range(size)] for _ in range(size)]
         self.clues = []
@@ -117,7 +117,7 @@ def format_crossword_receipt(printer, config: Dict[str, Any] = None, module_name
     """Prints a crossword puzzle."""
     from datetime import datetime
     
-    size = config.get('size', 10) if config else 10
+    size = config.get('size', 12) if config else 12
     num_words = config.get('num_words', 8) if config else 8
     
     # Generate crossword
@@ -138,40 +138,35 @@ def format_crossword_receipt(printer, config: Dict[str, Any] = None, module_name
             clue_positions[key] = []
         clue_positions[key].append(clue['number'])
     
-    # Print grid with | and _ to form squares
-    # Format: |1|H|E|L|L|O| for cells with content
-    #         |_|_|_|_|_|_| for empty cells
+    # Print grid with |_| for empty cells and |A| for filled cells
+    # Format: |1||H||E||L||L||O| for cells with content
+    #         |_||_||_||_||_||_| for empty cells
     max_width = getattr(printer, 'width', 32)
     
-    # Calculate how many cells fit (each cell is 2 chars: |X or |_)
-    cells_per_row = min(size, (max_width - 1) // 2)
+    # Calculate how many cells fit (each cell is 2 chars: |X| or |_|)
+    # With 32 chars, we can fit 12 cells: |X||X||X|... = 24 chars
+    cells_per_row = min(size, max_width // 2)
     
     for i, row in enumerate(generator.grid):
-        # Build content line with | separators
-        content_line = "|"
+        # Build content line
+        content_line = ""
         
         for j in range(cells_per_row):
             cell = row[j] if j < len(row) else ' '
             
             if (i, j) in clue_positions:
-                # Show clue number (single digit)
+                # Show clue number (single digit) in format |N|
                 nums = clue_positions[(i, j)]
-                content_line += str(nums[0])
+                content_line += f"|{nums[0]}|"
             elif cell == ' ':
-                content_line += "_"
+                # Empty cell: |_|
+                content_line += "|_|"
             else:
-                # Show the letter
-                content_line += cell
-            
-            # Add vertical separator
-            content_line += "|"
+                # Show the letter in format |L|
+                content_line += f"|{cell}|"
         
         # Print content line
         printer.print_text(content_line[:max_width])
-        
-        # Print horizontal separator line between rows
-        separator_line = "|" + "_|" * cells_per_row
-        printer.print_text(separator_line[:max_width])
     
     printer.print_line()
     

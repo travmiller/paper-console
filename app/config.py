@@ -159,7 +159,7 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             id=DEFAULT_CROSSWORD_ID,
             type="crossword",
             name="Crossword",
-            config={"size": 10, "num_words": 8},
+            config={"size": 12, "num_words": 8},
         ),
         DEFAULT_TEXT_ID: ModuleInstance(
             id=DEFAULT_TEXT_ID,
