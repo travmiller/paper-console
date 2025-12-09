@@ -1793,6 +1793,10 @@ def execute_module(module: ModuleInstance) -> bool:
         elif module_type == "checklist":
             checklist.format_checklist_receipt(printer, config, module_name)
 
+        elif module_type == "system_monitor":
+            from app.modules import system_monitor
+            system_monitor.format_system_monitor_receipt(printer, config, module_name)
+
 
         elif module_type == "astronomy":
             astronomy.format_astronomy_receipt(printer, module_name=module_name)

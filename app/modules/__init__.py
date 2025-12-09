@@ -12,4 +12,5 @@ from . import (
     quotes,
     history,
     checklist,
+    system_monitor,
 )

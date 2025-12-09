@@ -442,6 +442,14 @@ const ModuleConfig = ({ module, updateConfig }) => {
     );
   }
 
+  if (module.type === 'system_monitor') {
+    return (
+      <div className={commonClasses.textMuted}>
+        Prints system status including IP address, disk usage, memory, uptime, and CPU temperature. No configuration needed.
+      </div>
+    );
+  }
+
   if (module.type === 'calendar') {
     const addCalendarSource = () => {
       const currentSources = config.ical_sources || [];
