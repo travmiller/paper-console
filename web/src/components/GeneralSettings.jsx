@@ -316,75 +316,136 @@ const GeneralSettings = ({
           <p className='text-xs text-gray-500 mt-1'>Choose how times are displayed across all modules</p>
         </div>
 
-        {/* Current System Time */}
+        {/* Current System Time Display */}
         {currentTime && (
-          <div className='mb-4 p-3 bg-[#1a1a1a] rounded border border-gray-800'>
-            <div className='text-sm text-gray-400 mb-1'>Current System Time</div>
-            <div className='text-lg font-bold text-white'>{currentTime.formatted}</div>
+          <div className='mb-6 p-4 bg-[#1a1a1a] rounded-lg border border-gray-800'>
+            <div className='flex items-center justify-between'>
+              <div>
+                <div className='text-xs text-gray-400 mb-1 uppercase tracking-wide'>Current System Time</div>
+                <div className='text-2xl font-bold text-white font-mono'>{currentTime.formatted}</div>
+              </div>
+              <div
+                className={`w-3 h-3 rounded-full ${useAutoTime && wifiStatus?.connected ? 'bg-green-500 animate-pulse' : 'bg-gray-500'}`}
+                title={useAutoTime && wifiStatus?.connected ? 'Auto-sync enabled' : 'Manual mode'}></div>
+            </div>
           </div>
         )}
 
-        {/* Time Control */}
+        {/* Time Synchronization Mode */}
         <div className='mb-4'>
-          <div className='flex items-center gap-2 mb-3'>
-            <input
-              type='checkbox'
-              id='useAutoTime'
-              checked={useAutoTime}
-              onChange={(e) => {
-                setUseAutoTime(e.target.checked);
-                if (e.target.checked && wifiStatus?.connected) {
-                  syncTimeAutomatically();
-                } else if (!e.target.checked && currentTime) {
+          <label className='block mb-3 text-sm font-medium text-gray-300'>Time Synchronization</label>
+
+          {/* Mode Selection - Radio Buttons */}
+          <div className='grid grid-cols-2 gap-3 mb-4'>
+            <label
+              className={`relative flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                useAutoTime ? 'border-blue-500 bg-blue-900/20' : 'border-gray-700 bg-[#2a2a2a] hover:border-gray-600'
+              }`}>
+              <input
+                type='radio'
+                name='timeMode'
+                checked={useAutoTime}
+                onChange={() => {
+                  setUseAutoTime(true);
+                  if (wifiStatus?.connected) {
+                    syncTimeAutomatically();
+                  }
+                }}
+                className='sr-only'
+              />
+              <div
+                className={`w-5 h-5 rounded-full border-2 mb-2 flex items-center justify-center ${
+                  useAutoTime ? 'border-blue-500' : 'border-gray-600'
+                }`}>
+                {useAutoTime && <div className='w-3 h-3 rounded-full bg-blue-500'></div>}
+              </div>
+              <span className={`text-sm font-medium ${useAutoTime ? 'text-blue-300' : 'text-gray-400'}`}>Automatic</span>
+              <span className='text-xs text-gray-500 mt-1 text-center'>Sync with NTP servers</span>
+            </label>
+
+            <label
+              className={`relative flex flex-col items-center p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                !useAutoTime ? 'border-green-500 bg-green-900/20' : 'border-gray-700 bg-[#2a2a2a] hover:border-gray-600'
+              }`}>
+              <input
+                type='radio'
+                name='timeMode'
+                checked={!useAutoTime}
+                onChange={() => {
+                  setUseAutoTime(false);
                   // When switching to manual, ensure inputs are populated
-                  if (!manualDate && currentTime.date) {
-                    setManualDate(currentTime.date);
+                  if (currentTime) {
+                    if (!manualDate && currentTime.date) {
+                      setManualDate(currentTime.date);
+                    }
+                    if (!manualTime && currentTime.time) {
+                      setManualTime(currentTime.time.substring(0, 5));
+                    }
                   }
-                  if (!manualTime && currentTime.time) {
-                    setManualTime(currentTime.time.substring(0, 5));
-                  }
-                }
-              }}
-              className='w-4 h-4'
-            />
-            <label htmlFor='useAutoTime' className='text-sm text-gray-300'>
-              Use automatic time synchronization
+                }}
+                className='sr-only'
+              />
+              <div
+                className={`w-5 h-5 rounded-full border-2 mb-2 flex items-center justify-center ${
+                  !useAutoTime ? 'border-green-500' : 'border-gray-600'
+                }`}>
+                {!useAutoTime && <div className='w-3 h-3 rounded-full bg-green-500'></div>}
+              </div>
+              <span className={`text-sm font-medium ${!useAutoTime ? 'text-green-300' : 'text-gray-400'}`}>Manual</span>
+              <span className='text-xs text-gray-500 mt-1 text-center'>Set time manually</span>
             </label>
           </div>
 
-          {!useAutoTime && (
-            <div className='mb-3'>
-              <div className='grid grid-cols-2 gap-3'>
+          {/* Automatic Mode Actions */}
+          {useAutoTime && (
+            <div className='p-4 bg-blue-900/10 border border-blue-800/30 rounded-lg'>
+              {wifiStatus?.connected ? (
                 <div>
-                  <label className='block mb-1 text-sm text-gray-400'>Date</label>
+                  <p className='text-sm text-gray-300 mb-3'>
+                    Time will automatically sync with NTP servers when connected to the internet.
+                  </p>
+                  <button
+                    type='button'
+                    onClick={syncTimeAutomatically}
+                    className='w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors'>
+                    Sync Now
+                  </button>
+                </div>
+              ) : (
+                <p className='text-sm text-amber-300'>
+                  ⚠️ Internet connection required for automatic time synchronization. Connect to WiFi or use manual mode.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Manual Mode Inputs */}
+          {!useAutoTime && (
+            <div className='p-4 bg-green-900/10 border border-green-800/30 rounded-lg'>
+              <div className='grid grid-cols-2 gap-3 mb-3'>
+                <div>
+                  <label className='block mb-2 text-sm text-gray-300'>Date</label>
                   <input type='date' value={manualDate} onChange={(e) => setManualDate(e.target.value)} className={inputClass} />
                 </div>
                 <div>
-                  <label className='block mb-1 text-sm text-gray-400'>Time</label>
+                  <label className='block mb-2 text-sm text-gray-300'>Time</label>
                   <input type='time' value={manualTime} onChange={(e) => setManualTime(e.target.value)} className={inputClass} step='1' />
                 </div>
               </div>
               <button
                 type='button'
                 onClick={setTimeManually}
-                className='mt-2 w-full py-2 px-4 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors'>
+                className='w-full py-2.5 px-4 bg-green-600 hover:bg-green-700 text-white rounded font-medium transition-colors'>
                 Set System Time
               </button>
+              <p className='text-xs text-gray-400 mt-2 text-center'>Use this when offline or to set a specific time</p>
             </div>
           )}
 
-          {useAutoTime && wifiStatus?.connected && (
-            <button
-              type='button'
-              onClick={syncTimeAutomatically}
-              className='w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors'>
-              Sync Time Now
-            </button>
-          )}
-
+          {/* Status Messages */}
           {timeStatus.message && (
             <div
-              className={`mt-2 p-2 rounded text-sm ${
+              className={`mt-4 p-3 rounded-lg text-sm ${
                 timeStatus.type === 'success'
                   ? 'bg-green-900/30 text-green-300 border border-green-900/50'
                   : 'bg-red-900/30 text-red-300 border border-red-900/50'
@@ -392,8 +453,6 @@ const GeneralSettings = ({
               {timeStatus.message}
             </div>
           )}
-
-          {!useAutoTime && <p className='text-xs text-gray-500 mt-2'>Manually set the system time and date when offline.</p>}
         </div>
       </div>
 
