@@ -42,11 +42,11 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
                   onOpenEdit(newModule.id, newModule);
                 }
               }}
-              className={`flex flex-col items-center p-4 bg-bg-nested border border-gray-700 hover:border-white rounded-lg transition-colors text-center group`}>
+              className={`flex flex-col items-center p-4 bg-[#1a1a1a] border border-gray-700 hover:border-white rounded-lg transition-colors text-center group`}>
               <span className={`font-bold text-white group-hover:text-blue-300 mb-1`}>{type.label}</span>
               <span
                 className={`text-xs px-2 py-0.5 rounded-full ${
-                  type.offline ? 'bg-status-offline-bg text-status-offline' : 'bg-status-online-bg text-status-online'
+                  type.offline ? 'bg-green-900/40 text-green-400' : 'bg-blue-900/30 text-blue-300'
                 }`}>
                 {type.offline ? 'Offline' : 'Online'}
               </span>

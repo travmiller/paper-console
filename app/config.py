@@ -109,8 +109,11 @@ DEFAULT_WEATHER_ID = "default-weather-001"
 DEFAULT_ASTRONOMY_ID = "default-astronomy-001"
 DEFAULT_SUDOKU_ID = "default-sudoku-001"
 DEFAULT_MAZE_ID = "default-maze-001"
+DEFAULT_CROSSWORD_ID = "default-crossword-001"
 DEFAULT_QUOTES_ID = "default-quotes-001"
 DEFAULT_HISTORY_ID = "default-history-001"
+DEFAULT_TEXT_ID = "default-text-001"
+DEFAULT_CHECKLIST_ID = "default-checklist-001"
 
 
 def _default_modules() -> Dict[str, ModuleInstance]:
@@ -152,6 +155,24 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             name="On This Day",
             config={"count": 3},
         ),
+        DEFAULT_CROSSWORD_ID: ModuleInstance(
+            id=DEFAULT_CROSSWORD_ID,
+            type="crossword",
+            name="Crossword",
+            config={"size": 10, "num_words": 8},
+        ),
+        DEFAULT_TEXT_ID: ModuleInstance(
+            id=DEFAULT_TEXT_ID,
+            type="text",
+            name="Note",
+            config={"label": "Note", "content": ""},
+        ),
+        DEFAULT_CHECKLIST_ID: ModuleInstance(
+            id=DEFAULT_CHECKLIST_ID,
+            type="checklist",
+            name="Checklist",
+            config={"items": []},
+        ),
     }
 
 
@@ -176,8 +197,12 @@ def _default_channels() -> Dict[int, ChannelConfig]:
         6: ChannelConfig(
             modules=[ChannelModuleAssignment(module_id=DEFAULT_HISTORY_ID, order=0)]
         ),
-        7: ChannelConfig(modules=[]),
-        8: ChannelConfig(modules=[]),
+        7: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_CROSSWORD_ID, order=0)]
+        ),
+        8: ChannelConfig(
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_CHECKLIST_ID, order=0)]
+        ),
     }
 
 

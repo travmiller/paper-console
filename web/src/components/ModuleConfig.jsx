@@ -192,12 +192,12 @@ const ModuleConfig = ({ module, updateConfig }) => {
             />
             {searchResults.length > 0 && (
               <ul
-                className={`absolute w-full z-10 max-h-[200px] overflow-y-auto bg-bg-input border border-bg-hover border-t-0 rounded-b shadow-lg list-none p-0 m-0`}>
+                className={`absolute w-full z-10 max-h-[200px] overflow-y-auto bg-[#333] border border-[#444] border-t-0 rounded-b shadow-lg list-none p-0 m-0`}>
                 {searchResults.map((result) => (
                   <li
                     key={result.id}
                     onClick={() => selectLocation(result)}
-                    className={`p-3 cursor-pointer border-b border-bg-hover last:border-0 hover:bg-bg-hover transition-colors`}>
+                    className={`p-3 cursor-pointer border-b border-[#444] last:border-0 hover:bg-[#444] transition-colors`}>
                     <strong>{result.name}</strong>
                     <span className={`${commonClasses.textSubtle} text-xs ml-2`}>
                       {result.state} {result.zipcode ? `(${result.zipcode})` : ''}

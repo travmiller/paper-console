@@ -140,20 +140,25 @@ def format_crossword_receipt(printer, config: Dict[str, Any] = None, module_name
     
     # Print grid (with numbers for clue starts)
     # Use a compact format for thermal printer (32 chars wide)
+    # Format: show clue numbers at word starts, letters where placed, dots for empty
     for i, row in enumerate(generator.grid):
         line = ""
         for j, cell in enumerate(row):
             if (i, j) in clue_positions:
                 # Show clue number (single digit)
+                # Note: In a real crossword, you'd show both number and letter,
+                # but for thermal printer we show number only at start
                 nums = clue_positions[(i, j)]
                 line += str(nums[0])
             elif cell == ' ':
                 line += "."
             else:
+                # Show the letter
                 line += cell
-        # Ensure line fits in printer width
-        if len(line) > printer.width:
-            line = line[:printer.width]
+        # Ensure line fits in printer width (typically 32 chars)
+        max_width = getattr(printer, 'width', 32)
+        if len(line) > max_width:
+            line = line[:max_width]
         printer.print_text(line)
     
     printer.print_line()
