@@ -146,6 +146,7 @@ def search_locations(query: str, limit: int = 10) -> List[Dict]:
     """
     Smart search for locations by city name with relevance scoring.
     Returns a list of location dictionaries sorted by relevance.
+    Optimized for performance with early exit conditions.
     """
     if not query or len(query.strip()) < 2:
         return []
@@ -156,91 +157,159 @@ def search_locations(query: str, limit: int = 10) -> List[Dict]:
     if not data:
         return []
 
+    query_words = query_lower.split()
     scored_results = []
     seen_locations = set()
 
+    # Pre-compute query characteristics for faster matching
+    is_multi_word = len(query_words) > 1
+    first_char = query_lower[0] if query_lower else ""
+
+    # Collect candidates first (faster than full processing)
+    candidates = []
+    high_score_count = 0  # Track high-scoring matches for early exit
+
     for row in data:
-        # GeoNames format
-        name = row.get("name", "").strip().lower()
+        # GeoNames format - get fields once
+        name = row.get("name", "").strip()
+        if not name:
+            continue
+
+        name_lower = name.lower()
         asciiname = row.get("asciiname", "").strip().lower()
         alternatenames = row.get("alternatenames", "").strip().lower()
         country_code = row.get("country_code", "").strip()
         admin1_code = row.get("admin1_code", "").strip()
+        admin1_lower = admin1_code.lower() if admin1_code else ""
 
         # Create unique key
-        location_key = (name, admin1_code, country_code)
+        location_key = (name_lower, admin1_code, country_code)
 
         if location_key in seen_locations:
             continue
 
-        # Search in name, asciiname, and alternatenames
-        # For multi-word queries, require at least one word to match prominently
-        query_words = query_lower.split()
+        # Fast matching - check most common cases first
         match = False
 
-        # Check if query matches name or asciiname
-        if query_lower in name or query_lower in asciiname:
+        # Exact or starts-with match (highest priority, fastest)
+        if query_lower in name_lower or query_lower in asciiname:
             match = True
-        elif name.startswith(query_lower) or asciiname.startswith(query_lower):
+        elif name_lower.startswith(query_lower) or asciiname.startswith(query_lower):
             match = True
-        # For multi-word queries, check if all words appear in name
-        elif len(query_words) > 1:
-            # All words must appear in name or asciiname
-            if all(word in name or word in asciiname for word in query_words):
+        # Multi-word queries
+        elif is_multi_word:
+            name_matches = [
+                word in name_lower or word in asciiname for word in query_words
+            ]
+            state_matches = [word == admin1_lower for word in query_words]
+
+            if all(name_matches):
                 match = True
-        # Single word - check if it's a prominent match
-        elif len(query_words) == 1:
+            elif any(name_matches) and any(state_matches):
+                match = True
+        # Single word queries
+        else:
             word = query_words[0]
-            # Word must be at least 3 chars and appear in name/asciiname
-            if len(word) >= 3 and (word in name or word in asciiname):
+            if len(word) >= 3 and (word in name_lower or word in asciiname):
                 match = True
-            # Or check alternatenames for single short words
+            elif len(word) == 2 and word == admin1_lower:
+                match = True
             elif len(word) < 3 and alternatenames and word in alternatenames:
                 match = True
-        # Check alternatenames as fallback
-        elif alternatenames and query_lower in alternatenames:
+
+        # Check alternatenames only if no match yet (slower operation)
+        if not match and alternatenames and query_lower in alternatenames:
             match = True
 
         if match:
             seen_locations.add(location_key)
 
+            # Store candidate with minimal processing
             try:
-                latitude = float(row.get("latitude", 0))
-                longitude = float(row.get("longitude", 0))
-                timezone = row.get("timezone", "").strip()
                 population = int(row.get("population", 0) or 0)
             except (ValueError, TypeError):
-                continue
+                population = 0
 
-            # Skip if coordinates are invalid
-            if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
-                continue
-
-            # Calculate relevance score
-            score = _calculate_match_score(
-                query_lower, name, asciiname, alternatenames, population
+            # Quick score estimate for early exit
+            # Exact/starts-with matches will score very high
+            is_exact_or_starts = (
+                query_lower in name_lower
+                or query_lower in asciiname
+                or name_lower.startswith(query_lower)
+                or asciiname.startswith(query_lower)
             )
 
-            # Format display name
-            display_name = _format_location_name(row)
+            candidates.append(
+                {
+                    "row": row,
+                    "name_lower": name_lower,
+                    "asciiname": asciiname,
+                    "alternatenames": alternatenames,
+                    "admin1_code": admin1_code,
+                    "admin1_lower": admin1_lower,
+                    "country_code": country_code,
+                    "population": population,
+                    "is_high_score": is_exact_or_starts,
+                }
+            )
 
-            # For US locations, use admin1_code as state
-            state = admin1_code if country_code == "US" else ""
+            if is_exact_or_starts:
+                high_score_count += 1
+                # If we have enough high-scoring matches, we can stop early
+                # This significantly speeds up common searches
+                if high_score_count >= limit * 3:
+                    break
 
-            result = {
-                "id": f"{row.get('geonameid', '')}-{name}-{admin1_code}-{country_code}",
-                "name": display_name,
-                "zipcode": "",  # GeoNames doesn't have zip codes
-                "city": row.get("name", "").strip(),
-                "state": state,
-                "country_code": country_code,
-                "latitude": latitude,
-                "longitude": longitude,
-                "timezone": timezone if timezone else "UTC",
-                "population": population,
-                "_score": score,  # Internal score for sorting
-            }
-            scored_results.append(result)
+            # Also limit total candidates to prevent excessive processing
+            if len(candidates) >= limit * 100:
+                break
+
+    # Process candidates and calculate scores
+    for candidate in candidates:
+        row = candidate["row"]
+        name_lower = candidate["name_lower"]
+        asciiname = candidate["asciiname"]
+        alternatenames = candidate["alternatenames"]
+        admin1_code = candidate["admin1_code"]
+        country_code = candidate["country_code"]
+        population = candidate["population"]
+
+        try:
+            latitude = float(row.get("latitude", 0))
+            longitude = float(row.get("longitude", 0))
+            timezone = row.get("timezone", "").strip()
+        except (ValueError, TypeError):
+            continue
+
+        # Skip if coordinates are invalid
+        if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
+            continue
+
+        # Calculate relevance score
+        score = _calculate_match_score(
+            query_lower, name_lower, asciiname, alternatenames, population
+        )
+
+        # Format display name
+        display_name = _format_location_name(row)
+
+        # For US locations, use admin1_code as state
+        state = admin1_code if country_code == "US" else ""
+
+        result = {
+            "id": f"{row.get('geonameid', '')}-{name_lower}-{admin1_code}-{country_code}",
+            "name": display_name,
+            "zipcode": "",  # GeoNames doesn't have zip codes
+            "city": row.get("name", "").strip(),
+            "state": state,
+            "country_code": country_code,
+            "latitude": latitude,
+            "longitude": longitude,
+            "timezone": timezone if timezone else "UTC",
+            "population": population,
+            "_score": score,  # Internal score for sorting
+        }
+        scored_results.append(result)
 
     # Sort by relevance score (descending)
     scored_results.sort(key=lambda x: x.get("_score", 0), reverse=True)

@@ -116,7 +116,15 @@ function App() {
     locationSearchTimer.current = setTimeout(async () => {
       try {
         // Always use local database (no API)
-        const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=20&use_api=false`);
+        // Add timeout to prevent hanging (5 seconds max)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+        const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=20&use_api=false`, {
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
+
         const data = await response.json();
         if (data.results) {
           setSearchResults(data.results);
@@ -124,8 +132,13 @@ function App() {
           setSearchResults([]);
         }
       } catch (err) {
-        console.error('Error fetching locations:', err);
-        setSearchResults([]);
+        if (err.name === 'AbortError') {
+          console.warn('Location search timed out');
+          setSearchResults([]);
+        } else {
+          console.error('Error fetching locations:', err);
+          setSearchResults([]);
+        }
       } finally {
         setIsSearching(false);
         locationSearchTimer.current = null;
