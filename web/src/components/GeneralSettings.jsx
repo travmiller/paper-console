@@ -22,6 +22,15 @@ const GeneralSettings = ({
   const [timeStatus, setTimeStatus] = useState({ type: '', message: '' });
   const [useAutoTime, setUseAutoTime] = useState(false);
 
+  // SSH management state
+  const [sshStatus, setSshStatus] = useState(null);
+  const [sshLoading, setSshLoading] = useState(false);
+  const [sshMessage, setSshMessage] = useState({ type: '', message: '' });
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [changingPassword, setChangingPassword] = useState(false);
+
   // Fetch current system time on mount and periodically
   useEffect(() => {
     const fetchTime = async () => {
@@ -43,6 +52,24 @@ const GeneralSettings = ({
     const interval = setInterval(fetchTime, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
   }, []); // Only run on mount
+
+  // Fetch SSH status on mount
+  useEffect(() => {
+    const fetchSshStatus = async () => {
+      try {
+        const response = await fetch('/api/system/ssh/status');
+        const data = await response.json();
+        setSshStatus(data);
+      } catch (err) {
+        console.error('Error fetching SSH status:', err);
+      }
+    };
+
+    fetchSshStatus();
+    // Refresh SSH status every 30 seconds
+    const interval = setInterval(fetchSshStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Format timezone to a more readable format
   const formatTimezone = (tz) => {
@@ -541,6 +568,207 @@ const GeneralSettings = ({
             Maximum lines per print job to prevent endless prints. Set to 0 for no limit (default: 200)
           </p>
         </div>
+      </div>
+
+      {/* SSH Management */}
+      <div className='mb-6 pt-4 border-t border-gray-700'>
+        <h3 className='text-lg font-bold text-white mb-4'>SSH Access</h3>
+        <p className='text-sm text-gray-400 mb-4'>
+          Manage SSH (Secure Shell) access to your PC-1 device. SSH allows advanced users to access the device via command line.
+        </p>
+
+        {sshStatus && sshStatus.available ? (
+          <div className='space-y-4'>
+            {/* SSH Status */}
+            <div className='p-4 bg-[#2a2a2a] border border-gray-700 rounded-lg'>
+              <div className='flex items-center justify-between mb-2'>
+                <span className='text-sm font-medium text-gray-300'>SSH Service</span>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium ${
+                    sshStatus.enabled && sshStatus.active
+                      ? 'bg-green-900/30 text-green-300 border border-green-900/50'
+                      : 'bg-red-900/30 text-red-300 border border-red-900/50'
+                  }`}>
+                  {sshStatus.enabled && sshStatus.active ? 'Enabled & Active' : 'Disabled'}
+                </span>
+              </div>
+              {sshStatus.username && (
+                <p className='text-xs text-gray-400 mt-1'>
+                  Username: <span className='text-gray-300 font-mono'>{sshStatus.username}</span>
+                </p>
+              )}
+              {sshStatus.enabled && (
+                <p className='text-xs text-gray-400 mt-1'>
+                  Connect via: <span className='text-gray-300 font-mono'>ssh {sshStatus.username || 'pi'}@pc-1.local</span>
+                </p>
+              )}
+            </div>
+
+            {/* Enable/Disable SSH */}
+            <div className='flex gap-3'>
+              {!sshStatus.enabled ? (
+                <button
+                  type='button'
+                  onClick={async () => {
+                    setSshLoading(true);
+                    setSshMessage({ type: '', message: '' });
+                    try {
+                      const response = await fetch('/api/system/ssh/enable', { method: 'POST' });
+                      const data = await response.json();
+                      if (data.success) {
+                        setSshMessage({ type: 'success', message: data.message });
+                        // Refresh status
+                        const statusResponse = await fetch('/api/system/ssh/status');
+                        const statusData = await statusResponse.json();
+                        setSshStatus(statusData);
+                      } else {
+                        setSshMessage({ type: 'error', message: data.message || 'Failed to enable SSH' });
+                      }
+                    } catch (err) {
+                      setSshMessage({ type: 'error', message: 'Error enabling SSH' });
+                    } finally {
+                      setSshLoading(false);
+                      setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
+                    }
+                  }}
+                  disabled={sshLoading}
+                  className='flex-1 py-2.5 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors'>
+                  {sshLoading ? 'Enabling...' : 'Enable SSH'}
+                </button>
+              ) : (
+                <button
+                  type='button'
+                  onClick={async () => {
+                    if (!confirm('Are you sure you want to disable SSH? You may lose remote access to the device.')) {
+                      return;
+                    }
+                    setSshLoading(true);
+                    setSshMessage({ type: '', message: '' });
+                    try {
+                      const response = await fetch('/api/system/ssh/disable', { method: 'POST' });
+                      const data = await response.json();
+                      if (data.success) {
+                        setSshMessage({ type: 'success', message: data.message });
+                        // Refresh status
+                        const statusResponse = await fetch('/api/system/ssh/status');
+                        const statusData = await statusResponse.json();
+                        setSshStatus(statusData);
+                      } else {
+                        setSshMessage({ type: 'error', message: data.message || 'Failed to disable SSH' });
+                      }
+                    } catch (err) {
+                      setSshMessage({ type: 'error', message: 'Error disabling SSH' });
+                    } finally {
+                      setSshLoading(false);
+                      setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
+                    }
+                  }}
+                  disabled={sshLoading}
+                  className='flex-1 py-2.5 px-4 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors'>
+                  {sshLoading ? 'Disabling...' : 'Disable SSH'}
+                </button>
+              )}
+              {sshStatus.enabled && (
+                <button
+                  type='button'
+                  onClick={() => setShowPasswordChange(!showPasswordChange)}
+                  className='flex-1 py-2.5 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors'>
+                  {showPasswordChange ? 'Cancel' : 'Change Password'}
+                </button>
+              )}
+            </div>
+
+            {/* Change Password Form */}
+            {showPasswordChange && sshStatus.enabled && (
+              <div className='p-4 bg-blue-900/10 border border-blue-800/30 rounded-lg'>
+                <h4 className='text-sm font-medium text-gray-300 mb-3'>Change SSH Password</h4>
+                <div className='space-y-3'>
+                  <div>
+                    <label className='block mb-2 text-sm text-gray-300'>New Password</label>
+                    <input
+                      type='password'
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder='Minimum 8 characters'
+                      className={inputClass}
+                      minLength={8}
+                    />
+                  </div>
+                  <div>
+                    <label className='block mb-2 text-sm text-gray-300'>Confirm Password</label>
+                    <input
+                      type='password'
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder='Re-enter password'
+                      className={inputClass}
+                      minLength={8}
+                    />
+                  </div>
+                  <button
+                    type='button'
+                    onClick={async () => {
+                      if (!newPassword || newPassword.length < 8) {
+                        setSshMessage({ type: 'error', message: 'Password must be at least 8 characters' });
+                        setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
+                        return;
+                      }
+                      if (newPassword !== confirmPassword) {
+                        setSshMessage({ type: 'error', message: 'Passwords do not match' });
+                        setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
+                        return;
+                      }
+                      setChangingPassword(true);
+                      setSshMessage({ type: '', message: '' });
+                      try {
+                        const response = await fetch('/api/system/ssh/password', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ new_password: newPassword }),
+                        });
+                        const data = await response.json();
+                        if (data.success) {
+                          setSshMessage({ type: 'success', message: data.message });
+                          setNewPassword('');
+                          setConfirmPassword('');
+                          setShowPasswordChange(false);
+                        } else {
+                          setSshMessage({ type: 'error', message: data.message || 'Failed to change password' });
+                        }
+                      } catch (err) {
+                        setSshMessage({ type: 'error', message: 'Error changing password' });
+                      } finally {
+                        setChangingPassword(false);
+                        setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
+                      }
+                    }}
+                    disabled={changingPassword || !newPassword || !confirmPassword}
+                    className='w-full py-2.5 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white rounded font-medium transition-colors'>
+                    {changingPassword ? 'Changing...' : 'Change Password'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* SSH Status Messages */}
+            {sshMessage.message && (
+              <div
+                className={`p-3 rounded-lg text-sm ${
+                  sshMessage.type === 'success'
+                    ? 'bg-green-900/30 text-green-300 border border-green-900/50'
+                    : 'bg-red-900/30 text-red-300 border border-red-900/50'
+                }`}>
+                {sshMessage.message}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className='p-4 bg-yellow-900/20 border border-yellow-800/30 rounded-lg'>
+            <p className='text-sm text-yellow-300'>
+              SSH management is only available on Linux systems (Raspberry Pi).
+            </p>
+          </div>
+        )}
       </div>
     </>
   );

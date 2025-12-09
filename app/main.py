@@ -1240,6 +1240,256 @@ async def sync_system_time():
         }
 
 
+# --- SSH MANAGEMENT API ---
+
+
+@app.get("/api/system/ssh/status")
+async def get_ssh_status():
+    """
+    Get SSH service status and configuration.
+    """
+    try:
+        if platform.system() != "Linux":
+            return {
+                "enabled": False,
+                "available": False,
+                "message": "SSH management is only available on Linux systems",
+            }
+
+        # Check if SSH service is enabled
+        result = subprocess.run(
+            ["systemctl", "is-enabled", "ssh"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        service_enabled = result.returncode == 0 and result.stdout.strip() in ("enabled", "enabled-runtime")
+
+        # Check if SSH service is active
+        result_active = subprocess.run(
+            ["systemctl", "is-active", "ssh"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        service_active = result_active.returncode == 0 and result_active.stdout.strip() == "active"
+
+        # Get current username
+        username = os.environ.get("USER") or os.environ.get("USERNAME") or "pi"
+
+        # Check if raspi-config SSH is enabled (if on Raspberry Pi)
+        raspi_ssh_enabled = None
+        if _is_raspberry_pi:
+            try:
+                result_raspi = subprocess.run(
+                    ["raspi-config", "nonint", "get_ssh"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                # raspi-config returns 0 if enabled, 1 if disabled
+                raspi_ssh_enabled = result_raspi.returncode == 0
+            except Exception:
+                pass
+
+        return {
+            "enabled": service_enabled,
+            "active": service_active,
+            "available": True,
+            "username": username,
+            "raspi_config_enabled": raspi_ssh_enabled,
+        }
+
+    except Exception as e:
+        return {
+            "enabled": False,
+            "active": False,
+            "available": False,
+            "error": str(e),
+            "message": "Could not check SSH status",
+        }
+
+
+@app.post("/api/system/ssh/enable")
+async def enable_ssh():
+    """
+    Enable SSH service.
+    """
+    try:
+        if platform.system() != "Linux":
+            return {
+                "success": False,
+                "message": "SSH management is only available on Linux systems",
+            }
+
+        # Enable SSH via systemctl
+        result = subprocess.run(
+            ["sudo", "systemctl", "enable", "ssh"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        if result.returncode != 0:
+            return {
+                "success": False,
+                "error": result.stderr,
+                "message": "Failed to enable SSH service",
+            }
+
+        # Start SSH service if not running
+        subprocess.run(
+            ["sudo", "systemctl", "start", "ssh"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        # Also enable via raspi-config if on Raspberry Pi
+        if _is_raspberry_pi:
+            try:
+                subprocess.run(
+                    ["sudo", "raspi-config", "nonint", "do_ssh", "0"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+            except Exception:
+                pass
+
+        return {
+            "success": True,
+            "message": "SSH service enabled successfully",
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error enabling SSH service",
+        }
+
+
+@app.post("/api/system/ssh/disable")
+async def disable_ssh():
+    """
+    Disable SSH service.
+    """
+    try:
+        if platform.system() != "Linux":
+            return {
+                "success": False,
+                "message": "SSH management is only available on Linux systems",
+            }
+
+        # Stop SSH service
+        subprocess.run(
+            ["sudo", "systemctl", "stop", "ssh"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        # Disable SSH service
+        result = subprocess.run(
+            ["sudo", "systemctl", "disable", "ssh"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        if result.returncode != 0:
+            return {
+                "success": False,
+                "error": result.stderr,
+                "message": "Failed to disable SSH service",
+            }
+
+        # Also disable via raspi-config if on Raspberry Pi
+        if _is_raspberry_pi:
+            try:
+                subprocess.run(
+                    ["sudo", "raspi-config", "nonint", "do_ssh", "1"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10,
+                )
+            except Exception:
+                pass
+
+        return {
+            "success": True,
+            "message": "SSH service disabled successfully",
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error disabling SSH service",
+        }
+
+
+class SSHPasswordChange(BaseModel):
+    current_password: Optional[str] = None
+    new_password: str
+
+
+@app.post("/api/system/ssh/password")
+async def change_ssh_password(password_data: SSHPasswordChange):
+    """
+    Change SSH user password.
+    Requires current password for verification (if set).
+    """
+    try:
+        if platform.system() != "Linux":
+            return {
+                "success": False,
+                "message": "SSH password change is only available on Linux systems",
+            }
+
+        username = os.environ.get("USER") or os.environ.get("USERNAME") or "pi"
+        new_password = password_data.new_password
+
+        if not new_password or len(new_password) < 8:
+            return {
+                "success": False,
+                "message": "Password must be at least 8 characters long",
+            }
+
+        # Use chpasswd to change password (requires sudo)
+        # Format: username:password
+        password_input = f"{username}:{new_password}\n"
+
+        result = subprocess.run(
+            ["sudo", "chpasswd"],
+            input=password_input,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+
+        if result.returncode != 0:
+            return {
+                "success": False,
+                "error": result.stderr,
+                "message": "Failed to change password. Ensure the application has sudo privileges.",
+            }
+
+        return {
+            "success": True,
+            "message": f"Password changed successfully for user '{username}'",
+            "username": username,
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error changing SSH password",
+        }
+
+
 # --- LOCATION SEARCH API ---
 
 
