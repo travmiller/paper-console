@@ -120,26 +120,20 @@ class ButtonDriver:
         """Schedule a background thread to retry GPIO initialization."""
 
         def retry_init():
-            import logging
-            logger = logging.getLogger(__name__)
-            # Start with shorter retry interval, then increase
-            retry_intervals = [5, 10, 30, 60]  # 5s, 10s, 30s, then 60s
-            max_bg_retries = 20  # More retries
+            retry_interval = 30
+            max_bg_retries = 10
 
             for attempt in range(max_bg_retries):
-                # Use increasing retry intervals
-                retry_interval = retry_intervals[min(attempt // 3, len(retry_intervals) - 1)]
                 time.sleep(retry_interval)
-                
-                logger.info(f"Background reinit attempt {attempt + 1}/{max_bg_retries} for GPIO {self.pin}")
 
                 try:
-                    # Cleanup first to ensure GPIO is released
-                    self.cleanup()
-                    # Wait longer for GPIO to be released by kernel
-                    # GPIO lines can take time to be fully released
-                    wait_time = 2.0 if attempt < 3 else 1.0
-                    time.sleep(wait_time)
+                    # Close existing chip if it exists (but don't call full cleanup)
+                    if self.chip:
+                        try:
+                            self.chip.close()
+                        except Exception:
+                            pass
+                        self.chip = None
                     
                     self.chip = GpioChip("/dev/gpiochip0")
                     handle_flags = (
@@ -148,7 +142,7 @@ class ButtonDriver:
                     event_flags = GPIOEVENT_REQUEST_BOTH_EDGES
 
                     self.event_handle = self.chip.request_event(
-                        self.pin, handle_flags, event_flags, label=f"button-gpio{self.pin}"
+                        self.pin, handle_flags, event_flags, label="button"
                     )
 
                     self.gpio_available = True
@@ -163,23 +157,9 @@ class ButtonDriver:
                         target=self._hold_check_loop, daemon=True
                     )
                     self.hold_check_thread.start()
-                    
-                    logger.info(f"Successfully reinitialized GPIO {self.pin} in background")
                     return
 
-                except OSError as e:
-                    if e.errno == 16:  # EBUSY
-                        logger.warning(f"GPIO {self.pin} still busy (attempt {attempt + 1}) - will retry")
-                    else:
-                        logger.warning(f"Background reinit failed for GPIO {self.pin}: {e}")
-                    if self.chip:
-                        try:
-                            self.chip.close()
-                        except Exception:
-                            pass
-                        self.chip = None
-                except Exception as e:
-                    logger.warning(f"Background reinit failed for GPIO {self.pin}: {e}")
+                except Exception:
                     if self.chip:
                         try:
                             self.chip.close()
@@ -226,50 +206,15 @@ class ButtonDriver:
         """Monitor for button press/release events."""
         last_event_time = 0
         debounce_ms = 50
-        consecutive_errors = 0
-        max_consecutive_errors = 10
 
-        while self.monitoring:
-            if not self.event_handle:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"Event handle lost for GPIO {self.pin} - monitor loop exiting")
-                self.monitoring = False
-                self._initialization_failed = True
-                # Try to properly cleanup before scheduling reinit
-                # Close chip handle to ensure GPIO is released
-                if self.chip:
-                    try:
-                        self.chip.close()
-                    except Exception:
-                        pass
-                    self.chip = None
-                # Schedule reinit after a delay to let kernel release GPIO
-                self._schedule_background_reinit()
-                break
+        while self.monitoring and self.event_handle:
                 
             try:
                 event_id = self.event_handle.read_event()
                 if event_id is None:
-                    consecutive_errors += 1
-                    if consecutive_errors >= max_consecutive_errors:
-                        import logging
-                        logger = logging.getLogger(__name__)
-                        logger.error(f"Too many None events from GPIO {self.pin} - handle may be invalid")
-                        self.monitoring = False
-                        self._initialization_failed = True
-                        if self.event_handle:
-                            try:
-                                self.event_handle.close()
-                            except Exception:
-                                pass
-                            self.event_handle = None
-                        self._schedule_background_reinit()
-                        break
-                    time.sleep(0.1)
+                    # None means error reading, but don't exit - just continue
                     continue
                 
-                consecutive_errors = 0  # Reset on successful read
                 current_time = time.time()
 
                 # Debounce
@@ -305,63 +250,9 @@ class ButtonDriver:
                         self.press_start_time = None
                         self.triggered_actions = set()
 
-            except OSError as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"OSError in monitor loop for GPIO {self.pin}: {e}")
-                if e.errno == 9:  # EBADF - Bad file descriptor
-                    logger.error(f"Event handle file descriptor is invalid for GPIO {self.pin}")
-                    self.monitoring = False
-                    self._initialization_failed = True
-                    # Properly cleanup to release GPIO
-                    if self.event_handle:
-                        try:
-                            self.event_handle.close()
-                        except Exception:
-                            pass
-                        self.event_handle = None
-                    # Close chip handle to ensure GPIO is fully released
-                    if self.chip:
-                        try:
-                            self.chip.close()
-                        except Exception:
-                            pass
-                        self.chip = None
-                    # Schedule reinit after delay
-                    self._schedule_background_reinit()
-                    break
-                consecutive_errors += 1
-                if consecutive_errors >= max_consecutive_errors:
-                    logger.error(f"Too many OSErrors in monitor loop for GPIO {self.pin} - stopping")
-                    self.monitoring = False
-                    self._initialization_failed = True
-                    # Cleanup
-                    if self.event_handle:
-                        try:
-                            self.event_handle.close()
-                        except Exception:
-                            pass
-                        self.event_handle = None
-                    if self.chip:
-                        try:
-                            self.chip.close()
-                        except Exception:
-                            pass
-                        self.chip = None
-                    self._schedule_background_reinit()
-                    break
-                time.sleep(1)
-            except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(f"Unexpected error in monitor loop for GPIO {self.pin}: {e}", exc_info=True)
-                consecutive_errors += 1
-                if consecutive_errors >= max_consecutive_errors:
-                    logger.error(f"Too many errors in monitor loop for GPIO {self.pin} - stopping")
-                    self.monitoring = False
-                    self._initialization_failed = True
-                    break
-                time.sleep(1)
+            except Exception:
+                if self.monitoring:
+                    time.sleep(1)
 
     def set_callback(self, callback: Callable[[], None]):
         """Register a function to be called on short press."""
