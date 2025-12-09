@@ -123,32 +123,82 @@ const GeneralSettings = ({
       return;
     }
 
-    // Validate date format (YYYY-MM-DD)
+    // Normalize and validate date format (YYYY-MM-DD)
+    const normalizedDate = manualDate.trim();
     const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-    if (!dateRegex.test(manualDate)) {
+    if (!dateRegex.test(normalizedDate)) {
       setTimeStatus({ type: 'error', message: 'Invalid date format. Please use YYYY-MM-DD format.' });
       setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
       return;
     }
 
-    // Validate time format (HH:MM)
-    const timeRegex = /^\d{2}:\d{2}$/;
-    if (!timeRegex.test(manualTime)) {
-      setTimeStatus({ type: 'error', message: 'Invalid time format. Please use HH:MM format.' });
+    // Normalize and validate time format
+    // HTML5 time input should return HH:MM format
+    let normalizedTime = String(manualTime || '').trim();
+
+    // Check if it's empty
+    if (!normalizedTime || normalizedTime.length === 0) {
+      setTimeStatus({ type: 'error', message: 'Please enter a valid time' });
       setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
       return;
     }
 
+    // HTML5 time input returns HH:MM format (e.g., "14:30")
+    // Accept both HH:MM and HH:MM:SS formats
+    const timeRegex = /^(\d{1,2}):(\d{2})(:(\d{2}))?$/;
+    const timeMatch = normalizedTime.match(timeRegex);
+
+    if (!timeMatch) {
+      console.error('Time validation failed:', {
+        normalizedTime,
+        original: manualTime,
+        type: typeof manualTime,
+        length: normalizedTime.length,
+        charCodes: normalizedTime.split('').map((c) => `${c}(${c.charCodeAt(0)})`),
+      });
+      setTimeStatus({ type: 'error', message: `Invalid time format: "${normalizedTime}". Please use HH:MM format (e.g., 14:30).` });
+      setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+      return;
+    }
+
+    // Extract and normalize time components
+    const hours = timeMatch[1].padStart(2, '0');
+    const minutes = timeMatch[2];
+    const seconds = timeMatch[4] || '00';
+
+    // Validate ranges
+    const hourNum = parseInt(hours, 10);
+    const minNum = parseInt(minutes, 10);
+    const secNum = parseInt(seconds, 10);
+
+    if (isNaN(hourNum) || hourNum < 0 || hourNum > 23) {
+      setTimeStatus({ type: 'error', message: `Invalid hours: ${hours}. Must be between 00 and 23.` });
+      setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+      return;
+    }
+
+    if (isNaN(minNum) || minNum < 0 || minNum > 59) {
+      setTimeStatus({ type: 'error', message: `Invalid minutes: ${minutes}. Must be between 00 and 59.` });
+      setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+      return;
+    }
+
+    if (isNaN(secNum) || secNum < 0 || secNum > 59) {
+      setTimeStatus({ type: 'error', message: `Invalid seconds: ${seconds}. Must be between 00 and 59.` });
+      setTimeout(() => setTimeStatus({ type: '', message: '' }), 5000);
+      return;
+    }
+
+    // Format as HH:MM:SS
+    const normalizedTimeStr = `${hours}:${minutes}:${seconds}`;
+
     setTimeStatus({ type: '', message: '' }); // Clear previous status
 
     try {
-      // Convert time to HH:MM:SS format (add seconds if missing)
-      const timeStr = manualTime.includes(':') && manualTime.split(':').length === 2 ? `${manualTime}:00` : manualTime;
-
       const response = await fetch('/api/system/time', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date: manualDate, time: timeStr }),
+        body: JSON.stringify({ date: normalizedDate, time: normalizedTimeStr }),
       });
 
       if (!response.ok) {
@@ -429,7 +479,18 @@ const GeneralSettings = ({
                 </div>
                 <div>
                   <label className='block mb-2 text-sm text-gray-300'>Time</label>
-                  <input type='time' value={manualTime} onChange={(e) => setManualTime(e.target.value)} className={inputClass} step='1' />
+                  <input
+                    type='time'
+                    value={manualTime || ''}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setManualTime(value);
+                      console.log('Time input changed:', value, 'Type:', typeof value);
+                    }}
+                    className={inputClass}
+                    step='1'
+                    required
+                  />
                 </div>
               </div>
               <button
