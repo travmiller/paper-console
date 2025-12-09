@@ -37,8 +37,7 @@ config.json.bak
 .welcome_printed
 
 # Manufacturing (internal production tools & images)
-manufacturing/*.img
-manufacturing/*.img.gz
+manufacturing/
 
 # IDE
 .vscode/
