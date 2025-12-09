@@ -980,14 +980,33 @@ async def set_system_time(request: SetTimeRequest):
         datetime_str = f"{date} {time}"
 
         if platform.system() == "Linux":
+            # Disable NTP sync first to prevent it from overriding manual time setting
+            # This is critical - NTP will immediately override manual time if enabled
+            try:
+                ntp_result = subprocess.run(
+                    ["sudo", "timedatectl", "set-ntp", "false"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    check=False,
+                )
+                if ntp_result.returncode != 0:
+                    print(f"Warning: Failed to disable NTP: {ntp_result.stderr}")
+            except Exception as e:
+                print(f"Warning: Error disabling NTP: {e}")
+
             # On Linux/Raspberry Pi, use 'date' command with sudo
             # Format: sudo date -s "YYYY-MM-DD HH:MM:SS"
+            # This sets the time in the system's local timezone
+            print(f"Setting system time to: {datetime_str}")
             result = subprocess.run(
                 ["sudo", "date", "-s", datetime_str],
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
+            
+            print(f"Date command result: returncode={result.returncode}, stdout={result.stdout}, stderr={result.stderr}")
 
             if result.returncode != 0:
                 return {
@@ -1005,7 +1024,7 @@ async def set_system_time(request: SetTimeRequest):
 
             return {
                 "success": True,
-                "message": f"System time set to {datetime_str}",
+                "message": f"System time set to {datetime_str}. NTP sync disabled to preserve manual setting.",
                 "datetime": datetime_str,
             }
         elif platform.system() == "Windows":
@@ -1057,6 +1076,39 @@ async def set_system_time(request: SetTimeRequest):
             "success": False,
             "error": str(e),
             "message": "An error occurred while setting system time.",
+        }
+
+
+@app.post("/api/system/time/sync/disable")
+async def disable_ntp_sync():
+    """
+    Disable NTP synchronization to allow manual time setting.
+    """
+    try:
+        if platform.system() == "Linux":
+            result = subprocess.run(
+                ["sudo", "timedatectl", "set-ntp", "false"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                return {
+                    "success": True,
+                    "message": "NTP synchronization disabled. Manual time setting is now active.",
+                }
+            else:
+                return {
+                    "success": False,
+                    "error": result.stderr or "Failed to disable NTP",
+                    "message": "Could not disable NTP sync. Manual time may be overridden.",
+                }
+        return {"success": True, "message": "NTP sync disabled"}
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+            "message": "Error disabling NTP sync",
         }
 
 

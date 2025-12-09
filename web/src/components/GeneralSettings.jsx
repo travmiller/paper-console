@@ -195,6 +195,7 @@ const GeneralSettings = ({
     setTimeStatus({ type: '', message: '' }); // Clear previous status
 
     try {
+      console.log('Setting time:', { date: normalizedDate, time: normalizedTimeStr });
       const response = await fetch('/api/system/time', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -209,22 +210,22 @@ const GeneralSettings = ({
 
       if (data.success) {
         setTimeStatus({ type: 'success', message: data.message || 'System time set successfully' });
-        setUseAutoTime(false);
-        // Refresh current time after a short delay
+        setUseAutoTime(false); // Ensure we're in manual mode
+        // Refresh current time after a short delay to verify it was set correctly
         setTimeout(async () => {
           try {
             const timeResponse = await fetch('/api/system/time');
             const timeData = await timeResponse.json();
             if (timeData.datetime) {
               setCurrentTime(timeData);
-              // Update manual inputs to match the set time
+              // Update manual inputs to match what was actually set
               setManualDate(timeData.date);
               setManualTime(timeData.time.substring(0, 5));
             }
           } catch (err) {
             console.error('Error refreshing time:', err);
           }
-        }, 500);
+        }, 1000); // Increased delay to ensure time is set before checking
       } else {
         setTimeStatus({
           type: 'error',
@@ -421,8 +422,17 @@ const GeneralSettings = ({
                 type='radio'
                 name='timeMode'
                 checked={!useAutoTime}
-                onChange={() => {
+                onChange={async () => {
                   setUseAutoTime(false);
+                  // When switching to manual, disable NTP sync to prevent override
+                  try {
+                    // Disable NTP sync when switching to manual mode
+                    await fetch('/api/system/time/sync/disable', { method: 'POST' }).catch(() => {
+                      // Ignore errors - the backend will handle NTP disable when setting time
+                    });
+                  } catch (err) {
+                    // Ignore errors
+                  }
                   // When switching to manual, ensure inputs are populated
                   if (currentTime) {
                     if (!manualDate && currentTime.date) {
