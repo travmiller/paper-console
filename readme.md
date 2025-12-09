@@ -302,8 +302,8 @@ paper-console/
 
 **TTL Serial Connection:**
 1. Wire according to table above
-2. Enable serial in `raspi-config` → Interface Options → Serial Port
-3. Device appears as `/dev/serial0`
+2. **Serial port is automatically configured** by `scripts/setup_pi.sh` (disables console, enables hardware)
+3. Device appears as `/dev/serial0` after setup
 
 **Note:** The system auto-detects serial ports in this order:
 1. `/dev/serial0` (GPIO Serial - primary)
@@ -325,8 +325,8 @@ paper-console/
 ### Printer Issues
 * **Device Not Found:**
   * Check if `/dev/serial0` exists: `ls -l /dev/serial*`
-  * Verify serial is enabled: `raspi-config` → Interface Options → Serial Port
-  * Check if console is disabled on serial: `sudo raspi-config` → Advanced → Serial
+  * If missing, run setup script: `sudo scripts/setup_pi.sh` (configures serial automatically)
+  * Or manually: `sudo raspi-config` → Interface Options → Serial Port → Enable hardware, Disable console
 * **Permission Denied:**
   * Ensure user is in `dialout` group: `groups`
   * Add user: `sudo usermod -a -G dialout $USER` (then log out/in)
@@ -359,6 +359,5 @@ paper-console/
 * **Email Auth Failed:** Use a **Google App Password**, not your main password. Ensure 2FA is enabled
 * **Calendar Not Showing Events:** Verify iCal URL is correct. Check that events exist in the date range
 * **Weather Wrong:** Check `config.json` Lat/Long via UI location search feature
-* **Channel Not Triggering:** Verify channel has modules assigned and config is saved
 
 ---
