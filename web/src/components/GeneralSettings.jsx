@@ -278,14 +278,14 @@ const GeneralSettings = ({
         <div className='mb-4 text-left relative'>
           <label className='block mb-2 text-sm text-gray-400'>Search City / Location</label>
           <div className='relative'>
-          <input
-            type='text'
+            <input
+              type='text'
               value={searchTerm || ''}
-            onChange={(e) => handleSearch(e.target.value)}
+              onChange={(e) => handleSearch(e.target.value)}
               placeholder='Type city name (e.g. Malden, London, Tokyo)'
-            autoComplete='off'
-            className={inputClass}
-          />
+              autoComplete='off'
+              className={inputClass}
+            />
             {isSearching && (
               <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
                 <div className='w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin'></div>
@@ -305,20 +305,6 @@ const GeneralSettings = ({
                         <strong className='text-white group-hover:text-blue-300 transition-colors'>{result.name}</strong>
                         {result.country_code && result.country_code !== 'US' && (
                           <span className='text-xs px-1.5 py-0.5 bg-blue-900/30 text-blue-300 rounded'>{result.country_code}</span>
-                        )}
-                      </div>
-                      <div className='flex items-center gap-3 mt-1 text-xs text-gray-400'>
-                        {result.state && <span>{result.state}</span>}
-                        {result.zipcode && <span>{result.zipcode}</span>}
-                        {result.timezone && <span className='text-gray-500'>{result.timezone.split('/').pop()?.replace('_', ' ')}</span>}
-                        {result.population && result.population > 0 && (
-                          <span className='text-gray-500'>
-                            {result.population >= 1000000
-                              ? `${(result.population / 1000000).toFixed(1)}M`
-                              : result.population >= 1000
-                              ? `${(result.population / 1000).toFixed(0)}K`
-                              : result.population}
-                  </span>
                         )}
                       </div>
                     </div>
@@ -348,27 +334,27 @@ const GeneralSettings = ({
             </span>
           </div>
         </div>
-          </div>
+      </div>
 
       {/* Time Settings */}
       <div className='mb-6 pt-4 border-t border-gray-700'>
         <label className={labelClass}>Time Settings</label>
 
         {/* Time Format */}
-          <div className='mb-4'>
-            <label className='block mb-2 text-sm text-gray-400'>Time Format</label>
-            <select
-              value={settings.time_format || '12h'}
-              onChange={(e) => saveGlobalSettings({ time_format: e.target.value })}
-              className={inputClass}>
-              <option value='12h'>12-hour (3:45 PM)</option>
-              <option value='24h'>24-hour (15:45)</option>
-            </select>
-            <p className='text-xs text-gray-500 mt-1'>Choose how times are displayed across all modules</p>
-          </div>
+        <div className='mb-4'>
+          <label className='block mb-2 text-sm text-gray-400'>Time Format</label>
+          <select
+            value={settings.time_format || '12h'}
+            onChange={(e) => saveGlobalSettings({ time_format: e.target.value })}
+            className={inputClass}>
+            <option value='12h'>12-hour (3:45 PM)</option>
+            <option value='24h'>24-hour (15:45)</option>
+          </select>
+          <p className='text-xs text-gray-500 mt-1'>Choose how times are displayed across all modules</p>
+        </div>
 
         {/* Current System Time Display */}
-          {currentTime && (
+        {currentTime && (
           <div className='mb-6 p-4 bg-[#1a1a1a] rounded-lg border border-gray-800'>
             <div className='flex items-center justify-between'>
               <div>
@@ -414,7 +400,7 @@ const GeneralSettings = ({
                     }
                     if (!manualTime && currentTime.time) {
                       setManualTime(currentTime.time.substring(0, 5));
-                        }
+                    }
                   }
                 }}
                 className='sr-only'
@@ -469,7 +455,7 @@ const GeneralSettings = ({
                     onClick={syncTimeAutomatically}
                     className='w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors'>
                     Sync Now
-                </button>
+                  </button>
                 </div>
               ) : (
                 <p className='text-sm text-amber-300'>
@@ -514,16 +500,16 @@ const GeneralSettings = ({
           )}
 
           {/* Status Messages */}
-            {timeStatus.message && (
-              <div
+          {timeStatus.message && (
+            <div
               className={`mt-4 p-3 rounded-lg text-sm ${
-                  timeStatus.type === 'success'
-                    ? 'bg-green-900/30 text-green-300 border border-green-900/50'
-                    : 'bg-red-900/30 text-red-300 border border-red-900/50'
-                }`}>
-                {timeStatus.message}
-              </div>
-            )}
+                timeStatus.type === 'success'
+                  ? 'bg-green-900/30 text-green-300 border border-green-900/50'
+                  : 'bg-red-900/30 text-red-300 border border-red-900/50'
+              }`}>
+              {timeStatus.message}
+            </div>
+          )}
         </div>
       </div>
 
