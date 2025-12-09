@@ -2109,21 +2109,60 @@ async def reinit_power_button():
     Manually reinitialize the power button driver.
     Useful if initialization failed.
     """
+    import logging
+    logger = logging.getLogger(__name__)
+    
     if not power_button:
         return {"error": "Power button driver not initialized"}
     
     if hasattr(power_button, "reinitialize"):
+        logger.info("Manual power button reinit requested")
         success = power_button.reinitialize()
         if success:
             # Re-register callbacks
             power_button.set_callback(on_power_button_callback_threadsafe)
             power_button.set_long_press_callback(on_button_long_press_threadsafe)
             power_button.set_factory_reset_callback(on_factory_reset_threadsafe)
+            logger.info("Power button reinitialized successfully")
             return {"message": "Power button reinitialized successfully"}
         else:
-            return {"error": "Failed to reinitialize power button"}
+            logger.error("Failed to reinitialize power button - GPIO may be busy")
+            return {
+                "error": "Failed to reinitialize power button",
+                "suggestion": "GPIO 3 may be in use. Try restarting the service: sudo systemctl restart pc-1.service"
+            }
     else:
         return {"error": "Reinitialize method not available"}
+
+
+@app.post("/debug/power-button-force-cleanup")
+async def force_cleanup_power_button():
+    """
+    Force cleanup of power button GPIO resources.
+    This will close all handles and wait for GPIO to be released.
+    """
+    import logging
+    import time
+    logger = logging.getLogger(__name__)
+    
+    if not power_button:
+        return {"error": "Power button driver not initialized"}
+    
+    logger.info("Force cleanup of power button GPIO resources")
+    
+    # Force cleanup
+    if hasattr(power_button, "cleanup"):
+        power_button.cleanup()
+        time.sleep(2.0)  # Wait for GPIO to be released
+    
+    # Reset state flags
+    power_button._initialization_failed = False
+    power_button.gpio_available = True
+    
+    return {
+        "message": "Power button GPIO resources cleaned up",
+        "next_step": "Call /debug/power-button-reinit to reinitialize"
+    }
 
 
 # --- CAPTIVE PORTAL (Auto-launch setup page) ---
