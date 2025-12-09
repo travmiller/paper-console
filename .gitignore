@@ -70,3 +70,9 @@ raspberry_pi/*.img
 nul
 NUL
 
+# Generated documentation
+docs/raspberry-pi-config-full.md
+
+# Cursor IDE files
+.cursorrules
+

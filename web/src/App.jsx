@@ -499,9 +499,6 @@ function App() {
       <div className='contents'>
         {activeTab === 'general' && (
           <GeneralSettings
-            searchTerm={searchTerm}
-            searchResults={searchResults}
-            handleSearch={handleSearch}
             selectLocation={selectLocation}
             settings={settings}
             saveGlobalSettings={saveGlobalSettings}
