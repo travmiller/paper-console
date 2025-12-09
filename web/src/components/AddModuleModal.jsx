@@ -1,5 +1,6 @@
 import React, { useRef } from 'react';
 import { AVAILABLE_MODULE_TYPES } from '../constants';
+import { commonClasses, colors } from '../design-tokens';
 
 const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModule, onOpenEdit }) => {
   const modalMouseDownTarget = useRef(null);
@@ -8,7 +9,7 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
 
   return (
     <div
-      className='fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4'
+      className={commonClasses.modalBackdrop}
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) {
           modalMouseDownTarget.current = 'backdrop';
@@ -21,11 +22,11 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
         modalMouseDownTarget.current = null;
       }}>
       <div
-        className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-4 sm:p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto'
+        className={commonClasses.modalContent}
         onClick={(e) => e.stopPropagation()}>
         <div className='flex justify-between items-center mb-6'>
           <h3 className='text-xl font-bold text-white'>Add Module to Channel {channelPosition}</h3>
-          <button onClick={onClose} className='text-gray-400 hover:text-white text-2xl'>
+          <button onClick={onClose} className={`${commonClasses.text.muted} hover:text-white text-2xl`}>
             &times;
           </button>
         </div>
@@ -43,9 +44,9 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
                   onOpenEdit(newModule.id, newModule);
                 }
               }}
-              className='flex flex-col items-center p-4 bg-[#1a1a1a] border border-gray-700 hover:border-white rounded-lg transition-colors text-center group'>
-              <span className='font-bold text-white group-hover:text-blue-300 mb-1'>{type.label}</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full ${type.offline ? 'bg-green-900/40 text-green-400' : 'bg-blue-900/40 text-blue-400'}`}>
+              className={`flex flex-col items-center p-4 ${commonClasses.bg.nested} ${commonClasses.border.default} hover:border-white rounded-lg transition-colors text-center group`}>
+              <span className={`font-bold ${commonClasses.text.primary} group-hover:text-blue-300 mb-1`}>{type.label}</span>
+              <span className={`text-xs px-2 py-0.5 rounded-full ${type.offline ? `${colors.status.offline.bg} ${colors.status.offline.text}` : `${colors.status.online.bg} ${colors.status.online.text}`}`}>
                 {type.offline ? 'Offline' : 'Online'}
               </span>
             </button>

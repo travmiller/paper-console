@@ -1,10 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import JsonTextarea from './JsonTextarea';
+import { commonClasses } from '../design-tokens';
 
 const ModuleConfig = ({ module, updateConfig }) => {
   const config = module.config || {};
-  const inputClass = 'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none';
-  const labelClass = 'block mb-2 text-sm text-gray-400';
+  const inputClass = commonClasses.input;
+  const labelClass = commonClasses.label;
 
   // Location search state for weather module
   const [searchTerm, setSearchTerm] = useState('');
@@ -99,7 +100,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
             className={inputClass}
             placeholder='Enter your NewsAPI key'
           />
-          <p className='text-xs text-gray-500 mt-1'>Get your free API key from newsapi.org</p>
+          <p className={`${commonClasses.textSubtle} mt-1`}>Get your free API key from newsapi.org</p>
         </div>
       </div>
     );
@@ -133,18 +134,18 @@ const ModuleConfig = ({ module, updateConfig }) => {
           <label className={labelClass}>RSS Feed URLs</label>
           <div className='space-y-3'>
             {(config.rss_feeds || []).map((feed, index) => (
-              <div key={index} className='bg-[#1a1a1a] p-3 rounded border border-gray-800'>
+              <div key={index} className={commonClasses.cardNested}>
                 <div className='flex justify-between items-start mb-2'>
-                  <span className='text-sm text-gray-400'>Feed {index + 1}</span>
+                  <span className={`${commonClasses.textMuted} text-sm`}>Feed {index + 1}</span>
                   <button
                     type='button'
                     onClick={() => removeRssFeed(index)}
-                    className='px-2 py-1 text-xs bg-red-900/30 text-red-300 rounded hover:bg-red-900/50 transition-colors'>
+                    className={commonClasses.buttonDanger}>
                     Remove
                   </button>
                 </div>
                 <div>
-                  <label className='block mb-1 text-xs text-gray-400'>RSS Feed URL</label>
+                  <label className={commonClasses.labelSmall}>RSS Feed URL</label>
                   <input
                     type='text'
                     value={feed || ''}
@@ -158,7 +159,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
             <button
               type='button'
               onClick={addRssFeed}
-              className='w-full py-2 bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors text-sm'>
+              className={`${commonClasses.buttonSecondary} w-full text-sm`}>
               + Add RSS Feed
             </button>
           </div>
@@ -179,12 +180,12 @@ const ModuleConfig = ({ module, updateConfig }) => {
             className={inputClass}
             placeholder='Enter your OpenWeather API key (optional)'
           />
-          <p className='text-xs text-gray-500 mt-1'>
+          <p className={`${commonClasses.textSubtle} mt-1`}>
             Optional: Get your free API key from openweathermap.org. If not provided, uses free Open-Meteo API.
           </p>
         </div>
 
-        <div className='pt-4 border-t border-gray-700'>
+        <div className={`pt-4 border-t ${commonClasses.border.default}`}>
           <label className={labelClass}>Location</label>
           <div className='mb-6 text-left relative'>
             <input
@@ -196,14 +197,14 @@ const ModuleConfig = ({ module, updateConfig }) => {
               className={inputClass}
             />
             {searchResults.length > 0 && (
-              <ul className='absolute w-full z-10 max-h-[200px] overflow-y-auto bg-[#333] border border-[#444] border-t-0 rounded-b shadow-lg list-none p-0 m-0'>
+              <ul className={`absolute w-full z-10 max-h-[200px] overflow-y-auto ${commonClasses.bg.input} border ${commonClasses.bg.hover} border-t-0 rounded-b shadow-lg list-none p-0 m-0`}>
                 {searchResults.map((result) => (
                   <li
                     key={result.id}
                     onClick={() => selectLocation(result)}
-                    className='p-3 cursor-pointer border-b border-[#444] last:border-0 hover:bg-[#444] transition-colors'>
+                    className={`p-3 cursor-pointer border-b ${commonClasses.bg.hover} last:border-0 hover:${commonClasses.bg.hover} transition-colors`}>
                     <strong>{result.name}</strong>
-                    <span className='text-xs text-gray-400 ml-2'>
+                    <span className={`${commonClasses.textSubtle} text-xs ml-2`}>
                       {result.state} {result.zipcode ? `(${result.zipcode})` : ''}
                     </span>
                   </li>
@@ -213,17 +214,17 @@ const ModuleConfig = ({ module, updateConfig }) => {
           </div>
 
           {config.city_name && (
-            <div className='bg-[#1a1a1a] p-3 rounded border border-gray-800 space-y-2'>
+            <div className={`${commonClasses.cardNested} space-y-2`}>
               <div className='flex justify-between'>
-                <span className='text-xs text-gray-400'>City</span>
+                <span className={commonClasses.textSubtle}>City</span>
                 <span className='text-sm text-white font-medium'>{config.city_name}</span>
               </div>
               <div className='flex justify-between'>
-                <span className='text-xs text-gray-400'>Timezone</span>
+                <span className={commonClasses.textSubtle}>Timezone</span>
                 <span className='text-sm text-white'>{config.timezone || 'Not set'}</span>
               </div>
               <div className='flex justify-between'>
-                <span className='text-xs text-gray-400'>Coordinates</span>
+                <span className={commonClasses.textSubtle}>Coordinates</span>
                 <span className='text-sm text-white'>
                   {config.latitude?.toFixed(4)}, {config.longitude?.toFixed(4)}
                 </span>
@@ -231,7 +232,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
             </div>
           )}
           {!config.city_name && (
-            <p className='text-xs text-gray-500 mt-1'>
+            <p className={`${commonClasses.textSubtle} mt-1`}>
               Search and select a location above. If not set, will use global location settings as fallback.
             </p>
           )}
@@ -279,7 +280,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
               onChange={(e) => updateConfig('auto_print_new', e.target.checked)}
               className='w-5 h-5 accent-blue-500 bg-[#333] border-gray-600 rounded focus:ring-blue-500 focus:ring-2'
             />
-            <span className='text-sm text-gray-300'>Automatically print new emails as they arrive (checks every minute)</span>
+            <span className={`${commonClasses.text.secondary} text-sm`}>Automatically print new emails as they arrive (checks every minute)</span>
           </div>
         </div>
       </div>
@@ -299,12 +300,12 @@ const ModuleConfig = ({ module, updateConfig }) => {
   }
 
   if (module.type === 'maze') {
-    return <div className='text-gray-400 text-sm'>Standard 15x15 maze. No configuration needed.</div>;
+    return <div className={commonClasses.textMuted}>Standard 15x15 maze. No configuration needed.</div>;
   }
 
   if (module.type === 'quotes') {
     return (
-      <div className='text-gray-400 text-sm'>Prints a random quote from the offline database (5,000+ quotes). No configuration needed.</div>
+      <div className={commonClasses.textMuted}>Prints a random quote from the offline database (5,000+ quotes). No configuration needed.</div>
     );
   }
 
@@ -318,7 +319,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
           <option value={5}>5 Events</option>
           <option value={10}>10 Events</option>
         </select>
-        <p className='text-xs text-gray-500'>Prints random historical events that happened on today's date (from offline database).</p>
+        <p className={commonClasses.textSubtle}>Prints random historical events that happened on today's date (from offline database).</p>
       </div>
     );
   }
@@ -420,7 +421,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
           <label className={labelClass}>Items</label>
           <div className='space-y-2'>
             {(config.items || []).map((item, index) => (
-              <div key={index} className='bg-[#1a1a1a] p-2 rounded border border-gray-800 flex gap-2 items-center'>
+              <div key={index} className={`${commonClasses.cardNestedSmall} flex gap-2 items-center`}>
                 <input
                   ref={(el) => (inputRefs.current[`item-${index}`] = el)}
                   type='text'
@@ -428,12 +429,12 @@ const ModuleConfig = ({ module, updateConfig }) => {
                   onChange={(e) => updateChecklistItem(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   placeholder='Enter item...'
-                  className='flex-1 p-2 text-sm bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none'
+                  className={`${commonClasses.inputSmall} flex-1`}
                 />
                 <button
                   type='button'
                   onClick={() => removeChecklistItem(index)}
-                  className='px-2 py-1 text-xs bg-red-900/30 text-red-300 rounded hover:bg-red-900/50 transition-colors flex-shrink-0'>
+                  className={`${commonClasses.buttonDanger} flex-shrink-0`}>
                   ×
                 </button>
               </div>
@@ -441,7 +442,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
             <button
               type='button'
               onClick={() => addChecklistItem()}
-              className='w-full py-1.5 bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors text-sm'>
+              className={`${commonClasses.buttonSecondary} w-full py-1.5 text-sm`}>
               + Add Item
             </button>
           </div>
@@ -474,19 +475,19 @@ const ModuleConfig = ({ module, updateConfig }) => {
           <label className={labelClass}>Calendar Sources</label>
           <div className='space-y-3'>
             {(config.ical_sources || []).map((source, index) => (
-              <div key={index} className='bg-[#1a1a1a] p-3 rounded border border-gray-800'>
+              <div key={index} className={commonClasses.cardNested}>
                 <div className='flex justify-between items-start mb-2'>
-                  <span className='text-sm text-gray-400'>Calendar {index + 1}</span>
+                  <span className={`${commonClasses.textMuted} text-sm`}>Calendar {index + 1}</span>
                   <button
                     type='button'
                     onClick={() => removeCalendarSource(index)}
-                    className='px-2 py-1 text-xs bg-red-900/30 text-red-300 rounded hover:bg-red-900/50 transition-colors'>
+                    className={commonClasses.buttonDanger}>
                     Remove
                   </button>
                 </div>
                 <div className='space-y-2'>
                   <div>
-                    <label className='block mb-1 text-xs text-gray-400'>Label</label>
+                    <label className={commonClasses.labelSmall}>Label</label>
                     <input
                       type='text'
                       value={source.label || ''}
@@ -496,7 +497,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
                     />
                   </div>
                   <div>
-                    <label className='block mb-1 text-xs text-gray-400'>iCal URL</label>
+                    <label className={commonClasses.labelSmall}>iCal URL</label>
                     <input
                       type='text'
                       value={source.url || ''}
@@ -511,7 +512,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
             <button
               type='button'
               onClick={addCalendarSource}
-              className='w-full py-2 bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors text-sm'>
+              className={`${commonClasses.buttonSecondary} w-full text-sm`}>
               + Add Calendar
             </button>
           </div>
@@ -532,7 +533,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
     );
   }
 
-  return <div className='text-gray-400 text-sm'>No configuration needed for this module type.</div>;
+  return <div className={commonClasses.textMuted}>No configuration needed for this module type.</div>;
 };
 
 export default ModuleConfig;
