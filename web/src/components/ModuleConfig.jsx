@@ -299,18 +299,12 @@ const ModuleConfig = ({ module, updateConfig }) => {
   }
 
   if (module.type === 'maze') {
-    return (
-      <div className='text-gray-400 text-sm'>
-        Standard 15x15 maze. No configuration needed.
-      </div>
-    );
+    return <div className='text-gray-400 text-sm'>Standard 15x15 maze. No configuration needed.</div>;
   }
 
   if (module.type === 'quotes') {
     return (
-      <div className='text-gray-400 text-sm'>
-        Prints a random quote from the offline database (5,000+ quotes). No configuration needed.
-      </div>
+      <div className='text-gray-400 text-sm'>Prints a random quote from the offline database (5,000+ quotes). No configuration needed.</div>
     );
   }
 
@@ -318,18 +312,13 @@ const ModuleConfig = ({ module, updateConfig }) => {
     return (
       <div className='space-y-3'>
         <label className={labelClass}>Number of Events</label>
-        <select
-          value={config.count || 3}
-          onChange={(e) => updateConfig('count', parseInt(e.target.value))}
-          className={inputClass}>
+        <select value={config.count || 3} onChange={(e) => updateConfig('count', parseInt(e.target.value))} className={inputClass}>
           <option value={1}>1 Event</option>
           <option value={3}>3 Events</option>
           <option value={5}>5 Events</option>
           <option value={10}>10 Events</option>
         </select>
-        <p className='text-xs text-gray-500'>
-          Prints random historical events that happened on today's date (from offline database).
-        </p>
+        <p className='text-xs text-gray-500'>Prints random historical events that happened on today's date (from offline database).</p>
       </div>
     );
   }
@@ -349,6 +338,80 @@ const ModuleConfig = ({ module, updateConfig }) => {
             onBlur={(e) => updateConfig('content', e.target.value, true)}
             className={`${inputClass} font-mono text-sm min-h-[120px]`}
           />
+        </div>
+      </div>
+    );
+  }
+
+  if (module.type === 'checklist') {
+    const addChecklistItem = () => {
+      const currentConfig = module.config || {};
+      const currentItems = currentConfig.items || [];
+      updateConfig('items', [...currentItems, { text: '' }]);
+    };
+
+    const updateChecklistItem = (index, value) => {
+      const currentConfig = module.config || {};
+      const currentItems = [...(currentConfig.items || [])];
+      if (!currentItems[index]) {
+        currentItems[index] = { text: '' };
+      }
+      currentItems[index] = { ...currentItems[index], text: value };
+      updateConfig('items', currentItems);
+    };
+
+    const removeChecklistItem = (index) => {
+      const currentConfig = module.config || {};
+      const currentItems = [...(currentConfig.items || [])];
+      currentItems.splice(index, 1);
+      updateConfig('items', currentItems);
+    };
+
+    return (
+      <div className='space-y-3'>
+        <div>
+          <label className={labelClass}>Title</label>
+          <input
+            type='text'
+            value={config.title || 'Checklist'}
+            onChange={(e) => updateConfig('title', e.target.value)}
+            className={inputClass}
+            placeholder='My Checklist'
+          />
+        </div>
+        <div>
+          <label className={labelClass}>Checklist Items</label>
+          <div className='space-y-3'>
+            {(config.items || []).map((item, index) => (
+              <div key={index} className='bg-[#1a1a1a] p-3 rounded border border-gray-800'>
+                <div className='flex justify-between items-start mb-2'>
+                  <span className='text-sm text-gray-400'>Item {index + 1}</span>
+                  <button
+                    type='button'
+                    onClick={() => removeChecklistItem(index)}
+                    className='px-2 py-1 text-xs bg-red-900/30 text-red-300 rounded hover:bg-red-900/50 transition-colors'>
+                    Remove
+                  </button>
+                </div>
+                <div>
+                  <label className='block mb-1 text-xs text-gray-400'>Item Text</label>
+                  <input
+                    type='text'
+                    value={item?.text || ''}
+                    onChange={(e) => updateChecklistItem(index, e.target.value)}
+                    placeholder='Enter checklist item...'
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+            ))}
+            <button
+              type='button'
+              onClick={addChecklistItem}
+              className='w-full py-2 bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors text-sm'>
+              + Add Item
+            </button>
+          </div>
         </div>
       </div>
     );

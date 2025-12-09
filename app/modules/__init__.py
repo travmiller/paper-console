@@ -11,4 +11,5 @@ from . import (
     maze,
     quotes,
     history,
+    checklist,
 )

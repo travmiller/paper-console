@@ -39,6 +39,7 @@ from app.modules import (
     maze,
     quotes,
     history,
+    checklist,
 )
 from app.routers import wifi
 import app.wifi_manager as wifi_manager
@@ -1008,8 +1009,10 @@ async def set_system_time(request: SetTimeRequest):
                 text=True,
                 timeout=5,
             )
-            
-            print(f"Date command result: returncode={result.returncode}, stdout={result.stdout}, stderr={result.stderr}")
+
+            print(
+                f"Date command result: returncode={result.returncode}, stdout={result.stdout}, stderr={result.stderr}"
+            )
 
             if result.returncode != 0:
                 return {
@@ -1776,6 +1779,9 @@ def execute_module(module: ModuleInstance) -> bool:
 
         elif module_type == "history":
             history.format_history_receipt(printer, config, module_name)
+
+        elif module_type == "checklist":
+            checklist.format_checklist_receipt(printer, config, module_name)
 
         elif module_type == "astronomy":
             astronomy.format_astronomy_receipt(printer, module_name=module_name)

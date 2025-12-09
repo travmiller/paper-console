@@ -11,4 +11,5 @@ export const AVAILABLE_MODULE_TYPES = [
   { id: 'calendar', label: 'Calendar', offline: false },
   { id: 'webhook', label: 'Webhook', offline: false },
   { id: 'text', label: 'Text / Note', offline: true },
+  { id: 'checklist', label: 'Checklist', offline: true },
 ];

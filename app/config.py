@@ -43,6 +43,15 @@ class TextConfig(BaseModel):
     content: str = ""
 
 
+class ChecklistItem(BaseModel):
+    text: str = ""
+
+
+class ChecklistConfig(BaseModel):
+    title: str = "Checklist"
+    items: List[ChecklistItem] = []
+
+
 class WeatherConfig(BaseModel):
     openweather_api_key: Optional[str] = None
     city_name: Optional[str] = None
@@ -102,7 +111,6 @@ DEFAULT_SUDOKU_ID = "default-sudoku-001"
 DEFAULT_MAZE_ID = "default-maze-001"
 DEFAULT_QUOTES_ID = "default-quotes-001"
 DEFAULT_HISTORY_ID = "default-history-001"
-
 
 
 def _default_modules() -> Dict[str, ModuleInstance]:
