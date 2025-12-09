@@ -131,10 +131,46 @@ def _format_location_name(row: Dict, is_geonames: bool) -> str:
         return city or "Unknown"
 
 
+def _calculate_match_score(
+    query_lower: str, name: str, asciiname: str, alternatenames: str, population: int
+) -> float:
+    """
+    Calculate a relevance score for a search match.
+    Higher scores = better matches.
+    """
+    score = 0.0
+
+    # Exact match gets highest score
+    if name == query_lower or asciiname == query_lower:
+        score += 10000.0
+    # Exact phrase match (query is a complete word/phrase in the name)
+    elif f" {query_lower} " in f" {name} " or f" {query_lower} " in f" {asciiname} ":
+        score += 5000.0
+    # Starts with query gets high score
+    elif name.startswith(query_lower) or asciiname.startswith(query_lower):
+        score += 3000.0
+    # Contains query as word boundary (not just substring)
+    elif query_lower in name.split() or query_lower in asciiname.split():
+        score += 2000.0
+    # Contains query gets medium score
+    elif query_lower in name or query_lower in asciiname:
+        score += 1000.0
+    # Alternate names match gets lower score
+    elif alternatenames and query_lower in alternatenames:
+        score += 500.0
+
+    # Boost score based on population (larger cities rank higher)
+    # Normalize population to 0-100 range (cities with 10M+ get max boost)
+    population_boost = min(population / 100000.0, 100.0)
+    score += population_boost
+
+    return score
+
+
 def search_locations(query: str, limit: int = 10) -> List[Dict]:
     """
-    Search for locations by city name.
-    Returns a list of location dictionaries with name, city, state/country, timezone, lat, lon.
+    Smart search for locations by city name with relevance scoring.
+    Returns a list of location dictionaries sorted by relevance.
     """
     if not query or len(query.strip()) < 2:
         return []
@@ -146,7 +182,8 @@ def search_locations(query: str, limit: int = 10) -> List[Dict]:
         return []
 
     is_geonames = _is_geonames_format(data)
-    results = []
+    scored_results = []
+    zip_results = []  # For old ZIP format
     seen_locations = set()
 
     for row in data:
@@ -165,14 +202,30 @@ def search_locations(query: str, limit: int = 10) -> List[Dict]:
                 continue
 
             # Search in name, asciiname, and alternatenames
+            # For multi-word queries, require at least one word to match prominently
+            query_words = query_lower.split()
             match = False
-            if (
-                query_lower in name
-                or query_lower in asciiname
-                or name.startswith(query_lower)
-                or asciiname.startswith(query_lower)
-            ):
+
+            # Check if query matches name or asciiname
+            if query_lower in name or query_lower in asciiname:
                 match = True
+            elif name.startswith(query_lower) or asciiname.startswith(query_lower):
+                match = True
+            # For multi-word queries, check if all words appear in name
+            elif len(query_words) > 1:
+                # All words must appear in name or asciiname
+                if all(word in name or word in asciiname for word in query_words):
+                    match = True
+            # Single word - check if it's a prominent match
+            elif len(query_words) == 1:
+                word = query_words[0]
+                # Word must be at least 3 chars and appear in name/asciiname
+                if len(word) >= 3 and (word in name or word in asciiname):
+                    match = True
+                # Or check alternatenames for single short words
+                elif len(word) < 3 and alternatenames and word in alternatenames:
+                    match = True
+            # Check alternatenames as fallback
             elif alternatenames and query_lower in alternatenames:
                 match = True
 
@@ -191,6 +244,11 @@ def search_locations(query: str, limit: int = 10) -> List[Dict]:
                 if not (-90 <= latitude <= 90) or not (-180 <= longitude <= 180):
                     continue
 
+                # Calculate relevance score
+                score = _calculate_match_score(
+                    query_lower, name, asciiname, alternatenames, population
+                )
+
                 # Format display name
                 display_name = _format_location_name(row, is_geonames=True)
 
@@ -208,11 +266,9 @@ def search_locations(query: str, limit: int = 10) -> List[Dict]:
                     "longitude": longitude,
                     "timezone": timezone if timezone else "UTC",
                     "population": population,
+                    "_score": score,  # Internal score for sorting
                 }
-                results.append(result)
-
-                if len(results) >= limit:
-                    break
+                scored_results.append(result)
         else:
             # Old ZIP format (backward compatibility)
             zipcode = row.get("DELIVERY ZIPCODE", "").strip()
@@ -267,16 +323,21 @@ def search_locations(query: str, limit: int = 10) -> List[Dict]:
                     "longitude": lon,
                     "timezone": timezone,
                 }
-                results.append(result)
+                zip_results.append(result)
 
-                if len(results) >= limit:
+                if len(zip_results) >= limit:
                     break
 
-    # Sort by population (descending) for GeoNames, or keep original order for ZIP
-    if is_geonames and results:
-        results.sort(key=lambda x: x.get("population", 0), reverse=True)
+    # Sort by relevance score (descending) for GeoNames, or keep original order for ZIP
+    if is_geonames and scored_results:
+        scored_results.sort(key=lambda x: x.get("_score", 0), reverse=True)
+        # Remove internal score before returning
+        for result in scored_results:
+            result.pop("_score", None)
+        return scored_results[:limit]
 
-    return results
+    # For old ZIP format, return results as-is
+    return zip_results[:limit]
 
 
 def get_location_by_zip(zipcode: str) -> Optional[Dict]:

@@ -1311,7 +1311,7 @@ async def get_system_default_location():
 
 
 @app.get("/api/location/search")
-async def search_location(q: str, limit: int = 10, use_api: Optional[str] = None):
+async def search_location(q: str, limit: int = 20, use_api: Optional[str] = None):
     """
     Search for locations by zip code or city name.
     When online and use_api=True (or enabled in settings), tries OpenStreetMap Nominatim API first for better results.

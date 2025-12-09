@@ -117,7 +117,8 @@ function App() {
       try {
         // Pass use_api parameter based on settings
         const useApi = settings.use_api_location_search || false;
-        const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=10&use_api=${useApi}`);
+        // Increase limit for better results, backend will return top matches
+        const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=20&use_api=${useApi}`);
         const data = await response.json();
         if (data.results) {
           setSearchResults(data.results);

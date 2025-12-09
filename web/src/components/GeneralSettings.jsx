@@ -257,16 +257,36 @@ const GeneralSettings = ({
             )}
           </div>
           {searchResults.length > 0 && (
-            <ul className='absolute w-full z-10 max-h-[200px] overflow-y-auto bg-[#333] border border-[#444] border-t-0 rounded-b shadow-lg list-none p-0 m-0'>
+            <ul className='absolute w-full z-10 max-h-[300px] overflow-y-auto bg-[#333] border border-[#444] border-t-0 rounded-b shadow-lg list-none p-0 m-0'>
               {searchResults.map((result) => (
                 <li
                   key={result.id}
                   onClick={() => selectLocation(result)}
-                  className='p-3 cursor-pointer border-b border-[#444] last:border-0 hover:bg-[#444] transition-colors'>
-                  <strong>{result.name}</strong>
-                  <span className='text-xs text-gray-400 ml-2'>
-                    {result.state} {result.zipcode ? `(${result.zipcode})` : ''}
-                  </span>
+                  className='p-3 cursor-pointer border-b border-[#444] last:border-0 hover:bg-[#444] transition-colors group'>
+                  <div className='flex items-start justify-between'>
+                    <div className='flex-1 min-w-0'>
+                      <div className='flex items-center gap-2'>
+                        <strong className='text-white group-hover:text-blue-300 transition-colors'>{result.name}</strong>
+                        {result.country_code && result.country_code !== 'US' && (
+                          <span className='text-xs px-1.5 py-0.5 bg-blue-900/30 text-blue-300 rounded'>{result.country_code}</span>
+                        )}
+                      </div>
+                      <div className='flex items-center gap-3 mt-1 text-xs text-gray-400'>
+                        {result.state && <span>{result.state}</span>}
+                        {result.zipcode && <span>{result.zipcode}</span>}
+                        {result.timezone && <span className='text-gray-500'>{result.timezone.split('/').pop()?.replace('_', ' ')}</span>}
+                        {result.population && result.population > 0 && (
+                          <span className='text-gray-500'>
+                            {result.population >= 1000000
+                              ? `${(result.population / 1000000).toFixed(1)}M`
+                              : result.population >= 1000
+                              ? `${(result.population / 1000).toFixed(0)}K`
+                              : result.population}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </li>
               ))}
             </ul>
