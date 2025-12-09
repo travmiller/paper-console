@@ -1,15 +1,18 @@
 # GeoNames Global Location Database Setup
 
-This project uses the GeoNames global cities database for offline location search. The database includes over 32,000 cities worldwide with populations greater than 15,000.
+This project uses the GeoNames global cities database for offline location search. The database can include cities from various population thresholds.
 
 ## Database Information
 
 - **Source**: GeoNames (https://www.geonames.org/)
-- **Dataset**: cities15000.zip (cities with population > 15,000)
+- **Available Datasets**:
+  - `cities500.zip`: Cities with population > 500 (~145K cities)
+  - `cities1000.zip`: Cities with population > 1,000 (~130K cities)
+  - `cities5000.zip`: Cities with population > 5,000 (~50K cities) **[default]**
+  - `cities15000.zip`: Cities with population > 15,000 (~33K cities)
 - **License**: Creative Commons Attribution 4.0
 - **Format**: CSV
 - **Location**: `app/data/geonames_cities.csv`
-- **Size**: ~32,895 cities
 
 ## Features
 
@@ -26,24 +29,33 @@ This project uses the GeoNames global cities database for offline location searc
 Run the download script to fetch and convert the GeoNames database:
 
 ```bash
+# Download default dataset (cities5000.zip - ~50K cities)
 python scripts/download_geonames.py
+
+# Or specify a different population threshold:
+python scripts/download_geonames.py 500   # ~145K cities (largest)
+python scripts/download_geonames.py 1000  # ~130K cities
+python scripts/download_geonames.py 5000  # ~50K cities (default)
+python scripts/download_geonames.py 15000 # ~33K cities (smallest)
 ```
 
 This will:
-1. Download `cities15000.zip` from GeoNames
+1. Download the selected dataset from GeoNames
 2. Extract the tab-separated data file
 3. Convert to CSV format
 4. Save to `app/data/geonames_cities.csv`
 5. Clean up temporary files
+
+**Note**: Larger datasets (500, 1000) will take longer to download and process, but provide more location coverage.
 
 ### Manual Download
 
 If you prefer to download manually:
 
 1. Visit https://download.geonames.org/export/dump/
-2. Download `cities15000.zip`
-3. Extract `cities15000.txt`
-4. Run the conversion script or manually convert to CSV
+2. Download your preferred dataset (e.g., `cities5000.zip`, `cities1000.zip`, etc.)
+3. Extract the corresponding `.txt` file
+4. Update the script variables or run the conversion script
 
 ## Database Format
 

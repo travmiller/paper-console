@@ -1,19 +1,64 @@
 #!/usr/bin/env python3
 """
 Download and process GeoNames cities database.
-Downloads cities15000.zip (cities with population > 15,000) and converts to CSV format.
+Downloads GeoNames cities data and converts to CSV format.
+
+Available datasets:
+- cities500.zip: Cities with population > 500 (~145K cities)
+- cities1000.zip: Cities with population > 1,000 (~130K cities)
+- cities5000.zip: Cities with population > 5,000 (~50K cities)
+- cities15000.zip: Cities with population > 15,000 (~33K cities) [default]
 """
 
 import urllib.request
 import zipfile
 import csv
 import os
+import sys
 from pathlib import Path
 
-# GeoNames download URL
-GEONAMES_URL = "https://download.geonames.org/export/dump/cities15000.zip"
-GEONAMES_FILE = "cities15000.zip"
-GEONAMES_TXT = "cities15000.txt"
+# Default population threshold (can be overridden via command line)
+DEFAULT_THRESHOLD = "5000"  # cities5000.zip for more locations
+
+# GeoNames download URLs
+GEONAMES_DATASETS = {
+    "500": {
+        "url": "https://download.geonames.org/export/dump/cities500.zip",
+        "file": "cities500.zip",
+        "txt": "cities500.txt",
+        "description": "Cities with population > 500 (~145K cities)",
+    },
+    "1000": {
+        "url": "https://download.geonames.org/export/dump/cities1000.zip",
+        "file": "cities1000.zip",
+        "txt": "cities1000.txt",
+        "description": "Cities with population > 1,000 (~130K cities)",
+    },
+    "5000": {
+        "url": "https://download.geonames.org/export/dump/cities5000.zip",
+        "file": "cities5000.zip",
+        "txt": "cities5000.txt",
+        "description": "Cities with population > 5,000 (~50K cities)",
+    },
+    "15000": {
+        "url": "https://download.geonames.org/export/dump/cities15000.zip",
+        "file": "cities15000.zip",
+        "txt": "cities15000.txt",
+        "description": "Cities with population > 15,000 (~33K cities)",
+    },
+}
+
+# Get threshold from command line or use default
+threshold = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_THRESHOLD
+if threshold not in GEONAMES_DATASETS:
+    print(f"Invalid threshold: {threshold}")
+    print(f"Available options: {', '.join(GEONAMES_DATASETS.keys())}")
+    sys.exit(1)
+
+dataset = GEONAMES_DATASETS[threshold]
+GEONAMES_URL = dataset["url"]
+GEONAMES_FILE = dataset["file"]
+GEONAMES_TXT = dataset["txt"]
 
 # Output directory
 BASE_DIR = Path(__file__).parent.parent
@@ -157,14 +202,17 @@ def cleanup_temp_files():
         if file.exists():
             try:
                 file.unlink()
-                print(f"Removed {file}")
+                print(f"Removed {file.name}")
             except Exception as e:
-                print(f"Could not remove {file}: {e}")
+                print(f"Could not remove {file.name}: {e}")
 
 
 def main():
     """Main function."""
     print("GeoNames Cities Database Downloader")
+    print("=" * 50)
+    print(f"Dataset: {dataset['description']}")
+    print(f"Downloading: {GEONAMES_FILE}")
     print("=" * 50)
 
     # Ensure data directory exists
@@ -182,8 +230,10 @@ def main():
 
     # Convert to CSV
     if convert_to_csv(txt_path):
-        print("\nSuccess! GeoNames database ready at:", OUTPUT_CSV)
-        print(f"  Total cities: Check the file for count")
+        print("\n" + "=" * 50)
+        print("Success! GeoNames database ready at:", OUTPUT_CSV)
+        print(f"Dataset: {dataset['description']}")
+        print("=" * 50)
     else:
         print("\nFailed to convert GeoNames data")
 

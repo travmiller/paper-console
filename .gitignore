@@ -70,6 +70,11 @@ raspberry_pi/*.img
 nul
 NUL
 
+# GeoNames temporary download files
+app/data/*.zip
+app/data/*.txt
+!app/data/__init__.py
+
 # Generated documentation
 docs/raspberry-pi-config-full.md
 
