@@ -34,9 +34,9 @@ const ChannelList = ({
                   <button
                     type='button'
                     onClick={() => triggerChannelPrint(pos)}
-                    className='text-xs px-2 py-0.5 rounded border bg-transparent text-gray-300 border-gray-500 hover:text-white hover:border-gray-400 transition-colors'
+                    className='flex items-center justify-center px-2 py-0.5 rounded border bg-transparent text-gray-300 border-gray-500 hover:text-white hover:border-gray-400 transition-colors'
                     title='Print Channel'>
-                    🖨
+                    <img src='/print-icon.svg' alt='Print' className='w-4 h-4 opacity-60 hover:opacity-100 transition-opacity' />
                   </button>
                   <button
                     type='button'
