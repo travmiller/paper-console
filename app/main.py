@@ -1311,16 +1311,181 @@ async def get_system_default_location():
 
 
 @app.get("/api/location/search")
-async def search_location(q: str, limit: int = 10):
+async def search_location(q: str, limit: int = 10, use_api: Optional[str] = None):
     """
-    Search for locations by zip code or city name using offline ZIP_Locale_Detail.csv.
+    Search for locations by zip code or city name.
+    When online and use_api=True (or enabled in settings), tries OpenStreetMap Nominatim API first for better results.
+    Falls back to offline ZIP_Locale_Detail.csv if API fails or use_api=False.
     Returns location data with timezone and coordinates.
     """
     if not q or len(q.strip()) < 2:
         return {"results": []}
 
-    results = location_lookup.search_locations(q.strip(), limit=limit)
-    return {"results": results}
+    query = q.strip()
+    results = []
+
+    # Check if API is enabled in settings (default to False for safety)
+    # Handle both string "true"/"false" from query params and boolean from settings
+    if use_api is None:
+        use_api_enabled = getattr(settings, "use_api_location_search", False)
+    else:
+        use_api_enabled = (
+            use_api.lower() == "true" if isinstance(use_api, str) else bool(use_api)
+        )
+
+    # Try API first if requested and online
+    if use_api_enabled:
+        try:
+            import requests
+            import time
+
+            # Use Nominatim API (free, no API key required)
+            # Rate limit: 1 request per second - we'll respect this
+            nominatim_url = "https://nominatim.openstreetmap.org/search"
+            params = {
+                "q": query,
+                "format": "json",
+                "limit": limit,
+                "addressdetails": 1,
+                "countrycodes": "us",  # Focus on US locations
+            }
+            headers = {
+                "User-Agent": "Paper-Console/1.0 (PC-1 Thermal Printer)",  # Required by Nominatim
+            }
+
+            response = requests.get(
+                nominatim_url, params=params, headers=headers, timeout=3
+            )
+            if response.status_code == 200:
+                api_results = response.json()
+                if api_results:
+                    # Convert Nominatim results to our format
+                    for item in api_results:
+                        address = item.get("address", {})
+                        city = (
+                            address.get("city")
+                            or address.get("town")
+                            or address.get("village")
+                            or address.get("municipality")
+                            or ""
+                        )
+                        # Nominatim provides state_code (2-letter) or state (full name)
+                        state = address.get("state_code", "") or address.get(
+                            "state", ""
+                        )
+                        zipcode = address.get("postcode", "")
+
+                        # Convert full state name to abbreviation if needed
+                        if state and len(state) > 2:
+                            # Map common full state names to abbreviations
+                            state_name_to_code = {
+                                "Alabama": "AL",
+                                "Alaska": "AK",
+                                "Arizona": "AZ",
+                                "Arkansas": "AR",
+                                "California": "CA",
+                                "Colorado": "CO",
+                                "Connecticut": "CT",
+                                "Delaware": "DE",
+                                "Florida": "FL",
+                                "Georgia": "GA",
+                                "Hawaii": "HI",
+                                "Idaho": "ID",
+                                "Illinois": "IL",
+                                "Indiana": "IN",
+                                "Iowa": "IA",
+                                "Kansas": "KS",
+                                "Kentucky": "KY",
+                                "Louisiana": "LA",
+                                "Maine": "ME",
+                                "Maryland": "MD",
+                                "Massachusetts": "MA",
+                                "Michigan": "MI",
+                                "Minnesota": "MN",
+                                "Mississippi": "MS",
+                                "Missouri": "MO",
+                                "Montana": "MT",
+                                "Nebraska": "NE",
+                                "Nevada": "NV",
+                                "New Hampshire": "NH",
+                                "New Jersey": "NJ",
+                                "New Mexico": "NM",
+                                "New York": "NY",
+                                "North Carolina": "NC",
+                                "North Dakota": "ND",
+                                "Ohio": "OH",
+                                "Oklahoma": "OK",
+                                "Oregon": "OR",
+                                "Pennsylvania": "PA",
+                                "Rhode Island": "RI",
+                                "South Carolina": "SC",
+                                "South Dakota": "SD",
+                                "Tennessee": "TN",
+                                "Texas": "TX",
+                                "Utah": "UT",
+                                "Vermont": "VT",
+                                "Virginia": "VA",
+                                "Washington": "WA",
+                                "West Virginia": "WV",
+                                "Wisconsin": "WI",
+                                "Wyoming": "WY",
+                                "District of Columbia": "DC",
+                                "Puerto Rico": "PR",
+                                "Virgin Islands": "VI",
+                                "Guam": "GU",
+                                "American Samoa": "AS",
+                                "Northern Mariana Islands": "MP",
+                            }
+                            state = state_name_to_code.get(
+                                state, state[:2].upper() if len(state) >= 2 else ""
+                            )
+
+                        # Only include US locations with city and valid 2-letter state code
+                        if city and state and len(state) == 2:
+                            # Get timezone from state
+                            from app.location_lookup import (
+                                STATE_TO_TIMEZONE,
+                                STATE_COORDINATES,
+                            )
+
+                            timezone = STATE_TO_TIMEZONE.get(state, "America/New_York")
+                            coords = STATE_COORDINATES.get(state, (40.7128, -74.0060))
+
+                            # Use actual coordinates from API
+                            lat = float(item.get("lat", coords[0]))
+                            lon = float(item.get("lon", coords[1]))
+
+                            display_name = f"{city}, {state}"
+                            if zipcode:
+                                display_name = f"{city}, {state} {zipcode}"
+
+                            result = {
+                                "id": f"{zipcode}-{city}-{state}-{item.get('place_id', '')}",
+                                "name": display_name,
+                                "zipcode": zipcode,
+                                "city": city,
+                                "state": state,
+                                "latitude": lat,
+                                "longitude": lon,
+                                "timezone": timezone,
+                            }
+                            results.append(result)
+
+                            if len(results) >= limit:
+                                break
+
+                    if results:
+                        return {"results": results, "source": "api"}
+        except Exception as e:
+            # API failed, fall back to local database
+            print(f"Location API search failed: {e}, falling back to local database")
+
+    # Fall back to local database (works offline)
+    local_results = location_lookup.search_locations(query, limit=limit)
+    if local_results:
+        return {"results": local_results, "source": "local"}
+
+    return {"results": [], "source": "none"}
 
 
 # --- MODULE MANAGEMENT API ---

@@ -37,6 +37,8 @@ function App() {
 
   // Debounce timers for module updates
   const moduleUpdateTimers = useRef({});
+  // Debounce timer for location search (respects Nominatim 1 req/sec limit)
+  const locationSearchTimer = useRef(null);
 
   // Check WiFi status on mount
   useEffect(() => {
@@ -82,31 +84,54 @@ function App() {
 
     // Update WiFi status every 10 seconds
     const interval = setInterval(fetchWifiStatus, 10000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      // Cleanup location search timer
+      if (locationSearchTimer.current) {
+        clearTimeout(locationSearchTimer.current);
+      }
+    };
   }, []);
 
   const handleSearch = async (term) => {
     setSearchTerm(term);
     if (term.length < 2) {
       setSearchResults([]);
+      setIsSearching(false);
+      if (locationSearchTimer.current) {
+        clearTimeout(locationSearchTimer.current);
+        locationSearchTimer.current = null;
+      }
       return;
     }
 
-    setIsSearching(true);
-    try {
-      const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=10`);
-      const data = await response.json();
-      if (data.results) {
-        setSearchResults(data.results);
-      } else {
-        setSearchResults([]);
-      }
-    } catch (err) {
-      console.error('Error fetching locations:', err);
-      setSearchResults([]);
-    } finally {
-      setIsSearching(false);
+    // Clear previous timer
+    if (locationSearchTimer.current) {
+      clearTimeout(locationSearchTimer.current);
     }
+
+    // Debounce search to respect Nominatim API rate limit (1 req/sec)
+    // Wait 500ms after user stops typing before searching
+    setIsSearching(true);
+    locationSearchTimer.current = setTimeout(async () => {
+      try {
+        // Pass use_api parameter based on settings
+        const useApi = settings.use_api_location_search || false;
+        const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=10&use_api=${useApi}`);
+        const data = await response.json();
+        if (data.results) {
+          setSearchResults(data.results);
+        } else {
+          setSearchResults([]);
+        }
+      } catch (err) {
+        console.error('Error fetching locations:', err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+        locationSearchTimer.current = null;
+      }
+    }, 500); // 500ms debounce
   };
 
   const updateChannelSchedule = async (position, schedule) => {
@@ -499,6 +524,10 @@ function App() {
       <div className='contents'>
         {activeTab === 'general' && (
           <GeneralSettings
+            searchTerm={searchTerm}
+            searchResults={searchResults}
+            isSearching={isSearching}
+            handleSearch={handleSearch}
             selectLocation={selectLocation}
             settings={settings}
             saveGlobalSettings={saveGlobalSettings}

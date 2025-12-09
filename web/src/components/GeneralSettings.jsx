@@ -1,6 +1,16 @@
 import React, { useState, useEffect } from 'react';
 
-const GeneralSettings = ({ selectLocation, settings, saveGlobalSettings, triggerAPMode, wifiStatus }) => {
+const GeneralSettings = ({
+  searchTerm,
+  searchResults,
+  isSearching,
+  handleSearch,
+  selectLocation,
+  settings,
+  saveGlobalSettings,
+  triggerAPMode,
+  wifiStatus,
+}) => {
   const inputClass =
     'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none box-border';
   const labelClass = 'block mb-2 font-bold text-gray-200';
@@ -198,14 +208,82 @@ const GeneralSettings = ({ selectLocation, settings, saveGlobalSettings, trigger
       {/* Location Settings */}
       <div className='mb-6'>
         <label className={labelClass}>Location</label>
+
+        {/* API Search Toggle */}
+        <div className='mb-4 p-3 bg-[#2a2a2a] rounded border border-gray-700'>
+          <div className='flex items-center justify-between mb-2'>
+            <div>
+              <label className='block text-sm font-medium text-gray-200 mb-1'>Enable Online Location Search</label>
+              <p className='text-xs text-gray-400'>Use OpenStreetMap API for better search results. Requires internet connection.</p>
+            </div>
+            <label className='relative inline-flex items-center cursor-pointer'>
+              <input
+                type='checkbox'
+                checked={settings.use_api_location_search || false}
+                onChange={(e) => saveGlobalSettings({ use_api_location_search: e.target.checked })}
+                className='sr-only peer'
+              />
+              <div className="w-11 h-6 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-blue-500 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+            </label>
+          </div>
+          {settings.use_api_location_search && (
+            <div className='mt-2 p-2 bg-blue-900/20 border border-blue-800/50 rounded text-xs text-blue-300'>
+              <strong>Note:</strong> Online search uses OpenStreetMap Nominatim API. Your search queries will be sent to their servers. This
+              feature requires an active internet connection.
+            </div>
+          )}
+        </div>
+
+        {/* Search for location */}
+        <div className='mb-4 text-left relative'>
+          <label className='block mb-2 text-sm text-gray-400'>Search City / Location</label>
+          <div className='relative'>
+            <input
+              type='text'
+              value={searchTerm || ''}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder={
+                settings.use_api_location_search
+                  ? 'Type city name (e.g. Malden, London, Tokyo)'
+                  : 'Type city name (offline global database)'
+              }
+              autoComplete='off'
+              className={inputClass}
+            />
+            {isSearching && (
+              <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
+                <div className='w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin'></div>
+              </div>
+            )}
+          </div>
+          {searchResults.length > 0 && (
+            <ul className='absolute w-full z-10 max-h-[200px] overflow-y-auto bg-[#333] border border-[#444] border-t-0 rounded-b shadow-lg list-none p-0 m-0'>
+              {searchResults.map((result) => (
+                <li
+                  key={result.id}
+                  onClick={() => selectLocation(result)}
+                  className='p-3 cursor-pointer border-b border-[#444] last:border-0 hover:bg-[#444] transition-colors'>
+                  <strong>{result.name}</strong>
+                  <span className='text-xs text-gray-400 ml-2'>
+                    {result.state} {result.zipcode ? `(${result.zipcode})` : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Set from system timezone */}
         <div className='mb-4'>
           <button
             type='button'
             onClick={setLocationFromSystem}
             className='w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded font-medium transition-colors'>
-            Set Location from System
+            Set Location from System Timezone
           </button>
-          <p className='text-xs text-gray-500 mt-1'>Use the Raspberry Pi's system timezone to automatically set your location</p>
+          <p className='text-xs text-gray-500 mt-1'>
+            Use the Raspberry Pi's system timezone to automatically set your location (defaults to major city in timezone)
+          </p>
         </div>
 
         {locationStatus.message && (
