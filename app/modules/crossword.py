@@ -138,28 +138,40 @@ def format_crossword_receipt(printer, config: Dict[str, Any] = None, module_name
             clue_positions[key] = []
         clue_positions[key].append(clue['number'])
     
-    # Print grid (with numbers for clue starts)
-    # Use a compact format for thermal printer (32 chars wide)
-    # Format: show clue numbers at word starts, letters where placed, dots for empty
+    # Print grid with | and _ to form squares
+    # Format: |1|H|E|L|L|O| for cells with content
+    #         |_|_|_|_|_|_| for empty cells
+    max_width = getattr(printer, 'width', 32)
+    
+    # Calculate how many cells fit (each cell is 2 chars: |X or |_)
+    cells_per_row = min(size, (max_width - 1) // 2)
+    
     for i, row in enumerate(generator.grid):
-        line = ""
-        for j, cell in enumerate(row):
+        # Build content line with | separators
+        content_line = "|"
+        
+        for j in range(cells_per_row):
+            cell = row[j] if j < len(row) else ' '
+            
             if (i, j) in clue_positions:
                 # Show clue number (single digit)
-                # Note: In a real crossword, you'd show both number and letter,
-                # but for thermal printer we show number only at start
                 nums = clue_positions[(i, j)]
-                line += str(nums[0])
+                content_line += str(nums[0])
             elif cell == ' ':
-                line += "."
+                content_line += "_"
             else:
                 # Show the letter
-                line += cell
-        # Ensure line fits in printer width (typically 32 chars)
-        max_width = getattr(printer, 'width', 32)
-        if len(line) > max_width:
-            line = line[:max_width]
-        printer.print_text(line)
+                content_line += cell
+            
+            # Add vertical separator
+            content_line += "|"
+        
+        # Print content line
+        printer.print_text(content_line[:max_width])
+        
+        # Print horizontal separator line between rows
+        separator_line = "|" + "_|" * cells_per_row
+        printer.print_text(separator_line[:max_width])
     
     printer.print_line()
     
