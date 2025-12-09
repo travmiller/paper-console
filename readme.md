@@ -6,10 +6,10 @@
 
 ---
 
-* **No Screens:** Output is physical thermal paper.
-* **No Subscriptions:** User-owned API keys or local algorithms.
-* **Heirloom Quality:** Walnut, Brass, and archival-grade paper.
-* **Universal Channels:** Fully configurable channels (News, Email, Webhooks, Games, Notes, Calendar).
+* **No screens:** output is physical thermal paper.
+* **No subscriptions:** user-owned API keys or local algorithms.
+* **Heirloom quality:** walnut, brass, and archival-grade paper.
+* **Universal channels:** fully configurable channels (Astronomy, Calendar Integration, Checklist Maker, Email Integration, On This Day in History, Maze Generator, News, Quote of the Day, RSS Feeds, Sudoku Generator, System Monitor, Text/Note, Weather, Custom Webhooks)
 
 ![PC-1 Front View](images/pc-1_front.jpg)
 *Front view showing the brass rotary dial, push button, and thermal paper output*
@@ -75,8 +75,8 @@ npm run dev
 2. **Run Setup Script:**
    ```bash
    cd ~/paper-console
-   chmod +x manufacturing/scripts/setup_pi.sh
-   sudo manufacturing/scripts/setup_pi.sh
+   chmod +x scripts/setup_pi.sh
+   sudo scripts/setup_pi.sh
    ```
    The script will:
    - Set hostname (default: `pc-1`)
@@ -149,10 +149,13 @@ paper-console/
 │   │   ├── checklist.py   # Checklist Logic
 │   │   ├── quotes.py      # Quotes Logic
 │   │   └── history.py     # Historical Events Logic
-│   └── web/               # React + Vite + Tailwind CSS Frontend
-├── manufacturing/
-│   └── scripts/
-│       └── setup_pi.sh        # Setup script (Hostname, Nginx, Systemd)
+├── web/                   # React + Vite + Tailwind CSS Frontend
+├── scripts/
+│   ├── setup_pi.sh            # Setup script (Hostname, Nginx, Systemd)
+│   └── wifi_ap_nmcli.sh      # WiFi AP mode manager
+├── testing/
+│   ├── test_modules.py       # Module testing script
+│   └── test_windows.bat      # Windows test runner
 ├── run.sh                 # Development server launcher
 ├── run.bat                # Windows development launcher
 ├── requirements.txt       # Python dependencies

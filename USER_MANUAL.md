@@ -17,9 +17,9 @@ This device is a physical interface for your digital life. It prints news, weath
 ### Connecting to WiFi
 To get news and weather, the PC-1 needs internet access.
 
-1. On your phone or computer, look for a WiFi network named **`PC-1-Hotspot`**.
-2. Connect to it.
-3. A "Sign In" page should pop up automatically. If it doesn't, open a browser and type **`http://10.0.0.1`**.
+1. On your phone or computer, look for a WiFi network named **`PC-1-Setup-XXXX`** (where XXXX is a unique device identifier).
+2. Connect to it. The password is **`setup1234`**.
+3. A "Sign In" page should pop up automatically. If it doesn't, open a browser and type **`http://10.42.0.1`** (or check the IP address printed on the startup slip).
 4. Select your home WiFi network from the list and enter your password.
 5. The device will save the settings, reboot, and print a confirmation when connected.
 
@@ -27,16 +27,21 @@ To get news and weather, the PC-1 needs internet access.
 
 ## 2. Using the Console
 
-The PC-1 is designed to be simple. There are only two controls:
+The PC-1 is designed to be simple. There are three controls:
 
 ### The Dial (Channels)
 The rotary dial has **8 positions** (Channels 1 through 8). 
 * Turn the dial to select what you want to print.
 * You can customize what each channel does in the settings (see Section 3).
+* Each channel can contain **multiple modules** that print in sequence (e.g., News followed by Weather followed by Sudoku).
 
-### The Button
+### The Main Button (Print/Cancel)
 * **Press Once:** Prints the content for the currently selected channel.
 * **Press During Printing:** **Cancels** the current print job immediately.
+
+### The Power Button
+* **Short Press:** Safely shuts down the device.
+* **Hold for 5 Seconds:** Activates **Setup Mode** (creates a WiFi hotspot for reconfiguration).
 * **Hold for 15 Seconds:** Performs a **Factory Reset** (erases all settings and WiFi). Use this only if you need to completely wipe the device.
 
 ---
@@ -50,26 +55,27 @@ You can change what prints on each channel using the web interface.
    *(Note: On some Android devices, you may need to use the IP address printed on the startup slip, e.g., `http://192.168.1.x`)*
 
 ### The Dashboard
-* **Channels Tab:** Shows your 8 dial positions. You can drag and drop modules here.
-* **Settings Tab:** Set your location (for Weather/Astronomy) and time format.
+* **Channels Tab:** Shows your 8 dial positions. You can add multiple modules to each channel, and they will print in sequence when you press the button.
+* **Settings Tab:** Set your location (for Weather/Astronomy) and time format (12-hour or 24-hour).
+* **Reordering:** Use the Up/Down arrows to reorder channels or modules within a channel.
 
 ### Adding Content
 1. Click on a Channel (e.g., "Channel 1").
 2. Click **"Add Module"**.
 3. Choose a module type:
-   * **Weather:** Prints current forecast for your location.
-   * **News:** Top headlines (requires a free API key).
-   * **RSS:** Follow your favorite blogs or podcasts.
-   * **Email:** Prints unread emails from your inbox.
+   * **Weather:** Prints current forecast for your location (uses Open-Meteo API, no key required).
+   * **News API:** Top headlines from NewsAPI (requires a free API key).
+   * **RSS Feeds:** Follow your favorite blogs or podcasts (supports unlimited RSS feed URLs).
+   * **Email Inbox:** Prints unread emails from your inbox (IMAP, auto-polls every 30 seconds). **Note:** For Gmail, you must use a Google App Password (not your regular password) and have 2FA enabled.
    * **Sudoku:** Generates a fresh puzzle (Medium or Hard difficulty).
-   * **Maze:** Generates a printable maze puzzle.
-   * **Astronomy:** Sunrise, sunset, and moon phase information.
-   * **Calendar:** Prints your daily agenda (supports Google/Apple Calendar).
-   * **Webhook:** Connect to any API (Dad Jokes, Random Facts, IoT devices, etc.).
-   * **Text:** Store a static note (like a WiFi password or shopping list).
-   * **Checklist:** Create a printable checklist with checkboxes.
-   * **Quotes:** Prints random inspirational quotes.
-   * **History:** Prints "On This Day" historical events.
+   * **Maze:** Generates a printable maze puzzle (Medium or Hard difficulty).
+   * **Astronomy:** Sunrise, sunset, and moon phase/illumination information for your location.
+   * **Calendar:** Prints your daily agenda from iCal URLs (supports Google Calendar, Apple Calendar, etc.). Handles recurring events and timezone-aware scheduling.
+   * **Webhook:** Connect to any API (Dad Jokes, Random Facts, IoT devices, Home Assistant, etc.). Supports GET/POST with custom headers and JSON path extraction.
+   * **Text / Note:** Store static multi-line text (like a WiFi password or shopping list).
+   * **Checklist:** Create a printable checklist with checkboxes for manual checking.
+   * **Quotes:** Prints random inspirational quotes from a curated database.
+   * **History:** Prints "On This Day" historical events from a historical events database.
 
 ### Scheduling (Alarm Clock)
 You can make the PC-1 print automatically at a specific time (e.g., print the news every morning at 8:00 AM).
@@ -86,7 +92,6 @@ The PC-1 uses standard **58mm Thermal Receipt Paper** (widely available online o
 3. Place the new roll inside with the **paper feeding from the bottom** (curl facing down).
 4. Pull a small amount of paper out.
 5. Close the lid until it clicks.
-6. Tear off the excess paper.
 
 **Note:** Thermal paper only prints on one side. If it comes out blank, the roll is likely upside down.
 
@@ -97,7 +102,8 @@ The PC-1 uses standard **58mm Thermal Receipt Paper** (widely available online o
 ### Device prints "Connect to WiFi" repeatedly
 This means the device cannot reach the internet.
 * Check if your internet is down.
-* If you changed your WiFi password, hold the button for 15 seconds to Factory Reset, then reconnect.
+* If you changed your WiFi password, hold the **Power Button** for 15 seconds to Factory Reset, then reconnect.
+* Alternatively, hold the **Power Button** for 5 seconds to activate Setup Mode and reconnect to WiFi.
 
 ### Prints are blank or faint
 * Ensure the paper is loaded correctly (shiny side facing the print head).
@@ -112,5 +118,5 @@ This means the device cannot reach the internet.
 If the device becomes unresponsive or you want to sell it:
 1. Unplug the device.
 2. Plug it back in.
-3. Press and **HOLD** the main button for **15 seconds**.
-4. The device will delete all settings and restart in "Hotspot Mode".
+3. Press and **HOLD** the **Power Button** (not the main button) for **15 seconds**.
+4. The device will print a confirmation message, delete all settings and WiFi credentials, then reboot in Setup Mode.
