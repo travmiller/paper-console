@@ -207,13 +207,17 @@ def start_ap_mode(retries: int = 3, retry_delay: float = 5.0) -> bool:
             # Clean state before retry
             if attempt > 1:
                 # Run via /bin/bash to avoid shebang/exec-bit/CRLF issues.
-                run_command(["sudo", "/bin/bash", script_path, "stop"], check=False)
+                # Use -n (non-interactive) so we fail fast if sudoers isn't configured.
+                run_command(["sudo", "-n", "/bin/bash", script_path, "stop"], check=False)
                 import time
 
                 time.sleep(2)
 
             # Run via /bin/bash to avoid shebang/exec-bit/CRLF issues.
-            result = run_command(["sudo", "/bin/bash", script_path, "start"], check=False)
+            # Use -n (non-interactive) so we fail fast if sudoers isn't configured.
+            result = run_command(
+                ["sudo", "-n", "/bin/bash", script_path, "start"], check=False
+            )
 
             if result.stdout and result.stdout.strip():
                 logger.info("AP script stdout:\n%s", result.stdout.strip())
@@ -243,7 +247,8 @@ def stop_ap_mode() -> bool:
         )
         script_path = os.path.abspath(script_path)
         # Run via /bin/bash to avoid shebang/exec-bit/CRLF issues.
-        run_command(["sudo", "/bin/bash", script_path, "stop"], check=False)
+        # Use -n (non-interactive) so we fail fast if sudoers isn't configured.
+        run_command(["sudo", "-n", "/bin/bash", script_path, "stop"], check=False)
         return True
     except Exception:
         return False
