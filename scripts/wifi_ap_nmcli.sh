@@ -73,15 +73,9 @@ start_ap() {
     # This triggers the captive portal popup on phones/laptops
     AP_IP=$(get_ap_ip)
     
-    # Configure dnsmasq to:
-    # 1. Hijack all DNS queries (address=/#/...)
-    # 2. Bind explicitly to the AP interface (wlan0) to ensure we serve requests
-    # 3. bind-interfaces ensures we don't conflict with other instances
-    cat > "$NM_DNSMASQ_DIR/captive-portal.conf" <<EOF
-address=/#/${AP_IP:-10.42.0.1}
-interface=$AP_INTERFACE
-bind-interfaces
-EOF
+    # Configure dnsmasq to hijack all DNS queries
+    # We rely on NetworkManager to handle the interface binding automatically
+    echo "address=/#/${AP_IP:-10.42.0.1}" > "$NM_DNSMASQ_DIR/captive-portal.conf"
     
     # Send SIGHUP to NetworkManager's dnsmasq to reload config (doesn't kill hotspot)
     pkill -HUP -f "dnsmasq.*NetworkManager" 2>/dev/null || true
