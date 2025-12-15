@@ -72,7 +72,14 @@ start_ap() {
     # Update captive portal config with actual IP and reload dnsmasq
     # This triggers the captive portal popup on phones/laptops
     AP_IP=$(get_ap_ip)
-    echo "address=/#/${AP_IP:-10.42.0.1}" > "$NM_DNSMASQ_DIR/captive-portal.conf"
+    
+    # We need two things for the captive portal to work:
+    # 1. address=/#/... -> Hijack all DNS queries to our IP
+    # 2. listen-address=... -> Ensure dnsmasq actually listens on the AP interface
+    cat > "$NM_DNSMASQ_DIR/captive-portal.conf" <<EOF
+address=/#/${AP_IP:-10.42.0.1}
+listen-address=${AP_IP:-10.42.0.1}
+EOF
     
     # Send SIGHUP to NetworkManager's dnsmasq to reload config (doesn't kill hotspot)
     pkill -HUP -f "dnsmasq.*NetworkManager" 2>/dev/null || true
