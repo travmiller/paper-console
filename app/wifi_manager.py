@@ -195,6 +195,7 @@ def start_ap_mode(retries: int = 3, retry_delay: float = 5.0) -> bool:
     script_path = os.path.join(
         os.path.dirname(__file__), "..", "scripts", "wifi_ap_nmcli.sh"
     )
+    script_path = os.path.abspath(script_path)
 
     for attempt in range(1, retries + 1):
         try:
@@ -227,6 +228,7 @@ def stop_ap_mode() -> bool:
         script_path = os.path.join(
             os.path.dirname(__file__), "..", "scripts", "wifi_ap_nmcli.sh"
         )
+        script_path = os.path.abspath(script_path)
         run_command(["sudo", script_path, "stop"], check=False)
         return True
     except Exception:

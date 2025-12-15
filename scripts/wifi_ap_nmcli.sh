@@ -2,7 +2,8 @@
 # WiFi AP Mode Manager using NetworkManager
 # Simplified and robust approach for Pi OS Bookworm
 
-set -e
+# Don't exit on error - we want to continue even if some steps fail
+set +e
 
 AP_SSID_PREFIX="PC-1-Setup"
 AP_PASSWORD="setup1234"
@@ -36,6 +37,13 @@ start_ap() {
     
     sleep 2
     
+    # Configure NetworkManager's dnsmasq for captive portal BEFORE starting hotspot
+    # This avoids needing to restart NetworkManager after the hotspot is up
+    NM_DNSMASQ_DIR="/etc/NetworkManager/dnsmasq.d"
+    mkdir -p "$NM_DNSMASQ_DIR"
+    # Use the standard AP IP that NetworkManager assigns (10.42.0.1)
+    echo "address=/#/10.42.0.1" > "$NM_DNSMASQ_DIR/captive-portal.conf"
+    
     echo "Creating hotspot: $SSID"
     
     # Use the simple hotspot command - NetworkManager handles DHCP automatically
@@ -45,43 +53,37 @@ start_ap() {
         ssid "$SSID" \
         password "$AP_PASSWORD"
     
+    HOTSPOT_RESULT=$?
+    
     # Wait for AP to be ready
     sleep 3
     
     # Get the IP that was assigned
     AP_IP=$(get_ap_ip)
     
-    # Configure DNS server for captive portal
-    # Note: 'shared' method starts its own dnsmasq, so we don't set ipv4.dns on the interface itself
-    # Instead we rely on the global dnsmasq config we set up
+    # If hotspot command failed, try to recover
+    if [ $HOTSPOT_RESULT -ne 0 ]; then
+        echo "Hotspot creation failed, attempting recovery..."
+        sleep 2
+        nmcli connection up "PC-1-Hotspot" 2>/dev/null || true
+        sleep 2
+    fi
     
-    # Restart the connection to apply settings
-    nmcli connection down "PC-1-Hotspot" 2>/dev/null || true
-    sleep 1
-    nmcli connection up "PC-1-Hotspot"
-    
-    # Wait for connection to stabilize
-    sleep 2
-    
-    # Configure NetworkManager's dnsmasq to answer all queries with Pi's IP
-    # NetworkManager uses dnsmasq internally, we need to configure it
-    # Create a dnsmasq config snippet for NetworkManager
-    NM_DNSMASQ_DIR="/etc/NetworkManager/dnsmasq.d"
-    mkdir -p "$NM_DNSMASQ_DIR"
-    echo "address=/#/${AP_IP:-10.42.0.1}" > "$NM_DNSMASQ_DIR/captive-portal.conf"
-    
-    # Restart NetworkManager to apply dnsmasq config
-    systemctl reload NetworkManager 2>/dev/null || systemctl restart NetworkManager 2>/dev/null || true
-    sleep 2
-    
-    echo ""
-    echo "========================================"
-    echo "AP Mode Active!"
-    echo "SSID: $SSID"
-    echo "Password: $AP_PASSWORD"
-    echo "IP: ${AP_IP:-unknown}"
-    echo "Portal: http://${AP_IP:-10.42.0.1}"
-    echo "========================================"
+    # Verify AP is actually running
+    if nmcli connection show --active 2>/dev/null | grep -q "PC-1-Hotspot"; then
+        echo ""
+        echo "========================================"
+        echo "AP Mode Active!"
+        echo "SSID: $SSID"
+        echo "Password: $AP_PASSWORD"
+        echo "IP: ${AP_IP:-10.42.0.1}"
+        echo "Portal: http://${AP_IP:-10.42.0.1}"
+        echo "========================================"
+        return 0
+    else
+        echo "ERROR: AP Mode failed to start"
+        return 1
+    fi
 }
 
 stop_ap() {
@@ -114,12 +116,15 @@ status() {
 case "$1" in
     start)
         start_ap
+        exit $?
         ;;
     stop)
         stop_ap
+        exit $?
         ;;
     status)
         status
+        exit 0
         ;;
     *)
         echo "Usage: $0 {start|stop|status}"

@@ -389,13 +389,22 @@ async def periodic_wifi_recovery():
 
 async def manual_ap_mode_trigger():
     """Manually trigger AP mode (e.g. via button hold 5-15 seconds)."""
+    logger = logging.getLogger(__name__)
+    logger.info("Manual AP mode trigger initiated")
+    
     # Print instructions BEFORE switching network mode
     await print_setup_instructions()
 
     # Give a small delay for the printer buffer to flush/finish
     await asyncio.sleep(2)
 
-    wifi_manager.start_ap_mode()
+    logger.info("Starting AP mode...")
+    success = wifi_manager.start_ap_mode()
+    
+    if success:
+        logger.info("AP mode started successfully")
+    else:
+        logger.error("AP mode failed to start - check wifi_ap_nmcli.sh script")
 
 
 async def factory_reset_trigger():
