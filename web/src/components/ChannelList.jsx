@@ -1,5 +1,7 @@
 import React from 'react';
 import { AVAILABLE_MODULE_TYPES } from '../constants';
+import printIcon from '../assets/print-icon.svg';
+import scheduleIcon from '../assets/schedule-icon.svg';
 
 const ChannelList = ({
   settings,
@@ -36,7 +38,7 @@ const ChannelList = ({
                     onClick={() => triggerChannelPrint(pos)}
                     className='group flex items-center justify-center px-2 py-0.5 rounded border bg-transparent text-gray-300 border-gray-500 hover:text-white hover:border-gray-400 transition-colors'
                     title='Print Channel'>
-                    <img src='/print-icon.svg' alt='Print' className='w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity' />
+                    <img src={printIcon} alt='Print' className='w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity' />
                   </button>
                   <button
                     type='button'
@@ -47,7 +49,7 @@ const ChannelList = ({
                         : 'bg-transparent text-gray-500 border-gray-700 hover:text-gray-300'
                     }`}
                     title='Configure Schedule'>
-                    <img src='/schedule-icon.svg' alt='Schedule' className='w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity' />
+                    <img src={scheduleIcon} alt='Schedule' className='w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity' />
                     <span className='text-xs'>{channel.schedule?.length || 0}</span>
                   </button>
                 </div>
