@@ -29,24 +29,18 @@ start_ap() {
     DEVICE_ID=$(get_device_id)
     SSID="${AP_SSID_PREFIX}-${DEVICE_ID}"
     
-    # Delete any existing hotspot profile
+    # 1. CLEANUP: Delete any existing hotspot connection to avoid conflicts
     nmcli connection delete "PC-1-Hotspot" 2>/dev/null || true
     
-    # Disconnect from any current WiFi
+    # 2. DISCONNECT: Ensure interface is free
     nmcli device disconnect "$AP_INTERFACE" 2>/dev/null || true
     
     sleep 2
     
-    # Configure NetworkManager's dnsmasq for captive portal BEFORE starting hotspot
-    # This avoids needing to restart NetworkManager after the hotspot is up
-    NM_DNSMASQ_DIR="/etc/NetworkManager/dnsmasq.d"
-    mkdir -p "$NM_DNSMASQ_DIR"
-    # Use the standard AP IP that NetworkManager assigns (10.42.0.1)
-    echo "address=/#/10.42.0.1" > "$NM_DNSMASQ_DIR/captive-portal.conf"
-    
     echo "Creating hotspot: $SSID"
     
-    # Use the simple hotspot command - NetworkManager handles DHCP automatically
+    # 3. CREATE & START: Atomic command to create and up the connection
+    # using 802-11-wireless.mode ap ensuring it's a true hotspot
     nmcli device wifi hotspot \
         ifname "$AP_INTERFACE" \
         con-name "PC-1-Hotspot" \
@@ -58,43 +52,36 @@ start_ap() {
     # Wait for AP to be ready
     sleep 3
     
-    # Get the IP that was assigned
-    AP_IP=$(get_ap_ip)
-    
-    # If hotspot command failed, try to recover
+    # 4. VERIFY & RECOVER
     if [ $HOTSPOT_RESULT -ne 0 ]; then
-        echo "Hotspot creation failed, attempting recovery..."
-        sleep 2
+        echo "Hotspot creation failed, attempting manual activation..."
+        # Sometimes creation succeeds but activation fails. Try bringing it up explicitly.
         nmcli connection up "PC-1-Hotspot" 2>/dev/null || true
-        sleep 2
+        sleep 3
     fi
     
-    # Update captive portal config with actual IP and reload dnsmasq
-    # This triggers the captive portal popup on phones/laptops
-    AP_IP=$(get_ap_ip)
-    
-    # Configure dnsmasq to hijack all DNS queries
-    # We rely on NetworkManager to handle the interface binding automatically
-    echo "address=/#/${AP_IP:-10.42.0.1}" > "$NM_DNSMASQ_DIR/captive-portal.conf"
-    
-    # Send SIGHUP to NetworkManager's dnsmasq to reload config (doesn't kill hotspot)
-    pkill -HUP -f "dnsmasq.*NetworkManager" 2>/dev/null || true
-    
-    sleep 1
-    
-    # Verify AP is actually running
+    # 5. FINAL CHECK
     if nmcli connection show --active 2>/dev/null | grep -q "PC-1-Hotspot"; then
+        AP_IP=$(get_ap_ip)
         echo ""
         echo "========================================"
         echo "AP Mode Active!"
         echo "SSID: $SSID"
         echo "Password: $AP_PASSWORD"
         echo "IP: ${AP_IP:-10.42.0.1}"
-        echo "Portal: http://${AP_IP:-10.42.0.1}"
         echo "========================================"
+        
+        # Configure DNS hijacking (Safe version: just address mapping)
+        NM_DNSMASQ_DIR="/etc/NetworkManager/dnsmasq.d"
+        mkdir -p "$NM_DNSMASQ_DIR"
+        echo "address=/#/${AP_IP:-10.42.0.1}" > "$NM_DNSMASQ_DIR/captive-portal.conf"
+        # Try to reload DNS, but don't worry if it fails - WiFi is the priority
+        pkill -HUP -f "dnsmasq.*NetworkManager" 2>/dev/null || true
+        
         return 0
     else
-        echo "ERROR: AP Mode failed to start"
+        echo "ERROR: AP Mode failed to start. Current status:"
+        nmcli device status
         return 1
     fi
 }
@@ -102,13 +89,15 @@ start_ap() {
 stop_ap() {
     echo "Stopping AP Mode..."
     
-    # Remove dnsmasq config for captive portal
+    # Remove dnsmasq config
     rm -f /etc/NetworkManager/dnsmasq.d/captive-portal.conf 2>/dev/null || true
-    systemctl reload NetworkManager 2>/dev/null || true
     
     # Deactivate hotspot
     nmcli connection down "PC-1-Hotspot" 2>/dev/null || true
     nmcli connection delete "PC-1-Hotspot" 2>/dev/null || true
+    
+    # Reload NM to clear DNS cache
+    pkill -HUP -f "dnsmasq.*NetworkManager" 2>/dev/null || true
     
     echo "AP Mode Stopped"
 }
