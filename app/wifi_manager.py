@@ -219,11 +219,18 @@ def start_ap_mode(retries: int = 3, retry_delay: float = 5.0) -> bool:
                 ["sudo", "-n", "/bin/bash", script_path, "start"], check=False
             )
 
+            # Keep journald quiet in normal operation; details are available when debugging.
             if result.stdout and result.stdout.strip():
-                logger.info("AP script stdout:\n%s", result.stdout.strip())
+                logger.debug("AP script stdout:\n%s", result.stdout.strip())
             if result.stderr and result.stderr.strip():
-                logger.warning("AP script stderr:\n%s", result.stderr.strip())
-            logger.info("AP script exit code: %s", result.returncode)
+                logger.debug("AP script stderr:\n%s", result.stderr.strip())
+            logger.debug("AP script exit code: %s", result.returncode)
+
+            if result.returncode != 0:
+                # Surface only a compact hint at INFO/WARN level.
+                stderr_first_line = (result.stderr or "").strip().splitlines()[:1]
+                hint = stderr_first_line[0] if stderr_first_line else "(no stderr)"
+                logger.warning("AP mode attempt %s failed (exit %s): %s", attempt, result.returncode, hint)
 
             if result.returncode == 0:
                 return True
