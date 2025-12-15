@@ -210,9 +210,30 @@ XDGEOF
 echo "enabled=False" > "$USER_HOME/.config/user-dirs.conf"
 chown -R "$SUDO_USER:$SUDO_USER" "$USER_HOME/.config"
 
-echo "--- Setup Complete ---"
-echo "1. Your device is now accessible at http://$HOSTNAME.local"
-echo "2. The application is running as a background service (pc-1.service)"
-echo "3. Nginx is proxying port 80 to 8000"
 echo ""
-echo "To check status: sudo systemctl status pc-1.service"
+echo "=========================================="
+echo "         SETUP COMPLETE"
+echo "=========================================="
+echo ""
+echo "Your device will be accessible at: http://$HOSTNAME.local"
+echo ""
+echo "A reboot is required for serial port changes"
+echo "to take effect (required for printing)."
+echo ""
+
+read -p "Reboot now? [Y/n]: " REBOOT_CHOICE
+REBOOT_CHOICE=${REBOOT_CHOICE:-Y}
+
+if [[ "$REBOOT_CHOICE" =~ ^[Yy]$ ]]; then
+    echo "Rebooting in 3 seconds..."
+    sleep 3
+    reboot
+else
+    echo ""
+    echo "Remember to reboot manually before using the printer:"
+    echo "  sudo reboot"
+    echo ""
+    echo "After reboot, check status with:"
+    echo "  sudo systemctl status pc-1.service"
+fi
+echo "=========================================="
