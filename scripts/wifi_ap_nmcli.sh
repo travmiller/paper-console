@@ -69,6 +69,16 @@ start_ap() {
         sleep 2
     fi
     
+    # Update captive portal config with actual IP and reload dnsmasq
+    # This triggers the captive portal popup on phones/laptops
+    AP_IP=$(get_ap_ip)
+    echo "address=/#/${AP_IP:-10.42.0.1}" > "$NM_DNSMASQ_DIR/captive-portal.conf"
+    
+    # Send SIGHUP to NetworkManager's dnsmasq to reload config (doesn't kill hotspot)
+    pkill -HUP -f "dnsmasq.*NetworkManager" 2>/dev/null || true
+    
+    sleep 1
+    
     # Verify AP is actually running
     if nmcli connection show --active 2>/dev/null | grep -q "PC-1-Hotspot"; then
         echo ""
