@@ -32,9 +32,6 @@ start_ap() {
     # 1. CLEANUP: Delete any existing hotspot connection to avoid conflicts
     nmcli connection delete "PC-1-Hotspot" 2>/dev/null || true
     
-    # 2. DISCONNECT: Ensure interface is free
-    nmcli device disconnect "$AP_INTERFACE" 2>/dev/null || true
-    
     # Ensure WiFi is actually on and unblocked
     nmcli radio wifi on
     rfkill unblock wifi
@@ -42,7 +39,8 @@ start_ap() {
     
     echo "Creating hotspot: $SSID"
     
-    # 3. CREATE & START: Force 2.4GHz (band bg) since Pi Zero 2 W doesn't support 5GHz
+    # 2. CREATE & START: Force 2.4GHz (band bg) since Pi Zero 2 W doesn't support 5GHz
+    # We use exactly what worked in manual testing
     nmcli device wifi hotspot \
         ifname "$AP_INTERFACE" \
         con-name "PC-1-Hotspot" \
