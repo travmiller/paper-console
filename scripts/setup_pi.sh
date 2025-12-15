@@ -138,11 +138,15 @@ fi
 # Make WiFi script executable
 echo "Setting up WiFi AP script..."
 chmod +x "$PROJECT_DIR/scripts/wifi_ap_nmcli.sh"
+# Ensure the script uses LF line endings (avoid /bin/bash^M issues after editing on Windows)
+sed -i 's/\r$//' "$PROJECT_DIR/scripts/wifi_ap_nmcli.sh" || true
 
 # Give sudo access for WiFi management AND service control (no password required)
 echo "Configuring sudo permissions for WiFi management and service control..."
 cat > /etc/sudoers.d/pc-1-wifi <<EOL
 $USER_NAME ALL=(ALL) NOPASSWD: $PROJECT_DIR/scripts/wifi_ap_nmcli.sh
+$USER_NAME ALL=(ALL) NOPASSWD: /bin/bash $PROJECT_DIR/scripts/wifi_ap_nmcli.sh
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/bash $PROJECT_DIR/scripts/wifi_ap_nmcli.sh
 $USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/nmcli
 $USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl restart pc-1.service
 $USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl start pc-1.service

@@ -206,12 +206,14 @@ def start_ap_mode(retries: int = 3, retry_delay: float = 5.0) -> bool:
             )
             # Clean state before retry
             if attempt > 1:
-                run_command(["sudo", script_path, "stop"], check=False)
+                # Run via /bin/bash to avoid shebang/exec-bit/CRLF issues.
+                run_command(["sudo", "/bin/bash", script_path, "stop"], check=False)
                 import time
 
                 time.sleep(2)
 
-            result = run_command(["sudo", script_path, "start"], check=False)
+            # Run via /bin/bash to avoid shebang/exec-bit/CRLF issues.
+            result = run_command(["sudo", "/bin/bash", script_path, "start"], check=False)
 
             if result.stdout and result.stdout.strip():
                 logger.info("AP script stdout:\n%s", result.stdout.strip())
@@ -240,7 +242,8 @@ def stop_ap_mode() -> bool:
             os.path.dirname(__file__), "..", "scripts", "wifi_ap_nmcli.sh"
         )
         script_path = os.path.abspath(script_path)
-        run_command(["sudo", script_path, "stop"], check=False)
+        # Run via /bin/bash to avoid shebang/exec-bit/CRLF issues.
+        run_command(["sudo", "/bin/bash", script_path, "stop"], check=False)
         return True
     except Exception:
         return False
