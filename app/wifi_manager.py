@@ -5,6 +5,7 @@ Handles WiFi scanning, connection, and AP mode management.
 
 import subprocess
 import os
+import logging
 from typing import List, Dict, Optional
 
 
@@ -192,6 +193,7 @@ def connect_to_wifi(ssid: str, password: Optional[str] = None) -> bool:
 
 def start_ap_mode(retries: int = 3, retry_delay: float = 5.0) -> bool:
     """Start AP mode using the shell script with retry logic."""
+    logger = logging.getLogger(__name__)
     script_path = os.path.join(
         os.path.dirname(__file__), "..", "scripts", "wifi_ap_nmcli.sh"
     )
@@ -199,6 +201,9 @@ def start_ap_mode(retries: int = 3, retry_delay: float = 5.0) -> bool:
 
     for attempt in range(1, retries + 1):
         try:
+            logger.info(
+                "Starting AP mode (attempt %s/%s) via %s", attempt, retries, script_path
+            )
             # Clean state before retry
             if attempt > 1:
                 run_command(["sudo", script_path, "stop"], check=False)
@@ -208,11 +213,17 @@ def start_ap_mode(retries: int = 3, retry_delay: float = 5.0) -> bool:
 
             result = run_command(["sudo", script_path, "start"], check=False)
 
+            if result.stdout and result.stdout.strip():
+                logger.info("AP script stdout:\n%s", result.stdout.strip())
+            if result.stderr and result.stderr.strip():
+                logger.warning("AP script stderr:\n%s", result.stderr.strip())
+            logger.info("AP script exit code: %s", result.returncode)
+
             if result.returncode == 0:
                 return True
 
         except Exception:
-            pass
+            logger.exception("AP mode start attempt failed")
 
         if attempt < retries:
             import time

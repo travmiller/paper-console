@@ -12,7 +12,9 @@ AP_INTERFACE="wlan0"
 # Generate unique SSID suffix from CPU serial
 get_device_id() {
     if [ -f /proc/cpuinfo ]; then
-        grep -i serial /proc/cpuinfo | awk '{print $3}' | tail -c 5
+        # Return the last 4 hex chars of the CPU serial (no newline).
+        # Important: avoid trailing newlines/whitespace in SSID which can make it "disappear" on clients.
+        awk -F': ' '/^[Ss]erial[[:space:]]*:/ {s=$2} END { if (length(s) >= 4) print substr(s, length(s)-3); else print "XXXX" }' /proc/cpuinfo | tr -d '\r\n'
     else
         echo "XXXX"
     fi
