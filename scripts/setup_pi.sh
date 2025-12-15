@@ -49,7 +49,7 @@ echo "Serial port configured for printer use."
 # 3. Install dependencies
 echo "Installing dependencies..."
 apt-get update
-apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager dnsmasq-base
+apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager dnsmasq-base rfkill dnsutils
 
 # Stop and disable standalone dnsmasq service if it exists (we use NM's internal dnsmasq)
 systemctl stop dnsmasq 2>/dev/null || true
