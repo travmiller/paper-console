@@ -101,7 +101,7 @@
   --fun-schedule: #CC9933;    /* Brass/Gold */
 
   --text-main: #2A2A2A;
-  --text-muted: #666666;
+  --text-muted: #7A756E;
 }
 
 body {
@@ -123,7 +123,7 @@ body {
   background: var(--bg-base); 
 }
 ::-webkit-scrollbar-thumb {
-  background: #ccc; 
+  background: #C4BFB8; 
   border: 1px solid var(--console-border);
   border-radius: 4px;
 }
@@ -136,9 +136,30 @@ body {
 */
 @layer utilities {
   .text-white { color: #000000 !important; } 
-  .text-gray-300 { color: #444444 !important; }
-  .text-gray-400 { color: #666666 !important; }
-  .text-gray-500 { color: #888888 !important; }
+  .text-gray-300 { color: #9A958F !important; }
+  .text-gray-400 { color: #9A958F !important; }
+  .text-gray-500 { color: #9A958F !important; }
+  .text-gray-600 { color: #7A756E !important; }
+  .text-gray-700 { color: #6B665F !important; }
+  
+  /* Hover states - grey text and borders turn black, backgrounds turn white */
+  .hover\:text-black:hover { color: #2A2A2A !important; }
+  .group:hover .group-hover\:text-black { color: #2A2A2A !important; }
+  .hover\:border-black:hover { border-color: #2A2A2A !important; }
+  .group:hover .group-hover\:border-black { border-color: #2A2A2A !important; }
+  .hover\:bg-white:hover { background-color: #FFFFFF !important; }
+  .group:hover .group-hover\:bg-white { background-color: #FFFFFF !important; }
+  
+  /* Warm grey borders */
+  .border-gray-200 { border-color: #D4CFC8 !important; }
+  .border-gray-300 { border-color: #C4BFB8 !important; }
+  .border-gray-400 { border-color: #9A958F !important; }
+  .border-gray-600 { border-color: #7A756E !important; }
+  
+  /* Warm grey backgrounds */
+  .bg-gray-50 { background-color: #E8E3DC !important; }
+  .bg-gray-100 { background-color: #D4CFC8 !important; }
+  .bg-gray-200 { background-color: #C4BFB8 !important; }
   
   .text-console-primary { color: var(--console-primary) !important; }
   .text-console-secondary { color: var(--console-secondary) !important; }

@@ -158,12 +158,12 @@ const ChannelList = ({
                         style={needsSetup ? { color: '#DC2626' } : {}}>
                         {isOnline && (
                           wifiStatus?.connected ? (
-                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#666666' }} />
+                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0 group-hover:text-black transition-colors" style={{ transform: 'translateY(0.125rem)', color: '#7A756E' }} />
                           ) : (
                             <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#DC2626' }} />
                           )
                         )}
-                        <span className="truncate font-mono" style={{ color: '#666666' }}>{typeMeta?.label?.toUpperCase()}</span>
+                        <span className="truncate font-mono group-hover:text-black transition-colors" style={{ color: '#7A756E' }}>{typeMeta?.label?.toUpperCase()}</span>
                       </div>
                           </>
                         );
@@ -175,15 +175,31 @@ const ChannelList = ({
                           type='button'
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'up')}
                           disabled={idx === 0}
-                          className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer [&:hover_svg]:text-[#000000]'>
-                          <ArrowUpIcon className='w-2.5 h-2.5 text-gray-600 transition-colors' />
+                          className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                          onMouseEnter={(e) => {
+                            const icon = e.currentTarget.querySelector('svg');
+                            if (icon) icon.style.color = '#2A2A2A';
+                          }}
+                          onMouseLeave={(e) => {
+                            const icon = e.currentTarget.querySelector('svg');
+                            if (icon) icon.style.color = '#7A756E';
+                          }}>
+                          <ArrowUpIcon className='w-2.5 h-2.5 transition-colors' style={{ color: '#7A756E' }} />
                         </button>
                         <button
                           type='button'
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'down')}
                           disabled={idx === channelModules.length - 1}
-                          className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer [&:hover_svg]:text-[#000000]'>
-                          <ArrowDownIcon className='w-2.5 h-2.5 text-gray-600 transition-colors' />
+                          className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                          onMouseEnter={(e) => {
+                            const icon = e.currentTarget.querySelector('svg');
+                            if (icon) icon.style.color = '#2A2A2A';
+                          }}
+                          onMouseLeave={(e) => {
+                            const icon = e.currentTarget.querySelector('svg');
+                            if (icon) icon.style.color = '#7A756E';
+                          }}>
+                          <ArrowDownIcon className='w-2.5 h-2.5 transition-colors' style={{ color: '#7A756E' }} />
                         </button>
                       </div>
                     </div>

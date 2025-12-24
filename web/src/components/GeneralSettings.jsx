@@ -294,7 +294,7 @@ const GeneralSettings = ({
             <div className='flex-1'>
               <div className='flex items-center gap-2'>
                 {wifiStatus.connected ? (
-                  <WiFiIcon className='w-4 h-4' style={{ color: '#666666' }} />
+                  <WiFiIcon className='w-4 h-4' style={{ color: '#7A756E' }} />
                 ) : (
                   <WiFiOffIcon className='w-4 h-4' style={{ color: '#DC2626' }} />
                 )}
@@ -490,7 +490,7 @@ const GeneralSettings = ({
                         <div className='text-lg font-bold text-black'>
                           {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
                         </div>
-                        <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#666666' }} />
+                        <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#7A756E' }} />
                       </div>
                     </div>
                   )}

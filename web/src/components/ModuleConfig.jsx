@@ -589,17 +589,27 @@ const ModuleConfig = ({ module, updateConfig }) => {
           <label className={labelClass}>Items</label>
           <div className='space-y-1.5 max-h-[400px] overflow-y-auto pr-2'>
             {(config.items || []).map((item, index) => (
-              <div key={index} className='flex gap-2 items-center group'>
-                <span className='text-xs text-gray-400 flex-shrink-0 self-start pt-1.5' style={{ fontFamily: 'monospace' }}>☐</span>
+              <div key={index} className='flex gap-2 items-start group'>
+                <span className='text-xs text-gray-400 flex-shrink-0 pt-1.5' style={{ fontFamily: 'monospace' }}>☐</span>
                 <textarea
-                  ref={(el) => (inputRefs.current[`item-${index}`] = el)}
+                  ref={(el) => {
+                    inputRefs.current[`item-${index}`] = el;
+                    if (el) {
+                      el.style.height = 'auto';
+                      el.style.height = el.scrollHeight + 'px';
+                    }
+                  }}
                   value={item?.text || ''}
-                  onChange={(e) => updateChecklistItem(index, e.target.value)}
+                  onChange={(e) => {
+                    updateChecklistItem(index, e.target.value);
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                  }}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   placeholder='Enter item...'
                   rows={1}
-                  className='flex-1 px-2 py-1.5 text-sm bg-transparent border-0 text-black focus:outline-none transition-colors resize-none overflow-hidden'
-                  style={{ backgroundColor: 'transparent', minHeight: '1.5rem' }}
+                  className='flex-1 px-2 py-1.5 text-sm bg-transparent border-0 text-black focus:outline-none transition-colors resize-none overflow-visible'
+                  style={{ backgroundColor: 'transparent', minHeight: '1.5rem', height: 'auto' }}
                   onInput={(e) => {
                     e.target.style.height = 'auto';
                     e.target.style.height = e.target.scrollHeight + 'px';

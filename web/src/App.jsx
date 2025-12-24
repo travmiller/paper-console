@@ -540,12 +540,12 @@ function App() {
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
             activeTab === 'general' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
           }`}
-          style={activeTab === 'general' ? { borderColor: '#2A2A2A', color: '#2A2A2A' } : { color: '#666666' }}
+          style={activeTab === 'general' ? { borderColor: '#2A2A2A', color: '#2A2A2A' } : { color: '#7A756E' }}
           onMouseEnter={(e) => {
             if (activeTab !== 'general') e.currentTarget.style.color = '#2A2A2A';
           }}
           onMouseLeave={(e) => {
-            if (activeTab !== 'general') e.currentTarget.style.color = '#666666';
+            if (activeTab !== 'general') e.currentTarget.style.color = '#7A756E';
           }}>
           <PreferencesIcon className='w-4 h-4' />
           GENERAL
@@ -556,12 +556,12 @@ function App() {
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
             activeTab === 'channels' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
           }`}
-          style={activeTab === 'channels' ? { borderColor: '#2A2A2A', color: '#2A2A2A' } : { color: '#666666' }}
+          style={activeTab === 'channels' ? { borderColor: '#2A2A2A', color: '#2A2A2A' } : { color: '#7A756E' }}
           onMouseEnter={(e) => {
             if (activeTab !== 'channels') e.currentTarget.style.color = '#2A2A2A';
           }}
           onMouseLeave={(e) => {
-            if (activeTab !== 'channels') e.currentTarget.style.color = '#666666';
+            if (activeTab !== 'channels') e.currentTarget.style.color = '#7A756E';
           }}>
           <BorderWidthIcon className='w-4 h-4' />
           CHANNELS
