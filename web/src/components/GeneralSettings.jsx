@@ -3,7 +3,6 @@ import { formatTimeForDisplay } from '../utils';
 import WiFiIcon from '../assets/WiFiIcon';
 import WiFiOffIcon from '../assets/WiFiOffIcon';
 
-
 const GeneralSettings = ({
   searchTerm,
   searchResults,
@@ -15,8 +14,7 @@ const GeneralSettings = ({
   triggerAPMode,
   wifiStatus,
 }) => {
-    const inputClass =
-    'w-full p-3 text-base border-2 border-gray-300 rounded-lg focus:outline-none box-border';
+  const inputClass = 'w-full p-3 text-base border-2 border-gray-300 rounded-lg focus:outline-none box-border';
   const labelClass = 'block mb-2 font-bold';
 
   // Create unique ink-like gradient for each card
@@ -300,29 +298,35 @@ const GeneralSettings = ({
       {wifiStatus && (
         <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[0] }}>
           <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
-          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Network</h3>
-          <div className='flex items-center justify-between'>
-            <div className='flex-1'>
-              <div className='flex items-center gap-2'>
-                {wifiStatus.connected ? (
-                  <WiFiIcon className='w-4 h-4' style={{ color: '#7A756E' }} />
-                ) : (
-                  <WiFiOffIcon className='w-4 h-4' style={{ color: '#DC2626' }} />
-                )}
-                <span className='font-bold text-black '>
-                  {wifiStatus.connected && wifiStatus.ssid
-                    ? wifiStatus.ssid
-                    : wifiStatus.mode === 'ap'
-                    ? 'Setup Mode (AP)'
-                    : 'Not Connected'}
-                </span>
-                <button type='button' onClick={triggerAPMode} className='text-xs underline ml-2 cursor-pointer font-bold' style={{ color: '#CC9933' }} onMouseEnter={(e) => e.currentTarget.style.color = '#2A2A2A'} onMouseLeave={(e) => e.currentTarget.style.color = '#CC9933'}>
-                  Reset WiFi
-                </button>
+            <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Network</h3>
+            <div className='flex items-center justify-between'>
+              <div className='flex-1'>
+                <div className='flex items-center gap-2'>
+                  {wifiStatus.connected ? (
+                    <WiFiIcon className='w-4 h-4' style={{ color: '#7A756E' }} />
+                  ) : (
+                    <WiFiOffIcon className='w-4 h-4' style={{ color: '#DC2626' }} />
+                  )}
+                  <span className='font-bold text-black '>
+                    {wifiStatus.connected && wifiStatus.ssid
+                      ? wifiStatus.ssid
+                      : wifiStatus.mode === 'ap'
+                      ? 'Setup Mode (AP)'
+                      : 'Not Connected'}
+                  </span>
+                  <button
+                    type='button'
+                    onClick={triggerAPMode}
+                    className='text-xs underline ml-2 cursor-pointer font-bold'
+                    style={{ color: '#CC9933' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = '#2A2A2A')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = '#CC9933')}>
+                    Reset WiFi
+                  </button>
+                </div>
+                {wifiStatus.connected && wifiStatus.ip && <div className='text-xs text-gray-600 mt-1 '>IP: {wifiStatus.ip}</div>}
               </div>
-              {wifiStatus.connected && wifiStatus.ip && <div className='text-xs text-gray-600 mt-1 '>IP: {wifiStatus.ip}</div>}
             </div>
-          </div>
           </div>
         </div>
       )}
@@ -330,507 +334,524 @@ const GeneralSettings = ({
       {/* Time Settings */}
       <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[1] }}>
         <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
-        <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Time Settings</h3>
+          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Time Settings</h3>
 
-        {/* Time Format */}
-        <div className='mb-4'>
-          <label className='block mb-2 text-sm text-gray-600  font-bold'>Time Format</label>
-          <select
-            value={settings.time_format || '12h'}
-            onChange={(e) => saveGlobalSettings({ time_format: e.target.value })}
-            className={inputClass}>
-            <option value='12h'>12-hour (3:45 PM)</option>
-            <option value='24h'>24-hour (15:45)</option>
-          </select>
-          <p className='text-xs text-gray-600 mt-1 '>Choose how times are displayed across all modules</p>
-        </div>
-
-        {/* Time Synchronization Mode */}
-        <div className='mb-4'>
-          <label className='block mb-3 text-sm font-medium text-black  font-bold'>Set Time</label>
-
-          {/* Mode Selection - Tabs */}
-          <div className='flex gap-0 mb-0'>
-            <label
-              className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all rounded-tl-lg ${
-                !useAutoTime 
-                  ? 'border-black border-b-0 bg-white z-10' 
-                  : 'border-gray-300 border-b-2 border-b-black bg-white hover:border-black z-0'
-              }`}>
-              <input
-                type='radio'
-                name='timeMode'
-                checked={!useAutoTime}
-                onChange={async () => {
-                  console.log('[TimeSync] Switching to manual mode');
-                  setUseAutoTime(false);
-                  saveGlobalSettings({ time_sync_mode: 'manual' });
-                  // When switching to manual, disable NTP sync to prevent override
-                  try {
-                    // Disable NTP sync when switching to manual mode
-                    await fetch('/api/system/time/sync/disable', { method: 'POST' }).catch(() => {
-                      // Ignore errors - the backend will handle NTP disable when setting time
-                    });
-                  } catch (err) {
-                    // Ignore errors
-                  }
-                  // When switching to manual, ensure inputs are populated
-                  if (currentTime) {
-                    if (!manualDate && currentTime.date) {
-                      setManualDate(currentTime.date);
-                    }
-                    if (!manualTime && currentTime.time) {
-                      setManualTime(currentTime.time.substring(0, 5));
-                    }
-                  }
-                }}
-                className='sr-only'
-              />
-              <span className={`text-sm font-medium  ${!useAutoTime ? 'text-black font-bold' : 'text-gray-600'}`}>Manual</span>
-            </label>
-
-            <label
-              className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all rounded-tr-lg ${
-                useAutoTime 
-                  ? 'border-black border-b-0 bg-white z-10' 
-                  : 'border-gray-300 border-b-2 border-b-black bg-white hover:border-black z-0'
-              }`}>
-              <input
-                type='radio'
-                name='timeMode'
-                checked={useAutoTime}
-                onChange={() => {
-                  console.log('[TimeSync] Switching to automatic mode');
-                  setUseAutoTime(true);
-                  saveGlobalSettings({ time_sync_mode: 'automatic' });
-                  if (wifiStatus?.connected) {
-                    syncTimeAutomatically();
-                  }
-                }}
-                className='sr-only'
-              />
-              <div className="flex items-baseline justify-center gap-1.5">
-                <WiFiIcon className={`w-3 h-3 flex-shrink-0 ${useAutoTime ? 'text-black' : 'text-gray-600'}`} style={{ transform: 'translateY(0.125rem)' }} />
-                <span className={`text-sm font-medium  ${useAutoTime ? 'text-black font-bold' : 'text-gray-600'}`}>Automatic</span>
-              </div>
-            </label>
+          {/* Time Format */}
+          <div className='mb-4'>
+            <label className='block mb-2 text-sm text-gray-600  font-bold'>Time Format</label>
+            <select
+              value={settings.time_format || '12h'}
+              onChange={(e) => saveGlobalSettings({ time_format: e.target.value })}
+              className={inputClass}>
+              <option value='12h'>12-hour (3:45 PM)</option>
+              <option value='24h'>24-hour (15:45)</option>
+            </select>
+            <p className='text-xs text-gray-600 mt-1 '>Choose how times are displayed across all modules</p>
           </div>
 
-          {/* Automatic Mode Actions */}
-          {useAutoTime && (
-            <div className='p-4 border-2 border-black rounded-b-lg -mt-[2px]'>
-              {wifiStatus?.connected ? (
-                <div>
-                  <p className='text-sm font-bold text-black mb-2 '>Time Set Automatically</p>
-                  {currentTime && (
-                    <div className='p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
-                      <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Time</div>
-                      <div className='flex items-center gap-2'>
-                        <div className='text-lg font-bold text-black'>
-                          {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
-                        </div>
-                        <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#7A756E' }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                <div>
-                  <p className='text-sm font-bold text-black mb-2 '>Not Syncing</p>
-                  <p className='text-sm text-yellow-700 mb-3 '>
-                    Internet connection required for automatic time synchronization. Connect to WiFi or use manual mode.
-                  </p>
-                  {currentTime && (
-                    <div className='p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
-                      <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Time</div>
-                      <div className='flex items-center gap-2'>
-                        <div className='text-lg font-bold text-black'>
-                          {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
-                        </div>
-                        <WiFiOffIcon className='w-3.5 h-3.5' style={{ color: '#DC2626' }} />
-                      </div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          {/* Time Synchronization Mode */}
+          <div className='mb-4'>
+            <label className='block mb-3 text-sm font-medium text-black  font-bold'>Set Time</label>
 
-          {/* Manual Mode Inputs */}
-          {!useAutoTime && (
-            <div className='p-4 border-2 border-black rounded-b-lg -mt-[2px]'>
-              <div className='grid grid-cols-1 min-[340px]:grid-cols-2 gap-3 mb-3'>
-                <div>
-                  <label className='block mb-2 text-sm text-black  font-bold'>Date</label>
-                  <input
-                    type='date'
-                    value={manualDate}
-                    onChange={(e) => setManualDate(e.target.value)}
-                    className='w-full py-3 px-2 text-base bg-white border-2 border-gray-300 rounded-lg text-black focus:border-black focus:outline-none box-border '
+            {/* Mode Selection - Tabs */}
+            <div className='flex gap-0 mb-0'>
+              <label
+                className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all rounded-tl-lg ${
+                  !useAutoTime
+                    ? 'border-black border-b-0 bg-white z-10'
+                    : 'border-gray-300 border-b-2 border-b-black bg-white hover:border-black z-0'
+                }`}>
+                <input
+                  type='radio'
+                  name='timeMode'
+                  checked={!useAutoTime}
+                  onChange={async () => {
+                    console.log('[TimeSync] Switching to manual mode');
+                    setUseAutoTime(false);
+                    saveGlobalSettings({ time_sync_mode: 'manual' });
+                    // When switching to manual, disable NTP sync to prevent override
+                    try {
+                      // Disable NTP sync when switching to manual mode
+                      await fetch('/api/system/time/sync/disable', { method: 'POST' }).catch(() => {
+                        // Ignore errors - the backend will handle NTP disable when setting time
+                      });
+                    } catch (err) {
+                      // Ignore errors
+                    }
+                    // When switching to manual, ensure inputs are populated
+                    if (currentTime) {
+                      if (!manualDate && currentTime.date) {
+                        setManualDate(currentTime.date);
+                      }
+                      if (!manualTime && currentTime.time) {
+                        setManualTime(currentTime.time.substring(0, 5));
+                      }
+                    }
+                  }}
+                  className='sr-only'
+                />
+                <span className={`text-sm font-medium  ${!useAutoTime ? 'text-black font-bold' : 'text-gray-600'}`}>Manual</span>
+              </label>
+
+              <label
+                className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all rounded-tr-lg ${
+                  useAutoTime
+                    ? 'border-black border-b-0 bg-white z-10'
+                    : 'border-gray-300 border-b-2 border-b-black bg-white hover:border-black z-0'
+                }`}>
+                <input
+                  type='radio'
+                  name='timeMode'
+                  checked={useAutoTime}
+                  onChange={() => {
+                    console.log('[TimeSync] Switching to automatic mode');
+                    setUseAutoTime(true);
+                    saveGlobalSettings({ time_sync_mode: 'automatic' });
+                    if (wifiStatus?.connected) {
+                      syncTimeAutomatically();
+                    }
+                  }}
+                  className='sr-only'
+                />
+                <div className='flex items-baseline justify-center gap-1.5'>
+                  <WiFiIcon
+                    className={`w-3 h-3 flex-shrink-0 ${useAutoTime ? 'text-black' : 'text-gray-600'}`}
+                    style={{ transform: 'translateY(0.125rem)' }}
                   />
+                  <span className={`text-sm font-medium  ${useAutoTime ? 'text-black font-bold' : 'text-gray-600'}`}>Automatic</span>
                 </div>
-                <div>
-                  <label className='block mb-2 text-sm text-black  font-bold'>Time</label>
-                  <input
-                    type='time'
-                    value={manualTime || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      setManualTime(value);
-                      console.log('Time input changed:', value, 'Type:', typeof value);
-                    }}
-                    className='w-full py-3 px-2 text-base bg-white border-2 border-gray-300 rounded-lg text-black focus:border-black focus:outline-none box-border '
-                    step='1'
-                    required
-                  />
-                </div>
+              </label>
+            </div>
+
+            {/* Automatic Mode Actions */}
+            {useAutoTime && (
+              <div className='p-4 border-2 border-black rounded-b-lg -mt-[2px]'>
+                {wifiStatus?.connected ? (
+                  <div>
+                    <p className='text-sm font-bold text-black mb-2 '>Time Set Automatically</p>
+                    {currentTime && (
+                      <div className='p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
+                        <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Time</div>
+                        <div className='flex items-center gap-2'>
+                          <div className='text-lg font-bold text-black'>
+                            {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
+                          </div>
+                          <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#7A756E' }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div>
+                    <p className='text-sm font-bold text-black mb-2 '>Not Syncing</p>
+                    <p className='text-sm text-yellow-700 mb-3 '>
+                      Internet connection required for automatic time synchronization. Connect to WiFi or use manual mode.
+                    </p>
+                    {currentTime && (
+                      <div className='p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
+                        <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Time</div>
+                        <div className='flex items-center gap-2'>
+                          <div className='text-lg font-bold text-black'>
+                            {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
+                          </div>
+                          <WiFiOffIcon className='w-3.5 h-3.5' style={{ color: '#DC2626' }} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              <button
-                type='button'
-                onClick={setTimeManually}
-                className='w-full py-2.5 px-4 bg-transparent border-2 border-black text-black rounded-lg  font-bold hover:bg-white transition-all cursor-pointer'>
-                Set System Time
-              </button>
-              <p className='text-xs text-gray-600 mt-2 text-center '>Use this when offline or to set a specific time</p>
-            </div>
-          )}
+            )}
 
-          {/* Status Messages */}
-          {timeStatus.message && (
-            <div
-              className={`mt-4 p-3 rounded-lg text-sm  border-2 ${
-                timeStatus.type === 'success'
-                  ? 'bg-gray-100 text-black border-black'
-                  : 'bg-white text-black border-black border-dashed'
-              }`}>
-              {timeStatus.type === 'error' && <span className="font-bold mr-2">ERROR:</span>}
-              {timeStatus.message}
-            </div>
-          )}
-        </div>
+            {/* Manual Mode Inputs */}
+            {!useAutoTime && (
+              <div className='p-4 border-2 border-black rounded-b-lg -mt-[2px]'>
+                <div className='grid grid-cols-1 min-[340px]:grid-cols-2 gap-3 mb-3'>
+                  <div>
+                    <label className='block mb-2 text-sm text-black  font-bold'>Date</label>
+                    <input
+                      type='date'
+                      value={manualDate}
+                      onChange={(e) => setManualDate(e.target.value)}
+                      className='w-full py-3 px-2 text-base bg-white border-2 border-gray-300 rounded-lg text-black focus:border-black focus:outline-none box-border '
+                    />
+                  </div>
+                  <div>
+                    <label className='block mb-2 text-sm text-black  font-bold'>Time</label>
+                    <input
+                      type='time'
+                      value={manualTime || ''}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        setManualTime(value);
+                        console.log('Time input changed:', value, 'Type:', typeof value);
+                      }}
+                      className='w-full py-3 px-2 text-base bg-white border-2 border-gray-300 rounded-lg text-black focus:border-black focus:outline-none box-border '
+                      step='1'
+                      required
+                    />
+                  </div>
+                </div>
+                <button
+                  type='button'
+                  onClick={setTimeManually}
+                  className='w-full py-2.5 px-4 bg-transparent border-2 border-black text-black rounded-lg  font-bold hover:bg-white transition-all cursor-pointer'>
+                  Set System Time
+                </button>
+                <p className='text-xs text-gray-600 mt-2 text-center '>Use this when offline or to set a specific time</p>
+              </div>
+            )}
+
+            {/* Status Messages */}
+            {timeStatus.message && (
+              <div
+                className={`mt-4 p-3 rounded-lg text-sm  border-2 ${
+                  timeStatus.type === 'success' ? 'bg-gray-100 text-black border-black' : 'bg-white text-black border-black border-dashed'
+                }`}>
+                {timeStatus.type === 'error' && <span className='font-bold mr-2'>ERROR:</span>}
+                {timeStatus.message}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
       {/* Location Settings */}
       <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[2] }}>
         <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
-        <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Location</h3>
+          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Location</h3>
 
-        {/* Search for location */}
-        <div className='mb-4 text-left relative'>
-          <label className='block mb-2 text-sm text-gray-600  font-bold'>Search City / Location</label>
-          <div className='relative'>
-            <input
-              type='text'
-              value={searchTerm || ''}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder='Type city name (e.g. Boston, London, Tokyo)'
-              autoComplete='off'
-              className={inputClass}
-            />
-            {isSearching && (
-              <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
-                <div className='w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin'></div>
-              </div>
-            )}
-          </div>
-          {searchResults.length > 0 && (
-            <ul className='absolute w-full z-10 max-h-[300px] overflow-y-auto bg-white border-2 border-gray-300 border-t-0 rounded-b-lg shadow-lg list-none p-0 m-0'>
-              {searchResults.map((result) => (
-                <li
-                  key={result.id}
-                  onClick={() => selectLocation(result)}
-                  className='p-3 cursor-pointer border-b-2 border-gray-200 last:border-0 hover:bg-white transition-colors group'>
-                  <div className='flex items-start justify-between'>
-                    <div className='flex-1 min-w-0'>
-                      <div className='flex items-center gap-2'>
-                        <strong className='text-black transition-colors '>{result.name}</strong>
-                        {result.population && result.population > 0 && (
-                          <span className='text-xs text-gray-600 '>
-                            {result.population >= 1000000
-                              ? `${(result.population / 1000000).toFixed(1)}M`
-                              : result.population >= 1000
-                              ? `${(result.population / 1000).toFixed(0)}K`
-                              : result.population}
-                          </span>
-                        )}
-                        {result.country_code && result.country_code !== 'US' && (
-                          <span className='text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded  border border-gray-300'>{result.country_code}</span>
-                        )}
+          {/* Search for location */}
+          <div className='mb-4 text-left relative'>
+            <label className='block mb-2 text-sm text-gray-600  font-bold'>Search City / Location</label>
+            <div className='relative'>
+              <input
+                type='text'
+                value={searchTerm || ''}
+                onChange={(e) => handleSearch(e.target.value)}
+                placeholder='Type city name (e.g. Boston, London, Tokyo)'
+                autoComplete='off'
+                className={inputClass}
+              />
+              {isSearching && (
+                <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
+                  <div className='w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin'></div>
+                </div>
+              )}
+            </div>
+            {searchResults.length > 0 && (
+              <ul className='absolute w-full z-10 max-h-[300px] overflow-y-auto bg-white border-2 border-gray-300 border-t-0 rounded-b-lg shadow-lg list-none p-0 m-0'>
+                {searchResults.map((result) => (
+                  <li
+                    key={result.id}
+                    onClick={() => selectLocation(result)}
+                    className='p-3 cursor-pointer border-b-2 border-gray-200 last:border-0 hover:bg-white transition-colors group'>
+                    <div className='flex items-start justify-between'>
+                      <div className='flex-1 min-w-0'>
+                        <div className='flex items-center gap-2'>
+                          <strong className='text-black transition-colors '>{result.name}</strong>
+                          {result.population && result.population > 0 && (
+                            <span className='text-xs text-gray-600 '>
+                              {result.population >= 1000000
+                                ? `${(result.population / 1000000).toFixed(1)}M`
+                                : result.population >= 1000
+                                ? `${(result.population / 1000).toFixed(0)}K`
+                                : result.population}
+                            </span>
+                          )}
+                          {result.country_code && result.country_code !== 'US' && (
+                            <span className='text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded  border border-gray-300'>
+                              {result.country_code}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
 
-        <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-4 rounded-lg'>
-          <div className='flex flex-row items-baseline gap-6'>
-            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Location</span>
-            <span className='font-bold text-black font-mono'>
-              {settings.city_name || 'Not Set'}
-              {settings.state && `, ${settings.state}`}
-            </span>
+          <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-4 rounded-lg'>
+            <div className='flex flex-row items-baseline gap-6'>
+              <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Location</span>
+              <span className='font-bold text-black font-mono'>
+                {settings.city_name || 'Not Set'}
+                {settings.state && `, ${settings.state}`}
+              </span>
+            </div>
+            <div className='flex flex-row items-baseline gap-6'>
+              <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Timezone</span>
+              <span className='font-bold text-black font-mono'>{formatTimezone(settings.timezone)}</span>
+            </div>
+            <div className='flex flex-row items-baseline gap-6'>
+              <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Coordinates</span>
+              <span className='font-bold text-black font-mono'>
+                {settings.latitude?.toFixed(4) || 'N/A'}, {settings.longitude?.toFixed(4) || 'N/A'}
+              </span>
+            </div>
           </div>
-          <div className='flex flex-row items-baseline gap-6'>
-            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Timezone</span>
-            <span className='font-bold text-black font-mono'>{formatTimezone(settings.timezone)}</span>
-          </div>
-          <div className='flex flex-row items-baseline gap-6'>
-            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Coordinates</span>
-            <span className='font-bold text-black font-mono'>
-              {settings.latitude?.toFixed(4) || 'N/A'}, {settings.longitude?.toFixed(4) || 'N/A'}
-            </span>
-          </div>
-        </div>
         </div>
       </div>
 
       {/* Printer Settings */}
       <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[3] }}>
         <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
-        <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Printer Settings</h3>
-        <div className='mb-4'>
-          <label className={labelClass}>Cutter Feed Lines</label>
-          <input
-            type='number'
-            min='0'
-            max='20'
-            value={settings.cutter_feed_lines ?? 3}
-            onChange={(e) => saveGlobalSettings({ cutter_feed_lines: parseInt(e.target.value) || 0 })}
-            className={inputClass}
-          />
-          <p className='text-xs text-gray-600 mt-1 '>
-            Number of empty lines to add at the end of each print job to clear the cutter (default: 3)
-          </p>
-        </div>
+          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Printer Settings</h3>
+          <div className='mb-4'>
+            <label className={labelClass}>Cutter Feed Lines</label>
+            <input
+              type='number'
+              min='0'
+              max='20'
+              value={settings.cutter_feed_lines ?? 3}
+              onChange={(e) => saveGlobalSettings({ cutter_feed_lines: parseInt(e.target.value) || 0 })}
+              className={inputClass}
+            />
+            <p className='text-xs text-gray-600 mt-1 '>
+              Number of empty lines to add at the end of each print job to clear the cutter (default: 3)
+            </p>
+          </div>
 
-        <div className='mb-4'>
-          <label className={labelClass}>Maximum Print Lines</label>
-          <input
-            type='number'
-            min='0'
-            max='1000'
-            value={settings.max_print_lines ?? 200}
-            onChange={(e) => saveGlobalSettings({ max_print_lines: parseInt(e.target.value) || 0 })}
-            className={inputClass}
-          />
-          <p className='text-xs text-gray-600 mt-1 '>
-            Maximum lines per print job to prevent endless prints. Set to 0 for no limit (default: 200)
-          </p>
-        </div>
+          <div className='mb-4'>
+            <label className={labelClass}>Maximum Print Lines</label>
+            <input
+              type='number'
+              min='0'
+              max='1000'
+              value={settings.max_print_lines ?? 200}
+              onChange={(e) => saveGlobalSettings({ max_print_lines: parseInt(e.target.value) || 0 })}
+              className={inputClass}
+            />
+            <p className='text-xs text-gray-600 mt-1 '>
+              Maximum lines per print job to prevent endless prints. Set to 0 for no limit (default: 200)
+            </p>
+          </div>
         </div>
       </div>
 
       {/* SSH Management */}
       <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[4] }}>
         <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
-        <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>SSH Access</h3>
-        <p className='text-sm text-gray-600 mb-4 '>
-          Manage SSH (Secure Shell) access to your PC-1 device. SSH allows advanced users to access the device via command line.
-        </p>
+          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>SSH Access</h3>
+          <p className='text-sm text-gray-600 mb-4 '>
+            Manage SSH (Secure Shell) access to your PC-1 device. SSH allows advanced users to access the device via command line.
+          </p>
 
-        {sshStatus && sshStatus.available ? (
-          <div className='space-y-4'>
-            {/* SSH Status */}
-            <div className='p-4 border-2 border-gray-300 rounded-lg'>
-              <div className='flex items-center justify-between mb-2'>
-                <span className='text-sm font-medium text-black  font-bold'>SSH Service</span>
-                <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium  border-2 ${
-                    sshStatus.enabled && sshStatus.active
-                      ? 'bg-white text-black border-black'
-                      : sshStatus.enabled
-                      ? 'bg-gray-200 text-black border-gray-400'
-                      : 'bg-white text-gray-500 border-gray-300'
-                  }`}>
-                  {sshStatus.enabled && sshStatus.active
-                    ? 'Enabled & Active'
-                    : sshStatus.enabled
-                    ? 'Enabled'
-                    : sshStatus.active
-                    ? 'Active'
-                    : 'Disabled'}
-                </span>
-              </div>
-              {sshStatus.username && (
-                <p className='text-xs text-gray-600 mt-1 '>
-                  Username: <span className='text-black '>{sshStatus.username}</span>
-                </p>
-              )}
-              {sshStatus.enabled && (
-                <p className='text-xs text-gray-600 mt-1 '>
-                  Connect via: <span className='text-black '>ssh {sshStatus.username || 'admin'}@pc-1.local</span>
-                </p>
-              )}
-            </div>
-
-            {/* Enable/Disable SSH */}
-            <div className='flex gap-3'>
-              {!sshStatus.enabled ? (
-                <button
-                  type='button'
-                  onClick={async () => {
-                    setSshLoading(true);
-                    setSshMessage({ type: '', message: '' });
-                    try {
-                      const response = await fetch('/api/system/ssh/enable', { method: 'POST' });
-                      const data = await response.json();
-                      if (data.success) {
-                        setSshMessage({ type: 'success', message: data.message });
-                        // Refresh status
-                        const statusResponse = await fetch('/api/system/ssh/status');
-                        const statusData = await statusResponse.json();
-                        setSshStatus(statusData);
-                      } else {
-                        setSshMessage({ type: 'error', message: data.message || 'Failed to enable SSH' });
-                      }
-                    } catch (err) {
-                      setSshMessage({ type: 'error', message: 'Error enabling SSH' });
-                    } finally {
-                      setSshLoading(false);
-                      setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
-                    }
-                  }}
-                  disabled={sshLoading}
-                  className='flex-1 py-2.5 px-4 bg-transparent border-2 border-black text-black disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg  font-bold hover:bg-black hover:text-white transition-all cursor-pointer'>
-                  {sshLoading ? 'Enabling...' : 'Enable SSH'}
-                </button>
-              ) : (
-                <button
-                  type='button'
-                  onClick={async () => {
-                    if (!confirm('Are you sure you want to disable SSH? You may lose remote access to the device.')) {
-                      return;
-                    }
-                    setSshLoading(true);
-                    setSshMessage({ type: '', message: '' });
-                    try {
-                      const response = await fetch('/api/system/ssh/disable', { method: 'POST' });
-                      const data = await response.json();
-                      if (data.success) {
-                        setSshMessage({ type: 'success', message: data.message });
-                        // Refresh status
-                        const statusResponse = await fetch('/api/system/ssh/status');
-                        const statusData = await statusResponse.json();
-                        setSshStatus(statusData);
-                      } else {
-                        setSshMessage({ type: 'error', message: data.message || 'Failed to disable SSH' });
-                      }
-                    } catch (err) {
-                      setSshMessage({ type: 'error', message: 'Error disabling SSH' });
-                    } finally {
-                      setSshLoading(false);
-                      setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
-                    }
-                  }}
-                  disabled={sshLoading}
-                  className='flex-1 py-2.5 px-4 bg-transparent border-2 border-black text-black disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg  font-bold hover:bg-black hover:text-white transition-all cursor-pointer'>
-                  {sshLoading ? 'Disabling...' : 'Disable SSH'}
-                </button>
-              )}
-              {sshStatus.enabled && (
-                <button
-                  type='button'
-                  onClick={() => setShowPasswordChange(!showPasswordChange)}
-                  className='flex-1 py-2.5 px-4 bg-transparent border-2 border-gray-400 text-black rounded-lg  font-bold hover:border-black hover:bg-white transition-all cursor-pointer'>
-                  {showPasswordChange ? 'Cancel' : 'Change Password'}
-                </button>
-              )}
-            </div>
-
-            {/* Change Password Form */}
-            {showPasswordChange && sshStatus.enabled && (
+          {sshStatus && sshStatus.available ? (
+            <div className='space-y-4'>
+              {/* SSH Status */}
               <div className='p-4 border-2 border-gray-300 rounded-lg'>
-                <h4 className='text-sm font-medium text-black mb-3  font-bold'>Change SSH Password</h4>
-                <div className='space-y-3'>
-                  <div>
-                    <label className='block mb-2 text-sm text-black  font-bold'>New Password</label>
-                    <input
-                      type='password'
-                      value={newPassword}
-                      onChange={(e) => setNewPassword(e.target.value)}
-                      placeholder='Minimum 8 characters'
-                      className={inputClass}
-                      minLength={8}
-                    />
-                  </div>
-                  <div>
-                    <label className='block mb-2 text-sm text-black  font-bold'>Confirm Password</label>
-                    <input
-                      type='password'
-                      value={confirmPassword}
-                      onChange={(e) => setConfirmPassword(e.target.value)}
-                      placeholder='Re-enter password'
-                      className={inputClass}
-                      minLength={8}
-                    />
-                  </div>
+                <div className='flex items-center justify-between mb-2'>
+                  <span className='text-sm font-medium text-black  font-bold'>SSH Service</span>
+                  <span
+                    className={`px-3 py-1 rounded-full text-xs font-medium  border-2 ${
+                      sshStatus.enabled && sshStatus.active
+                        ? 'bg-white text-black border-black'
+                        : sshStatus.enabled
+                        ? 'bg-gray-200 text-black border-gray-400'
+                        : 'bg-white text-gray-500 border-gray-300'
+                    }`}>
+                    {sshStatus.enabled && sshStatus.active
+                      ? 'Enabled & Active'
+                      : sshStatus.enabled
+                      ? 'Enabled'
+                      : sshStatus.active
+                      ? 'Active'
+                      : 'Disabled'}
+                  </span>
+                </div>
+                {sshStatus.username && (
+                  <p className='text-xs text-gray-600 mt-1 '>
+                    Username: <span className='text-black '>{sshStatus.username}</span>
+                  </p>
+                )}
+                {sshStatus.enabled && (
+                  <p className='text-xs text-gray-600 mt-1 '>
+                    Connect via: <span className='text-black '>ssh {sshStatus.username || 'admin'}@pc-1.local</span>
+                  </p>
+                )}
+              </div>
+
+              {/* Enable/Disable SSH */}
+              <div className='flex gap-3'>
+                {!sshStatus.enabled ? (
                   <button
                     type='button'
                     onClick={async () => {
-                      if (!newPassword || newPassword.length < 8) {
-                        setSshMessage({ type: 'error', message: 'Password must be at least 8 characters' });
-                        setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
-                        return;
-                      }
-                      if (newPassword !== confirmPassword) {
-                        setSshMessage({ type: 'error', message: 'Passwords do not match' });
-                        setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
-                        return;
-                      }
-                      setChangingPassword(true);
+                      setSshLoading(true);
                       setSshMessage({ type: '', message: '' });
                       try {
-                        const response = await fetch('/api/system/ssh/password', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ new_password: newPassword }),
-                        });
+                        const response = await fetch('/api/system/ssh/enable', { method: 'POST' });
                         const data = await response.json();
                         if (data.success) {
                           setSshMessage({ type: 'success', message: data.message });
-                          setNewPassword('');
-                          setConfirmPassword('');
-                          setShowPasswordChange(false);
+                          // Refresh status
+                          const statusResponse = await fetch('/api/system/ssh/status');
+                          const statusData = await statusResponse.json();
+                          setSshStatus(statusData);
                         } else {
-                          setSshMessage({ type: 'error', message: data.message || 'Failed to change password' });
+                          setSshMessage({ type: 'error', message: data.message || 'Failed to enable SSH' });
                         }
                       } catch (err) {
-                        setSshMessage({ type: 'error', message: 'Error changing password' });
+                        setSshMessage({ type: 'error', message: 'Error enabling SSH' });
                       } finally {
-                        setChangingPassword(false);
+                        setSshLoading(false);
                         setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
                       }
                     }}
-                    disabled={changingPassword || !newPassword || !confirmPassword}
-                    className='w-full py-2.5 px-4 bg-transparent border-2 border-black text-black disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg  font-bold hover:bg-black hover:text-white transition-all cursor-pointer'>
-                    {changingPassword ? 'Changing...' : 'Change Password'}
+                    disabled={sshLoading}
+                    className='flex-1 py-2.5 px-4 bg-transparent border-2 border-black text-black disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg  font-bold hover:bg-black hover:text-white transition-all cursor-pointer'>
+                    {sshLoading ? 'Enabling...' : 'Enable SSH'}
                   </button>
-                </div>
+                ) : (
+                  <button
+                    type='button'
+                    onClick={async () => {
+                      if (!confirm('Are you sure you want to disable SSH? You may lose remote access to the device.')) {
+                        return;
+                      }
+                      setSshLoading(true);
+                      setSshMessage({ type: '', message: '' });
+                      try {
+                        const response = await fetch('/api/system/ssh/disable', { method: 'POST' });
+                        const data = await response.json();
+                        if (data.success) {
+                          setSshMessage({ type: 'success', message: data.message });
+                          // Refresh status
+                          const statusResponse = await fetch('/api/system/ssh/status');
+                          const statusData = await statusResponse.json();
+                          setSshStatus(statusData);
+                        } else {
+                          setSshMessage({ type: 'error', message: data.message || 'Failed to disable SSH' });
+                        }
+                      } catch (err) {
+                        setSshMessage({ type: 'error', message: 'Error disabling SSH' });
+                      } finally {
+                        setSshLoading(false);
+                        setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
+                      }
+                    }}
+                    disabled={sshLoading}
+                    className='flex-1 py-2.5 px-4 bg-transparent border-0 rounded-lg transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed font-bold'
+                    style={{ color: '#DC7171' }}
+                    onMouseEnter={(e) => {
+                      if (!sshLoading) e.currentTarget.style.color = '#DC2626';
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!sshLoading) e.currentTarget.style.color = '#DC7171';
+                    }}>
+                    {sshLoading ? 'Disabling...' : 'Disable SSH'}
+                  </button>
+                )}
+                {sshStatus.enabled && (
+                  <button
+                    type='button'
+                    onClick={() => setShowPasswordChange(!showPasswordChange)}
+                    className='flex-1 py-2.5 px-4 bg-transparent border-2 rounded-lg  font-bold transition-all cursor-pointer'
+                    style={{ color: '#CC9933', borderColor: '#CC9933' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.color = '#2A2A2A';
+                      e.currentTarget.style.borderColor = '#2A2A2A';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.color = '#CC9933';
+                      e.currentTarget.style.borderColor = '#CC9933';
+                    }}>
+                    {showPasswordChange ? 'Cancel' : 'Change Password'}
+                  </button>
+                )}
               </div>
-            )}
 
-            {/* SSH Status Messages */}
-            {sshMessage.message && (
-              <div
-                className={`p-3 rounded-lg text-sm  border-2 ${
-                  sshMessage.type === 'success'
-                    ? 'bg-gray-100 text-black border-black'
-                    : 'bg-white text-black border-black border-dashed'
-                }`}>
-                {sshMessage.type === 'error' && <span className="font-bold mr-2">ERROR:</span>}
-                {sshMessage.message}
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className='p-4 border-2 border-gray-300 rounded-lg'>
-            <p className='text-sm text-gray-500 '>SSH isn't available in testing mode</p>
-          </div>
-        )}
+              {/* Change Password Form */}
+              {showPasswordChange && sshStatus.enabled && (
+                <div className='p-4 border-2 border-gray-300 rounded-lg'>
+                  <h4 className='text-sm font-medium text-black mb-3  font-bold'>Change SSH Password</h4>
+                  <div className='space-y-3'>
+                    <div>
+                      <label className='block mb-2 text-sm text-black  font-bold'>New Password</label>
+                      <input
+                        type='password'
+                        value={newPassword}
+                        onChange={(e) => setNewPassword(e.target.value)}
+                        placeholder='Minimum 8 characters'
+                        className={inputClass}
+                        minLength={8}
+                      />
+                    </div>
+                    <div>
+                      <label className='block mb-2 text-sm text-black  font-bold'>Confirm Password</label>
+                      <input
+                        type='password'
+                        value={confirmPassword}
+                        onChange={(e) => setConfirmPassword(e.target.value)}
+                        placeholder='Re-enter password'
+                        className={inputClass}
+                        minLength={8}
+                      />
+                    </div>
+                    <button
+                      type='button'
+                      onClick={async () => {
+                        if (!newPassword || newPassword.length < 8) {
+                          setSshMessage({ type: 'error', message: 'Password must be at least 8 characters' });
+                          setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
+                          return;
+                        }
+                        if (newPassword !== confirmPassword) {
+                          setSshMessage({ type: 'error', message: 'Passwords do not match' });
+                          setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
+                          return;
+                        }
+                        setChangingPassword(true);
+                        setSshMessage({ type: '', message: '' });
+                        try {
+                          const response = await fetch('/api/system/ssh/password', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ new_password: newPassword }),
+                          });
+                          const data = await response.json();
+                          if (data.success) {
+                            setSshMessage({ type: 'success', message: data.message });
+                            setNewPassword('');
+                            setConfirmPassword('');
+                            setShowPasswordChange(false);
+                          } else {
+                            setSshMessage({ type: 'error', message: data.message || 'Failed to change password' });
+                          }
+                        } catch (err) {
+                          setSshMessage({ type: 'error', message: 'Error changing password' });
+                        } finally {
+                          setChangingPassword(false);
+                          setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
+                        }
+                      }}
+                      disabled={changingPassword || !newPassword || !confirmPassword}
+                      className='w-full py-2.5 px-4 bg-transparent border-2 border-black text-black disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg  font-bold hover:bg-black hover:text-white transition-all cursor-pointer'>
+                      {changingPassword ? 'Changing...' : 'Change Password'}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* SSH Status Messages */}
+              {sshMessage.message && (
+                <div
+                  className={`p-3 rounded-lg text-sm  border-2 ${
+                    sshMessage.type === 'success' ? 'bg-gray-100 text-black border-black' : 'bg-white text-black border-black border-dashed'
+                  }`}>
+                  {sshMessage.type === 'error' && <span className='font-bold mr-2'>ERROR:</span>}
+                  {sshMessage.message}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className='p-4 border-2 border-gray-300 rounded-lg'>
+              <p className='text-sm text-gray-500 '>SSH isn't available in testing mode</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
