@@ -305,7 +305,7 @@ const GeneralSettings = ({
             <div className='flex-1'>
               <div className='flex items-center gap-2'>
                 {wifiStatus.connected ? (
-                  <WiFiIcon className='w-4 h-4' style={{ color: '#2563EB' }} />
+                  <WiFiIcon className='w-4 h-4' style={{ color: '#7A756E' }} />
                 ) : (
                   <WiFiOffIcon className='w-4 h-4' style={{ color: '#DC2626' }} />
                 )}
@@ -316,7 +316,7 @@ const GeneralSettings = ({
                     ? 'Setup Mode (AP)'
                     : 'Not Connected'}
                 </span>
-                <button type='button' onClick={triggerAPMode} className='text-xs underline ml-2 cursor-pointer' style={{ color: '#CC9933' }} onMouseEnter={(e) => e.currentTarget.style.color = '#2A2A2A'} onMouseLeave={(e) => e.currentTarget.style.color = '#CC9933'}>
+                <button type='button' onClick={triggerAPMode} className='text-xs underline ml-2 cursor-pointer font-bold' style={{ color: '#CC9933' }} onMouseEnter={(e) => e.currentTarget.style.color = '#2A2A2A'} onMouseLeave={(e) => e.currentTarget.style.color = '#CC9933'}>
                   Reset WiFi
                 </button>
               </div>
@@ -421,23 +421,18 @@ const GeneralSettings = ({
             <div className='p-4 border-2 border-black rounded-b-lg -mt-[2px]'>
               {wifiStatus?.connected ? (
                 <div>
+                  <p className='text-sm font-bold text-black mb-2 '>Time Set Automatically</p>
                   {currentTime && (
-                    <div className='mb-3 p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
+                    <div className='p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
                       <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Time</div>
                       <div className='flex items-center gap-2'>
                         <div className='text-lg font-bold text-black'>
                           {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
                         </div>
-                        <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#2563EB' }} />
+                        <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#7A756E' }} />
                       </div>
                     </div>
                   )}
-                  <button
-                    type='button'
-                    onClick={syncTimeAutomatically}
-                    className='w-full py-2 px-4 bg-transparent border-2 border-black text-black rounded-lg  font-bold hover:bg-black hover:text-white transition-all cursor-pointer'>
-                    Sync Now
-                  </button>
                 </div>
               ) : (
                 <div>

@@ -158,7 +158,7 @@ const ChannelList = ({
                         style={needsSetup ? { color: '#DC2626' } : {}}>
                         {isOnline && (
                           wifiStatus?.connected ? (
-                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0 group-hover:text-black transition-colors" style={{ transform: 'translateY(0.125rem)', color: '#2563EB' }} />
+                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0 group-hover:text-black transition-colors" style={{ transform: 'translateY(0.125rem)', color: '#7A756E' }} />
                           ) : (
                             <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#DC2626' }} />
                           )
