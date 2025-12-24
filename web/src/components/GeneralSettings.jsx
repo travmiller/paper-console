@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { formatTimeForDisplay } from '../utils';
+import WiFiIcon from '../assets/WiFiIcon';
+import WiFiOffIcon from '../assets/WiFiOffIcon';
 
-const WiFiIcon = ({ className }) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-    <path d="M5 12.55C6.97656 10.5766 9.46875 9.55 12 9.55C14.5312 9.55 17.0234 10.5766 19 12.55" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <path d="M8.5 16.05C9.53125 15.0188 10.7188 14.5 12 14.5C13.2812 14.5 14.4688 15.0188 15.5 16.05" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-    <circle cx="12" cy="19.5" r="1.5" fill="currentColor"/>
-  </svg>
-);
 
 const GeneralSettings = ({
   searchTerm,
@@ -288,7 +283,11 @@ const GeneralSettings = ({
           <div className='flex items-center justify-between'>
             <div className='flex-1'>
               <div className='flex items-center gap-2'>
-                <div className={`w-3 h-3 rounded-full ${wifiStatus.connected ? 'bg-green-600' : 'bg-red-600'}`}></div>
+                {wifiStatus.connected ? (
+                  <WiFiIcon className='w-4 h-4 text-blue-600' />
+                ) : (
+                  <WiFiOffIcon className='w-4 h-4 text-amber-700' />
+                )}
                 <span className='font-bold text-black '>
                   {wifiStatus.connected && wifiStatus.ssid
                     ? wifiStatus.ssid
@@ -405,7 +404,7 @@ const GeneralSettings = ({
           {/* Mode Selection - Tabs */}
           <div className='flex gap-0 mb-0'>
             <label
-              className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all ${
+              className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all rounded-tl-lg ${
                 !useAutoTime 
                   ? 'border-black border-b-0 bg-white z-10' 
                   : 'border-gray-300 border-b-2 border-b-black bg-white hover:border-black z-0'
@@ -441,7 +440,7 @@ const GeneralSettings = ({
             </label>
 
             <label
-              className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all ${
+              className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all rounded-tr-lg ${
                 useAutoTime 
                   ? 'border-black border-b-0 bg-white z-10' 
                   : 'border-gray-300 border-b-2 border-b-black bg-white hover:border-black z-0'
@@ -459,8 +458,8 @@ const GeneralSettings = ({
                 className='sr-only'
               />
               <div className="flex items-baseline justify-center gap-1.5">
-                <WiFiIcon className={`w-4 h-4 flex-shrink-0 ${useAutoTime ? 'text-blue-600' : 'text-gray-600'}`} style={{ transform: 'translateY(0.125rem)' }} />
-                <span className={`text-sm font-medium  ${useAutoTime ? 'text-blue-600 font-bold' : 'text-gray-600'}`}>Automatic</span>
+                <WiFiIcon className={`w-3 h-3 flex-shrink-0 ${useAutoTime ? 'text-black' : 'text-gray-600'}`} style={{ transform: 'translateY(0.125rem)' }} />
+                <span className={`text-sm font-medium  ${useAutoTime ? 'text-black font-bold' : 'text-gray-600'}`}>Automatic</span>
               </div>
             </label>
           </div>
@@ -470,14 +469,14 @@ const GeneralSettings = ({
             <div className='p-4 border-2 border-black rounded-b-lg -mt-[2px]'>
               {wifiStatus?.connected ? (
                 <div>
-                  <p className='text-sm text-black mb-3 '>
-                    Time will automatically sync with NTP servers when connected to the internet.
-                  </p>
                   {currentTime && (
                     <div className='mb-3 p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
                       <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Time</div>
-                      <div className='text-lg font-bold text-black'>
-                        {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
+                      <div className='flex items-center gap-2'>
+                        <div className='text-lg font-bold text-black'>
+                          {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
+                        </div>
+                        <WiFiIcon className='w-3.5 h-3.5 text-blue-600' />
                       </div>
                     </div>
                   )}
@@ -490,14 +489,18 @@ const GeneralSettings = ({
                 </div>
               ) : (
                 <div>
+                  <p className='text-sm font-bold text-black mb-2 '>Not Syncing</p>
                   <p className='text-sm text-yellow-700 mb-3 '>
-                    ⚠️ Internet connection required for automatic time synchronization. Connect to WiFi or use manual mode.
+                    Internet connection required for automatic time synchronization. Connect to WiFi or use manual mode.
                   </p>
                   {currentTime && (
                     <div className='p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
                       <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Time</div>
-                      <div className='text-lg font-bold text-black'>
-                        {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
+                      <div className='flex items-center gap-2'>
+                        <div className='text-lg font-bold text-black'>
+                          {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
+                        </div>
+                        <WiFiOffIcon className='w-3.5 h-3.5 text-amber-700' />
                       </div>
                     </div>
                   )}

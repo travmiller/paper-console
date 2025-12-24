@@ -578,6 +578,7 @@ function App() {
             setEditingModule={setEditingModule}
             moveModuleInChannel={moveModuleInChannel}
             setShowAddModuleModal={setShowAddModuleModal}
+            wifiStatus={wifiStatus}
           />
         )}
 
