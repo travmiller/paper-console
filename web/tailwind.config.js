@@ -2,13 +2,13 @@
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
+    fontFamily: {
+      sans: ['"IBM Plex Sans"', 'sans-serif'],
+      mono: ['"IBM Plex Mono"', 'monospace'],
+    },
     extend: {
-      fontFamily: {
-        sans: ['"IBM Plex Sans"', 'sans-serif'],
-        mono: ['"IBM Plex Mono"', 'monospace'],
-      },
       colors: {
-        // Synth Theme Base
+        // PC1 Theme Base
         bg: {
           base: '#131318',      // Deepest blue-black
           card: '#1a1b26',      // Panel background
@@ -16,8 +16,8 @@ export default {
           input: '#252630',     // Input fields
           hover: '#2d2e3a',     // Hover state
         },
-        // Synth Theme Accents
-        synth: {
+        // PC1 Theme Accents
+        pc1: {
           border: '#8b8bf5',    // Periwinkle/Lavender Outline
           primary: '#ff3366',   // Neon Red/Pink
           secondary: '#00ff99', // Cyan/Green

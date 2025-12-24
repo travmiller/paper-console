@@ -64,19 +64,13 @@
   font-display: swap;
 }
 
-/* Set font variables before Tailwind import so it uses our fonts */
-:root {
-  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "IBM Plex Mono", "SF Mono", "Consolas", "Monaco", "Menlo", "Roboto Mono", "Courier New", monospace;
-}
-
 @import "tailwindcss";
 
-/* Override Tailwind's default font variables */
+/* Override Tailwind's default font variables to use IBM Plex */
 :root,
 :host {
-  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
-  --font-mono: "IBM Plex Mono", "SF Mono", "Consolas", "Monaco", "Menlo", "Roboto Mono", "Courier New", monospace !important;
+  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "IBM Plex Mono", "SF Mono", "Consolas", "Monaco", "Menlo", "Roboto Mono", "Courier New", monospace;
 }
 
 :root {
