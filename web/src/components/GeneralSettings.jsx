@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { formatTimeForDisplay } from '../utils';
 import WiFiIcon from '../assets/WiFiIcon';
 import WiFiOffIcon from '../assets/WiFiOffIcon';
+import WindowCodeIcon from '../assets/WindowCodeIcon';
 
 
 const GeneralSettings = ({
@@ -629,13 +630,14 @@ const GeneralSettings = ({
               <div className='flex items-center justify-between mb-2'>
                 <span className='text-sm font-medium text-black  font-bold'>SSH Service</span>
                 <span
-                  className={`px-3 py-1 rounded-full text-xs font-medium  border-2 ${
+                  className={`px-3 py-1 rounded-full text-xs font-medium  border-2 flex items-center gap-1.5 ${
                     sshStatus.enabled && sshStatus.active
                       ? 'bg-white text-black border-black'
                       : sshStatus.enabled
                       ? 'bg-gray-200 text-black border-gray-400'
                       : 'bg-white text-gray-500 border-gray-300'
                   }`}>
+                  {sshStatus.enabled && sshStatus.active && <WindowCodeIcon className='w-3 h-3' />}
                   {sshStatus.enabled && sshStatus.active
                     ? 'Enabled & Active'
                     : sshStatus.enabled
