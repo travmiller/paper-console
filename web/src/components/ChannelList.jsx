@@ -147,6 +147,18 @@ const ChannelList = ({
                         const configured = moduleIsConfigured(item.module);
                         const showState = isOnline;
                         const needsSetup = showState && !configured;
+                        const hasWifi = wifiStatus?.connected;
+                        
+                        // Determine icon color:
+                        // - Red: No WiFi
+                        // - Brass: WiFi connected but needs setup
+                        // - Grey: WiFi connected and configured
+                        let iconColor = '#7A756E'; // Default grey
+                        if (!hasWifi) {
+                          iconColor = '#DC2626'; // Red for no WiFi
+                        } else if (needsSetup) {
+                          iconColor = '#CC9933'; // Brass for needs setup
+                        }
 
                         return (
                           <>
@@ -155,10 +167,10 @@ const ChannelList = ({
                         className={`text-[10px]  truncate flex items-baseline gap-1 ${
                           needsSetup ? '' : 'text-gray-700'
                         }`}
-                        style={needsSetup ? { color: '#DC2626' } : {}}>
+                        style={needsSetup ? { color: '#CC9933' } : {}}>
                         {isOnline && (
-                          wifiStatus?.connected ? (
-                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0 group-hover:text-black transition-colors" style={{ transform: 'translateY(0.125rem)', color: '#7A756E' }} />
+                          hasWifi ? (
+                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0 group-hover:text-black transition-colors" style={{ transform: 'translateY(0.125rem)', color: iconColor }} />
                           ) : (
                             <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#DC2626' }} />
                           )

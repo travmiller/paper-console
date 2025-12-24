@@ -69,8 +69,8 @@
 /* Override Tailwind's default font variables to use IBM Plex */
 :root,
 :host {
-  --font-sans: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-mono: "IBM Plex Mono", "SF Mono", "Consolas", "Monaco", "Menlo", "Roboto Mono", "Courier New", monospace;
+  --font-sans: "IBM Plex Sans", sans-serif;
+  --font-mono: "IBM Plex Mono", monospace;
 }
 
 :root {
@@ -243,7 +243,7 @@ body {
   select,
   pre,
   code {
-    font-family: "IBM Plex Mono", "SF Mono", "Consolas", "Monaco", "Menlo", "Roboto Mono", "Courier New", monospace !important;
+    font-family: "IBM Plex Mono", monospace !important;
   }
 }
 
