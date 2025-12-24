@@ -10,6 +10,8 @@ import StatusMessage from './components/StatusMessage';
 import ResetSettingsButton from './components/ResetSettingsButton';
 import { AVAILABLE_MODULE_TYPES } from './constants';
 import GitHubIcon from './assets/GitHubIcon';
+import BorderWidthIcon from './assets/BorderWidthIcon';
+import PreferencesIcon from './assets/PreferencesIcon';
 
 function App() {
   const [wifiMode, setWifiMode] = useState(null); // null = checking, 'client' = normal, 'ap' = setup mode
@@ -522,7 +524,7 @@ function App() {
 
   return (
     <div className='max-w-[480px] w-full mx-auto px-2 pt-4 pb-12 sm:px-6 sm:pt-8 sm:pb-16 bg-white min-h-screen text-black'>
-      <div className='mb-8'>
+      <div className='mb-8 pt-8 pb-4'>
         <h1 className='text-3xl sm:text-4xl leading-none font-bold tracking-tighter text-black'>PC-1 CONSOLE</h1>
       </div>
 
@@ -531,21 +533,23 @@ function App() {
         <button
           type='button'
           onClick={() => setActiveTab('general')}
-          className={`px-6 py-2 font-bold tracking-wider transition-all text-sm ${
+          className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
             activeTab === 'general'
               ? 'border-b-2 border-black text-black translate-y-[2px]'
               : 'text-gray-500 hover:text-black border-b-2 border-transparent'
           }`}>
+          <PreferencesIcon className='w-4 h-4' />
           GENERAL
         </button>
         <button
           type='button'
           onClick={() => setActiveTab('channels')}
-          className={`px-6 py-2 font-bold tracking-wider transition-all text-sm ${
+          className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
             activeTab === 'channels'
               ? 'border-b-2 border-black text-black translate-y-[2px]'
               : 'text-gray-500 hover:text-black border-b-2 border-transparent'
           }`}>
+          <BorderWidthIcon className='w-4 h-4' />
           CHANNELS
         </button>
       </div>
