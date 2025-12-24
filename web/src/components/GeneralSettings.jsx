@@ -749,16 +749,7 @@ const GeneralSettings = ({
                   <button
                     type='button'
                     onClick={() => setShowPasswordChange(!showPasswordChange)}
-                    className='flex-1 py-2.5 px-4 bg-transparent border-2 rounded-lg  font-bold transition-all cursor-pointer'
-                    style={{ color: '#CC9933', borderColor: '#CC9933' }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.color = '#2A2A2A';
-                      e.currentTarget.style.borderColor = '#2A2A2A';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.color = '#CC9933';
-                      e.currentTarget.style.borderColor = '#CC9933';
-                    }}>
+                    className='flex-1 py-2.5 px-4 bg-transparent border-2 border-gray-400 text-black rounded-lg  font-bold hover:border-black hover:bg-white transition-all cursor-pointer'>
                     {showPasswordChange ? 'Cancel' : 'Change Password'}
                   </button>
                 )}
