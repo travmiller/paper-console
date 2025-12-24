@@ -2,6 +2,8 @@ import React, { useRef } from 'react';
 import ModuleConfig from './ModuleConfig';
 import { AVAILABLE_MODULE_TYPES } from '../constants';
 import { commonClasses } from '../design-tokens';
+import CloseButton from './CloseButton';
+import PrimaryButton from './PrimaryButton';
 import BinIcon from '../assets/BinIcon';
 import GCheckIcon from '../assets/GCheckIcon';
 
@@ -33,14 +35,12 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
               <span className="font-mono">Type: {AVAILABLE_MODULE_TYPES.find((t) => t.id === module?.type)?.label}</span>
             </div>
           </div>
-          <button
+          <CloseButton
             onClick={() => {
               onSave(moduleId, module, true);
               onClose();
             }}
-            className={`text-gray-500 hover:text-black text-2xl `}>
-            &times;
-          </button>
+          />
         </div>
 
         <div className='mb-6'>
@@ -76,36 +76,23 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
             type='button' 
             onClick={() => onDelete(moduleId)} 
             className='px-4 py-2 bg-transparent border-0 rounded-lg transition-all cursor-pointer flex items-center gap-2'
-            style={{ color: '#DC7171' }}
+            style={{ color: 'var(--color-error-light)' }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.color = '#DC2626';
+              e.currentTarget.style.color = 'var(--color-error)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.color = '#DC7171';
+              e.currentTarget.style.color = 'var(--color-error-light)';
             }}>
             <BinIcon className='w-4 h-4' />
             Delete Module
           </button>
-          <button
-            type='button'
+          <PrimaryButton
             onClick={() => {
               onSave(moduleId, module, true);
               onClose();
-            }}
-            className='px-6 py-2 bg-transparent border-2 rounded-lg font-bold transition-all cursor-pointer flex items-center gap-2'
-            style={{ borderColor: '#7A756E', color: '#7A756E' }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = '#FFFFFF';
-              e.currentTarget.style.borderColor = '#2A2A2A';
-              e.currentTarget.style.color = '#2A2A2A';
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'transparent';
-              e.currentTarget.style.borderColor = '#7A756E';
-              e.currentTarget.style.color = '#7A756E';
             }}>
             Save
-          </button>
+          </PrimaryButton>
         </div>
       </div>
     </div>

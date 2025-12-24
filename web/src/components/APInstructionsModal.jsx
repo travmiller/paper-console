@@ -11,25 +11,33 @@ const APInstructionsModal = ({ show }) => {
 
         <div className='text-left space-y-4 bg-gray-50 p-4 rounded-lg border-2 border-gray-300 mb-6'>
           <div className='flex gap-3'>
-            <span className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold' style={{ backgroundColor: '#CC9933' }}>
+            <span
+              className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold'
+              style={{ backgroundColor: 'var(--color-brass)' }}>
               1
             </span>
             <p className='text-black text-sm'>Wait for the printer to print setup instructions.</p>
           </div>
           <div className='flex gap-3'>
-            <span className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold' style={{ backgroundColor: '#CC9933' }}>
+            <span
+              className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold'
+              style={{ backgroundColor: 'var(--color-brass)' }}>
               2
             </span>
             <p className='text-black text-sm'>
-              Connect your device to the <span className='text-black bg-gray-200 px-1 rounded border border-gray-300'>PC-1-Setup-XXXX</span> WiFi network.
+              Connect your device to the <span className='text-black bg-gray-200 px-1 rounded border border-gray-300'>PC-1-Setup-XXXX</span>{' '}
+              WiFi network.
             </p>
           </div>
           <div className='flex gap-3'>
-            <span className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold' style={{ backgroundColor: '#CC9933' }}>
+            <span
+              className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold'
+              style={{ backgroundColor: 'var(--color-brass)' }}>
               3
             </span>
             <p className='text-black text-sm'>
-              Navigate to <span className='text-black bg-gray-200 px-1 rounded border border-gray-300'>http://10.42.0.1</span> to configure WiFi.
+              Navigate to <span className='text-black bg-gray-200 px-1 rounded border border-gray-300'>http://10.42.0.1</span> to configure
+              WiFi.
             </p>
           </div>
         </div>

@@ -1,6 +1,7 @@
 import React, { useRef } from 'react';
 import { AVAILABLE_MODULE_TYPES } from '../constants';
 import { commonClasses } from '../design-tokens';
+import CloseButton from './CloseButton';
 import WiFiIcon from '../assets/WiFiIcon';
 
 const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModule, onOpenEdit }) => {
@@ -25,9 +26,7 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
       <div className={commonClasses.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className='flex justify-between items-center mb-6'>
           <h3 className='text-xl font-bold text-black '>Add Module to Channel {channelPosition}</h3>
-          <button onClick={onClose} className={`text-gray-500 hover:text-black text-2xl  cursor-pointer hover-shimmer`}>
-            &times;
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
 
         <div className='grid grid-cols-2 md:grid-cols-3 gap-3'>
@@ -52,7 +51,7 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
               className={`flex flex-col items-center p-4 bg-white border-2 border-gray-300 hover:border-black rounded-lg transition-colors text-center group cursor-pointer hover-shimmer`}>
               <div className="flex items-baseline justify-center gap-1.5">
                 {!type.offline && (
-                  <WiFiIcon className="w-3 h-3 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#7A756E' }} />
+                  <WiFiIcon className="w-3 h-3 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: 'var(--color-text-muted)' }} />
                 )}
                 <span className={`font-bold text-black group-hover:text-black `}>{type.label}</span>
               </div>

@@ -79,29 +79,76 @@
   font-weight: 400; /* Regular weight for better readability */
 
   color-scheme: light;
-  color: #2A2A2A;
-  background-color: #F5F2EA;
-
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --console-primary: #CC9933;
-  --console-secondary: #CC9933;
-  --console-border: #2A2A2A;
+  /* Color Tokens */
+  --color-brass: #ae861d;
+  --color-brass-10: rgba(174, 134, 29, 0.1);
   
-  --bg-base: #F5F2EA;         /* Cream/Off-white background */
-  --bg-card: #FFFCF5;         /* Slightly lighter cream for cards */
-  --bg-nested: #FFFCF5;       /* Slight contrast for items */
-  --bg-input: #FFFCF5;
+  --color-text-main: #2A2A2A;
+  --color-text-muted: #7A756E;
+  --color-text-gray-300: #9A958F;
+  --color-text-gray-400: #9A958F;
+  --color-text-gray-500: #9A958F;
+  --color-text-gray-600: #7A756E;
+  --color-text-gray-700: #6B665F;
+  --color-text-black: #000000;
+  --color-text-white: #FFFFFF;
   
-  /* Fun Accent Colors */
-  --fun-print: #CC9933;       /* Brass/Gold */
-  --fun-schedule: #CC9933;    /* Brass/Gold */
-
-  --text-main: #2A2A2A;
-  --text-muted: #7A756E;
+  --color-error: #DC2626;
+  --color-error-light: #DC7171;
+  --color-error-10: rgba(220, 38, 38, 0.1);
+  
+  --color-bg-base: #F5F2EA;
+  --color-bg-card: #FFFCF5;
+  --color-bg-nested: #FFFCF5;
+  --color-bg-input: #FFFCF5;
+  --color-bg-white: #FFFFFF;
+  --color-bg-gray-50: #E8E3DC;
+  --color-bg-gray-100: #D4CFC8;
+  --color-bg-gray-200: #C4BFB8;
+  --color-bg-dark: #1a1a1a;
+  
+  /* Ink gradient colors */
+  --color-ink-black: #000000;
+  --color-ink-gray-dark: #3a3a3a;
+  --color-ink-gray-medium: #4a4a4a;
+  --color-ink-gray-light: #525252;
+  
+  /* Ink gradient colors */
+  --color-ink-black: #000000;
+  --color-ink-gray-dark: #3a3a3a;
+  --color-ink-gray-medium: #4a4a4a;
+  --color-ink-gray-light: #525252;
+  
+  --color-border-main: #2A2A2A;
+  --color-border-gray-200: #D4CFC8;
+  --color-border-gray-300: #C4BFB8;
+  --color-border-gray-400: #9A958F;
+  --color-border-gray-600: #7A756E;
+  --color-border-gray-700: #2A2A2A;
+  --color-border-gray-800: #2A2A2A;
+  --color-border-scrollbar: #C4BFB8;
+  
+  /* Legacy/Compatibility Variables */
+  --console-primary: var(--color-brass);
+  --console-secondary: var(--color-brass);
+  --console-border: var(--color-border-main);
+  --bg-base: var(--color-bg-base);
+  --bg-card: var(--color-bg-card);
+  --bg-nested: var(--color-bg-nested);
+  --bg-input: var(--color-bg-input);
+  --fun-print: var(--color-brass);
+  --fun-schedule: var(--color-brass);
+  --text-main: var(--color-text-main);
+  --text-muted: var(--color-text-muted);
+  
+  /* Apply defaults */
+  color: var(--color-text-main);
+  background-color: var(--color-bg-base);
 }
 
 body {
@@ -111,8 +158,8 @@ body {
   min-width: 320px;
   min-height: 100vh;
   justify-content: center;
-  background-color: #F5F2EA;
-  color: var(--text-main);
+  background-color: var(--color-bg-base);
+  color: var(--color-text-main);
 }
 
 /* Custom Scrollbar */
@@ -123,43 +170,43 @@ body {
   background: var(--bg-base); 
 }
 ::-webkit-scrollbar-thumb {
-  background: #C4BFB8; 
-  border: 1px solid var(--console-border);
+  background: var(--color-border-scrollbar); 
+  border: 1px solid var(--color-border-main);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--console-border); 
+  background: var(--color-border-main);
 }
 
 /* 
    Force-include utility classes 
 */
 @layer utilities {
-  .text-white { color: #000000 !important; } 
-  .text-gray-300 { color: #9A958F !important; }
-  .text-gray-400 { color: #9A958F !important; }
-  .text-gray-500 { color: #9A958F !important; }
-  .text-gray-600 { color: #7A756E !important; }
-  .text-gray-700 { color: #6B665F !important; }
+  .text-white { color: var(--color-text-black) !important; } 
+  .text-gray-300 { color: var(--color-text-gray-300) !important; }
+  .text-gray-400 { color: var(--color-text-gray-400) !important; }
+  .text-gray-500 { color: var(--color-text-gray-500) !important; }
+  .text-gray-600 { color: var(--color-text-gray-600) !important; }
+  .text-gray-700 { color: var(--color-text-gray-700) !important; }
   
   /* Hover states - grey text and borders turn black, backgrounds turn white */
-  .hover\:text-black:hover { color: #2A2A2A !important; }
-  .group:hover .group-hover\:text-black { color: #2A2A2A !important; }
-  .hover\:border-black:hover { border-color: #2A2A2A !important; }
-  .group:hover .group-hover\:border-black { border-color: #2A2A2A !important; }
-  .hover\:bg-white:hover { background-color: #FFFFFF !important; }
-  .group:hover .group-hover\:bg-white { background-color: #FFFFFF !important; }
+  .hover\:text-black:hover { color: var(--color-text-main) !important; }
+  .group:hover .group-hover\:text-black { color: var(--color-text-main) !important; }
+  .hover\:border-black:hover { border-color: var(--color-border-main) !important; }
+  .group:hover .group-hover\:border-black { border-color: var(--color-border-main) !important; }
+  .hover\:bg-white:hover { background-color: var(--color-bg-white) !important; }
+  .group:hover .group-hover\:bg-white { background-color: var(--color-bg-white) !important; }
   
   /* Warm grey borders */
-  .border-gray-200 { border-color: #D4CFC8 !important; }
-  .border-gray-300 { border-color: #C4BFB8 !important; }
-  .border-gray-400 { border-color: #9A958F !important; }
-  .border-gray-600 { border-color: #7A756E !important; }
+  .border-gray-200 { border-color: var(--color-border-gray-200) !important; }
+  .border-gray-300 { border-color: var(--color-border-gray-300) !important; }
+  .border-gray-400 { border-color: var(--color-border-gray-400) !important; }
+  .border-gray-600 { border-color: var(--color-border-gray-600) !important; }
   
   /* Warm grey backgrounds */
-  .bg-gray-50 { background-color: #E8E3DC !important; }
-  .bg-gray-100 { background-color: #D4CFC8 !important; }
-  .bg-gray-200 { background-color: #C4BFB8 !important; }
+  .bg-gray-50 { background-color: var(--color-bg-gray-50) !important; }
+  .bg-gray-100 { background-color: var(--color-bg-gray-100) !important; }
+  .bg-gray-200 { background-color: var(--color-bg-gray-200) !important; }
   
   .text-console-primary { color: var(--console-primary) !important; }
   .text-console-secondary { color: var(--console-secondary) !important; }
@@ -180,50 +227,50 @@ body {
   .bg-bg-input { background-color: var(--bg-input) !important; }
   
   /* Override white backgrounds to cream */
-  .bg-white { background-color: #FFFCF5 !important; }
+  .bg-white { background-color: var(--color-bg-card) !important; }
   
   /* Override black text to soft black */
-  .text-black { color: #2A2A2A !important; }
+  .text-black { color: var(--color-text-main) !important; }
   
   /* Override black borders to soft black */
-  .border-black { border-color: #2A2A2A !important; }
+  .border-black { border-color: var(--color-border-main) !important; }
   
   /* Input styling */
   input, textarea, select {
-    background-color: #FFFCF5 !important;
-    color: #2A2A2A !important;
+    background-color: var(--color-bg-input) !important;
+    color: var(--color-text-main) !important;
   }
   
   input:focus, textarea:focus, select:focus {
-    border-color: #2A2A2A !important;
+    border-color: var(--color-border-main) !important;
   }
   
   /* Brass/Gold color utilities (replacing blue) */
-  .text-blue-500 { color: #CC9933 !important; }
-  .text-blue-600 { color: #CC9933 !important; }
-  .bg-blue-50 { background-color: rgba(204, 153, 51, 0.1) !important; }
-  .bg-blue-500 { background-color: #CC9933 !important; }
-  .border-blue-600 { border-color: #CC9933 !important; }
-  .hover\:bg-blue-50:hover { background-color: rgba(204, 153, 51, 0.1) !important; }
-  .accent-blue-500 { accent-color: #CC9933 !important; }
-  .focus\:ring-blue-500:focus { --tw-ring-color: #CC9933 !important; }
+  .text-blue-500 { color: var(--color-brass) !important; }
+  .text-blue-600 { color: var(--color-brass) !important; }
+  .bg-blue-50 { background-color: var(--color-brass-10) !important; }
+  .bg-blue-500 { background-color: var(--color-brass) !important; }
+  .border-blue-600 { border-color: var(--color-brass) !important; }
+  .hover\:bg-blue-50:hover { background-color: var(--color-brass-10) !important; }
+  .accent-blue-500 { accent-color: var(--color-brass) !important; }
+  .focus\:ring-blue-500:focus { --tw-ring-color: var(--color-brass) !important; }
   
   /* Error/Red color utilities (replacing amber/orange) */
-  .text-amber-700 { color: #DC2626 !important; }
-  .text-orange-500 { color: #DC2626 !important; }
-  .text-orange-600 { color: #DC2626 !important; }
-  .bg-amber-50 { background-color: rgba(220, 38, 38, 0.1) !important; }
-  .bg-orange-50 { background-color: rgba(220, 38, 38, 0.1) !important; }
-  .border-amber-700 { border-color: #DC2626 !important; }
-  .border-orange-500 { border-color: #DC2626 !important; }
+  .text-amber-700 { color: var(--color-error) !important; }
+  .text-orange-500 { color: var(--color-error) !important; }
+  .text-orange-600 { color: var(--color-error) !important; }
+  .bg-amber-50 { background-color: var(--color-error-10) !important; }
+  .bg-orange-50 { background-color: var(--color-error-10) !important; }
+  .border-amber-700 { border-color: var(--color-error) !important; }
+  .border-orange-500 { border-color: var(--color-error) !important; }
   
   /* Hover background utilities - white instead of gray */
-  .hover\:bg-gray-50:hover { background-color: #FFFFFF !important; }
-  .hover\:bg-gray-100:hover { background-color: #FFFFFF !important; }
+  .hover\:bg-gray-50:hover { background-color: var(--color-bg-white) !important; }
+  .hover\:bg-gray-100:hover { background-color: var(--color-bg-white) !important; }
   
   /* Override the dark gray borders from the legacy theme */
-  .border-gray-700 { border-color: #2A2A2A !important; }
-  .border-gray-800 { border-color: #2A2A2A !important; }
+  .border-gray-700 { border-color: var(--color-border-gray-700) !important; }
+  .border-gray-800 { border-color: var(--color-border-gray-800) !important; }
 
   /* Fun Button Utilities */
   .text-fun-print { color: var(--fun-print) !important; }
@@ -249,22 +296,22 @@ body {
 
 /* White hover background effect for warm theme */
 .hover-shimmer:hover {
-  background-color: #FFFFFF !important; /* White */
+  background-color: var(--color-bg-white) !important;
 }
 
 /* Ensure it works on elements with existing backgrounds */
 .hover-shimmer.bg-bg-input:hover,
 .hover-shimmer.bg-white:hover,
 .hover-shimmer.bg-transparent:hover {
-  background-color: #FFFFFF !important;
+  background-color: var(--color-bg-white) !important;
 }
 
 /* Inverted Active State Utilities */
 .active-inverted {
-  background-color: #2A2A2A !important;
-  color: #FFFCF5 !important;
-  border-color: #2A2A2A !important;
+  background-color: var(--color-border-main) !important;
+  color: var(--color-bg-card) !important;
+  border-color: var(--color-border-main) !important;
 }
 .active-inverted svg {
-  color: #FFFCF5 !important;
+  color: var(--color-bg-card) !important;
 }

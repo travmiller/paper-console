@@ -443,8 +443,8 @@ const ModuleConfig = ({ module, updateConfig }) => {
               checked={config.auto_print_new !== false} // Default to true
               onChange={(e) => updateConfig('auto_print_new', e.target.checked)}
               className='w-5 h-5 bg-white border-2 border-gray-300 rounded focus:ring-2'
-              style={{ accentColor: '#CC9933' }}
-              onFocus={(e) => e.currentTarget.style.setProperty('--tw-ring-color', '#CC9933', 'important')}
+              style={{ accentColor: 'var(--color-brass)' }}
+              onFocus={(e) => e.currentTarget.style.setProperty('--tw-ring-color', 'var(--color-brass)', 'important')}
             />
             <span className={`text-gray-600 text-sm `}>Automatically print new emails as they arrive (checks every minute)</span>
           </div>

@@ -1,5 +1,7 @@
 import React, { useRef } from 'react';
 import { formatTimeForDisplay } from '../utils';
+import CloseButton from './CloseButton';
+import PrimaryButton from './PrimaryButton';
 
 const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => {
   const modalMouseDownTarget = useRef(null);
@@ -20,12 +22,10 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => 
         }
         modalMouseDownTarget.current = null;
       }}>
-      <div className='border-4 rounded-xl p-4 sm:p-6 max-w-md w-full shadow-lg' style={{ backgroundColor: '#FFFCF5', borderColor: '#2A2A2A' }} onClick={(e) => e.stopPropagation()}>
+      <div className='border-4 rounded-xl p-4 sm:p-6 max-w-md w-full shadow-lg' style={{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border-main)' }} onClick={(e) => e.stopPropagation()}>
         <div className='flex justify-between items-center mb-6'>
           <h3 className='text-xl font-bold text-black '>Schedule Channel {position}</h3>
-          <button onClick={onClose} className='text-gray-500 hover:text-black text-2xl  cursor-pointer hover-shimmer'>
-            &times;
-          </button>
+          <CloseButton onClick={onClose} />
         </div>
 
         <div className='space-y-4'>
@@ -33,7 +33,7 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => 
 
           <div className='space-y-2 max-h-[300px] overflow-y-auto'>
             {(channel?.schedule || []).map((time, idx) => (
-              <div key={idx} className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-300 hover:border-black' style={{ backgroundColor: '#FFFCF5' }}>
+              <div key={idx} className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-300 hover:border-black' style={{ backgroundColor: 'var(--color-bg-card)' }}>
                 <span className='text-black  text-lg'>{formatTimeForDisplay(time, timeFormat)}</span>
                 <button
                   onClick={() => {
@@ -72,22 +72,11 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => 
                 type='time'
                 required
                 className='flex-1 border-2 border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:border-black '
-                style={{ backgroundColor: '#FFFCF5' }}
+                style={{ backgroundColor: 'var(--color-bg-card)' }}
               />
-              <button 
-                type='submit' 
-                className='bg-transparent border-2 border-black px-4 py-2 rounded-lg font-bold transition-all cursor-pointer'
-                style={{ color: '#2A2A2A', borderColor: '#2A2A2A' }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = '#2A2A2A';
-                  e.currentTarget.style.color = '#FFFFFF';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
-                  e.currentTarget.style.color = '#2A2A2A';
-                }}>
+              <PrimaryButton type="submit">
                 Add
-              </button>
+              </PrimaryButton>
             </form>
           </div>
         </div>

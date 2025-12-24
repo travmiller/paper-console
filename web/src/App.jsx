@@ -525,27 +525,31 @@ function App() {
   return (
     <div
       className='max-w-[480px] w-full mx-auto px-2 pt-4 pb-12 sm:px-6 sm:pt-8 sm:pb-16 min-h-screen'
-      style={{ backgroundColor: '#F5F2EA', color: '#2A2A2A' }}>
+      style={{ backgroundColor: 'var(--color-bg-base)', color: 'var(--color-text-main)' }}>
       <div className='mb-8 pt-4 pb-2'>
-        <h1 className='text-3xl sm:text-4xl leading-none font-bold tracking-tighter' style={{ color: '#2A2A2A' }}>
+        <h1 className='text-3xl sm:text-4xl leading-none font-bold tracking-tighter' style={{ color: 'var(--color-text-main)' }}>
           PC-1 SETTINGS
         </h1>
       </div>
 
       {/* Tabs */}
-      <div className='flex gap-2 mb-8 border-b-2 border-dashed' style={{ borderColor: '#2A2A2A' }}>
+      <div className='flex gap-2 mb-8 border-b-2 border-dashed' style={{ borderColor: 'var(--color-border-main)' }}>
         <button
           type='button'
           onClick={() => setActiveTab('general')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
             activeTab === 'general' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
           }`}
-          style={activeTab === 'general' ? { borderColor: '#2A2A2A', color: '#2A2A2A' } : { color: '#7A756E' }}
+          style={
+            activeTab === 'general'
+              ? { borderColor: 'var(--color-border-main)', color: 'var(--color-text-main)' }
+              : { color: 'var(--color-text-muted)' }
+          }
           onMouseEnter={(e) => {
-            if (activeTab !== 'general') e.currentTarget.style.color = '#2A2A2A';
+            if (activeTab !== 'general') e.currentTarget.style.color = 'var(--color-text-main)';
           }}
           onMouseLeave={(e) => {
-            if (activeTab !== 'general') e.currentTarget.style.color = '#7A756E';
+            if (activeTab !== 'general') e.currentTarget.style.color = 'var(--color-text-muted)';
           }}>
           <PreferencesIcon className='w-4 h-4' />
           GENERAL
@@ -556,12 +560,16 @@ function App() {
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
             activeTab === 'channels' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
           }`}
-          style={activeTab === 'channels' ? { borderColor: '#2A2A2A', color: '#2A2A2A' } : { color: '#7A756E' }}
+          style={
+            activeTab === 'channels'
+              ? { borderColor: 'var(--color-border-main)', color: 'var(--color-text-main)' }
+              : { color: 'var(--color-text-muted)' }
+          }
           onMouseEnter={(e) => {
-            if (activeTab !== 'channels') e.currentTarget.style.color = '#2A2A2A';
+            if (activeTab !== 'channels') e.currentTarget.style.color = 'var(--color-text-main)';
           }}
           onMouseLeave={(e) => {
-            if (activeTab !== 'channels') e.currentTarget.style.color = '#7A756E';
+            if (activeTab !== 'channels') e.currentTarget.style.color = 'var(--color-text-muted)';
           }}>
           <BorderWidthIcon className='w-4 h-4' />
           CHANNELS

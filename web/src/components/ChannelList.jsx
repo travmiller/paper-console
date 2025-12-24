@@ -1,5 +1,5 @@
 import React from 'react';
-import { AVAILABLE_MODULE_TYPES } from '../constants';
+import { AVAILABLE_MODULE_TYPES, INK_GRADIENTS } from '../constants';
 import WiFiIcon from '../assets/WiFiIcon';
 import WiFiOffIcon from '../assets/WiFiOffIcon';
 import PrintIcon from '../assets/PrintIcon';
@@ -57,17 +57,8 @@ const ChannelList = ({
             .filter((item) => item.module)
             .sort((a, b) => a.order - b.order);
 
-          // Create unique ink-like gradient for each channel
-          const inkGradients = [
-            'radial-gradient(circle at 20% 30%, #000000 0%, #3a3a3a 25%, #000000 50%, #4a4a4a 75%, #000000 100%)',
-            'radial-gradient(circle at 80% 70%, #000000 0%, #4a4a4a 20%, #000000 40%, #3a3a3a 60%, #000000 80%, #525252 100%)',
-            'radial-gradient(ellipse at 50% 20%, #000000 0%, #3a3a3a 30%, #000000 60%, #4a4a4a 90%, #000000 100%)',
-            'radial-gradient(circle at 70% 50%, #000000 0%, #525252 15%, #000000 35%, #3a3a3a 55%, #000000 75%, #4a4a4a 100%)',
-            'radial-gradient(ellipse at 30% 80%, #000000 0%, #4a4a4a 25%, #000000 50%, #3a3a3a 75%, #000000 100%)',
-            'radial-gradient(circle at 60% 40%, #000000 0%, #3a3a3a 20%, #000000 45%, #525252 70%, #000000 100%)',
-            'radial-gradient(ellipse at 40% 60%, #000000 0%, #4a4a4a 30%, #000000 60%, #3a3a3a 90%, #000000 100%)',
-            'radial-gradient(circle at 50% 50%, #000000 0%, #3a3a3a 25%, #000000 50%, #4a4a4a 75%, #000000 100%)',
-          ];
+          // Use shared ink gradients
+          const inkGradients = INK_GRADIENTS;
           
           return (
             <div key={pos} className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[pos - 1] }}>
@@ -93,12 +84,12 @@ const ChannelList = ({
                           ? 'bg-transparent shadow-sm'
                           : 'bg-transparent border-gray-300 hover:border-black hover:bg-white'
                       }`}
-                      style={channel.schedule && channel.schedule.length > 0 ? { color: '#CC9933', borderColor: '#CC9933' } : {}}
-                      onMouseEnter={(e) => { if (channel.schedule && channel.schedule.length > 0) e.currentTarget.style.backgroundColor = 'rgba(204, 153, 51, 0.1)'; }}
+                      style={channel.schedule && channel.schedule.length > 0 ? { color: 'var(--color-brass)', borderColor: 'var(--color-brass)' } : {}}
+                      onMouseEnter={(e) => { if (channel.schedule && channel.schedule.length > 0) e.currentTarget.style.backgroundColor = 'var(--color-brass-10)'; }}
                       onMouseLeave={(e) => { if (channel.schedule && channel.schedule.length > 0) e.currentTarget.style.backgroundColor = 'transparent'; }}
                       title='Configure Schedule'>
-                      <ScheduleIcon className={`w-3.5 h-3.5 transition-all ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: '#CC9933' } : {}} />
-                      <span className={`text-xs font-bold ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: '#CC9933' } : {}}>{channel.schedule?.length || 0}</span>
+                      <ScheduleIcon className={`w-3.5 h-3.5 transition-all ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: 'var(--color-brass)' } : {}} />
+                      <span className={`text-xs font-bold ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: 'var(--color-brass)' } : {}}>{channel.schedule?.length || 0}</span>
                     </button>
                   </div>
                 </div>
@@ -133,9 +124,9 @@ const ChannelList = ({
                   <div
                     key={item.module_id}
                     className='flex items-center justify-between p-2 rounded-lg border-2 border-gray-600 hover:border-black group transition-all cursor-pointer'
-                    style={{ backgroundColor: '#FFFCF5' }}
-                    onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', '#FFFFFF', 'important')}
-                    onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', '#FFFCF5', 'important')}
+                    style={{ backgroundColor: 'var(--color-bg-card)' }}
+                    onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-white)', 'important')}
+                    onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-card)', 'important')}
                     onClick={() => {
                       setShowEditModuleModal(item.module_id);
                       setEditingModule(JSON.parse(JSON.stringify(modules[item.module_id])));
@@ -153,11 +144,11 @@ const ChannelList = ({
                         // - Red: No WiFi
                         // - Brass: WiFi connected but needs setup
                         // - Grey: WiFi connected and configured
-                        let iconColor = '#7A756E'; // Default grey
+                        let iconColor = 'var(--color-text-muted)'; // Default grey
                         if (!hasWifi) {
-                          iconColor = '#DC2626'; // Red for no WiFi
+                          iconColor = 'var(--color-error)'; // Red for no WiFi
                         } else if (needsSetup) {
-                          iconColor = '#CC9933'; // Brass for needs setup
+                          iconColor = 'var(--color-brass)'; // Brass for needs setup
                         }
 
                         return (
@@ -167,15 +158,15 @@ const ChannelList = ({
                         className={`text-[10px]  truncate flex items-baseline gap-1 ${
                           needsSetup ? '' : 'text-gray-700'
                         }`}
-                        style={needsSetup ? { color: '#CC9933' } : {}}>
+                        style={needsSetup ? { color: 'var(--color-brass)' } : {}}>
                         {isOnline && (
                           hasWifi ? (
                             <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0 group-hover:text-black transition-colors" style={{ transform: 'translateY(0.125rem)', color: iconColor }} />
                           ) : (
-                            <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#DC2626' }} />
+                            <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: 'var(--color-error)' }} />
                           )
                         )}
-                        <span className="truncate font-mono group-hover:text-black transition-colors" style={{ color: '#7A756E' }}>{typeMeta?.label?.toUpperCase()}</span>
+                        <span className="truncate font-mono group-hover:text-black transition-colors" style={{ color: 'var(--color-text-muted)' }}>{typeMeta?.label?.toUpperCase()}</span>
                       </div>
                           </>
                         );
@@ -190,13 +181,13 @@ const ChannelList = ({
                           className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
                           onMouseEnter={(e) => {
                             const icon = e.currentTarget.querySelector('svg');
-                            if (icon) icon.style.color = '#2A2A2A';
+                            if (icon) icon.style.color = 'var(--color-text-main)';
                           }}
                           onMouseLeave={(e) => {
                             const icon = e.currentTarget.querySelector('svg');
-                            if (icon) icon.style.color = '#7A756E';
+                            if (icon) icon.style.color = 'var(--color-text-muted)';
                           }}>
-                          <ArrowUpIcon className='w-2.5 h-2.5 transition-colors' style={{ color: '#7A756E' }} />
+                          <ArrowUpIcon className='w-2.5 h-2.5 transition-colors' style={{ color: 'var(--color-text-muted)' }} />
                         </button>
                         <button
                           type='button'
@@ -205,13 +196,13 @@ const ChannelList = ({
                           className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
                           onMouseEnter={(e) => {
                             const icon = e.currentTarget.querySelector('svg');
-                            if (icon) icon.style.color = '#2A2A2A';
+                            if (icon) icon.style.color = 'var(--color-text-main)';
                           }}
                           onMouseLeave={(e) => {
                             const icon = e.currentTarget.querySelector('svg');
-                            if (icon) icon.style.color = '#7A756E';
+                            if (icon) icon.style.color = 'var(--color-text-muted)';
                           }}>
-                          <ArrowDownIcon className='w-2.5 h-2.5 transition-colors' style={{ color: '#7A756E' }} />
+                          <ArrowDownIcon className='w-2.5 h-2.5 transition-colors' style={{ color: 'var(--color-text-muted)' }} />
                         </button>
                       </div>
                     </div>
@@ -225,7 +216,7 @@ const ChannelList = ({
                   onClick={() => setShowAddModuleModal(pos)}
                   className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer'
                   style={{ backgroundColor: 'transparent' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-white)'}
                   onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   title='Add a module to this channel'>
                   + ADD MODULE

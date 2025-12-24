@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { formatTimeForDisplay } from '../utils';
+import { INK_GRADIENTS } from '../constants';
+import PrimaryButton from './PrimaryButton';
 import WiFiIcon from '../assets/WiFiIcon';
 import WiFiOffIcon from '../assets/WiFiOffIcon';
 
@@ -17,14 +19,8 @@ const GeneralSettings = ({
   const inputClass = 'w-full p-3 text-base border-2 border-gray-300 rounded-lg focus:outline-none box-border';
   const labelClass = 'block mb-2 font-bold';
 
-  // Create unique ink-like gradient for each card
-  const inkGradients = [
-    'radial-gradient(circle at 20% 30%, #000000 0%, #3a3a3a 25%, #000000 50%, #4a4a4a 75%, #000000 100%)',
-    'radial-gradient(circle at 80% 70%, #000000 0%, #4a4a4a 20%, #000000 40%, #3a3a3a 60%, #000000 80%, #525252 100%)',
-    'radial-gradient(ellipse at 50% 20%, #000000 0%, #3a3a3a 30%, #000000 60%, #4a4a4a 90%, #000000 100%)',
-    'radial-gradient(circle at 70% 50%, #000000 0%, #525252 15%, #000000 35%, #3a3a3a 55%, #000000 75%, #4a4a4a 100%)',
-    'radial-gradient(ellipse at 30% 80%, #000000 0%, #4a4a4a 25%, #000000 50%, #3a3a3a 75%, #000000 100%)',
-  ];
+  // Use shared ink gradients
+  const inkGradients = INK_GRADIENTS;
 
   // System time state
   const [currentTime, setCurrentTime] = useState(null);
@@ -303,9 +299,9 @@ const GeneralSettings = ({
               <div className='flex-1'>
                 <div className='flex items-center gap-2'>
                   {wifiStatus.connected ? (
-                    <WiFiIcon className='w-4 h-4' style={{ color: '#7A756E' }} />
+                    <WiFiIcon className='w-4 h-4' style={{ color: 'var(--color-text-muted)' }} />
                   ) : (
-                    <WiFiOffIcon className='w-4 h-4' style={{ color: '#DC2626' }} />
+                    <WiFiOffIcon className='w-4 h-4' style={{ color: 'var(--color-error)' }} />
                   )}
                   <span className='font-bold text-black '>
                     {wifiStatus.connected && wifiStatus.ssid
@@ -318,9 +314,9 @@ const GeneralSettings = ({
                     type='button'
                     onClick={triggerAPMode}
                     className='text-xs underline ml-2 cursor-pointer font-bold'
-                    style={{ color: '#CC9933' }}
-                    onMouseEnter={(e) => (e.currentTarget.style.color = '#2A2A2A')}
-                    onMouseLeave={(e) => (e.currentTarget.style.color = '#CC9933')}>
+                    style={{ color: 'var(--color-brass)' }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--color-text-main)')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--color-brass)')}>
                     Reset WiFi
                   </button>
                 </div>
@@ -436,7 +432,7 @@ const GeneralSettings = ({
                           <div className='text-lg font-bold text-black'>
                             {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
                           </div>
-                          <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#7A756E' }} />
+                          <WiFiIcon className='w-3.5 h-3.5' style={{ color: 'var(--color-text-muted)' }} />
                         </div>
                       </div>
                     )}
@@ -454,7 +450,7 @@ const GeneralSettings = ({
                           <div className='text-lg font-bold text-black'>
                             {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
                           </div>
-                          <WiFiOffIcon className='w-3.5 h-3.5' style={{ color: '#DC2626' }} />
+                          <WiFiOffIcon className='w-3.5 h-3.5' style={{ color: 'var(--color-error)' }} />
                         </div>
                       </div>
                     )}
@@ -492,12 +488,9 @@ const GeneralSettings = ({
                     />
                   </div>
                 </div>
-                <button
-                  type='button'
-                  onClick={setTimeManually}
-                  className='w-full py-2.5 px-4 bg-transparent border-2 border-black text-black rounded-lg  font-bold hover:bg-white transition-all cursor-pointer'>
+                <PrimaryButton onClick={setTimeManually} className='w-full'>
                   Set System Time
-                </button>
+                </PrimaryButton>
                 <p className='text-xs text-gray-600 mt-2 text-center '>Use this when offline or to set a specific time</p>
               </div>
             )}
@@ -735,12 +728,12 @@ const GeneralSettings = ({
                     }}
                     disabled={sshLoading}
                     className='flex-1 py-2.5 px-4 bg-transparent border-0 rounded-lg transition-all cursor-pointer disabled:opacity-30 disabled:cursor-not-allowed font-bold'
-                    style={{ color: '#DC7171' }}
+                    style={{ color: 'var(--color-error-light)' }}
                     onMouseEnter={(e) => {
-                      if (!sshLoading) e.currentTarget.style.color = '#DC2626';
+                      if (!sshLoading) e.currentTarget.style.color = 'var(--color-error)';
                     }}
                     onMouseLeave={(e) => {
-                      if (!sshLoading) e.currentTarget.style.color = '#DC7171';
+                      if (!sshLoading) e.currentTarget.style.color = 'var(--color-error-light)';
                     }}>
                     {sshLoading ? 'Disabling...' : 'Disable SSH'}
                   </button>
@@ -782,8 +775,7 @@ const GeneralSettings = ({
                         minLength={8}
                       />
                     </div>
-                    <button
-                      type='button'
+                    <PrimaryButton
                       onClick={async () => {
                         if (!newPassword || newPassword.length < 8) {
                           setSshMessage({ type: 'error', message: 'Password must be at least 8 characters' });
@@ -820,9 +812,10 @@ const GeneralSettings = ({
                         }
                       }}
                       disabled={changingPassword || !newPassword || !confirmPassword}
-                      className='w-full py-2.5 px-4 bg-transparent border-2 border-black text-black disabled:border-gray-300 disabled:text-gray-400 disabled:cursor-not-allowed rounded-lg  font-bold hover:bg-black hover:text-white transition-all cursor-pointer'>
-                      {changingPassword ? 'Changing...' : 'Change Password'}
-                    </button>
+                      loading={changingPassword}
+                      className='w-full'>
+                      Change Password
+                    </PrimaryButton>
                   </div>
                 </div>
               )}
