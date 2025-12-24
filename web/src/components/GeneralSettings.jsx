@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatTimeForDisplay } from '../utils';
 
 const WiFiIcon = ({ className }) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -472,6 +473,14 @@ const GeneralSettings = ({
                   <p className='text-sm text-black mb-3 '>
                     Time will automatically sync with NTP servers when connected to the internet.
                   </p>
+                  {currentTime && (
+                    <div className='mb-3 p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
+                      <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Time</div>
+                      <div className='text-lg font-bold text-black'>
+                        {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
+                      </div>
+                    </div>
+                  )}
                   <button
                     type='button'
                     onClick={syncTimeAutomatically}
@@ -480,9 +489,19 @@ const GeneralSettings = ({
                   </button>
                 </div>
               ) : (
-                <p className='text-sm text-yellow-700 '>
-                  ⚠️ Internet connection required for automatic time synchronization. Connect to WiFi or use manual mode.
-                </p>
+                <div>
+                  <p className='text-sm text-yellow-700 mb-3 '>
+                    ⚠️ Internet connection required for automatic time synchronization. Connect to WiFi or use manual mode.
+                  </p>
+                  {currentTime && (
+                    <div className='p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
+                      <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Time</div>
+                      <div className='text-lg font-bold text-black'>
+                        {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           )}
