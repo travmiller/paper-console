@@ -20,7 +20,7 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => 
         }
         modalMouseDownTarget.current = null;
       }}>
-      <div className='bg-white border-4 border-black rounded-xl p-4 sm:p-6 max-w-md w-full shadow-lg' onClick={(e) => e.stopPropagation()}>
+      <div className='border-4 rounded-xl p-4 sm:p-6 max-w-md w-full shadow-lg' style={{ backgroundColor: '#FFFCF5', borderColor: '#2A2A2A' }} onClick={(e) => e.stopPropagation()}>
         <div className='flex justify-between items-center mb-6'>
           <h3 className='text-xl font-bold text-black '>Schedule Channel {position}</h3>
           <button onClick={onClose} className='text-gray-500 hover:text-black text-2xl  cursor-pointer hover-shimmer'>
@@ -33,7 +33,7 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => 
 
           <div className='space-y-2 max-h-[300px] overflow-y-auto'>
             {(channel?.schedule || []).map((time, idx) => (
-              <div key={idx} className='flex items-center justify-between bg-gray-50 p-3 rounded-lg border-2 border-gray-300 hover:border-black'>
+              <div key={idx} className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-300 hover:border-black' style={{ backgroundColor: '#FFFCF5' }}>
                 <span className='text-black  text-lg'>{formatTimeForDisplay(time, timeFormat)}</span>
                 <button
                   onClick={() => {
@@ -71,9 +71,21 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => 
                 name='timeInput'
                 type='time'
                 required
-                className='flex-1 bg-white border-2 border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:border-black '
+                className='flex-1 border-2 border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:border-black '
+                style={{ backgroundColor: '#FFFCF5' }}
               />
-              <button type='submit' className='bg-transparent border-2 border-black text-black px-4 py-2 rounded-lg  font-bold hover:bg-black hover:text-white transition-all cursor-pointer'>
+              <button 
+                type='submit' 
+                className='bg-transparent border-2 border-black px-4 py-2 rounded-lg font-bold transition-all cursor-pointer'
+                style={{ color: '#2A2A2A', borderColor: '#2A2A2A' }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = '#2A2A2A';
+                  e.currentTarget.style.color = '#FFFFFF';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#2A2A2A';
+                }}>
                 Add
               </button>
             </form>

@@ -11,13 +11,13 @@ const APInstructionsModal = ({ show }) => {
 
         <div className='text-left space-y-4 bg-gray-50 p-4 rounded-lg border-2 border-gray-300 mb-6'>
           <div className='flex gap-3'>
-            <span className='flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold'>
+            <span className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold' style={{ backgroundColor: '#CC9933' }}>
               1
             </span>
             <p className='text-black text-sm'>Wait for the printer to print setup instructions.</p>
           </div>
           <div className='flex gap-3'>
-            <span className='flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold'>
+            <span className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold' style={{ backgroundColor: '#CC9933' }}>
               2
             </span>
             <p className='text-black text-sm'>
@@ -25,7 +25,7 @@ const APInstructionsModal = ({ show }) => {
             </p>
           </div>
           <div className='flex gap-3'>
-            <span className='flex-shrink-0 w-6 h-6 rounded-full bg-blue-500 text-white flex items-center justify-center text-sm font-bold'>
+            <span className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold' style={{ backgroundColor: '#CC9933' }}>
               3
             </span>
             <p className='text-black text-sm'>

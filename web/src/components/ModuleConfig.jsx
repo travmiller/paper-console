@@ -366,7 +366,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
                   <li
                     key={result.id}
                     onClick={() => selectLocation(result)}
-                    className={`p-3 cursor-pointer border-b-2 border-gray-200 last:border-0 hover:bg-gray-100 transition-colors hover-shimmer`}>
+                    className={`p-3 cursor-pointer border-b-2 border-gray-200 last:border-0 hover:bg-white transition-colors hover-shimmer`}>
                     <strong>{result.name}</strong>
                     <span className={`${commonClasses.textSubtle} text-xs ml-2`}>
                       {result.state} {result.zipcode ? `(${result.zipcode})` : ''}
@@ -442,7 +442,9 @@ const ModuleConfig = ({ module, updateConfig }) => {
               type='checkbox'
               checked={config.auto_print_new !== false} // Default to true
               onChange={(e) => updateConfig('auto_print_new', e.target.checked)}
-              className='w-5 h-5 accent-blue-500 bg-white border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2'
+              className='w-5 h-5 bg-white border-2 border-gray-300 rounded focus:ring-2'
+              style={{ accentColor: '#CC9933' }}
+              onFocus={(e) => e.currentTarget.style.setProperty('--tw-ring-color', '#CC9933', 'important')}
             />
             <span className={`text-gray-600 text-sm `}>Automatically print new emails as they arrive (checks every minute)</span>
           </div>
@@ -582,30 +584,43 @@ const ModuleConfig = ({ module, updateConfig }) => {
     }, []);
 
     return (
-      <div className='space-y-2'>
+      <div className='space-y-3'>
         <div>
           <label className={labelClass}>Items</label>
-          <div className='space-y-2'>
+          <div className='space-y-1.5 max-h-[400px] overflow-y-auto pr-2'>
             {(config.items || []).map((item, index) => (
-              <div key={index} className={`${commonClasses.cardNestedSmall} flex gap-2 items-center`}>
-                <input
+              <div key={index} className='flex gap-2 items-center group'>
+                <span className='text-xs text-gray-400 flex-shrink-0 self-start pt-1.5' style={{ fontFamily: 'monospace' }}>☐</span>
+                <textarea
                   ref={(el) => (inputRefs.current[`item-${index}`] = el)}
-                  type='text'
                   value={item?.text || ''}
                   onChange={(e) => updateChecklistItem(index, e.target.value)}
                   onKeyDown={(e) => handleKeyDown(e, index)}
                   placeholder='Enter item...'
-                  className={`${commonClasses.inputSmall} flex-1`}
+                  rows={1}
+                  className='flex-1 px-2 py-1.5 text-sm bg-transparent border-0 text-black focus:outline-none transition-colors resize-none overflow-hidden'
+                  style={{ backgroundColor: 'transparent', minHeight: '1.5rem' }}
+                  onInput={(e) => {
+                    e.target.style.height = 'auto';
+                    e.target.style.height = e.target.scrollHeight + 'px';
+                  }}
                 />
-                <button type='button' onClick={() => removeChecklistItem(index)} className={`${commonClasses.buttonDanger} flex-shrink-0`}>
+                <button 
+                  type='button' 
+                  onClick={() => removeChecklistItem(index)} 
+                  className='opacity-0 group-hover:opacity-100 px-2 py-1 text-base text-red-600 hover:text-red-700 font-bold transition-opacity cursor-pointer'
+                  title='Remove item'>
                   ×
                 </button>
               </div>
             ))}
-            <button type='button' onClick={() => addChecklistItem()} className={`${commonClasses.buttonSecondary} w-full py-1.5 text-sm`}>
-              + Add Item
-            </button>
           </div>
+          <button 
+            type='button' 
+            onClick={() => addChecklistItem()} 
+            className='mt-3 w-full px-3 py-1.5 text-sm bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-500 hover:text-black transition-all cursor-pointer'>
+            + Add Item
+          </button>
         </div>
       </div>
     );

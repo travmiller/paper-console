@@ -1,7 +1,7 @@
 import React from 'react';
 
-const WiFiOffIcon = ({ className }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16">
+const WiFiOffIcon = ({ className, style, ...props }) => (
+  <svg className={className} style={style} xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" {...props}>
     <title>wifi-off</title>
     <g fill="currentColor">
       <path fill="currentColor" d="M8.142,7.507C8.094,7.506,8.048,7.5,8,7.5c-1.9,0-3.6,0.7-4.9,2.1L4.5,11 c0.798-0.886,1.912-1.357,3.06-1.457L8.142,7.507z"></path>

@@ -523,21 +523,30 @@ function App() {
   }
 
   return (
-    <div className='max-w-[480px] w-full mx-auto px-2 pt-4 pb-12 sm:px-6 sm:pt-8 sm:pb-16 bg-white min-h-screen text-black'>
+    <div
+      className='max-w-[480px] w-full mx-auto px-2 pt-4 pb-12 sm:px-6 sm:pt-8 sm:pb-16 min-h-screen'
+      style={{ backgroundColor: '#F5F2EA', color: '#2A2A2A' }}>
       <div className='mb-8 pt-4 pb-2'>
-        <h1 className='text-3xl sm:text-4xl leading-none font-bold tracking-tighter text-black'>PC-1 CONSOLE</h1>
+        <h1 className='text-3xl sm:text-4xl leading-none font-bold tracking-tighter' style={{ color: '#2A2A2A' }}>
+          PC-1 CONSOLE
+        </h1>
       </div>
 
       {/* Tabs */}
-      <div className='flex gap-2 mb-8 border-b-2 border-dashed border-gray-400'>
+      <div className='flex gap-2 mb-8 border-b-2 border-dashed' style={{ borderColor: '#2A2A2A' }}>
         <button
           type='button'
           onClick={() => setActiveTab('general')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
-            activeTab === 'general'
-              ? 'border-b-2 border-black text-black translate-y-[2px]'
-              : 'text-gray-500 hover:text-black border-b-2 border-transparent'
-          }`}>
+            activeTab === 'general' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
+          }`}
+          style={activeTab === 'general' ? { borderColor: '#2A2A2A', color: '#2A2A2A' } : { color: '#666666' }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'general') e.currentTarget.style.color = '#2A2A2A';
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'general') e.currentTarget.style.color = '#666666';
+          }}>
           <PreferencesIcon className='w-4 h-4' />
           GENERAL
         </button>
@@ -545,10 +554,15 @@ function App() {
           type='button'
           onClick={() => setActiveTab('channels')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
-            activeTab === 'channels'
-              ? 'border-b-2 border-black text-black translate-y-[2px]'
-              : 'text-gray-500 hover:text-black border-b-2 border-transparent'
-          }`}>
+            activeTab === 'channels' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
+          }`}
+          style={activeTab === 'channels' ? { borderColor: '#2A2A2A', color: '#2A2A2A' } : { color: '#666666' }}
+          onMouseEnter={(e) => {
+            if (activeTab !== 'channels') e.currentTarget.style.color = '#2A2A2A';
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'channels') e.currentTarget.style.color = '#666666';
+          }}>
           <BorderWidthIcon className='w-4 h-4' />
           CHANNELS
         </button>

@@ -16,8 +16,8 @@ const GeneralSettings = ({
   wifiStatus,
 }) => {
     const inputClass =
-    'w-full p-3 text-base bg-white border-2 border-gray-300 rounded-lg text-black focus:border-black focus:outline-none box-border';
-  const labelClass = 'block mb-2 font-bold text-black';
+    'w-full p-3 text-base border-2 border-gray-300 rounded-lg focus:outline-none box-border';
+  const labelClass = 'block mb-2 font-bold';
 
   // Create unique ink-like gradient for each card
   const inkGradients = [
@@ -294,9 +294,9 @@ const GeneralSettings = ({
             <div className='flex-1'>
               <div className='flex items-center gap-2'>
                 {wifiStatus.connected ? (
-                  <WiFiIcon className='w-4 h-4 text-blue-600' />
+                  <WiFiIcon className='w-4 h-4' style={{ color: '#666666' }} />
                 ) : (
-                  <WiFiOffIcon className='w-4 h-4 text-amber-700' />
+                  <WiFiOffIcon className='w-4 h-4' style={{ color: '#DC2626' }} />
                 )}
                 <span className='font-bold text-black '>
                   {wifiStatus.connected && wifiStatus.ssid
@@ -305,7 +305,7 @@ const GeneralSettings = ({
                     ? 'Setup Mode (AP)'
                     : 'Not Connected'}
                 </span>
-                <button type='button' onClick={triggerAPMode} className='text-xs text-blue-500 hover:text-black underline ml-2  cursor-pointer'>
+                <button type='button' onClick={triggerAPMode} className='text-xs underline ml-2 cursor-pointer' style={{ color: '#CC9933' }} onMouseEnter={(e) => e.currentTarget.style.color = '#2A2A2A'} onMouseLeave={(e) => e.currentTarget.style.color = '#CC9933'}>
                   Reset WiFi
                 </button>
               </div>
@@ -345,7 +345,7 @@ const GeneralSettings = ({
                 <li
                   key={result.id}
                   onClick={() => selectLocation(result)}
-                  className='p-3 cursor-pointer border-b-2 border-gray-200 last:border-0 hover:bg-gray-100 transition-colors group'>
+                  className='p-3 cursor-pointer border-b-2 border-gray-200 last:border-0 hover:bg-white transition-colors group'>
                   <div className='flex items-start justify-between'>
                     <div className='flex-1 min-w-0'>
                       <div className='flex items-center gap-2'>
@@ -490,7 +490,7 @@ const GeneralSettings = ({
                         <div className='text-lg font-bold text-black'>
                           {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
                         </div>
-                        <WiFiIcon className='w-3.5 h-3.5 text-blue-600' />
+                        <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#666666' }} />
                       </div>
                     </div>
                   )}
@@ -514,7 +514,7 @@ const GeneralSettings = ({
                         <div className='text-lg font-bold text-black'>
                           {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
                         </div>
-                        <WiFiOffIcon className='w-3.5 h-3.5 text-amber-700' />
+                        <WiFiOffIcon className='w-3.5 h-3.5' style={{ color: '#DC2626' }} />
                       </div>
                     </div>
                   )}
@@ -725,7 +725,7 @@ const GeneralSettings = ({
                 <button
                   type='button'
                   onClick={() => setShowPasswordChange(!showPasswordChange)}
-                  className='flex-1 py-2.5 px-4 bg-transparent border-2 border-gray-400 text-black rounded-lg  font-bold hover:border-black hover:bg-gray-100 transition-all cursor-pointer'>
+                  className='flex-1 py-2.5 px-4 bg-transparent border-2 border-gray-400 text-black rounded-lg  font-bold hover:border-black hover:bg-white transition-all cursor-pointer'>
                   {showPasswordChange ? 'Cancel' : 'Change Password'}
                 </button>
               )}

@@ -52,7 +52,7 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
               className={`flex flex-col items-center p-4 bg-white border-2 border-gray-300 hover:border-black rounded-lg transition-colors text-center group cursor-pointer hover-shimmer`}>
               <div className="flex items-baseline justify-center gap-1.5">
                 {!type.offline && (
-                  <WiFiIcon className="w-3 h-3 text-blue-600 flex-shrink-0" style={{ transform: 'translateY(0.125rem)' }} />
+                  <WiFiIcon className="w-3 h-3 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#666666' }} />
                 )}
                 <span className={`font-bold text-black group-hover:text-black `}>{type.label}</span>
               </div>

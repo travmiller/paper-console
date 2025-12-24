@@ -81,7 +81,7 @@ const ChannelList = ({
                     <button
                       type='button'
                       onClick={() => triggerChannelPrint(pos)}
-                      className='group flex items-center justify-center px-2 py-1 rounded border-2 bg-transparent border-gray-300 hover:border-black hover:bg-gray-100 transition-all cursor-pointer'
+                      className='group flex items-center justify-center px-2 py-1 rounded border-2 bg-transparent border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
                       title='Print Channel'>
                       <PrintIcon className='w-3.5 h-3.5 text-gray-400 group-hover:text-black transition-all' />
                     </button>
@@ -90,12 +90,15 @@ const ChannelList = ({
                       onClick={() => setShowScheduleModal(pos)}
                       className={`group flex items-center gap-1 px-2 py-1 rounded border-2 transition-all cursor-pointer ${
                         channel.schedule && channel.schedule.length > 0
-                          ? 'bg-transparent text-blue-600 border-blue-600 hover:bg-blue-50 shadow-sm'
-                          : 'bg-transparent border-gray-300 hover:border-black hover:bg-gray-100'
+                          ? 'bg-transparent shadow-sm'
+                          : 'bg-transparent border-gray-300 hover:border-black hover:bg-white'
                       }`}
+                      style={channel.schedule && channel.schedule.length > 0 ? { color: '#CC9933', borderColor: '#CC9933' } : {}}
+                      onMouseEnter={(e) => { if (channel.schedule && channel.schedule.length > 0) e.currentTarget.style.backgroundColor = 'rgba(204, 153, 51, 0.1)'; }}
+                      onMouseLeave={(e) => { if (channel.schedule && channel.schedule.length > 0) e.currentTarget.style.backgroundColor = 'transparent'; }}
                       title='Configure Schedule'>
-                      <ScheduleIcon className={`w-3.5 h-3.5 transition-all ${channel.schedule?.length > 0 ? 'text-blue-600' : 'text-gray-400 group-hover:text-black'}`} />
-                      <span className={`text-xs  font-bold ${channel.schedule?.length > 0 ? 'text-blue-600' : 'text-gray-400 group-hover:text-black'}`}>{channel.schedule?.length || 0}</span>
+                      <ScheduleIcon className={`w-3.5 h-3.5 transition-all ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: '#CC9933' } : {}} />
+                      <span className={`text-xs font-bold ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: '#CC9933' } : {}}>{channel.schedule?.length || 0}</span>
                     </button>
                   </div>
                 </div>
@@ -107,7 +110,7 @@ const ChannelList = ({
                       swapChannels(pos, pos - 1);
                     }}
                     disabled={pos === 1}
-                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-gray-600 hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-gray-100'
+                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-gray-600 hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white'
                     title='Move channel up'>
                     <ArrowUpIcon className='w-3 h-3' />
                   </button>
@@ -118,7 +121,7 @@ const ChannelList = ({
                       swapChannels(pos, pos + 1);
                     }}
                     disabled={pos === 8}
-                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-gray-600 hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-gray-100'
+                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-gray-600 hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white'
                     title='Move channel down'>
                     <ArrowDownIcon className='w-3 h-3' />
                   </button>
@@ -129,7 +132,10 @@ const ChannelList = ({
                 {channelModules.map((item, idx) => (
                   <div
                     key={item.module_id}
-                    className='flex items-center justify-between p-2 bg-bg-input rounded-lg border-2 border-gray-600 hover:border-black hover:bg-gray-100 group transition-all cursor-pointer'
+                    className='flex items-center justify-between p-2 bg-bg-input rounded-lg border-2 border-gray-600 hover:border-black group transition-all cursor-pointer'
+                    style={{ backgroundColor: '#FFFCF5' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FFFCF5'}
                     onClick={() => {
                       setShowEditModuleModal(item.module_id);
                       setEditingModule(JSON.parse(JSON.stringify(modules[item.module_id])));
@@ -147,16 +153,17 @@ const ChannelList = ({
                       <div className='text-sm font-bold text-gray-700 group-hover:text-black  truncate transition-colors'>{item.module.name}</div>
                       <div
                         className={`text-[10px]  truncate flex items-baseline gap-1 ${
-                          needsSetup ? 'text-amber-700' : 'text-gray-700'
-                        }`}>
+                          needsSetup ? '' : 'text-gray-700'
+                        }`}
+                        style={needsSetup ? { color: '#DC2626' } : {}}>
                         {isOnline && (
                           wifiStatus?.connected ? (
-                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)' }} />
+                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#666666' }} />
                           ) : (
-                            <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0 text-amber-700" style={{ transform: 'translateY(0.125rem)' }} />
+                            <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#DC2626' }} />
                           )
                         )}
-                        <span className="truncate font-mono">{typeMeta?.label?.toUpperCase()}</span>
+                        <span className="truncate font-mono" style={{ color: '#666666' }}>{typeMeta?.label?.toUpperCase()}</span>
                       </div>
                           </>
                         );
@@ -188,7 +195,10 @@ const ChannelList = ({
                 <button
                   type='button'
                   onClick={() => setShowAddModuleModal(pos)}
-                  className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer hover:bg-gray-50'
+                  className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer'
+                  style={{ backgroundColor: 'transparent' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                   title='Add a module to this channel'>
                   + ADD MODULE
                 </button>

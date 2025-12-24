@@ -79,28 +79,28 @@
   font-weight: 400; /* Regular weight for better readability */
 
   color-scheme: light;
-  color: #000000;
-  background-color: #ffffff;
+  color: #2A2A2A;
+  background-color: #F5F2EA;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --console-primary: #ff3300;
-  --console-secondary: #0055ff;
-  --console-border: #000000;
+  --console-primary: #CC9933;
+  --console-secondary: #CC9933;
+  --console-border: #2A2A2A;
   
-  --bg-base: #e8e8e5;         /* Bone / Paper Grey */
-  --bg-card: #ffffff;         /* Pure White Panels */
-  --bg-nested: #f4f4f4;       /* Slight contrast for items */
-  --bg-input: #ffffff;
+  --bg-base: #F5F2EA;         /* Cream/Off-white background */
+  --bg-card: #FFFCF5;         /* Slightly lighter cream for cards */
+  --bg-nested: #FFFCF5;       /* Slight contrast for items */
+  --bg-input: #FFFCF5;
   
   /* Fun Accent Colors */
-  --fun-print: #0055ff;       /* Electric Blue */
-  --fun-schedule: #00cc66;    /* Vibrant Green */
+  --fun-print: #CC9933;       /* Brass/Gold */
+  --fun-schedule: #CC9933;    /* Brass/Gold */
 
-  --text-main: #000000;
+  --text-main: #2A2A2A;
   --text-muted: #666666;
 }
 
@@ -111,7 +111,7 @@ body {
   min-width: 320px;
   min-height: 100vh;
   justify-content: center;
-  background-color: #ffffff;
+  background-color: #F5F2EA;
   color: var(--text-main);
 }
 
@@ -158,9 +158,51 @@ body {
   .bg-bg-nested { background-color: var(--bg-nested) !important; }
   .bg-bg-input { background-color: var(--bg-input) !important; }
   
+  /* Override white backgrounds to cream */
+  .bg-white { background-color: #FFFCF5 !important; }
+  
+  /* Override black text to soft black */
+  .text-black { color: #2A2A2A !important; }
+  
+  /* Override black borders to soft black */
+  .border-black { border-color: #2A2A2A !important; }
+  
+  /* Input styling */
+  input, textarea, select {
+    background-color: #FFFCF5 !important;
+    color: #2A2A2A !important;
+  }
+  
+  input:focus, textarea:focus, select:focus {
+    border-color: #2A2A2A !important;
+  }
+  
+  /* Brass/Gold color utilities (replacing blue) */
+  .text-blue-500 { color: #CC9933 !important; }
+  .text-blue-600 { color: #CC9933 !important; }
+  .bg-blue-50 { background-color: rgba(204, 153, 51, 0.1) !important; }
+  .bg-blue-500 { background-color: #CC9933 !important; }
+  .border-blue-600 { border-color: #CC9933 !important; }
+  .hover\:bg-blue-50:hover { background-color: rgba(204, 153, 51, 0.1) !important; }
+  .accent-blue-500 { accent-color: #CC9933 !important; }
+  .focus\:ring-blue-500:focus { --tw-ring-color: #CC9933 !important; }
+  
+  /* Error/Red color utilities (replacing amber/orange) */
+  .text-amber-700 { color: #DC2626 !important; }
+  .text-orange-500 { color: #DC2626 !important; }
+  .text-orange-600 { color: #DC2626 !important; }
+  .bg-amber-50 { background-color: rgba(220, 38, 38, 0.1) !important; }
+  .bg-orange-50 { background-color: rgba(220, 38, 38, 0.1) !important; }
+  .border-amber-700 { border-color: #DC2626 !important; }
+  .border-orange-500 { border-color: #DC2626 !important; }
+  
+  /* Hover background utilities - white instead of gray */
+  .hover\:bg-gray-50:hover { background-color: #FFFFFF !important; }
+  .hover\:bg-gray-100:hover { background-color: #FFFFFF !important; }
+  
   /* Override the dark gray borders from the legacy theme */
-  .border-gray-700 { border-color: #e5e5e5 !important; }
-  .border-gray-800 { border-color: #d4d4d4 !important; }
+  .border-gray-700 { border-color: #2A2A2A !important; }
+  .border-gray-800 { border-color: #2A2A2A !important; }
 
   /* Fun Button Utilities */
   .text-fun-print { color: var(--fun-print) !important; }
@@ -184,24 +226,24 @@ body {
   }
 }
 
-/* Light gray hover background effect for B&W theme */
+/* White hover background effect for warm theme */
 .hover-shimmer:hover {
-  background-color: #f3f3f3 !important; /* Light gray */
+  background-color: #FFFFFF !important; /* White */
 }
 
 /* Ensure it works on elements with existing backgrounds */
 .hover-shimmer.bg-bg-input:hover,
 .hover-shimmer.bg-white:hover,
 .hover-shimmer.bg-transparent:hover {
-  background-color: #f3f3f3 !important;
+  background-color: #FFFFFF !important;
 }
 
 /* Inverted Active State Utilities */
 .active-inverted {
-  background-color: #000000 !important;
-  color: #ffffff !important;
-  border-color: #000000 !important;
+  background-color: #2A2A2A !important;
+  color: #FFFCF5 !important;
+  border-color: #2A2A2A !important;
 }
 .active-inverted svg {
-  color: #ffffff !important;
+  color: #FFFCF5 !important;
 }
