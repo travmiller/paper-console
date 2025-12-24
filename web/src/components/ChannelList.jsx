@@ -77,29 +77,31 @@ const ChannelList = ({
           return (
             <div key={pos} className='bg-bg-card border-4 border-black rounded-xl p-4 flex flex-col h-full shadow-lg'>
               <div className='flex items-center justify-between mb-3 gap-4'>
-                <div className='flex items-center gap-2 overflow-x-auto'>
+                <div className='flex items-center gap-3 overflow-x-auto'>
                   <h3 className='font-bold text-black  text-lg tracking-tight'>
                     {pos}
                   </h3>
-                  <button
-                    type='button'
-                    onClick={() => triggerChannelPrint(pos)}
-                    className='group flex items-center justify-center px-2 py-0.5 rounded border-2 bg-transparent border-gray-300 hover:border-black hover:bg-gray-100 transition-all cursor-pointer'
-                    title='Print Channel'>
-                    <PrintIcon className='w-4 h-4 text-gray-400 group-hover:text-black transition-all' />
-                  </button>
-                  <button
-                    type='button'
-                    onClick={() => setShowScheduleModal(pos)}
-                    className={`group flex items-center gap-1 px-2 py-0.5 rounded border-2 transition-all cursor-pointer ${
-                      channel.schedule && channel.schedule.length > 0
-                        ? 'bg-transparent text-blue-600 border-blue-600 hover:bg-blue-50 shadow-sm'
-                        : 'bg-transparent border-gray-300 hover:border-black hover:bg-gray-100'
-                    }`}
-                    title='Configure Schedule'>
-                    <ScheduleIcon className={`w-4 h-4 transition-all ${channel.schedule?.length > 0 ? 'text-blue-600' : 'text-gray-400 group-hover:text-black'}`} />
-                    <span className={`text-xs  font-bold ${channel.schedule?.length > 0 ? 'text-blue-600' : 'text-gray-400 group-hover:text-black'}`}>{channel.schedule?.length || 0}</span>
-                  </button>
+                  <div className='flex items-center gap-1'>
+                    <button
+                      type='button'
+                      onClick={() => triggerChannelPrint(pos)}
+                      className='group flex items-center justify-center px-2 py-0.5 rounded border-2 bg-transparent border-gray-300 hover:border-black hover:bg-gray-100 transition-all cursor-pointer'
+                      title='Print Channel'>
+                      <PrintIcon className='w-4 h-4 text-gray-400 group-hover:text-black transition-all' />
+                    </button>
+                    <button
+                      type='button'
+                      onClick={() => setShowScheduleModal(pos)}
+                      className={`group flex items-center gap-1 px-2 py-0.5 rounded border-2 transition-all cursor-pointer ${
+                        channel.schedule && channel.schedule.length > 0
+                          ? 'bg-transparent text-blue-600 border-blue-600 hover:bg-blue-50 shadow-sm'
+                          : 'bg-transparent border-gray-300 hover:border-black hover:bg-gray-100'
+                      }`}
+                      title='Configure Schedule'>
+                      <ScheduleIcon className={`w-4 h-4 transition-all ${channel.schedule?.length > 0 ? 'text-blue-600' : 'text-gray-400 group-hover:text-black'}`} />
+                      <span className={`text-xs  font-bold ${channel.schedule?.length > 0 ? 'text-blue-600' : 'text-gray-400 group-hover:text-black'}`}>{channel.schedule?.length || 0}</span>
+                    </button>
+                  </div>
                 </div>
                 <div className='flex gap-1'>
                   <button
@@ -109,9 +111,9 @@ const ChannelList = ({
                       swapChannels(pos, pos - 1);
                     }}
                     disabled={pos === 1}
-                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-black hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-gray-100'
+                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-gray-600 hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-gray-100'
                     title='Move channel up'>
-                    ↑
+                    ▲
                   </button>
                   <button
                     type='button'
@@ -120,9 +122,9 @@ const ChannelList = ({
                       swapChannels(pos, pos + 1);
                     }}
                     disabled={pos === 8}
-                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-black hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-gray-100'
+                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-gray-600 hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-gray-100'
                     title='Move channel down'>
-                    ↓
+                    ▼
                   </button>
                 </div>
               </div>
@@ -148,8 +150,8 @@ const ChannelList = ({
                           <>
                       <div className='text-sm font-bold text-gray-700 group-hover:text-black  truncate transition-colors'>{item.module.name}</div>
                       <div
-                        className={`text-[10px]  truncate opacity-80 flex items-baseline gap-1 ${
-                          needsSetup ? 'text-amber-700' : 'text-gray-500'
+                        className={`text-[10px]  truncate flex items-baseline gap-1 ${
+                          needsSetup ? 'text-amber-700' : 'text-gray-700'
                         }`}>
                         {isOnline && <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)' }} />}
                         <span className="truncate">{typeMeta?.label?.toUpperCase()}</span>
@@ -177,14 +179,14 @@ const ChannelList = ({
                           type='button'
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'up')}
                           disabled={idx === 0}
-                          className='px-1 text-[10px] leading-none text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'>
+                          className='px-1 text-[10px] leading-none text-gray-600 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'>
                           ▲
                         </button>
                         <button
                           type='button'
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'down')}
                           disabled={idx === channelModules.length - 1}
-                          className='px-1 text-[10px] leading-none text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'>
+                          className='px-1 text-[10px] leading-none text-gray-600 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'>
                           ▼
                         </button>
                       </div>
@@ -197,7 +199,7 @@ const ChannelList = ({
                 <button
                   type='button'
                   onClick={() => setShowAddModuleModal(pos)}
-                  className='w-full py-1.5 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer hover:bg-gray-50'
+                  className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer hover:bg-gray-50'
                   title='Add a module to this channel'>
                   + ADD MODULE
                 </button>

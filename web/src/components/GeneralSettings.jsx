@@ -361,19 +361,19 @@ const GeneralSettings = ({
         </div>
 
         <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-4 rounded-lg'>
-          <div className='flex flex-col'>
-            <span className='text-xs text-gray-600 mb-1 uppercase  font-bold'>Location</span>
+          <div className='flex flex-row items-baseline gap-6'>
+            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Location</span>
             <span className='font-bold text-black '>
               {settings.city_name || 'Not Set'}
               {settings.state && `, ${settings.state}`}
             </span>
           </div>
-          <div className='flex flex-col'>
-            <span className='text-xs text-gray-600 mb-1 uppercase  font-bold'>Timezone</span>
+          <div className='flex flex-row items-baseline gap-6'>
+            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Timezone</span>
             <span className='font-bold text-black '>{formatTimezone(settings.timezone)}</span>
           </div>
-          <div className='flex flex-col'>
-            <span className='text-xs text-gray-600 mb-1 uppercase  font-bold'>Coordinates</span>
+          <div className='flex flex-row items-baseline gap-6'>
+            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Coordinates</span>
             <span className='font-bold text-black '>
               {settings.latitude?.toFixed(4) || 'N/A'}, {settings.longitude?.toFixed(4) || 'N/A'}
             </span>
@@ -408,7 +408,7 @@ const GeneralSettings = ({
               className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all ${
                 !useAutoTime 
                   ? 'border-black border-b-0 bg-white z-10' 
-                  : 'border-gray-300 border-b-2 border-b-black bg-gray-100 hover:border-black z-0'
+                  : 'border-gray-300 border-b-2 border-b-black bg-white hover:border-black z-0'
               }`}>
               <input
                 type='radio'
@@ -444,7 +444,7 @@ const GeneralSettings = ({
               className={`relative flex flex-col items-center px-4 py-2 border-t-2 border-l-2 border-r-2 cursor-pointer transition-all ${
                 useAutoTime 
                   ? 'border-black border-b-0 bg-white z-10' 
-                  : 'border-gray-300 border-b-2 border-b-black bg-gray-100 hover:border-black z-0'
+                  : 'border-gray-300 border-b-2 border-b-black bg-white hover:border-black z-0'
               }`}>
               <input
                 type='radio'

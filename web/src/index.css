@@ -14,10 +14,9 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* TE / Lab Light Theme Variables */
-  --synth-primary: #ff3300;   /* International Orange */
-  --synth-secondary: #0055ff; /* Technical Blue */
-  --synth-border: #000000;    /* Ink Black */
+  --console-primary: #ff3300;
+  --console-secondary: #0055ff;
+  --console-border: #000000;
   
   --bg-base: #e8e8e5;         /* Bone / Paper Grey */
   --bg-card: #ffffff;         /* Pure White Panels */
@@ -52,11 +51,11 @@ body {
 }
 ::-webkit-scrollbar-thumb {
   background: #ccc; 
-  border: 1px solid var(--synth-border);
+  border: 1px solid var(--console-border);
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--synth-border); 
+  background: var(--console-border); 
 }
 
 /* 
@@ -68,17 +67,17 @@ body {
   .text-gray-400 { color: #666666 !important; }
   .text-gray-500 { color: #888888 !important; }
   
-  .text-synth-primary { color: var(--synth-primary) !important; }
-  .text-synth-secondary { color: var(--synth-secondary) !important; }
-  .text-synth-border { color: var(--synth-border) !important; }
+  .text-console-primary { color: var(--console-primary) !important; }
+  .text-console-secondary { color: var(--console-secondary) !important; }
+  .text-console-border { color: var(--console-border) !important; }
   
-  .bg-synth-primary { background-color: var(--synth-primary) !important; }
-  .bg-synth-secondary { background-color: var(--synth-secondary) !important; }
-  .bg-synth-border { background-color: var(--synth-border) !important; }
+  .bg-console-primary { background-color: var(--console-primary) !important; }
+  .bg-console-secondary { background-color: var(--console-secondary) !important; }
+  .bg-console-border { background-color: var(--console-border) !important; }
   
-  .border-synth-primary { border-color: var(--synth-primary) !important; }
-  .border-synth-secondary { border-color: var(--synth-secondary) !important; }
-  .border-synth-border { border-color: var(--synth-border) !important; }
+  .border-console-primary { border-color: var(--console-primary) !important; }
+  .border-console-secondary { border-color: var(--console-secondary) !important; }
+  .border-console-border { border-color: var(--console-border) !important; }
 
   /* Map the bg-* classes to our new variables */
   .bg-bg-base { background-color: var(--bg-base) !important; }

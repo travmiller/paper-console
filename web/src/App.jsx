@@ -520,7 +520,7 @@ function App() {
   }
 
   return (
-    <div className='max-w-[480px] w-full mx-auto px-2 pt-4 pb-12 sm:px-6 sm:pt-8 sm:pb-16 bg-white min-h-screen text-synth-text'>
+    <div className='max-w-[480px] w-full mx-auto px-2 pt-4 pb-12 sm:px-6 sm:pt-8 sm:pb-16 bg-white min-h-screen text-black'>
       <div className='mb-8'>
         <h1 className='text-3xl sm:text-4xl leading-none font-bold tracking-tighter text-black'>PC-1 CONSOLE</h1>
       </div>
@@ -532,7 +532,7 @@ function App() {
           onClick={() => setActiveTab('general')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm ${
             activeTab === 'general'
-              ? 'border-b-2 border-synth-border text-black translate-y-[2px]'
+              ? 'border-b-2 border-console-border text-black translate-y-[2px]'
               : 'text-gray-500 hover:text-black border-b-2 border-transparent'
           }`}>
           GENERAL
@@ -542,7 +542,7 @@ function App() {
           onClick={() => setActiveTab('channels')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm ${
             activeTab === 'channels'
-              ? 'border-b-2 border-synth-border text-black translate-y-[2px]'
+              ? 'border-b-2 border-console-border text-black translate-y-[2px]'
               : 'text-gray-500 hover:text-black border-b-2 border-transparent'
           }`}>
           CHANNELS
