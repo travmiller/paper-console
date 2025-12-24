@@ -391,6 +391,10 @@ def _try_load_config_file(config_path: str) -> Settings | None:
                         normalized_channels[key] = value
                 data["channels"] = normalized_channels
 
+            # Ensure time_sync_mode is set (for backward compatibility with old configs)
+            if "time_sync_mode" not in data:
+                data["time_sync_mode"] = "manual"
+
             return Settings(**data)
     except Exception:
         return None
@@ -431,7 +435,12 @@ def save_config(new_settings: Settings):
     try:
         # Write to temp file first
         with open(temp_path, "w") as f:
-            json.dump(new_settings.model_dump(), f, indent=4)
+            # Get the model dump and ensure time_sync_mode is always included
+            settings_dict = new_settings.model_dump(exclude_unset=False)
+            # Explicitly ensure time_sync_mode is present (for backward compatibility)
+            if "time_sync_mode" not in settings_dict:
+                settings_dict["time_sync_mode"] = "manual"
+            json.dump(settings_dict, f, indent=4)
             f.flush()
             os.fsync(f.fileno())
 
