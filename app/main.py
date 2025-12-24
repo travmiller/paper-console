@@ -2330,9 +2330,22 @@ async def captive_other():
 if os.path.exists("web/dist"):
     app.mount("/assets", StaticFiles(directory="web/dist/assets"), name="assets")
     
-    # Serve fonts directory
+    # Serve fonts directory with explicit MIME type
     if os.path.exists("web/dist/fonts"):
-        app.mount("/fonts", StaticFiles(directory="web/dist/fonts"), name="fonts")
+        @app.get("/fonts/{font_path:path}")
+        async def serve_font(font_path: str):
+            font_file_path = os.path.join("web/dist/fonts", font_path)
+            if os.path.exists(font_file_path):
+                # Determine MIME type based on file extension
+                if font_path.endswith(".woff2"):
+                    return FileResponse(font_file_path, media_type="font/woff2")
+                elif font_path.endswith(".woff"):
+                    return FileResponse(font_file_path, media_type="font/woff")
+                elif font_path.endswith(".ttf"):
+                    return FileResponse(font_file_path, media_type="font/ttf")
+                elif font_path.endswith(".otf"):
+                    return FileResponse(font_file_path, media_type="font/otf")
+            raise HTTPException(status_code=404, detail="Font not found")
 
     # Serve favicon explicitly
     @app.get("/favicon.svg")

@@ -1,7 +1,7 @@
 /* IBM Plex Sans Font Faces */
 @font-face {
   font-family: 'IBM Plex Sans';
-  src: url('/fonts/IBMPlexSans-Regular.woff2') format('woff2');
+  src: url('/fonts/IBM_Plex_Sans/static/IBMPlexSans-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -9,7 +9,7 @@
 
 @font-face {
   font-family: 'IBM Plex Sans';
-  src: url('/fonts/IBMPlexSans-Medium.woff2') format('woff2');
+  src: url('/fonts/IBM_Plex_Sans/static/IBMPlexSans-Medium.ttf') format('truetype');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -17,7 +17,7 @@
 
 @font-face {
   font-family: 'IBM Plex Sans';
-  src: url('/fonts/IBMPlexSans-SemiBold.woff2') format('woff2');
+  src: url('/fonts/IBM_Plex_Sans/static/IBMPlexSans-SemiBold.ttf') format('truetype');
   font-weight: 600;
   font-style: normal;
   font-display: swap;
@@ -25,7 +25,7 @@
 
 @font-face {
   font-family: 'IBM Plex Sans';
-  src: url('/fonts/IBMPlexSans-Bold.woff2') format('woff2');
+  src: url('/fonts/IBM_Plex_Sans/static/IBMPlexSans-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
@@ -34,7 +34,7 @@
 /* IBM Plex Mono Font Faces */
 @font-face {
   font-family: 'IBM Plex Mono';
-  src: url('/fonts/IBMPlexMono-Regular.woff2') format('woff2');
+  src: url('/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf') format('truetype');
   font-weight: 400;
   font-style: normal;
   font-display: swap;
@@ -42,7 +42,7 @@
 
 @font-face {
   font-family: 'IBM Plex Mono';
-  src: url('/fonts/IBMPlexMono-Medium.woff2') format('woff2');
+  src: url('/fonts/IBM_Plex_Mono/IBMPlexMono-Medium.ttf') format('truetype');
   font-weight: 500;
   font-style: normal;
   font-display: swap;
@@ -50,7 +50,7 @@
 
 @font-face {
   font-family: 'IBM Plex Mono';
-  src: url('/fonts/IBMPlexMono-SemiBold.woff2') format('woff2');
+  src: url('/fonts/IBM_Plex_Mono/IBMPlexMono-SemiBold.ttf') format('truetype');
   font-weight: 600;
   font-style: normal;
   font-display: swap;
@@ -58,7 +58,7 @@
 
 @font-face {
   font-family: 'IBM Plex Mono';
-  src: url('/fonts/IBMPlexMono-Bold.woff2') format('woff2');
+  src: url('/fonts/IBM_Plex_Mono/IBMPlexMono-Bold.ttf') format('truetype');
   font-weight: 700;
   font-style: normal;
   font-display: swap;
