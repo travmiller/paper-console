@@ -527,13 +527,13 @@ function App() {
       </div>
 
       {/* Tabs */}
-      <div className='flex gap-2 mb-8 border-b-2 border-gray-400'>
+      <div className='flex gap-2 mb-8 border-b-2 border-dashed border-gray-400'>
         <button
           type='button'
           onClick={() => setActiveTab('general')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm ${
             activeTab === 'general'
-              ? 'border-b-2 border-console-border text-black translate-y-[2px]'
+              ? 'border-b-2 border-black text-black translate-y-[2px]'
               : 'text-gray-500 hover:text-black border-b-2 border-transparent'
           }`}>
           GENERAL
@@ -543,7 +543,7 @@ function App() {
           onClick={() => setActiveTab('channels')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm ${
             activeTab === 'channels'
-              ? 'border-b-2 border-console-border text-black translate-y-[2px]'
+              ? 'border-b-2 border-black text-black translate-y-[2px]'
               : 'text-gray-500 hover:text-black border-b-2 border-transparent'
           }`}>
           CHANNELS
