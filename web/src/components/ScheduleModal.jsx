@@ -20,38 +20,38 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => 
         }
         modalMouseDownTarget.current = null;
       }}>
-      <div className='bg-[#2a2a2a] border border-gray-700 rounded-lg p-4 sm:p-6 max-w-md w-full' onClick={(e) => e.stopPropagation()}>
+      <div className='bg-white border-4 border-black rounded-xl p-4 sm:p-6 max-w-md w-full shadow-lg' onClick={(e) => e.stopPropagation()}>
         <div className='flex justify-between items-center mb-6'>
-          <h3 className='text-xl font-bold text-white'>Schedule Channel {position}</h3>
-          <button onClick={onClose} className='text-gray-400 hover:text-white text-2xl'>
+          <h3 className='text-xl font-bold text-black '>Schedule Channel {position}</h3>
+          <button onClick={onClose} className='text-gray-500 hover:text-black text-2xl  cursor-pointer hover-shimmer'>
             &times;
           </button>
         </div>
 
         <div className='space-y-4'>
-          <div className='text-sm text-gray-400 mb-4'>Add times when this channel should automatically print.</div>
+          <div className='text-sm text-gray-600 mb-4 '>Add times when this channel should automatically print.</div>
 
           <div className='space-y-2 max-h-[300px] overflow-y-auto'>
             {(channel?.schedule || []).map((time, idx) => (
-              <div key={idx} className='flex items-center justify-between bg-[#1a1a1a] p-3 rounded border border-gray-800'>
-                <span className='text-white font-mono text-lg'>{formatTimeForDisplay(time, timeFormat)}</span>
+              <div key={idx} className='flex items-center justify-between bg-gray-50 p-3 rounded-lg border-2 border-gray-300 hover:border-black'>
+                <span className='text-black  text-lg'>{formatTimeForDisplay(time, timeFormat)}</span>
                 <button
                   onClick={() => {
                     const newSchedule = [...(channel?.schedule || [])];
                     newSchedule.splice(idx, 1);
                     onUpdate(newSchedule);
                   }}
-                  className='text-red-400 hover:text-red-300 px-2'>
+                  className='text-red-600 hover:text-red-700 px-2  font-bold cursor-pointer hover-shimmer'>
                   &times;
                 </button>
               </div>
             ))}
             {(!channel?.schedule || channel.schedule.length === 0) && (
-              <div className='text-gray-600 text-center py-4 italic'>No scheduled times.</div>
+              <div className='text-gray-500 text-center py-4 italic '>No scheduled times.</div>
             )}
           </div>
 
-          <div className='pt-4 border-t border-gray-700'>
+          <div className='pt-4 border-t-2 border-gray-300'>
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -71,9 +71,9 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => 
                 name='timeInput'
                 type='time'
                 required
-                className='flex-1 bg-[#333] border border-gray-600 rounded px-3 py-2 text-white focus:outline-none focus:border-white'
+                className='flex-1 bg-white border-2 border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:border-black '
               />
-              <button type='submit' className='bg-white text-black px-4 py-2 rounded font-medium hover:bg-gray-200 transition-colors'>
+              <button type='submit' className='bg-transparent border-2 border-black text-black px-4 py-2 rounded-lg  font-bold hover:bg-black hover:text-white transition-all cursor-pointer'>
                 Add
               </button>
             </form>

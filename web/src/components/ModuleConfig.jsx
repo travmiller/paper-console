@@ -233,7 +233,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
             <textarea
               value={config.body || ''}
               onChange={(e) => updateConfig('body', e.target.value)}
-              className={`${inputClass} font-mono text-sm min-h-[80px]`}
+              className={`${inputClass}  text-sm min-h-[80px]`}
               placeholder='{"key": "value"}'
             />
             <p className={`${commonClasses.textSubtle} mt-1`}>Enter JSON body for POST requests</p>
@@ -348,7 +348,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
           </p>
         </div>
 
-        <div className={`pt-4 border-t border-gray-700`}>
+        <div className={`pt-4 border-t-2 border-gray-300`}>
           <label className={labelClass}>Location</label>
           <div className='mb-6 text-left relative'>
             <input
@@ -361,12 +361,12 @@ const ModuleConfig = ({ module, updateConfig }) => {
             />
             {searchResults.length > 0 && (
               <ul
-                className={`absolute w-full z-10 max-h-[200px] overflow-y-auto bg-[#333] border border-[#444] border-t-0 rounded-b shadow-lg list-none p-0 m-0`}>
+                className={`absolute w-full z-10 max-h-[200px] overflow-y-auto bg-white border-2 border-gray-300 border-t-0 rounded-b-lg shadow-lg list-none p-0 m-0`}>
                 {searchResults.map((result) => (
                   <li
                     key={result.id}
                     onClick={() => selectLocation(result)}
-                    className={`p-3 cursor-pointer border-b border-[#444] last:border-0 hover:bg-[#444] transition-colors`}>
+                    className={`p-3 cursor-pointer border-b-2 border-gray-200 last:border-0 hover:bg-gray-100 transition-colors hover-shimmer`}>
                     <strong>{result.name}</strong>
                     <span className={`${commonClasses.textSubtle} text-xs ml-2`}>
                       {result.state} {result.zipcode ? `(${result.zipcode})` : ''}
@@ -381,15 +381,15 @@ const ModuleConfig = ({ module, updateConfig }) => {
             <div className={`${commonClasses.cardNested} space-y-2`}>
               <div className='flex justify-between'>
                 <span className={commonClasses.textSubtle}>City</span>
-                <span className='text-sm text-white font-medium'>{config.city_name}</span>
+                <span className='text-sm text-black font-medium '>{config.city_name}</span>
               </div>
               <div className='flex justify-between'>
                 <span className={commonClasses.textSubtle}>Timezone</span>
-                <span className='text-sm text-white'>{config.timezone || 'Not set'}</span>
+                <span className='text-sm text-black '>{config.timezone || 'Not set'}</span>
               </div>
               <div className='flex justify-between'>
                 <span className={commonClasses.textSubtle}>Coordinates</span>
-                <span className='text-sm text-white'>
+                <span className='text-sm text-black '>
                   {config.latitude?.toFixed(4)}, {config.longitude?.toFixed(4)}
                 </span>
               </div>
@@ -442,9 +442,9 @@ const ModuleConfig = ({ module, updateConfig }) => {
               type='checkbox'
               checked={config.auto_print_new !== false} // Default to true
               onChange={(e) => updateConfig('auto_print_new', e.target.checked)}
-              className='w-5 h-5 accent-blue-500 bg-[#333] border-gray-600 rounded focus:ring-blue-500 focus:ring-2'
+              className='w-5 h-5 accent-blue-500 bg-white border-2 border-gray-300 rounded focus:ring-blue-500 focus:ring-2'
             />
-            <span className={`text-gray-300 text-sm`}>Automatically print new emails as they arrive (checks every minute)</span>
+            <span className={`text-gray-600 text-sm `}>Automatically print new emails as they arrive (checks every minute)</span>
           </div>
         </div>
       </div>
@@ -503,7 +503,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
             value={config.content || ''}
             onChange={(e) => updateConfig('content', e.target.value)}
             onBlur={(e) => updateConfig('content', e.target.value, true)}
-            className={`${inputClass} font-mono text-sm min-h-[120px]`}
+            className={`${inputClass}  text-sm min-h-[120px]`}
           />
         </div>
       </div>

@@ -1,7 +1,29 @@
 import React from 'react';
 import { AVAILABLE_MODULE_TYPES } from '../constants';
-import printIcon from '../assets/print-icon.svg';
-import scheduleIcon from '../assets/schedule-icon.svg';
+
+const PrintIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M3 5.5H20C20.8284 5.5 21.5 6.17157 21.5 7V16C21.5 16.8284 20.8284 17.5 20 17.5H15.5V10.5H7.5V17.5H3C2.17157 17.5 1.5 16.8284 1.5 16V7C1.5 6.17157 2.17157 5.5 3 5.5Z" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M8 12H15V10H16V20C16 20.5523 15.5523 21 15 21H8C7.44772 21 7 20.5523 7 20V10H8V12ZM8 19V20H15V19H8ZM8 18H15V16H8V18ZM8 15H15V13H8V15Z" fill="currentColor"/>
+  </svg>
+);
+
+const ScheduleIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <circle cx="12" cy="13" r="6.5" stroke="currentColor" strokeWidth="1.5"/>
+    <path d="M12 9V14L14 12.5566" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M11 5L13 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M17.9677 7.90075L17.0323 6.96533" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);
+
+const WiFiIcon = ({ className }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M5 12.55C6.97656 10.5766 9.46875 9.55 12 9.55C14.5312 9.55 17.0234 10.5766 19 12.55" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <path d="M8.5 16.05C9.53125 15.0188 10.7188 14.5 12 14.5C13.2812 14.5 14.4688 15.0188 15.5 16.05" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+    <circle cx="12" cy="19.5" r="1.5" fill="currentColor"/>
+  </svg>
+);
 
 const ChannelList = ({
   settings,
@@ -14,10 +36,34 @@ const ChannelList = ({
   moveModuleInChannel,
   setShowAddModuleModal,
 }) => {
+  const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
+
+  const moduleIsConfigured = (module) => {
+    const cfg = module?.config || {};
+    switch (module?.type) {
+      case 'news':
+        return isNonEmptyString(cfg.news_api_key);
+      case 'rss':
+        return Array.isArray(cfg.rss_feeds) && cfg.rss_feeds.some((f) => isNonEmptyString(String(f || '')));
+      case 'email':
+        return isNonEmptyString(cfg.email_user) && isNonEmptyString(cfg.email_password);
+      case 'calendar':
+        return Array.isArray(cfg.ical_sources) && cfg.ical_sources.some((s) => isNonEmptyString(s?.url));
+      case 'webhook':
+        return isNonEmptyString(cfg.url);
+      case 'text':
+        return isNonEmptyString(cfg.content);
+      case 'weather':
+        // Weather can use either module-level location OR global settings location.
+        return isNonEmptyString(cfg.city_name) || isNonEmptyString(settings?.city_name);
+      default:
+        return true;
+    }
+  };
+
   return (
     <div className='space-y-4'>
-      <h2 className='text-xl font-bold mb-4'>Channel Configuration</h2>
-      <div className='space-y-6'>
+      <div className='space-y-4'>
         {[1, 2, 3, 4, 5, 6, 7, 8].map((pos) => {
           const channel = settings.channels?.[pos] || { modules: [] };
           const channelModules = (channel.modules || [])
@@ -29,28 +75,30 @@ const ChannelList = ({
             .sort((a, b) => a.order - b.order);
 
           return (
-            <div key={pos} className='bg-[#2a2a2a] border border-gray-700 rounded-md p-4 flex flex-col h-full'>
+            <div key={pos} className='bg-bg-card border-4 border-black rounded-xl p-4 flex flex-col h-full shadow-lg'>
               <div className='flex items-center justify-between mb-3 gap-4'>
                 <div className='flex items-center gap-2 overflow-x-auto'>
-                  <h3 className='font-bold text-white'>Channel {pos}</h3>
+                  <h3 className='font-bold text-black  text-lg tracking-tight'>
+                    {pos}
+                  </h3>
                   <button
                     type='button'
                     onClick={() => triggerChannelPrint(pos)}
-                    className='group flex items-center justify-center px-2 py-0.5 rounded border bg-transparent text-gray-300 border-gray-500 hover:text-white hover:border-gray-400 transition-colors'
+                    className='group flex items-center justify-center px-2 py-0.5 rounded border-2 bg-transparent border-gray-300 hover:border-black hover:bg-gray-100 transition-all cursor-pointer'
                     title='Print Channel'>
-                    <img src={printIcon} alt='Print' className='w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity' />
+                    <PrintIcon className='w-4 h-4 text-gray-400 group-hover:text-black transition-all' />
                   </button>
                   <button
                     type='button'
                     onClick={() => setShowScheduleModal(pos)}
-                    className={`group flex items-center gap-1 px-2 py-0.5 rounded border transition-colors ${
+                    className={`group flex items-center gap-1 px-2 py-0.5 rounded border-2 transition-all cursor-pointer ${
                       channel.schedule && channel.schedule.length > 0
-                        ? 'bg-blue-900/30 text-blue-300 border-blue-800 hover:bg-blue-900/50'
-                        : 'bg-transparent text-gray-500 border-gray-700 hover:text-gray-300'
+                        ? 'bg-transparent text-blue-600 border-blue-600 hover:bg-blue-50 shadow-sm'
+                        : 'bg-transparent border-gray-300 hover:border-black hover:bg-gray-100'
                     }`}
                     title='Configure Schedule'>
-                    <img src={scheduleIcon} alt='Schedule' className='w-4 h-4 opacity-60 group-hover:opacity-100 transition-opacity' />
-                    <span className='text-xs'>{channel.schedule?.length || 0}</span>
+                    <ScheduleIcon className={`w-4 h-4 transition-all ${channel.schedule?.length > 0 ? 'text-blue-600' : 'text-gray-400 group-hover:text-black'}`} />
+                    <span className={`text-xs  font-bold ${channel.schedule?.length > 0 ? 'text-blue-600' : 'text-gray-400 group-hover:text-black'}`}>{channel.schedule?.length || 0}</span>
                   </button>
                 </div>
                 <div className='flex gap-1'>
@@ -61,7 +109,8 @@ const ChannelList = ({
                       swapChannels(pos, pos - 1);
                     }}
                     disabled={pos === 1}
-                    className='px-2 py-1 text-xs bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors disabled:opacity-30'>
+                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-black hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-gray-100'
+                    title='Move channel up'>
                     ↑
                   </button>
                   <button
@@ -71,61 +120,86 @@ const ChannelList = ({
                       swapChannels(pos, pos + 1);
                     }}
                     disabled={pos === 8}
-                    className='px-2 py-1 text-xs bg-[#1a1a1a] border border-gray-600 hover:border-white rounded text-white transition-colors disabled:opacity-30'>
+                    className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-black hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-gray-100'
+                    title='Move channel down'>
                     ↓
                   </button>
                 </div>
               </div>
 
-              <div className='space-y-2 mb-4 flex-grow'>
+              <div className='space-y-2 mb-2 flex-grow'>
                 {channelModules.map((item, idx) => (
                   <div
                     key={item.module_id}
-                    className='flex items-center justify-between p-2 bg-[#1a1a1a] rounded border border-gray-800 group hover:border-gray-600 transition-colors cursor-pointer'
+                    className='flex items-center justify-between p-2 bg-bg-input rounded-lg border-2 border-gray-600 hover:border-black hover:bg-gray-100 group transition-all cursor-pointer'
                     onClick={() => {
                       setShowEditModuleModal(item.module_id);
                       setEditingModule(JSON.parse(JSON.stringify(modules[item.module_id])));
                     }}>
                     <div className='flex-1 min-w-0 mr-2'>
-                      <div className='text-sm font-medium text-white truncate'>{item.module.name}</div>
-                      <div className='text-xs text-gray-400 truncate'>
-                        {AVAILABLE_MODULE_TYPES.find((t) => t.id === item.module.type)?.label}
+                      {(() => {
+                        const typeMeta = AVAILABLE_MODULE_TYPES.find((t) => t.id === item.module.type);
+                        const isOnline = typeMeta ? !typeMeta.offline : false;
+                        const configured = moduleIsConfigured(item.module);
+                        const showState = isOnline;
+                        const needsSetup = showState && !configured;
+
+                        return (
+                          <>
+                      <div className='text-sm font-bold text-gray-700 group-hover:text-black  truncate transition-colors'>{item.module.name}</div>
+                      <div
+                        className={`text-[10px]  truncate opacity-70 flex items-baseline gap-1 ${
+                          needsSetup ? 'text-amber-700' : 'text-gray-400'
+                        }`}>
+                        {isOnline && <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)' }} />}
+                        <span className="truncate">{typeMeta?.label?.toUpperCase()}</span>
                       </div>
+                          </>
+                        );
+                      })()}
                     </div>
-                    <div className='flex gap-1' onClick={(e) => e.stopPropagation()}>
+                    <div className='flex gap-2 items-center' onClick={(e) => e.stopPropagation()}>
+                      {(() => {
+                        const typeMeta = AVAILABLE_MODULE_TYPES.find((t) => t.id === item.module.type);
+                        const isOnline = typeMeta ? !typeMeta.offline : false;
+                        if (!isOnline) return null;
+
+                        const configured = moduleIsConfigured(item.module);
+                        return (
+                          <span
+                            className={`inline-block w-2 h-2 rounded-full ${configured ? 'bg-emerald-500' : 'bg-amber-500'}`}
+                            title={configured ? 'Ready' : 'Needs setup'}
+                          />
+                        );
+                      })()}
                       <div className='flex flex-col gap-0.5'>
                         <button
                           type='button'
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'up')}
                           disabled={idx === 0}
-                          className='px-1 text-[10px] leading-none text-gray-400 hover:text-white disabled:opacity-30'>
+                          className='px-1 text-[10px] leading-none text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'>
                           ▲
                         </button>
                         <button
                           type='button'
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'down')}
                           disabled={idx === channelModules.length - 1}
-                          className='px-1 text-[10px] leading-none text-gray-400 hover:text-white disabled:opacity-30'>
+                          className='px-1 text-[10px] leading-none text-gray-400 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'>
                           ▼
                         </button>
                       </div>
                     </div>
                   </div>
                 ))}
-
-                {channelModules.length === 0 && (
-                  <div className='text-center text-gray-500 py-8 text-sm border-2 border-dashed border-gray-700 rounded-md'>
-                    Empty Channel
-                  </div>
-                )}
               </div>
 
-              <div className='pt-3 border-t border-gray-700 mt-auto'>
+              <div className='mt-auto'>
                 <button
                   type='button'
                   onClick={() => setShowAddModuleModal(pos)}
-                  className='w-full py-2 bg-[#333] hover:bg-[#444] border border-gray-600 hover:border-gray-500 rounded text-white transition-colors text-sm font-medium'>
-                  + Add Module
+                  className='w-full py-1.5 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer hover:bg-gray-50'
+                  title='Add a module to this channel'>
+                  + ADD MODULE
                 </button>
               </div>
             </div>

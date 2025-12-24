@@ -65,43 +65,43 @@ export default function WiFiSetup({ onComplete }) {
     }
   };
 
-  const inputClass = 'w-full p-3 text-base bg-[#333] border border-gray-700 rounded text-white focus:border-white focus:outline-none';
-  const buttonClass = 'w-full py-3 px-4 rounded font-bold transition-colors';
+  const inputClass = 'w-full p-3 text-base bg-white border-2 border-gray-300 rounded-lg text-black focus:border-black focus:outline-none box-border';
+  const buttonClass = 'w-full py-3 px-4 rounded-lg font-bold transition-all';
 
   // Show success screen after connection started
   if (connectionStarted) {
     return (
-      <div className='max-w-[600px] w-full p-8'>
+      <div className='max-w-[480px] w-full mx-auto px-2 pt-4 pb-12 sm:px-6 sm:pt-8 sm:pb-16 bg-white min-h-screen'>
         <div className='text-center'>
           <div className='text-6xl mb-6'>📡</div>
-          <h1 className='text-3xl mb-4 font-bold text-green-400'>Connecting to WiFi...</h1>
-          <p className='text-gray-300 mb-6'>
-            Your PC-1 is now connecting to <strong>{selectedSSID}</strong>
+          <h1 className='text-3xl mb-4 font-bold text-black'>Connecting to WiFi...</h1>
+          <p className='text-gray-600 mb-6'>
+            Your PC-1 is now connecting to <strong className='text-black'>{selectedSSID}</strong>
           </p>
           
-          <div className='bg-gray-800 rounded-lg p-6 text-left mb-6'>
-            <h2 className='font-bold text-white mb-4'>Next Steps:</h2>
-            <ol className='space-y-3 text-gray-300'>
+          <div className='bg-bg-card border-4 border-black rounded-xl p-6 text-left mb-6 shadow-lg'>
+            <h2 className='font-bold text-black mb-4'>Next Steps:</h2>
+            <ol className='space-y-3 text-black'>
               <li className='flex items-start gap-2'>
-                <span className='bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm'>1</span>
+                <span className='bg-black text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm font-bold'>1</span>
                 <span>Disconnect from <strong>PC-1-Setup</strong> network on your phone</span>
               </li>
               <li className='flex items-start gap-2'>
-                <span className='bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm'>2</span>
+                <span className='bg-black text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm font-bold'>2</span>
                 <span>Connect your phone to <strong>{selectedSSID}</strong></span>
               </li>
               <li className='flex items-start gap-2'>
-                <span className='bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm'>3</span>
+                <span className='bg-black text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm font-bold'>3</span>
                 <span>Wait about 30 seconds for the device to connect</span>
               </li>
               <li className='flex items-start gap-2'>
-                <span className='bg-blue-600 text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm'>4</span>
-                <span>Visit <strong className='text-blue-400'>http://pc-1.local</strong> to access settings</span>
+                <span className='bg-black text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm font-bold'>4</span>
+                <span>Visit <strong className='text-black'>http://pc-1.local</strong> to access settings</span>
               </li>
             </ol>
           </div>
 
-          <p className='text-sm text-gray-500'>
+          <p className='text-sm text-gray-600'>
             If the connection fails, the PC-1 will re-create the setup network automatically.
           </p>
         </div>
@@ -110,29 +110,30 @@ export default function WiFiSetup({ onComplete }) {
   }
 
   return (
-    <div className='max-w-[600px] w-full p-8'>
+    <div className='max-w-[480px] w-full mx-auto px-2 pt-4 pb-12 sm:px-6 sm:pt-8 sm:pb-16 bg-white min-h-screen'>
       <div className='text-center mb-8'>
-        <h1 className='text-4xl mb-4 font-bold'>WiFi Setup</h1>
-        <p className='text-gray-400'>Connect your PC-1 to your home WiFi network</p>
+        <h1 className='text-3xl sm:text-4xl mb-4 font-bold text-black'>WiFi Setup</h1>
+        <p className='text-gray-600'>Connect your PC-1 to your home WiFi network</p>
       </div>
 
       {error && (
-        <div className='bg-red-900/30 border border-red-700 text-red-200 p-4 rounded mb-6'>
-          {error}
+        <div className='bg-white border-2 border-red-500 text-red-600 p-4 rounded-lg mb-6'>
+          <span className='font-bold mr-2'>ERROR:</span>{error}
         </div>
       )}
 
-      <form onSubmit={connectToWiFi} className='space-y-6'>
+      <div className='bg-bg-card border-4 border-black rounded-xl p-4 flex flex-col shadow-lg mb-6'>
+        <form onSubmit={connectToWiFi} className='space-y-6'>
         {!showManualEntry ? (
           <>
             <div>
               <div className='flex items-center justify-between mb-3'>
-                <label className='block font-bold text-gray-200'>Available Networks</label>
+                <label className='block font-bold text-black'>Available Networks</label>
                 <button
                   type='button'
                   onClick={scanNetworks}
                   disabled={isScanning}
-                  className='text-sm px-3 py-1 bg-gray-700 hover:bg-gray-600 rounded transition-colors disabled:opacity-50'>
+                  className='text-sm px-3 py-1 bg-transparent border-2 border-gray-300 hover:border-black rounded-lg text-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer'>
                   {isScanning ? 'Scanning...' : 'Refresh'}
                 </button>
               </div>
@@ -155,14 +156,14 @@ export default function WiFiSetup({ onComplete }) {
             <button
               type='button'
               onClick={() => setShowManualEntry(true)}
-              className='text-sm text-blue-400 hover:text-blue-300'>
+              className='text-sm text-gray-600 hover:text-black underline cursor-pointer'>
               Enter network name manually
             </button>
           </>
         ) : (
           <>
             <div>
-              <label className='block mb-2 font-bold text-gray-200'>Network Name (SSID)</label>
+              <label className='block mb-2 font-bold text-black'>Network Name (SSID)</label>
               <input
                 type='text'
                 value={selectedSSID}
@@ -180,14 +181,14 @@ export default function WiFiSetup({ onComplete }) {
                 setShowManualEntry(false);
                 setSelectedSSID('');
               }}
-              className='text-sm text-blue-400 hover:text-blue-300'>
+              className='text-sm text-gray-600 hover:text-black underline cursor-pointer'>
               ← Back to network list
             </button>
           </>
         )}
 
         <div>
-          <label className='block mb-2 font-bold text-gray-200'>Password</label>
+          <label className='block mb-2 font-bold text-black'>Password</label>
           <input
             type='password'
             value={password}
@@ -201,16 +202,17 @@ export default function WiFiSetup({ onComplete }) {
         <button
           type='submit'
           disabled={isConnecting || !selectedSSID}
-          className={`${buttonClass} bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed`}>
+          className={`${buttonClass} bg-transparent border-2 border-black text-black hover:bg-black hover:text-white disabled:opacity-50 disabled:cursor-not-allowed disabled:border-gray-300 disabled:text-gray-400 cursor-pointer`}>
           {isConnecting ? 'Connecting...' : 'Connect to WiFi'}
         </button>
-      </form>
+        </form>
+      </div>
 
-      <div className='mt-8 p-4 bg-gray-800 rounded border border-gray-700'>
-        <p className='text-sm text-gray-300 mb-2'>
+      <div className='mt-8 p-4 bg-bg-card border-4 border-black rounded-xl shadow-lg'>
+        <p className='text-sm text-black mb-2'>
           <strong>Note:</strong> After clicking Connect, this device will disconnect from the setup network and join your home WiFi.
         </p>
-        <p className='text-sm text-gray-400'>
+        <p className='text-sm text-gray-600'>
           You'll need to reconnect your phone to your home WiFi to access the settings page.
         </p>
       </div>

@@ -520,27 +520,32 @@ function App() {
   }
 
   return (
-    <div className='max-w-[400px] w-full px-2 pt-4 pb-12 sm:px-8 sm:pt-8 sm:pb-16 mx-auto'>
-      <h1 className='text-3xl sm:text-4xl mb-6 sm:mb-8 text-center leading-tight font-bold'>PC-1 Settings</h1>
-      <p className='text-center text-gray-500 mb-6 sm:mb-8 text-sm sm:text-base'>Configure your Paper Console</p>
+    <div className='max-w-[480px] w-full mx-auto px-2 pt-4 pb-12 sm:px-6 sm:pt-8 sm:pb-16 bg-white min-h-screen text-synth-text'>
+      <div className="mb-8">
+        <h1 className='text-3xl sm:text-4xl leading-none font-bold tracking-tighter text-black'>PC-1 CONSOLE</h1>
+      </div>
 
       {/* Tabs */}
-      <div className='flex gap-2 mb-6 border-b border-gray-700'>
+      <div className='flex gap-2 mb-8 border-b-2 border-gray-400'>
         <button
           type='button'
           onClick={() => setActiveTab('general')}
-          className={`px-4 py-2 font-medium transition-colors ${
-            activeTab === 'general' ? 'border-b-2 border-white text-white' : 'text-gray-400 hover:text-white'
+          className={`px-6 py-2 font-bold tracking-wider transition-all text-sm ${
+            activeTab === 'general' 
+              ? 'border-b-2 border-synth-border text-black translate-y-[2px]' 
+              : 'text-gray-500 hover:text-black border-b-2 border-transparent'
           }`}>
-          General
+          GENERAL
         </button>
         <button
           type='button'
           onClick={() => setActiveTab('channels')}
-          className={`px-4 py-2 font-medium transition-colors ${
-            activeTab === 'channels' ? 'border-b-2 border-white text-white' : 'text-gray-400 hover:text-white'
+          className={`px-6 py-2 font-bold tracking-wider transition-all text-sm ${
+            activeTab === 'channels' 
+              ? 'border-b-2 border-synth-border text-black translate-y-[2px]' 
+              : 'text-gray-500 hover:text-black border-b-2 border-transparent'
           }`}>
-          Channels
+          CHANNELS
         </button>
       </div>
 

@@ -1,18 +1,35 @@
 @import "tailwindcss";
 
 :root {
-  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  font-family: "IBM Plex Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   line-height: 1.5;
-  font-weight: 400;
+  font-weight: 400; /* Regular weight for better readability */
 
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
+  color-scheme: light;
+  color: #000000;
+  background-color: #ffffff;
 
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* TE / Lab Light Theme Variables */
+  --synth-primary: #ff3300;   /* International Orange */
+  --synth-secondary: #0055ff; /* Technical Blue */
+  --synth-border: #000000;    /* Ink Black */
+  
+  --bg-base: #e8e8e5;         /* Bone / Paper Grey */
+  --bg-card: #ffffff;         /* Pure White Panels */
+  --bg-nested: #f4f4f4;       /* Slight contrast for items */
+  --bg-input: #ffffff;
+  
+  /* Fun Accent Colors */
+  --fun-print: #0055ff;       /* Electric Blue */
+  --fun-schedule: #00cc66;    /* Vibrant Green */
+
+  --text-main: #000000;
+  --text-muted: #666666;
 }
 
 body {
@@ -22,4 +39,87 @@ body {
   min-width: 320px;
   min-height: 100vh;
   justify-content: center;
+  background-color: #ffffff;
+  color: var(--text-main);
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-base); 
+}
+::-webkit-scrollbar-thumb {
+  background: #ccc; 
+  border: 1px solid var(--synth-border);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--synth-border); 
+}
+
+/* 
+   Force-include utility classes 
+*/
+@layer utilities {
+  .text-white { color: #000000 !important; } 
+  .text-gray-300 { color: #444444 !important; }
+  .text-gray-400 { color: #666666 !important; }
+  .text-gray-500 { color: #888888 !important; }
+  
+  .text-synth-primary { color: var(--synth-primary) !important; }
+  .text-synth-secondary { color: var(--synth-secondary) !important; }
+  .text-synth-border { color: var(--synth-border) !important; }
+  
+  .bg-synth-primary { background-color: var(--synth-primary) !important; }
+  .bg-synth-secondary { background-color: var(--synth-secondary) !important; }
+  .bg-synth-border { background-color: var(--synth-border) !important; }
+  
+  .border-synth-primary { border-color: var(--synth-primary) !important; }
+  .border-synth-secondary { border-color: var(--synth-secondary) !important; }
+  .border-synth-border { border-color: var(--synth-border) !important; }
+
+  /* Map the bg-* classes to our new variables */
+  .bg-bg-base { background-color: var(--bg-base) !important; }
+  .bg-bg-card { background-color: var(--bg-card) !important; }
+  .bg-bg-nested { background-color: var(--bg-nested) !important; }
+  .bg-bg-input { background-color: var(--bg-input) !important; }
+  
+  /* Override the dark gray borders from the legacy theme */
+  .border-gray-700 { border-color: #e5e5e5 !important; }
+  .border-gray-800 { border-color: #d4d4d4 !important; }
+
+  /* Fun Button Utilities */
+  .text-fun-print { color: var(--fun-print) !important; }
+  .border-fun-print { border-color: var(--fun-print) !important; }
+  .bg-fun-print { background-color: var(--fun-print) !important; }
+  .hover\:bg-fun-print:hover { background-color: var(--fun-print) !important; }
+  
+  .text-fun-schedule { color: var(--fun-schedule) !important; }
+  .border-fun-schedule { border-color: var(--fun-schedule) !important; }
+  .bg-fun-schedule { background-color: var(--fun-schedule) !important; }
+  .hover\:bg-fun-schedule:hover { background-color: var(--fun-schedule) !important; }
+}
+
+/* Light gray hover background effect for B&W theme */
+.hover-shimmer:hover {
+  background-color: #f3f3f3 !important; /* Light gray */
+}
+
+/* Ensure it works on elements with existing backgrounds */
+.hover-shimmer.bg-bg-input:hover,
+.hover-shimmer.bg-white:hover,
+.hover-shimmer.bg-transparent:hover {
+  background-color: #f3f3f3 !important;
+}
+
+/* Inverted Active State Utilities */
+.active-inverted {
+  background-color: #000000 !important;
+  color: #ffffff !important;
+  border-color: #000000 !important;
+}
+.active-inverted svg {
+  color: #ffffff !important;
 }

@@ -3,30 +3,41 @@ export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
+      fontFamily: {
+        mono: ['"JetBrains Mono"', '"SF Mono"', '"Consolas"', '"Monaco"', '"Menlo"', '"Roboto Mono"', '"Courier New"', 'monospace'], // Modern monospace stack
+      },
       colors: {
-        // Base dark theme colors
+        // Synth Theme Base
         bg: {
-          base: '#242424',      // Main background
-          card: '#2a2a2a',      // Card/modal backgrounds
-          nested: '#1a1a1a',    // Nested card/item backgrounds
-          input: '#333',         // Input field backgrounds
-          hover: '#444',        // Hover states
+          base: '#131318',      // Deepest blue-black
+          card: '#1a1b26',      // Panel background
+          nested: '#131318',    // Nested items (same as base for cutout effect)
+          input: '#252630',     // Input fields
+          hover: '#2d2e3a',     // Hover state
         },
-        // Semantic colors
+        // Synth Theme Accents
+        synth: {
+          border: '#8b8bf5',    // Periwinkle/Lavender Outline
+          primary: '#ff3366',   // Neon Red/Pink
+          secondary: '#00ff99', // Cyan/Green
+          text: '#e0e0e0',      // Off-white text
+          label: '#8b8bf5',     // Lavender labels
+        },
+        // Legacy status mapping (keeping for compatibility, but tweaked)
         status: {
           online: {
-            DEFAULT: '#93c5fd',  // blue-300
-            bg: 'rgba(59, 130, 246, 0.3)',    // blue-900/30
-            border: 'rgba(30, 58, 138, 0.5)', // blue-900/50
+            DEFAULT: '#00ff99',
+            bg: 'rgba(0, 255, 153, 0.1)',
+            border: '#00ff99',
           },
           offline: {
-            DEFAULT: '#86efac',  // green-400
-            bg: 'rgba(20, 83, 45, 0.4)',      // green-900/40
+            DEFAULT: '#8b8bf5',
+            bg: 'rgba(139, 139, 245, 0.1)',
           },
           error: {
-            DEFAULT: '#fca5a5',  // red-300
-            bg: 'rgba(127, 29, 29, 0.3)',     // red-900/30
-            hover: 'rgba(127, 29, 29, 0.5)',  // red-900/50
+            DEFAULT: '#ff3366',
+            bg: 'rgba(255, 51, 102, 0.1)',
+            hover: 'rgba(255, 51, 102, 0.2)',
           },
         },
       },
@@ -34,4 +45,4 @@ export default {
   },
   plugins: [],
 };
-
+// Force reload
