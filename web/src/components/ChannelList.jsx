@@ -132,10 +132,10 @@ const ChannelList = ({
                 {channelModules.map((item, idx) => (
                   <div
                     key={item.module_id}
-                    className='flex items-center justify-between p-2 bg-bg-input rounded-lg border-2 border-gray-600 hover:border-black group transition-all cursor-pointer'
+                    className='flex items-center justify-between p-2 rounded-lg border-2 border-gray-600 hover:border-black group transition-all cursor-pointer'
                     style={{ backgroundColor: '#FFFCF5' }}
-                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FFFFFF'}
-                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#FFFCF5'}
+                    onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', '#FFFFFF', 'important')}
+                    onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', '#FFFCF5', 'important')}
                     onClick={() => {
                       setShowEditModuleModal(item.module_id);
                       setEditingModule(JSON.parse(JSON.stringify(modules[item.module_id])));
@@ -158,7 +158,7 @@ const ChannelList = ({
                         style={needsSetup ? { color: '#DC2626' } : {}}>
                         {isOnline && (
                           wifiStatus?.connected ? (
-                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0 group-hover:text-black transition-colors" style={{ transform: 'translateY(0.125rem)', color: '#7A756E' }} />
+                            <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0 group-hover:text-black transition-colors" style={{ transform: 'translateY(0.125rem)', color: '#2563EB' }} />
                           ) : (
                             <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: '#DC2626' }} />
                           )

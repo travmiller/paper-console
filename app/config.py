@@ -209,6 +209,7 @@ class Settings(BaseModel):
     city_name: str = "New York"
     state: Optional[str] = None
     time_format: str = "12h"  # "12h" for 12-hour format, "24h" for 24-hour format
+    time_sync_mode: str = "manual"  # "manual" or "automatic" for time synchronization mode
     cutter_feed_lines: int = (
         3  # Number of empty lines to add at end of print job to clear cutter
     )
@@ -252,6 +253,13 @@ class Settings(BaseModel):
     def validate_time_format(cls, v):
         if v not in ("12h", "24h"):
             return "12h"
+        return v
+
+    @field_validator("time_sync_mode")
+    @classmethod
+    def validate_time_sync_mode(cls, v):
+        if v not in ("manual", "automatic"):
+            return "manual"
         return v
 
     @field_validator("timezone")

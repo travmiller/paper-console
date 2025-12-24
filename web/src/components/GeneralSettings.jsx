@@ -66,6 +66,13 @@ const GeneralSettings = ({
     return () => clearInterval(interval);
   }, []); // Only run on mount
 
+  // Load saved time sync mode preference
+  useEffect(() => {
+    if (settings?.time_sync_mode) {
+      setUseAutoTime(settings.time_sync_mode === 'automatic');
+    }
+  }, [settings?.time_sync_mode]);
+
   // Fetch SSH status on mount
   useEffect(() => {
     const fetchSshStatus = async () => {
@@ -294,7 +301,7 @@ const GeneralSettings = ({
             <div className='flex-1'>
               <div className='flex items-center gap-2'>
                 {wifiStatus.connected ? (
-                  <WiFiIcon className='w-4 h-4' style={{ color: '#7A756E' }} />
+                  <WiFiIcon className='w-4 h-4' style={{ color: '#2563EB' }} />
                 ) : (
                   <WiFiOffIcon className='w-4 h-4' style={{ color: '#DC2626' }} />
                 )}
@@ -316,85 +323,8 @@ const GeneralSettings = ({
         </div>
       )}
 
-      {/* Location Settings */}
-      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[1] }}>
-        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
-        <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Location</h3>
-
-        {/* Search for location */}
-        <div className='mb-4 text-left relative'>
-          <label className='block mb-2 text-sm text-gray-600  font-bold'>Search City / Location</label>
-          <div className='relative'>
-            <input
-              type='text'
-              value={searchTerm || ''}
-              onChange={(e) => handleSearch(e.target.value)}
-              placeholder='Type city name (e.g. Boston, London, Tokyo)'
-              autoComplete='off'
-              className={inputClass}
-            />
-            {isSearching && (
-              <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
-                <div className='w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin'></div>
-              </div>
-            )}
-          </div>
-          {searchResults.length > 0 && (
-            <ul className='absolute w-full z-10 max-h-[300px] overflow-y-auto bg-white border-2 border-gray-300 border-t-0 rounded-b-lg shadow-lg list-none p-0 m-0'>
-              {searchResults.map((result) => (
-                <li
-                  key={result.id}
-                  onClick={() => selectLocation(result)}
-                  className='p-3 cursor-pointer border-b-2 border-gray-200 last:border-0 hover:bg-white transition-colors group'>
-                  <div className='flex items-start justify-between'>
-                    <div className='flex-1 min-w-0'>
-                      <div className='flex items-center gap-2'>
-                        <strong className='text-black transition-colors '>{result.name}</strong>
-                        {result.population && result.population > 0 && (
-                          <span className='text-xs text-gray-600 '>
-                            {result.population >= 1000000
-                              ? `${(result.population / 1000000).toFixed(1)}M`
-                              : result.population >= 1000
-                              ? `${(result.population / 1000).toFixed(0)}K`
-                              : result.population}
-                          </span>
-                        )}
-                        {result.country_code && result.country_code !== 'US' && (
-                          <span className='text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded  border border-gray-300'>{result.country_code}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-4 rounded-lg'>
-          <div className='flex flex-row items-baseline gap-6'>
-            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Location</span>
-            <span className='font-bold text-black font-mono'>
-              {settings.city_name || 'Not Set'}
-              {settings.state && `, ${settings.state}`}
-            </span>
-          </div>
-          <div className='flex flex-row items-baseline gap-6'>
-            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Timezone</span>
-            <span className='font-bold text-black font-mono'>{formatTimezone(settings.timezone)}</span>
-          </div>
-          <div className='flex flex-row items-baseline gap-6'>
-            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Coordinates</span>
-            <span className='font-bold text-black font-mono'>
-              {settings.latitude?.toFixed(4) || 'N/A'}, {settings.longitude?.toFixed(4) || 'N/A'}
-            </span>
-          </div>
-        </div>
-        </div>
-      </div>
-
       {/* Time Settings */}
-      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[2] }}>
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[1] }}>
         <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
         <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Time Settings</h3>
 
@@ -429,6 +359,7 @@ const GeneralSettings = ({
                 checked={!useAutoTime}
                 onChange={async () => {
                   setUseAutoTime(false);
+                  saveGlobalSettings({ time_sync_mode: 'manual' });
                   // When switching to manual, disable NTP sync to prevent override
                   try {
                     // Disable NTP sync when switching to manual mode
@@ -465,6 +396,7 @@ const GeneralSettings = ({
                 checked={useAutoTime}
                 onChange={() => {
                   setUseAutoTime(true);
+                  saveGlobalSettings({ time_sync_mode: 'automatic' });
                   if (wifiStatus?.connected) {
                     syncTimeAutomatically();
                   }
@@ -490,7 +422,7 @@ const GeneralSettings = ({
                         <div className='text-lg font-bold text-black'>
                           {currentTime.date} {formatTimeForDisplay(currentTime.time, settings.time_format || '12h')}
                         </div>
-                        <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#7A756E' }} />
+                        <WiFiIcon className='w-3.5 h-3.5' style={{ color: '#2563EB' }} />
                       </div>
                     </div>
                   )}
@@ -574,6 +506,83 @@ const GeneralSettings = ({
               {timeStatus.message}
             </div>
           )}
+        </div>
+        </div>
+      </div>
+
+      {/* Location Settings */}
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[2] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
+        <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Location</h3>
+
+        {/* Search for location */}
+        <div className='mb-4 text-left relative'>
+          <label className='block mb-2 text-sm text-gray-600  font-bold'>Search City / Location</label>
+          <div className='relative'>
+            <input
+              type='text'
+              value={searchTerm || ''}
+              onChange={(e) => handleSearch(e.target.value)}
+              placeholder='Type city name (e.g. Boston, London, Tokyo)'
+              autoComplete='off'
+              className={inputClass}
+            />
+            {isSearching && (
+              <div className='absolute right-3 top-1/2 transform -translate-y-1/2'>
+                <div className='w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin'></div>
+              </div>
+            )}
+          </div>
+          {searchResults.length > 0 && (
+            <ul className='absolute w-full z-10 max-h-[300px] overflow-y-auto bg-white border-2 border-gray-300 border-t-0 rounded-b-lg shadow-lg list-none p-0 m-0'>
+              {searchResults.map((result) => (
+                <li
+                  key={result.id}
+                  onClick={() => selectLocation(result)}
+                  className='p-3 cursor-pointer border-b-2 border-gray-200 last:border-0 hover:bg-white transition-colors group'>
+                  <div className='flex items-start justify-between'>
+                    <div className='flex-1 min-w-0'>
+                      <div className='flex items-center gap-2'>
+                        <strong className='text-black transition-colors '>{result.name}</strong>
+                        {result.population && result.population > 0 && (
+                          <span className='text-xs text-gray-600 '>
+                            {result.population >= 1000000
+                              ? `${(result.population / 1000000).toFixed(1)}M`
+                              : result.population >= 1000
+                              ? `${(result.population / 1000).toFixed(0)}K`
+                              : result.population}
+                          </span>
+                        )}
+                        {result.country_code && result.country_code !== 'US' && (
+                          <span className='text-xs px-1.5 py-0.5 bg-gray-100 text-gray-700 rounded  border border-gray-300'>{result.country_code}</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-4 rounded-lg'>
+          <div className='flex flex-row items-baseline gap-6'>
+            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Location</span>
+            <span className='font-bold text-black font-mono'>
+              {settings.city_name || 'Not Set'}
+              {settings.state && `, ${settings.state}`}
+            </span>
+          </div>
+          <div className='flex flex-row items-baseline gap-6'>
+            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Timezone</span>
+            <span className='font-bold text-black font-mono'>{formatTimezone(settings.timezone)}</span>
+          </div>
+          <div className='flex flex-row items-baseline gap-6'>
+            <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Coordinates</span>
+            <span className='font-bold text-black font-mono'>
+              {settings.latitude?.toFixed(4) || 'N/A'}, {settings.longitude?.toFixed(4) || 'N/A'}
+            </span>
+          </div>
         </div>
         </div>
       </div>
