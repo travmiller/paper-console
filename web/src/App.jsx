@@ -528,7 +528,7 @@ function App() {
       style={{ backgroundColor: '#F5F2EA', color: '#2A2A2A' }}>
       <div className='mb-8 pt-4 pb-2'>
         <h1 className='text-3xl sm:text-4xl leading-none font-bold tracking-tighter' style={{ color: '#2A2A2A' }}>
-          PC-1 CONSOLE
+          PC-1 SETTINGS
         </h1>
       </div>
 
