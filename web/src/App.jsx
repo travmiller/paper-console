@@ -9,6 +9,7 @@ import APInstructionsModal from './components/APInstructionsModal';
 import StatusMessage from './components/StatusMessage';
 import ResetSettingsButton from './components/ResetSettingsButton';
 import { AVAILABLE_MODULE_TYPES } from './constants';
+import GitHubIcon from './assets/GitHubIcon';
 
 function App() {
   const [wifiMode, setWifiMode] = useState(null); // null = checking, 'client' = normal, 'ap' = setup mode
@@ -563,7 +564,20 @@ function App() {
               triggerAPMode={triggerAPMode}
               wifiStatus={wifiStatus}
             />
-            <ResetSettingsButton setSettings={setSettings} setModules={setModules} setStatus={setStatus} />
+            <div className='mt-8 flex items-center justify-between'>
+              {/* GitHub Link */}
+              <a
+                href='https://github.com/travmiller/paper-console'
+                target='_blank'
+                rel='noopener noreferrer'
+                className='inline-flex items-center gap-2 text-gray-600 hover:text-black transition-colors'>
+                <GitHubIcon className='w-5 h-5' />
+                <span className='text-sm font-mono'>paper-console</span>
+              </a>
+
+              {/* Reset Button */}
+              <ResetSettingsButton setSettings={setSettings} setModules={setModules} setStatus={setStatus} />
+            </div>
           </>
         )}
 
