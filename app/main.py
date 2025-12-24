@@ -2329,6 +2329,10 @@ async def captive_other():
 # Ensure 'web/dist' exists (run 'npm run build' in web/ directory first)
 if os.path.exists("web/dist"):
     app.mount("/assets", StaticFiles(directory="web/dist/assets"), name="assets")
+    
+    # Serve fonts directory
+    if os.path.exists("web/dist/fonts"):
+        app.mount("/fonts", StaticFiles(directory="web/dist/fonts"), name="fonts")
 
     # Serve favicon explicitly
     @app.get("/favicon.svg")
@@ -2339,6 +2343,7 @@ if os.path.exists("web/dist"):
     @app.get("/{full_path:path}")
     async def serve_frontend(full_path: str):
         # If path starts with api/, let it fall through to API routes
+        # Fonts are handled by the mount above, so they won't reach here
         if (
             full_path.startswith("api/")
             or full_path.startswith("docs")
