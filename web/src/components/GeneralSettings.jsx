@@ -631,7 +631,7 @@ const GeneralSettings = ({
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium  border-2 ${
                     sshStatus.enabled && sshStatus.active
-                      ? 'bg-black text-white border-black'
+                      ? 'bg-white text-black border-black'
                       : sshStatus.enabled
                       ? 'bg-gray-200 text-black border-gray-400'
                       : 'bg-white text-gray-500 border-gray-300'
