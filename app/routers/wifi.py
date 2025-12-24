@@ -28,12 +28,17 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
         # Wait for WiFi adapter to switch back to client mode
         time.sleep(5)
 
+    # Always clean up DNS hijacking before connecting (in case AP mode wasn't detected)
+    wifi_manager.cleanup_dns_hijacking()
+
     # Connect to the new network
     success = wifi_manager.connect_to_wifi(ssid, password)
 
     if success:
         # Wait for IP address
         time.sleep(3)
+        # Clean up DNS hijacking again after connection (ensure it's gone)
+        wifi_manager.cleanup_dns_hijacking()
         status = wifi_manager.get_wifi_status()
         ip_address = status.get("ip", "unknown")
 

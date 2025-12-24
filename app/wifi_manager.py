@@ -246,6 +246,24 @@ def start_ap_mode(retries: int = 3, retry_delay: float = 5.0) -> bool:
     return False
 
 
+def cleanup_dns_hijacking() -> bool:
+    """Remove DNS hijacking configuration (captive portal DNS)."""
+    try:
+        # Remove DNS hijacking config file
+        run_command(
+            ["sudo", "-n", "rm", "-f", "/etc/NetworkManager/dnsmasq.d/captive-portal.conf"],
+            check=False,
+        )
+        # Reload dnsmasq to apply changes
+        run_command(
+            ["sudo", "-n", "pkill", "-HUP", "-f", "dnsmasq.*NetworkManager"],
+            check=False,
+        )
+        return True
+    except Exception:
+        return False
+
+
 def stop_ap_mode() -> bool:
     """Stop AP mode."""
     try:
@@ -256,6 +274,8 @@ def stop_ap_mode() -> bool:
         # Run via /bin/bash to avoid shebang/exec-bit/CRLF issues.
         # Use -n (non-interactive) so we fail fast if sudoers isn't configured.
         run_command(["sudo", "-n", "/bin/bash", script_path, "stop"], check=False)
+        # Also explicitly clean up DNS hijacking in case the script didn't
+        cleanup_dns_hijacking()
         return True
     except Exception:
         return False
