@@ -148,8 +148,8 @@ const ChannelList = ({
                           <>
                       <div className='text-sm font-bold text-gray-700 group-hover:text-black  truncate transition-colors'>{item.module.name}</div>
                       <div
-                        className={`text-[10px]  truncate opacity-70 flex items-baseline gap-1 ${
-                          needsSetup ? 'text-amber-700' : 'text-gray-400'
+                        className={`text-[10px]  truncate opacity-80 flex items-baseline gap-1 ${
+                          needsSetup ? 'text-amber-700' : 'text-gray-500'
                         }`}>
                         {isOnline && <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)' }} />}
                         <span className="truncate">{typeMeta?.label?.toUpperCase()}</span>
