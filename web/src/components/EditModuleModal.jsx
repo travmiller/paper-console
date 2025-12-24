@@ -28,8 +28,8 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
           <div>
             <h3 className='text-xl font-bold text-black mb-1 '>Edit Module</h3>
             <div className={`text-gray-600 text-sm flex gap-4 `}>
-              <span>ID: {moduleId}</span>
-              <span>Type: {AVAILABLE_MODULE_TYPES.find((t) => t.id === module?.type)?.label}</span>
+              <span className="font-mono">ID: {moduleId}</span>
+              <span className="font-mono">Type: {AVAILABLE_MODULE_TYPES.find((t) => t.id === module?.type)?.label}</span>
             </div>
           </div>
           <button

@@ -99,6 +99,16 @@ body {
   .border-fun-schedule { border-color: var(--fun-schedule) !important; }
   .bg-fun-schedule { background-color: var(--fun-schedule) !important; }
   .hover\:bg-fun-schedule:hover { background-color: var(--fun-schedule) !important; }
+  
+  /* Data display font - use IBM Plex Mono for inputs, textareas, and data */
+  .font-data,
+  input,
+  textarea,
+  select,
+  pre,
+  code {
+    font-family: "IBM Plex Mono", "SF Mono", "Consolas", "Monaco", "Menlo", "Roboto Mono", "Courier New", monospace !important;
+  }
 }
 
 /* Light gray hover background effect for B&W theme */

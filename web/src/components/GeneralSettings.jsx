@@ -19,6 +19,15 @@ const GeneralSettings = ({
     'w-full p-3 text-base bg-white border-2 border-gray-300 rounded-lg text-black focus:border-black focus:outline-none box-border';
   const labelClass = 'block mb-2 font-bold text-black';
 
+  // Create unique ink-like gradient for each card
+  const inkGradients = [
+    'radial-gradient(circle at 20% 30%, #000000 0%, #3a3a3a 25%, #000000 50%, #4a4a4a 75%, #000000 100%)',
+    'radial-gradient(circle at 80% 70%, #000000 0%, #4a4a4a 20%, #000000 40%, #3a3a3a 60%, #000000 80%, #525252 100%)',
+    'radial-gradient(ellipse at 50% 20%, #000000 0%, #3a3a3a 30%, #000000 60%, #4a4a4a 90%, #000000 100%)',
+    'radial-gradient(circle at 70% 50%, #000000 0%, #525252 15%, #000000 35%, #3a3a3a 55%, #000000 75%, #4a4a4a 100%)',
+    'radial-gradient(ellipse at 30% 80%, #000000 0%, #4a4a4a 25%, #000000 50%, #3a3a3a 75%, #000000 100%)',
+  ];
+
   // System time state
   const [currentTime, setCurrentTime] = useState(null);
   const [manualDate, setManualDate] = useState('');
@@ -278,7 +287,8 @@ const GeneralSettings = ({
     <div className='space-y-4'>
       {/* WiFi Status Display */}
       {wifiStatus && (
-        <div className='bg-bg-card border-4 border-black rounded-xl p-4 flex flex-col shadow-lg'>
+        <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[0] }}>
+          <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
           <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Network</h3>
           <div className='flex items-center justify-between'>
             <div className='flex-1'>
@@ -302,11 +312,13 @@ const GeneralSettings = ({
               {wifiStatus.connected && wifiStatus.ip && <div className='text-xs text-gray-600 mt-1 '>IP: {wifiStatus.ip}</div>}
             </div>
           </div>
+          </div>
         </div>
       )}
 
       {/* Location Settings */}
-      <div className='bg-bg-card border-4 border-black rounded-xl p-4 flex flex-col shadow-lg'>
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[1] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
         <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Location</h3>
 
         {/* Search for location */}
@@ -362,26 +374,28 @@ const GeneralSettings = ({
         <div className='grid grid-cols-[repeat(auto-fit,minmax(200px,1fr))] gap-4 p-4 rounded-lg'>
           <div className='flex flex-row items-baseline gap-6'>
             <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Location</span>
-            <span className='font-bold text-black '>
+            <span className='font-bold text-black font-mono'>
               {settings.city_name || 'Not Set'}
               {settings.state && `, ${settings.state}`}
             </span>
           </div>
           <div className='flex flex-row items-baseline gap-6'>
             <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Timezone</span>
-            <span className='font-bold text-black '>{formatTimezone(settings.timezone)}</span>
+            <span className='font-bold text-black font-mono'>{formatTimezone(settings.timezone)}</span>
           </div>
           <div className='flex flex-row items-baseline gap-6'>
             <span className='text-xs text-gray-600 uppercase  font-bold w-20'>Coordinates</span>
-            <span className='font-bold text-black '>
+            <span className='font-bold text-black font-mono'>
               {settings.latitude?.toFixed(4) || 'N/A'}, {settings.longitude?.toFixed(4) || 'N/A'}
             </span>
           </div>
         </div>
+        </div>
       </div>
 
       {/* Time Settings */}
-      <div className='bg-bg-card border-4 border-black rounded-xl p-4 flex flex-col shadow-lg'>
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[2] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
         <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Time Settings</h3>
 
         {/* Time Format */}
@@ -561,10 +575,12 @@ const GeneralSettings = ({
             </div>
           )}
         </div>
+        </div>
       </div>
 
       {/* Printer Settings */}
-      <div className='bg-bg-card border-4 border-black rounded-xl p-4 flex flex-col shadow-lg'>
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[3] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
         <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Printer Settings</h3>
         <div className='mb-4'>
           <label className={labelClass}>Cutter Feed Lines</label>
@@ -595,10 +611,12 @@ const GeneralSettings = ({
             Maximum lines per print job to prevent endless prints. Set to 0 for no limit (default: 200)
           </p>
         </div>
+        </div>
       </div>
 
       {/* SSH Management */}
-      <div className='bg-bg-card border-4 border-black rounded-xl p-4 flex flex-col shadow-lg'>
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[4] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
         <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>SSH Access</h3>
         <p className='text-sm text-gray-600 mb-4 '>
           Manage SSH (Secure Shell) access to your PC-1 device. SSH allows advanced users to access the device via command line.
@@ -795,6 +813,7 @@ const GeneralSettings = ({
             <p className='text-sm text-gray-500 '>SSH isn't available in testing mode</p>
           </div>
         )}
+        </div>
       </div>
     </div>
   );

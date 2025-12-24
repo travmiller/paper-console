@@ -57,8 +57,21 @@ const ChannelList = ({
             .filter((item) => item.module)
             .sort((a, b) => a.order - b.order);
 
+          // Create unique ink-like gradient for each channel
+          const inkGradients = [
+            'radial-gradient(circle at 20% 30%, #000000 0%, #3a3a3a 25%, #000000 50%, #4a4a4a 75%, #000000 100%)',
+            'radial-gradient(circle at 80% 70%, #000000 0%, #4a4a4a 20%, #000000 40%, #3a3a3a 60%, #000000 80%, #525252 100%)',
+            'radial-gradient(ellipse at 50% 20%, #000000 0%, #3a3a3a 30%, #000000 60%, #4a4a4a 90%, #000000 100%)',
+            'radial-gradient(circle at 70% 50%, #000000 0%, #525252 15%, #000000 35%, #3a3a3a 55%, #000000 75%, #4a4a4a 100%)',
+            'radial-gradient(ellipse at 30% 80%, #000000 0%, #4a4a4a 25%, #000000 50%, #3a3a3a 75%, #000000 100%)',
+            'radial-gradient(circle at 60% 40%, #000000 0%, #3a3a3a 20%, #000000 45%, #525252 70%, #000000 100%)',
+            'radial-gradient(ellipse at 40% 60%, #000000 0%, #4a4a4a 30%, #000000 60%, #3a3a3a 90%, #000000 100%)',
+            'radial-gradient(circle at 50% 50%, #000000 0%, #3a3a3a 25%, #000000 50%, #4a4a4a 75%, #000000 100%)',
+          ];
+          
           return (
-            <div key={pos} className='bg-bg-card border-4 border-black rounded-xl p-4 flex flex-col h-full shadow-lg'>
+            <div key={pos} className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[pos - 1] }}>
+              <div className='bg-bg-card rounded-lg p-4 flex flex-col h-full'>
               <div className='flex items-center justify-between mb-3 gap-4'>
                 <div className='flex items-center gap-3 overflow-x-auto'>
                   <h3 className='font-bold text-black  text-lg tracking-tight'>
@@ -143,7 +156,7 @@ const ChannelList = ({
                             <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0 text-amber-700" style={{ transform: 'translateY(0.125rem)' }} />
                           )
                         )}
-                        <span className="truncate">{typeMeta?.label?.toUpperCase()}</span>
+                        <span className="truncate font-mono">{typeMeta?.label?.toUpperCase()}</span>
                       </div>
                           </>
                         );
@@ -155,15 +168,15 @@ const ChannelList = ({
                           type='button'
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'up')}
                           disabled={idx === 0}
-                          className='px-1 text-[10px] leading-none text-gray-600 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'>
-                          <ArrowUpIcon className='w-2.5 h-2.5' />
+                          className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer [&:hover_svg]:text-[#000000]'>
+                          <ArrowUpIcon className='w-2.5 h-2.5 text-gray-600 transition-colors' />
                         </button>
                         <button
                           type='button'
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'down')}
                           disabled={idx === channelModules.length - 1}
-                          className='px-1 text-[10px] leading-none text-gray-600 hover:text-black disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'>
-                          <ArrowDownIcon className='w-2.5 h-2.5' />
+                          className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer [&:hover_svg]:text-[#000000]'>
+                          <ArrowDownIcon className='w-2.5 h-2.5 text-gray-600 transition-colors' />
                         </button>
                       </div>
                     </div>
@@ -179,6 +192,7 @@ const ChannelList = ({
                   title='Add a module to this channel'>
                   + ADD MODULE
                 </button>
+              </div>
               </div>
             </div>
           );

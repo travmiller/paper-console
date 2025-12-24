@@ -4,7 +4,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        mono: ['"JetBrains Mono"', '"SF Mono"', '"Consolas"', '"Monaco"', '"Menlo"', '"Roboto Mono"', '"Courier New"', 'monospace'], // Modern monospace stack
+        sans: ['"IBM Plex Sans"', '-apple-system', 'BlinkMacSystemFont', '"Segoe UI"', 'Roboto', '"Helvetica Neue"', 'Arial', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', '"SF Mono"', '"Consolas"', '"Monaco"', '"Menlo"', '"Roboto Mono"', '"Courier New"', 'monospace'],
       },
       colors: {
         // Synth Theme Base
