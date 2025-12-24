@@ -68,10 +68,14 @@ const GeneralSettings = ({
 
   // Load saved time sync mode preference
   useEffect(() => {
-    if (settings?.time_sync_mode) {
-      setUseAutoTime(settings.time_sync_mode === 'automatic');
+    // Only initialize if settings are actually loaded (not empty initial state)
+    // Check if settings has meaningful data (like timezone or city_name)
+    if (settings && (settings.timezone || settings.city_name || settings.time_sync_mode !== undefined)) {
+      const syncMode = settings.time_sync_mode || 'manual';
+      console.log('[TimeSync] Loading preference:', { syncMode, time_sync_mode: settings.time_sync_mode });
+      setUseAutoTime(syncMode === 'automatic');
     }
-  }, [settings?.time_sync_mode]);
+  }, [settings]);
 
   // Fetch SSH status on mount
   useEffect(() => {
@@ -358,6 +362,7 @@ const GeneralSettings = ({
                 name='timeMode'
                 checked={!useAutoTime}
                 onChange={async () => {
+                  console.log('[TimeSync] Switching to manual mode');
                   setUseAutoTime(false);
                   saveGlobalSettings({ time_sync_mode: 'manual' });
                   // When switching to manual, disable NTP sync to prevent override
@@ -395,6 +400,7 @@ const GeneralSettings = ({
                 name='timeMode'
                 checked={useAutoTime}
                 onChange={() => {
+                  console.log('[TimeSync] Switching to automatic mode');
                   setUseAutoTime(true);
                   saveGlobalSettings({ time_sync_mode: 'automatic' });
                   if (wifiStatus?.connected) {
