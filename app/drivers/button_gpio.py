@@ -50,7 +50,9 @@ class ButtonDriver:
             set()
         )  # Track which hold actions have fired for this press
         self.last_release_time = 0  # Track last button release for cooldown
-        self.cooldown_period = 0.3  # 300ms cooldown after release to prevent double-triggers
+        self.cooldown_period = 0.05  # 50ms cooldown after release to prevent double-triggers
+        self.last_callback_time = 0  # Track when callback was last called
+        self.callback_cooldown = 0.15  # 150ms minimum between callbacks to prevent rapid-fire
 
         self.chip = None
         self.event_handle = None
@@ -193,81 +195,99 @@ class ButtonDriver:
     def _monitor_loop(self):
         """Monitor for button press/release events."""
         last_event_time = 0
-        debounce_ms = 150  # Increased from 50ms to 150ms for better debouncing
+        debounce_ms = 50  # 50ms debounce - minimal but effective
 
         while self.monitoring and self.event_handle:
             try:
-                # Use select to check if data is available (non-blocking check)
-                # This prevents blocking and allows us to process events more reliably
                 fd = self.event_handle.fd
                 if fd is None:
-                    time.sleep(0.1)
+                    time.sleep(0.01)
                     continue
                 
-                # Wait up to 100ms for an event (non-blocking with timeout)
-                ready, _, _ = select.select([fd], [], [], 0.1)
+                # Check if data is available (non-blocking with short timeout)
+                ready, _, _ = select.select([fd], [], [], 0.01)
                 
                 if not ready:
                     # No event available, continue loop
                     continue
                 
-                # Event is available, read it
-                event_id = self.event_handle.read_event()
-                if event_id is None:
-                    # None means error reading, but don't exit - just continue
-                    continue
+                # Read all available events in a batch to avoid missing any
+                # Process up to 10 events per iteration to handle rapid presses
+                events_processed = 0
+                max_events_per_iteration = 10
                 
-                current_time = time.time()
-
-                # Debounce - ignore events that come too quickly after the last one
-                if (current_time - last_event_time) < (debounce_ms / 1000.0):
-                    continue
-                last_event_time = current_time
-
-                if event_id == GPIOEVENT_EVENT_FALLING_EDGE:
-                    # Press started
-                    # Check cooldown period - ignore presses that come too soon after release
-                    if (current_time - self.last_release_time) < self.cooldown_period:
-                        continue
+                while events_processed < max_events_per_iteration:
+                    # Check if more data is available
+                    ready, _, _ = select.select([fd], [], [], 0)
+                    if not ready:
+                        break
                     
-                    self.is_pressed = True
-                    self.press_start_time = current_time
-                    self.triggered_actions = set()
+                    # Read the event
+                    event_id = self.event_handle.read_event()
+                    if event_id is None:
+                        break
+                    
+                    events_processed += 1
+                    current_time = time.time()
 
-                elif event_id == GPIOEVENT_EVENT_RISING_EDGE:
-                    # Released
-                    if self.is_pressed:
-                        # Calculate hold duration
-                        hold_duration = None
-                        if self.press_start_time:
-                            hold_duration = current_time - self.press_start_time
+                    # Debounce - ignore events that come too quickly after the last one
+                    time_since_last_event = current_time - last_event_time
+                    if time_since_last_event < (debounce_ms / 1000.0):
+                        continue
+                    last_event_time = current_time
 
-                        # Check if we should trigger AP mode (long press)
-                        # Only trigger if:
-                        # - Hold duration was between 5-15 seconds
-                        # - Factory reset was NOT triggered
-                        if (
-                            hold_duration is not None
-                            and hold_duration >= self.long_press_duration
-                            and hold_duration < self.factory_reset_duration
-                            and "factory_reset" not in self.triggered_actions
-                            and self.long_press_callback
-                        ):
-                            try:
-                                self.long_press_callback()
-                            except Exception:
-                                pass
-                        # Otherwise, trigger short press if no actions were triggered
-                        elif not self.triggered_actions and self.callback:
-                            try:
-                                self.callback()
-                            except Exception:
-                                pass
-
-                        self.is_pressed = False
-                        self.press_start_time = None
+                    if event_id == GPIOEVENT_EVENT_FALLING_EDGE:
+                        # Press started
+                        # Only check cooldown if we're not already processing a press
+                        if not self.is_pressed:
+                            time_since_release = current_time - self.last_release_time
+                            if time_since_release < self.cooldown_period:
+                                continue
+                        
+                        self.is_pressed = True
+                        self.press_start_time = current_time
                         self.triggered_actions = set()
-                        self.last_release_time = current_time  # Track release time for cooldown
+
+                    elif event_id == GPIOEVENT_EVENT_RISING_EDGE:
+                        # Released
+                        if self.is_pressed:
+                            # Calculate hold duration
+                            hold_duration = None
+                            if self.press_start_time:
+                                hold_duration = current_time - self.press_start_time
+
+                            # Check if we should trigger AP mode (long press)
+                            # Only trigger if:
+                            # - Hold duration was between 5-15 seconds
+                            # - Factory reset was NOT triggered
+                            if (
+                                hold_duration is not None
+                                and hold_duration >= self.long_press_duration
+                                and hold_duration < self.factory_reset_duration
+                                and "factory_reset" not in self.triggered_actions
+                                and self.long_press_callback
+                            ):
+                                # Check callback cooldown before triggering long press
+                                if (current_time - self.last_callback_time) >= self.callback_cooldown:
+                                    try:
+                                        self.long_press_callback()
+                                        self.last_callback_time = current_time
+                                    except Exception:
+                                        pass
+                            # Otherwise, trigger short press if no actions were triggered
+                            elif not self.triggered_actions and self.callback:
+                                # Check callback cooldown before triggering short press
+                                if (current_time - self.last_callback_time) >= self.callback_cooldown:
+                                    try:
+                                        self.callback()
+                                        self.last_callback_time = current_time
+                                    except Exception:
+                                        pass
+
+                            self.is_pressed = False
+                            self.press_start_time = None
+                            self.triggered_actions = set()
+                            self.last_release_time = current_time  # Track release time for cooldown
 
             except OSError:
                 # File descriptor closed or invalid, wait a bit and continue
@@ -276,7 +296,7 @@ class ButtonDriver:
             except Exception:
                 # Other errors - log and continue
                 if self.monitoring:
-                    time.sleep(0.1)
+                    time.sleep(0.01)
 
     def set_callback(self, callback: Callable[[], None]):
         """Register a function to be called on short press."""
