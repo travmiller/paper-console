@@ -1,6 +1,7 @@
 import threading
 import time
 import os
+import select
 from typing import Callable, Optional
 
 # Try to import our ioctl driver
@@ -48,6 +49,8 @@ class ButtonDriver:
         self.triggered_actions = (
             set()
         )  # Track which hold actions have fired for this press
+        self.last_release_time = 0  # Track last button release for cooldown
+        self.cooldown_period = 0.3  # 300ms cooldown after release to prevent double-triggers
 
         self.chip = None
         self.event_handle = None
@@ -190,11 +193,25 @@ class ButtonDriver:
     def _monitor_loop(self):
         """Monitor for button press/release events."""
         last_event_time = 0
-        debounce_ms = 50
+        debounce_ms = 150  # Increased from 50ms to 150ms for better debouncing
 
         while self.monitoring and self.event_handle:
-                
             try:
+                # Use select to check if data is available (non-blocking check)
+                # This prevents blocking and allows us to process events more reliably
+                fd = self.event_handle.fd
+                if fd is None:
+                    time.sleep(0.1)
+                    continue
+                
+                # Wait up to 100ms for an event (non-blocking with timeout)
+                ready, _, _ = select.select([fd], [], [], 0.1)
+                
+                if not ready:
+                    # No event available, continue loop
+                    continue
+                
+                # Event is available, read it
                 event_id = self.event_handle.read_event()
                 if event_id is None:
                     # None means error reading, but don't exit - just continue
@@ -202,13 +219,17 @@ class ButtonDriver:
                 
                 current_time = time.time()
 
-                # Debounce
+                # Debounce - ignore events that come too quickly after the last one
                 if (current_time - last_event_time) < (debounce_ms / 1000.0):
                     continue
                 last_event_time = current_time
 
                 if event_id == GPIOEVENT_EVENT_FALLING_EDGE:
                     # Press started
+                    # Check cooldown period - ignore presses that come too soon after release
+                    if (current_time - self.last_release_time) < self.cooldown_period:
+                        continue
+                    
                     self.is_pressed = True
                     self.press_start_time = current_time
                     self.triggered_actions = set()
@@ -246,10 +267,16 @@ class ButtonDriver:
                         self.is_pressed = False
                         self.press_start_time = None
                         self.triggered_actions = set()
+                        self.last_release_time = current_time  # Track release time for cooldown
 
-            except Exception:
+            except OSError:
+                # File descriptor closed or invalid, wait a bit and continue
                 if self.monitoring:
-                    time.sleep(1)
+                    time.sleep(0.5)
+            except Exception:
+                # Other errors - log and continue
+                if self.monitoring:
+                    time.sleep(0.1)
 
     def set_callback(self, callback: Callable[[], None]):
         """Register a function to be called on short press."""
