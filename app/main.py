@@ -179,18 +179,6 @@ async def scheduler_loop():
 print_in_progress = False
 
 
-def on_button_press():
-    """
-    Callback for when the physical button is pressed.
-    Calls the async trigger_current_channel function.
-    """
-    try:
-        loop = asyncio.get_running_loop()
-        loop.create_task(trigger_current_channel())
-    except RuntimeError:
-        pass
-
-
 global_loop = None
 
 
@@ -201,9 +189,19 @@ def on_button_press_threadsafe():
     # Simple check to prevent double prints
     if print_in_progress:
         return
+    
+    # Set flag immediately to prevent multiple clicks while task is being scheduled
+    print_in_progress = True
 
-    if global_loop and global_loop.is_running():
-        asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
+    try:
+        if global_loop and global_loop.is_running():
+            asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
+        else:
+            # Loop not running, reset flag
+            print_in_progress = False
+    except Exception:
+        # Failed to schedule, reset flag
+        print_in_progress = False
 
 
 def on_button_long_press_threadsafe():
