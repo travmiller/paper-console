@@ -28,7 +28,3 @@ dial = DialDriver()
 # Main Interface Button (Print / WiFi Setup / Reset) - GPIO 25 (Pin 22)
 button = ButtonDriver(pin=25)
 
-# dedicated Power Button (Shutdown / Wake) - GPIO 3
-# Note: Waking from halt is a hardware feature of GPIO 3.
-# We only need to handle the shutdown logic here.
-power_button = ButtonDriver(pin=3)

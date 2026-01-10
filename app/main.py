@@ -54,7 +54,7 @@ from app.modules import (
 from app.routers import wifi
 import app.wifi_manager as wifi_manager
 import app.hardware as hardware
-from app.hardware import printer, dial, button, power_button, _is_raspberry_pi
+from app.hardware import printer, dial, button, _is_raspberry_pi
 import app.location_lookup as location_lookup
 
 # --- BACKGROUND TASKS ---
@@ -329,8 +329,8 @@ async def check_first_boot():
     printer.print_text("--------------------------------")
     printer.print_text("NEED HELP LATER?")
     printer.print_text("--------------------------------")
-    printer.print_text("Power Btn 5s = WiFi setup")
-    printer.print_text("Power Btn 15s = Reset all")
+    printer.print_text("Button 5s = WiFi setup")
+    printer.print_text("Button 15s = Reset all")
     printer.print_text("================================")
     printer.feed(2)
 
@@ -478,38 +478,6 @@ def on_factory_reset_threadsafe():
         asyncio.run_coroutine_threadsafe(factory_reset_trigger(), global_loop)
 
 
-async def shutdown_trigger():
-    """Shutdown the device safely."""
-    import subprocess
-
-    # Print shutdown message
-    printer.feed(1)
-    printer.print_text("=" * 32)
-    printer.print_text("       SHUTTING DOWN")
-    printer.print_text("=" * 32)
-    printer.feed(1)
-
-    # Flush buffer
-    if hasattr(printer, "flush_buffer"):
-        printer.flush_buffer()
-    if hasattr(printer, "feed_direct"):
-        printer.feed_direct(3)
-
-    await asyncio.sleep(2)
-
-    try:
-        subprocess.run(["sudo", "shutdown", "-h", "now"], check=False)
-    except Exception:
-        pass
-
-
-def on_power_button_callback_threadsafe():
-    """Callback for power button short press (shutdown)."""
-    global global_loop
-    if global_loop and global_loop.is_running():
-        asyncio.run_coroutine_threadsafe(shutdown_trigger(), global_loop)
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
@@ -533,19 +501,13 @@ async def lifespan(app: FastAPI):
     scheduler_task = asyncio.create_task(scheduler_loop())
     task_monitor_task = asyncio.create_task(task_watchdog())
 
-    # Initialize Main Button Callbacks (Printing Only)
+    # Initialize Main Button Callbacks
+    # Short press = Print
     button.set_callback(on_button_press_threadsafe)
-
-    # Initialize Power Button Callbacks (Shutdown, AP Mode, Factory Reset)
-    power_button.set_callback(
-        on_power_button_callback_threadsafe
-    )  # Short press = Shutdown
-    power_button.set_long_press_callback(
-        on_button_long_press_threadsafe
-    )  # 5s = AP Mode (reusing function name)
-    power_button.set_factory_reset_callback(
-        on_factory_reset_threadsafe
-    )  # 15s = Factory Reset
+    # Long press (5s) = AP Mode
+    button.set_long_press_callback(on_button_long_press_threadsafe)
+    # Factory reset (15s) = Factory Reset
+    button.set_factory_reset_callback(on_factory_reset_threadsafe)
 
     yield
 
@@ -567,8 +529,6 @@ async def lifespan(app: FastAPI):
         dial.cleanup()
     if hasattr(button, "cleanup"):
         button.cleanup()
-    if hasattr(power_button, "cleanup"):
-        power_button.cleanup()
 
 
 app = FastAPI(
@@ -648,9 +608,6 @@ async def health_check():
     health["components"]["printer"] = "available" if printer else "unavailable"
     health["components"]["dial"] = "available" if dial else "unavailable"
     health["components"]["button"] = "available" if button else "unavailable"
-    health["components"]["power_button"] = (
-        "available" if power_button else "unavailable"
-    )
     health["components"]["gpio"] = "available" if _is_raspberry_pi else "mock"
 
     # Check config file

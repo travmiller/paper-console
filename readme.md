@@ -235,68 +235,74 @@ paper-console/
 1. **Raspberry Pi Zero 2 W** with Raspberry Pi OS Lite installed
 2. **Thermal Printer** (QR204/CSN-A2 or compatible 58mm TTL thermal printer)
 3. **1-Pole 8-Position Rotary Switch**
-4. **Momentary Push Button** (x2)
+4. **Momentary Push Button** (x1)
 5. **Power Supply:** 5V 5A Power Supply (Barrel Jack) -> Terminal Adapter
 
-### Complete Wiring Tables
+### Complete Wiring Tables (Component-Based)
 
-#### Thermal Printer (TTL Serial)
-| Printer Wire | Pi GPIO | Physical Pin |
-|--------------|---------|--------------|
-| RX | GPIO 14 (TXD) | Pin 8 |
-| TX | GPIO 15 (RXD) | Pin 10 |
-| DTR | GPIO 18 | Pin 12 |
-| GND | Ground | Pin 14 |
-| VCC | 5V | Pin 2 or 4 |
+This layout organizes connections into logical groups (blocks) for easier assembly with standard connectors (DuPont or JST).
 
-#### Main Button (Print)
-| Signal | GPIO | Physical Pin |
-|--------|------|--------------|
-| GND | Ground | Pin 20 |
-| Signal | GPIO 25 | Pin 22 |
+#### 1. Power & Printer Data Block (Top)
+*Use a 4-pin or 5-pin connector block.*
 
-#### Power Button (Shutdown/Wake)
-| Signal | GPIO | Physical Pin |
-|--------|------|--------------|
-| Signal | GPIO 3 | Pin 5 |
-| GND | Ground | Pin 6 |
+| Pin | GPIO | Function | Wire To |
+| :---: | :---: | :--- | :--- |
+| **2** | 5V | **Power Input (+)** | External PSU 5V (+) |
+| **6** | GND | **Power Input (-)** | External PSU GND (-) |
+| **8** | 14 | **TX (Data)** | Printer RX |
+| **10** | 15 | **RX (Data)** | Printer TX |
+| **12** | 18 | **DTR (Flow)** | Printer DTR |
+| **14** | GND | **Signal GND** | Printer GND |
 
-#### Rotary Dial (8-Position)
-| Position | GPIO | Physical Pin |
-|----------|------|--------------|
-| Common (GND) | Ground | Pin 39 |
-| Position 1 | GPIO 5 | Pin 29 |
-| Position 2 | GPIO 6 | Pin 31 |
-| Position 3 | GPIO 13 | Pin 33 |
-| Position 4 | GPIO 19 | Pin 35 |
-| Position 5 | GPIO 26 | Pin 37 |
-| Position 6 | GPIO 16 | Pin 36 |
-| Position 7 | GPIO 20 | Pin 38 |
-| Position 8 | GPIO 21 | Pin 40 |
+*Note: Power the Pi via Pins 2 & 6. Power the Printer directly from the external PSU (split the cable), or via a custom HAT trace. Do not pull high current through the Pi itself.*
+
+#### 2. Main Button Block (Middle)
+*Use a 2-pin connector.*
+
+| Pin | GPIO | Function | Wire To |
+| :---: | :---: | :--- | :--- |
+| **20** | GND | **Button GND** | Button Pin 1 |
+| **22** | 25 | **Button Signal** | Button Pin 2 |
+
+#### 3. Rotary Dial Block (Bottom)
+*Use a 12-pin (2x6) connector block.*
+
+| Pin (Left) | GPIO | Function | | Pin (Right) | GPIO | Function |
+| :---: | :---: | :--- | :--- | :---: | :---: | :--- |
+| **29** | 5 | **Pos 1** | \| | **30** | GND | *Unused* |
+| **31** | 6 | **Pos 2** | \| | **32** | 12 | *Unused* |
+| **33** | 13 | **Pos 3** | \| | **34** | GND | *Unused* |
+| **35** | 19 | **Pos 4** | \| | **36** | 16 | **Pos 6** |
+| **37** | 26 | **Pos 5** | \| | **38** | 20 | **Pos 7** |
+| **39** | GND | **Common** | \| | **40** | 21 | **Pos 8** |
 
 ### Visual Pin Layout
+Legend: `[X]` = Used, `[ ]` = Empty. The header is 2 pins wide.
+
 ```
-                    3V3  (1)  (2)  5V [Printer VCC]
-                  GPIO2  (3)  (4)  5V
-      [Power Btn] GPIO3  (5)  (6)  GND [Power Btn]
-                  GPIO4  (7)  (8)  GPIO14/TXD [→ Printer RX]
-                    GND  (9)  (10) GPIO15/RXD [← Printer TX]
-                 GPIO17 (11)  (12) GPIO18 [Printer DTR]
-                 GPIO27 (13)  (14) GND    [Printer GND]
-                 GPIO22 (15)  (16) GPIO23
-                    3V3 (17)  (18) GPIO24
-                 GPIO10 (19)  (20) GND    [Main Btn GND]
-                  GPIO9 (21)  (22) GPIO25 [Main Btn]
-                 GPIO11 (23)  (24) GPIO8
-                    GND (25)  (26) GPIO7
-                  GPIO0 (27)  (28) GPIO1
-       [Dial P1] GPIO5  (29)  (30) GND
-       [Dial P2] GPIO6  (31)  (32) GPIO12
-       [Dial P3] GPIO13 (33)  (34) GND
-       [Dial P4] GPIO19 (35)  (36) GPIO16 [Dial P6]
-       [Dial P5] GPIO26 (37)  (38) GPIO20 [Dial P7]
-   [Dial Common] GND    (39)  (40) GPIO21 [Dial P8]
+      (Pin 1) [ ] [X] (Pin 2)  --> Power 5V (+)
+      (Pin 3) [ ] [ ] (Pin 4)
+      (Pin 5) [ ] [X] (Pin 6)  --> Power GND (-)
+      (Pin 7) [ ] [X] (Pin 8)  --> Printer TX
+      (Pin 9) [ ] [X] (Pin 10) --> Printer RX
+     (Pin 11) [ ] [X] (Pin 12) --> Printer DTR
+     (Pin 13) [ ] [X] (Pin 14) --> Printer GND
+     (Pin 15) [ ] [ ] (Pin 16)
+     (Pin 17) [ ] [ ] (Pin 18)
+     (Pin 19) [ ] [X] (Pin 20) --> Button GND
+     (Pin 21) [ ] [X] (Pin 22) --> Button SIG
+     (Pin 23) [ ] [ ] (Pin 24)
+     (Pin 25) [ ] [ ] (Pin 26)
+     (Pin 27) [ ] [ ] (Pin 28)
+     (Pin 29) [X] [ ] (Pin 30) --> Dial 1
+     (Pin 31) [X] [ ] (Pin 32) --> Dial 2
+     (Pin 33) [X] [ ] (Pin 34) --> Dial 3
+     (Pin 35) [X] [X] (Pin 36) --> Dial 4 | Dial 6
+     (Pin 37) [X] [X] (Pin 38) --> Dial 5 | Dial 7
+     (Pin 39) [X] [X] (Pin 40) --> Dial COM| Dial 8
 ```
+
+**Ground Wiring Note:** All device grounds (Printer, Main Button, Rotary Dial Common) connect to a single common ground bus, which then connects to **any one** Pi GPIO ground pin (Pin 14 shown above). All Pi GPIO ground pins are internally connected, so Pin 6, 9, 14, 20, 25, 30, 34, or 39 will work equally well.
 
 ### Thermal Printer
 
@@ -312,11 +318,12 @@ paper-console/
 
 ### Power Supply
 
-**Shared Power Setup:**
-- Use a 5V 5A power supply with a terminal adapter
-- Split power in parallel: one branch to Pi, one branch to Printer
-- Connect data lines separately
-- **Important:** Do not power printer through Pi GPIO pins (insufficient current for printer)
+**Recommended Setup (Split Power):**
+1.  **Source:** Use a 5V 5A power supply (Barrel Jack).
+2.  **Distribution:** Use a custom PCB HAT or a terminal splitter to feed power to two places simultaneously:
+    *   **To Pi:** Connect to GPIO Pins 2 (5V) and 6 (GND).
+    *   **To Printer:** Connect to the printer's power input cable.
+3.  **Warning:** Do **not** plug the power supply into the Pi's USB port and try to power the printer from the Pi's GPIO pins. The printer draws too much current (up to 4A) and will crash the Pi. Always split the power *before* or *at* the GPIO header using a proper PCB trace.
 
 ---
 
