@@ -175,8 +175,12 @@ async def scheduler_loop():
 
 # --- HARDWARE CALLBACKS ---
 
-# Print state tracking
+# Print state tracking with proper thread synchronization
+import threading
+print_lock = threading.Lock()
 print_in_progress = False
+last_print_time = 0.0
+PRINT_DEBOUNCE_SECONDS = 3.0  # Minimum time between print jobs
 
 
 global_loop = None
@@ -184,33 +188,34 @@ global_loop = None
 
 def on_button_press_threadsafe():
     """Callback that schedules the trigger on the main event loop."""
-    global global_loop, print_in_progress
+    global global_loop, print_in_progress, last_print_time
+    import time
 
-    # Simple check to prevent double prints
-    if print_in_progress:
-        return
-    
-    # Set flag immediately to prevent multiple clicks while task is being scheduled
-    print_in_progress = True
-
-    # Also check hardware status if available
-    if hasattr(printer, "is_printer_busy"):
-        try:
-            if printer.is_printer_busy():
-                print_in_progress = False
-                return
-        except Exception:
-            pass
+    with print_lock:
+        # Check if print is already in progress
+        if print_in_progress:
+            return
+        
+        # Debounce: ignore presses that come too quickly after the last one
+        current_time = time.time()
+        if (current_time - last_print_time) < PRINT_DEBOUNCE_SECONDS:
+            return
+        
+        # Set flag immediately to prevent multiple clicks
+        print_in_progress = True
+        last_print_time = current_time
 
     try:
         if global_loop and global_loop.is_running():
             asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
         else:
             # Loop not running, reset flag
-            print_in_progress = False
+            with print_lock:
+                print_in_progress = False
     except Exception:
         # Failed to schedule, reset flag
-        print_in_progress = False
+        with print_lock:
+            print_in_progress = False
 
 
 def on_button_long_press_threadsafe():
@@ -2074,9 +2079,6 @@ async def trigger_channel(position: int):
     """
     global print_in_progress
 
-    # Mark print as in progress
-    print_in_progress = True
-
     try:
         # Instant tactile feedback - tiny paper blip
         if hasattr(printer, "blip"):
@@ -2166,8 +2168,9 @@ async def trigger_channel(position: int):
             printer.feed_direct(feed_lines)
 
     finally:
-        # Always mark print as complete
-        print_in_progress = False
+        # Always mark print as complete (thread-safe)
+        with print_lock:
+            print_in_progress = False
 
 
 async def trigger_current_channel():
@@ -2184,10 +2187,16 @@ async def manual_trigger():
     """Simulates pressing the big brass button."""
     global print_in_progress
 
-    if print_in_progress:
-        raise HTTPException(status_code=409, detail="Print already in progress")
+    with print_lock:
+        if print_in_progress:
+            raise HTTPException(status_code=409, detail="Print already in progress")
+        print_in_progress = True
 
-    await trigger_current_channel()
+    try:
+        await trigger_current_channel()
+    finally:
+        with print_lock:
+            print_in_progress = False
     return {"message": "Triggered"}
 
 
@@ -2209,11 +2218,16 @@ async def print_channel(position: int):
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
 
-    if print_in_progress:
-        raise HTTPException(status_code=409, detail="Print already in progress")
+    with print_lock:
+        if print_in_progress:
+            raise HTTPException(status_code=409, detail="Print already in progress")
+        print_in_progress = True
 
-    # Don't need to set dial.set_position since we're passing position directly
-    await trigger_channel(position)
+    try:
+        await trigger_channel(position)
+    finally:
+        with print_lock:
+            print_in_progress = False
     return {"message": f"Printing channel {position}"}
 
 

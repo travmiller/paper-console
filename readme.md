@@ -233,7 +233,7 @@ paper-console/
 
 ### Prerequisites
 1. **Raspberry Pi Zero 2 W** with Raspberry Pi OS Lite installed
-2. **Thermal Printer** (QR204/CSN-A2 or compatible 58mm TTL thermal printer)
+2. **Thermal Printer** (QR204/CSN-A2 or compatible 58mm TTL thermal printer. 30mm diameter paper roll maximum)
 3. **1-Pole 8-Position Rotary Switch**
 4. **Momentary Push Button** (x1)
 5. **Power Supply:** 5V 5A Power Supply (Barrel Jack) -> Terminal Adapter
