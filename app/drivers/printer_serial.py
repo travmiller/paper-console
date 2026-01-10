@@ -434,10 +434,10 @@ class PrinterDriver:
             pass
 
     def blip(self):
-        """Tiny paper feed for tactile feedback."""
+        """Full line paper feed for tactile feedback."""
         try:
-            # ESC J n - Feed paper n dots (n/203 inches on most printers)
-            self._write(b"\x1b\x4a\x01")
+            # Feed one full line for visible/audible feedback
+            self._write(b"\n")
         except Exception:
             pass
 
