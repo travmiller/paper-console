@@ -193,6 +193,15 @@ def on_button_press_threadsafe():
     # Set flag immediately to prevent multiple clicks while task is being scheduled
     print_in_progress = True
 
+    # Also check hardware status if available
+    if hasattr(printer, "is_printer_busy"):
+        try:
+            if printer.is_printer_busy():
+                print_in_progress = False
+                return
+        except Exception:
+            pass
+
     try:
         if global_loop and global_loop.is_running():
             asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
