@@ -1034,24 +1034,36 @@ class PrinterDriver:
             "plugs": "plugs",
             "newspaper": "newspaper",
             "rss": "rss",
+            "arrow_right": "arrow-right",
+            "wifi": "wifi-high",
             # Weather icons
             "rain": "cloud-rain",
             "snow": "cloud-snow",
+            "snowflake": "snowflake",  # More specific icon for snow conditions
             "storm": "cloud-lightning",
             "thunder": "cloud-lightning",
             "lightning": "cloud-lightning",
             "cloud-fog": "cloud-fog",
             "fog": "cloud-fog",
             "mist": "cloud-fog",
+            "cloud-moon": "cloud-moon",  # For night conditions
+            "sun-horizon": "sun-horizon",  # For sunrise/sunset
+            "thermometer": "thermometer",  # For temperature display
+            "thermometer-hot": "thermometer-hot",  # For hot temperatures
+            "thermometer-cold": "thermometer-cold",  # For cold temperatures
+            "wind": "wind",  # For wind information
+            "rainbow": "rainbow",  # For rainbow conditions
+            "rainbow-cloud": "rainbow-cloud",  # Alternative rainbow icon
         }
 
         # Use mapped name or original
         file_name = icon_map.get(icon_type.lower(), icon_type.lower())
 
         # Try to load PNG from icons/regular directory
-        # Get project root (go up from app/drivers/)
-        app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        icon_path = os.path.join(app_dir, "icons", "regular", f"{file_name}.png")
+        # Get project root (go up from app/drivers/ to app/, then up to project root)
+        app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # app/
+        project_root = os.path.dirname(app_dir)  # project root
+        icon_path = os.path.join(project_root, "icons", "regular", f"{file_name}.png")
 
         if os.path.exists(icon_path):
             try:
@@ -1132,13 +1144,13 @@ class PrinterDriver:
             elif condition_lower == "fog" or "mist" in condition_lower:
                 return "cloud-fog"  # Maps to cloud-fog.png
             
-            # Thunderstorm (codes 95, 96, 99) - check before rain to avoid false matches
-            elif "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+            # Thunderstorm (codes 95, 96, 99) - check FIRST to avoid false matches
+            if "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
                 return "storm"  # Maps to cloud-lightning.png
             
             # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
             elif "snow" in condition_lower:
-                return "snow"  # Maps to cloud-snow.png
+                return "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
             
             # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
             elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
@@ -1229,13 +1241,13 @@ class PrinterDriver:
             elif condition_lower == "fog" or "mist" in condition_lower:
                 return "cloud-fog"  # Maps to cloud-fog.png
             
-            # Thunderstorm (codes 95, 96, 99) - check before rain to avoid false matches
-            elif "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+            # Thunderstorm (codes 95, 96, 99) - check FIRST to avoid false matches
+            if "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
                 return "storm"  # Maps to cloud-lightning.png
             
             # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
             elif "snow" in condition_lower:
-                return "snow"  # Maps to cloud-snow.png
+                return "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
             
             # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
             elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:

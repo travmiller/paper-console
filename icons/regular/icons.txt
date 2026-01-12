@@ -1,506 +1,1512 @@
-travi@TDesktop MINGW64 /c/Code/paper-console/icons/regular (main)
-$ ls
-acorn.png                           dots-three.png                    pants.png
-address-book.png                    dots-three-circle.png             paperclip.png
-address-book-tabs.png               dots-three-circle-vertical.png    paperclip-horizontal.png
-airplane.png                        dots-three-outline.png            paper-plane.png
-airplane-in-flight.png              dots-three-outline-vertical.png   paper-plane-right.png
-airplane-landing.png                dots-three-vertical.png           paper-plane-tilt.png
-airplane-takeoff.png                download.png                      parachute.png
-airplane-taxiing.png                download-simple.png               paragraph.png
-airplane-tilt.png                   dress.png                         parallelogram.png
-airplay.png                         dresser.png                       park.png
-air-traffic-control.png             dribbble-logo.png                 password.png
-alarm.png                           drone.png                         path.png
-alien.png                           drop.png                          patreon-logo.png
-align-bottom.png                    dropbox-logo.png                  pause.png
-align-bottom-simple.png             drop-half.png                     pause-circle.png
-align-center-horizontal.png         drop-half-bottom.png              paw-print.png
-align-center-horizontal-simple.png  drop-simple.png                   paypal-logo.png
-align-center-vertical.png           drop-slash.png                    peace.png
-align-center-vertical-simple.png    ear.png                           pen.png
-align-left.png                      ear-slash.png                     pencil.png
-align-left-simple.png               egg.png                           pencil-circle.png
-align-right.png                     egg-crack.png                     pencil-line.png
-align-right-simple.png              eject.png                         pencil-ruler.png
-align-top.png                       eject-simple.png                  pencil-simple.png
-align-top-simple.png                elevator.png                      pencil-simple-line.png
-amazon-logo.png                     empty.png                         pencil-simple-slash.png
-ambulance.png                       engine.png                        pencil-slash.png
-anchor.png                          envelope.png                      pen-nib.png
-anchor-simple.png                   envelope-open.png                 pen-nib-straight.png
-android-logo.png                    envelope-simple.png               pentagon.png
-angle.png                           envelope-simple-open.png          pentagram.png
-angular-logo.png                    equalizer.png                     pepper.png
-aperture.png                        equals.png                        percent.png
-apple-logo.png                      eraser.png                        person.png
-apple-podcasts-logo.png             escalator-down.png                person-arms-spread.png
-approximate-equals.png              escalator-up.png                  person-simple.png
-app-store-logo.png                  exam.png                          person-simple-bike.png
-app-window.png                      exclamation-mark.png              person-simple-circle.png
-archive.png                         exclude.png                       person-simple-hike.png
-armchair.png                        exclude-square.png                person-simple-run.png
-arrow-arc-left.png                  export.png                        person-simple-ski.png
-arrow-arc-right.png                 eye.png                           person-simple-snowboard.png
-arrow-bend-double-up-left.png       eye-closed.png                    person-simple-swim.png
-arrow-bend-double-up-right.png      eyedropper.png                    person-simple-tai-chi.png
-arrow-bend-down-left.png            eyedropper-sample.png             person-simple-throw.png
-arrow-bend-down-right.png           eyeglasses.png                    person-simple-walk.png
-arrow-bend-left-down.png            eyes.png                          perspective.png
-arrow-bend-left-up.png              eye-slash.png                     phone.png
-arrow-bend-right-down.png           facebook-logo.png                 phone-call.png
-arrow-bend-right-up.png             face-mask.png                     phone-disconnect.png
-arrow-bend-up-left.png              factory.png                       phone-incoming.png
-arrow-bend-up-right.png             faders.png                        phone-list.png
-arrow-circle-down.png               faders-horizontal.png             phone-outgoing.png
-arrow-circle-down-left.png          fallout-shelter.png               phone-pause.png
-arrow-circle-down-right.png         fan.png                           phone-plus.png
-arrow-circle-left.png               farm.png                          phone-slash.png
-arrow-circle-right.png              fast-forward.png                  phone-transfer.png
-arrow-circle-up.png                 fast-forward-circle.png           phone-x.png
-arrow-circle-up-left.png            feather.png                       phosphor-logo.png
-arrow-circle-up-right.png           fediverse-logo.png                pi.png
-arrow-clockwise.png                 figma-logo.png                    piano-keys.png
-arrow-counter-clockwise.png         file.png                          picnic-table.png
-arrow-down.png                      file-archive.png                  picture-in-picture.png
-arrow-down-left.png                 file-arrow-down.png               piggy-bank.png
-arrow-down-right.png                file-arrow-up.png                 pill.png
-arrow-elbow-down-left.png           file-audio.png                    ping-pong.png
-arrow-elbow-down-right.png          file-c.png                        pinterest-logo.png
-arrow-elbow-left.png                file-cloud.png                    pint-glass.png
-arrow-elbow-left-down.png           file-code.png                     pinwheel.png
-arrow-elbow-left-up.png             file-cpp.png                      pipe.png
-arrow-elbow-right.png               file-c-sharp.png                  pipe-wrench.png
-arrow-elbow-right-down.png          file-css.png                      pix-logo.png
-arrow-elbow-right-up.png            file-csv.png                      pizza.png
-arrow-elbow-up-left.png             file-dashed.png                   placeholder.png
-arrow-elbow-up-right.png            file-doc.png                      planet.png
-arrow-fat-down.png                  file-html.png                     plant.png
-arrow-fat-left.png                  file-image.png                    play.png
-arrow-fat-line-down.png             file-ini.png                      play-circle.png
-arrow-fat-line-left.png             file-jpg.png                      playlist.png
-arrow-fat-line-right.png            file-js.png                       play-pause.png
-arrow-fat-lines-down.png            file-jsx.png                      plug.png
-arrow-fat-lines-left.png            file-lock.png                     plug-charging.png
-arrow-fat-lines-right.png           file-magnifying-glass.png         plugs.png
-arrow-fat-lines-up.png              file-md.png                       plugs-connected.png
-arrow-fat-line-up.png               file-minus.png                    plus.png
-arrow-fat-right.png                 file-pdf.png                      plus-circle.png
-arrow-fat-up.png                    file-plus.png                     plus-minus.png
-arrow-left.png                      file-png.png                      plus-square.png
-arrow-line-down.png                 file-ppt.png                      poker-chip.png
-arrow-line-down-left.png            file-py.png                       police-car.png
-arrow-line-down-right.png           file-rs.png                       polygon.png
-arrow-line-left.png                 files.png                         popcorn.png
-arrow-line-right.png                file-sql.png                      popsicle.png
-arrow-line-up.png                   file-svg.png                      potted-plant.png
-arrow-line-up-left.png              file-text.png                     power.png
-arrow-line-up-right.png             file-ts.png                       prescription.png
-arrow-right.png                     file-tsx.png                      presentation.png
-arrows-clockwise.png                file-txt.png                      presentation-chart.png
-arrows-counter-clockwise.png        file-video.png                    printer.png
-arrows-down-up.png                  file-vue.png                      prohibit.png
-arrows-horizontal.png               file-x.png                        prohibit-inset.png
-arrows-in.png                       file-xls.png                      projector-screen.png
-arrows-in-cardinal.png              file-zip.png                      projector-screen-chart.png
-arrows-in-line-horizontal.png       film-reel.png                     pulse.png
-arrows-in-line-vertical.png         film-script.png                   push-pin.png
-arrows-in-simple.png                film-slate.png                    push-pin-simple.png
-arrows-left-right.png               film-strip.png                    push-pin-simple-slash.png
-arrows-merge.png                    fingerprint.png                   push-pin-slash.png
-arrows-out.png                      fingerprint-simple.png            puzzle-piece.png
-arrows-out-cardinal.png             finn-the-human.png                qr-code.png
-arrows-out-line-horizontal.png      fire.png                          question.png
-arrows-out-line-vertical.png        fire-extinguisher.png             question-mark.png
-arrows-out-simple.png               fire-simple.png                   queue.png
-arrow-square-down.png               fire-truck.png                    quotes.png
-arrow-square-down-left.png          first-aid.png                     rabbit.png
-arrow-square-down-right.png         first-aid-kit.png                 racquet.png
-arrow-square-in.png                 fish.png                          radical.png
-arrow-square-left.png               fish-simple.png                   radio.png
-arrow-square-out.png                flag.png                          radioactive.png
-arrow-square-right.png              flag-banner.png                   radio-button.png
-arrow-square-up.png                 flag-banner-fold.png              rainbow.png
-arrow-square-up-left.png            flag-checkered.png                rainbow-cloud.png
-arrow-square-up-right.png           flag-pennant.png                  ranking.png
-arrows-split.png                    flame.png                         read-cv-logo.png
-arrows-vertical.png                 flashlight.png                    receipt.png
-arrow-u-down-left.png               flask.png                         receipt-x.png
-arrow-u-down-right.png              flip-horizontal.png               record.png
-arrow-u-left-down.png               flip-vertical.png                 rectangle.png
-arrow-u-left-up.png                 floppy-disk.png                   rectangle-dashed.png
-arrow-up.png                        floppy-disk-back.png              recycle.png
-arrow-up-left.png                   flow-arrow.png                    reddit-logo.png
-arrow-up-right.png                  flower.png                        repeat.png
-arrow-u-right-down.png              flower-lotus.png                  repeat-once.png
-arrow-u-right-up.png                flower-tulip.png                  replit-logo.png
-arrow-u-up-left.png                 flying-saucer.png                 resize.png
-arrow-u-up-right.png                folder.png                        rewind.png
-article.png                         folder-dashed.png                 rewind-circle.png
-article-medium.png                  folder-lock.png                   road-horizon.png
-article-ny-times.png                folder-minus.png                  robot.png
-asclepius.png                       folder-open.png                   rocket.png
-asterisk.png                        folder-plus.png                   rocket-launch.png
-asterisk-simple.png                 folders.png                       rows.png
-at.png                              folder-simple.png                 rows-plus-bottom.png
-atom.png                            folder-simple-dashed.png          rows-plus-top.png
-avocado.png                         folder-simple-lock.png            rss.png
-axe.png                             folder-simple-minus.png           rss-simple.png
-baby.png                            folder-simple-plus.png            rug.png
-baby-carriage.png                   folder-simple-star.png            ruler.png
-backpack.png                        folder-simple-user.png            sailboat.png
-backspace.png                       folder-star.png                   scales.png
-bag.png                             folder-user.png                   scan.png
-bag-simple.png                      football.png                      scan-smiley.png
-balloon.png                         football-helmet.png               scissors.png
-bandaids.png                        footprints.png                    scooter.png
-bank.png                            fork-knife.png                    screencast.png
-barbell.png                         four-k.png                        screwdriver.png
-barcode.png                         frame-corners.png                 scribble.png
-barn.png                            framer-logo.png                   scribble-loop.png
-barricade.png                       function.png                      scroll.png
-baseball.png                        funnel.png                        seal.png
-baseball-cap.png                    funnel-simple.png                 seal-check.png
-baseball-helmet.png                 funnel-simple-x.png               seal-percent.png
-basket.png                          funnel-x.png                      seal-question.png
-basketball.png                      game-controller.png               seal-warning.png
-bathtub.png                         garage.png                        seat.png
-battery-charging.png                gas-can.png                       seatbelt.png
-battery-charging-vertical.png       gas-pump.png                      security-camera.png
-battery-empty.png                   gauge.png                         selection.png
-battery-full.png                    gavel.png                         selection-all.png
-battery-high.png                    gear.png                          selection-background.png
-battery-low.png                     gear-fine.png                     selection-foreground.png
-battery-medium.png                  gear-six.png                      selection-inverse.png
-battery-plus.png                    gender-female.png                 selection-plus.png
-battery-plus-vertical.png           gender-intersex.png               selection-slash.png
-battery-vertical-empty.png          gender-male.png                   shapes.png
-battery-vertical-full.png           gender-neuter.png                 share.png
-battery-vertical-high.png           gender-nonbinary.png              share-fat.png
-battery-vertical-low.png            gender-transgender.png            share-network.png
-battery-vertical-medium.png         ghost.png                         shield.png
-battery-warning.png                 gif.png                           shield-check.png
-battery-warning-vertical.png        gift.png                          shield-checkered.png
-beach-ball.png                      git-branch.png                    shield-chevron.png
-beanie.png                          git-commit.png                    shield-plus.png
-bed.png                             git-diff.png                      shield-slash.png
-beer-bottle.png                     git-fork.png                      shield-star.png
-beer-stein.png                      github-logo.png                   shield-warning.png
-behance-logo.png                    gitlab-logo.png                   shipping-container.png
-bell.png                            gitlab-logo-simple.png            shirt-folded.png
-bell-ringing.png                    git-merge.png                     shooting-star.png
-bell-simple.png                     git-pull-request.png              shopping-bag.png
-bell-simple-ringing.png             globe.png                         shopping-bag-open.png
-bell-simple-slash.png               globe-hemisphere-east.png         shopping-cart.png
-bell-simple-z.png                   globe-hemisphere-west.png         shopping-cart-simple.png
-bell-slash.png                      globe-simple.png                  shovel.png
-bell-z.png                          globe-simple-x.png                shower.png
-belt.png                            globe-stand.png                   shrimp.png
-bezier-curve.png                    globe-x.png                       shuffle.png
-bicycle.png                         goggles.png                       shuffle-angular.png
-binary.png                          golf.png                          shuffle-simple.png
-binoculars.png                      goodreads-logo.png                sidebar.png
-biohazard.png                       google-cardboard-logo.png         sidebar-simple.png
-bird.png                            google-chrome-logo.png            sigma.png
-blueprint.png                       google-drive-logo.png             signature.png
-bluetooth.png                       google-logo.png                   sign-in.png
-bluetooth-connected.png             google-photos-logo.png            sign-out.png
-bluetooth-slash.png                 google-play-logo.png              signpost.png
-bluetooth-x.png                     google-podcasts-logo.png          sim-card.png
-boat.png                            gps.png                           siren.png
-bomb.png                            gps-fix.png                       sketch-logo.png
-bone.png                            gps-slash.png                     skip-back.png
-book.png                            gradient.png                      skip-back-circle.png
-book-bookmark.png                   graduation-cap.png                skip-forward.png
-bookmark.png                        grains.png                        skip-forward-circle.png
-bookmarks.png                       grains-slash.png                  skull.png
-bookmark-simple.png                 graph.png                         skype-logo.png
-bookmarks-simple.png                graphics-card.png                 slack-logo.png
-book-open.png                       greater-than.png                  sliders.png
-book-open-text.png                  greater-than-or-equal.png         sliders-horizontal.png
-book-open-user.png                  grid-four.png                     slideshow.png
-books.png                           grid-nine.png                     smiley.png
-boot.png                            guitar.png                        smiley-angry.png
-boules.png                          hair-dryer.png                    smiley-blank.png
-bounding-box.png                    hamburger.png                     smiley-meh.png
-bowl-food.png                       hammer.png                        smiley-melting.png
-bowling-ball.png                    hand.png                          smiley-nervous.png
-bowl-steam.png                      hand-arrow-down.png               smiley-sad.png
-box-arrow-down.png                  hand-arrow-up.png                 smiley-sticker.png
-box-arrow-up.png                    handbag.png                       smiley-wink.png
-boxing-glove.png                    handbag-simple.png                smiley-x-eyes.png
-brackets-angle.png                  hand-coins.png                    snapchat-logo.png
-brackets-curly.png                  hand-deposit.png                  sneaker.png
-brackets-round.png                  hand-eye.png                      sneaker-move.png
-brackets-square.png                 hand-fist.png                     snowflake.png
-brain.png                           hand-grabbing.png                 soccer-ball.png
-brandy.png                          hand-heart.png                    sock.png
-bread.png                           hand-palm.png                     solar-panel.png
-bridge.png                          hand-peace.png                    solar-roof.png
-briefcase.png                       hand-pointing.png                 sort-ascending.png
-briefcase-metal.png                 hands-clapping.png                sort-descending.png
-broadcast.png                       handshake.png                     soundcloud-logo.png
-broom.png                           hand-soap.png                     spade.png
-browser.png                         hands-praying.png                 sparkle.png
-browsers.png                        hand-swipe-left.png               speaker-hifi.png
-bug.png                             hand-swipe-right.png              speaker-high.png
-bug-beetle.png                      hand-tap.png                      speaker-low.png
-bug-droid.png                       hand-waving.png                   speaker-none.png
-building.png                        hand-withdraw.png                 speaker-simple-high.png
-building-apartment.png              hard-drive.png                    speaker-simple-low.png
-building-office.png                 hard-drives.png                   speaker-simple-none.png
-buildings.png                       hard-hat.png                      speaker-simple-slash.png
-bulldozer.png                       hash.png                          speaker-simple-x.png
-bus.png                             hash-straight.png                 speaker-slash.png
-butterfly.png                       head-circuit.png                  speaker-x.png
-cable-car.png                       headlights.png                    speedometer.png
-cactus.png                          headphones.png                    sphere.png
-cake.png                            headset.png                       spinner.png
-calculator.png                      heart.png                         spinner-ball.png
-calendar.png                        heartbeat.png                     spinner-gap.png
-calendar-blank.png                  heart-break.png                   spiral.png
-calendar-check.png                  heart-half.png                    split-horizontal.png
-calendar-dot.png                    heart-straight.png                split-vertical.png
-calendar-dots.png                   heart-straight-break.png          spotify-logo.png
-calendar-heart.png                  hexagon.png                       spray-bottle.png
-calendar-minus.png                  high-definition.png               square.png
-calendar-plus.png                   high-heel.png                     square-half.png
-calendar-slash.png                  highlighter.png                   square-half-bottom.png
-calendar-star.png                   highlighter-circle.png            square-logo.png
-calendar-x.png                      hockey.png                        squares-four.png
-call-bell.png                       hoodie.png                        square-split-horizontal.png
-camera.png                          horse.png                         square-split-vertical.png
-camera-plus.png                     hospital.png                      stack.png
-camera-rotate.png                   hourglass.png                     stack-minus.png
-camera-slash.png                    hourglass-high.png                stack-overflow-logo.png
-campfire.png                        hourglass-low.png                 stack-plus.png
-car.png                             hourglass-medium.png              stack-simple.png
-car-battery.png                     hourglass-simple.png              stairs.png
-cardholder.png                      hourglass-simple-high.png         stamp.png
-cards.png                           hourglass-simple-low.png          standard-definition.png
-cards-three.png                     hourglass-simple-medium.png       star.png
-caret-circle-double-down.png        house.png                         star-and-crescent.png
-caret-circle-double-left.png        house-line.png                    star-four.png
-caret-circle-double-right.png       house-simple.png                  star-half.png
-caret-circle-double-up.png          hurricane.png                     star-of-david.png
-caret-circle-down.png               ice-cream.png                     steam-logo.png
-caret-circle-left.png               identification-badge.png          steering-wheel.png
-caret-circle-right.png              identification-card.png           steps.png
-caret-circle-up.png                 image.png                         stethoscope.png
-caret-circle-up-down.png            image-broken.png                  sticker.png
-caret-double-down.png               images.png                        stool.png
-caret-double-left.png               image-square.png                  stop.png
-caret-double-right.png              images-square.png                 stop-circle.png
-caret-double-up.png                 infinity.png                      storefront.png
-caret-down.png                      info.png                          strategy.png
-caret-left.png                      instagram-logo.png                stripe-logo.png
-caret-line-down.png                 intersect.png                     student.png
-caret-line-left.png                 intersection.png                  subset-of.png
-caret-line-right.png                intersect-square.png              subset-proper-of.png
-caret-line-up.png                   intersect-three.png               subtitles.png
-caret-right.png                     invoice.png                       subtitles-slash.png
-caret-up.png                        island.png                        subtract.png
-caret-up-down.png                   jar.png                           subtract-square.png
-car-profile.png                     jar-label.png                     subway.png
-carrot.png                          jeep.png                          suitcase.png
-car-simple.png                      joystick.png                      suitcase-rolling.png
-cash-register.png                   kanban.png                        suitcase-simple.png
-cassette-tape.png                   key.png                           sun.png
-castle-turret.png                   keyboard.png                      sun-dim.png
-cat.png                             keyhole.png                       sunglasses.png
-cell-signal-full.png                key-return.png                    sun-horizon.png
-cell-signal-high.png                knife.png                         superset-of.png
-cell-signal-low.png                 ladder.png                        superset-proper-of.png
-cell-signal-medium.png              ladder-simple.png                 swap.png
-cell-signal-none.png                lamp.png                          swatches.png
-cell-signal-slash.png               lamp-pendant.png                  swimming-pool.png
-cell-signal-x.png                   laptop.png                        sword.png
-cell-tower.png                      lasso.png                         synagogue.png
-certificate.png                     lastfm-logo.png                   syringe.png
-chair.png                           layout.png                        table.png
-chalkboard.png                      leaf.png                          tabs.png
-chalkboard-simple.png               lectern.png                       tag.png
-chalkboard-teacher.png              lego.png                          tag-chevron.png
-champagne.png                       lego-smiley.png                   tag-simple.png
-charging-station.png                less-than.png                     target.png
-chart-bar.png                       less-than-or-equal.png            taxi.png
-chart-bar-horizontal.png            letter-circle-h.png               tea-bag.png
-chart-donut.png                     letter-circle-p.png               telegram-logo.png
-chart-line.png                      letter-circle-v.png               television.png
-chart-line-down.png                 lifebuoy.png                      television-simple.png
-chart-line-up.png                   lightbulb.png                     tennis-ball.png
-chart-pie.png                       lightbulb-filament.png            tent.png
-chart-pie-slice.png                 lighthouse.png                    terminal.png
-chart-polar.png                     lightning.png                     terminal-window.png
-chart-scatter.png                   lightning-a.png                   test-tube.png
-chat.png                            lightning-slash.png               text-aa.png
-chat-centered.png                   line-segment.png                  text-align-center.png
-chat-centered-dots.png              line-segments.png                 text-align-justify.png
-chat-centered-slash.png             line-vertical.png                 text-align-left.png
-chat-centered-text.png              link.png                          text-align-right.png
-chat-circle.png                     link-break.png                    text-a-underline.png
-chat-circle-dots.png                linkedin-logo.png                 text-b.png
-chat-circle-slash.png               link-simple.png                   textbox.png
-chat-circle-text.png                link-simple-break.png             text-columns.png
-chat-dots.png                       link-simple-horizontal.png        text-h.png
-chats.png                           link-simple-horizontal-break.png  text-h-five.png
-chats-circle.png                    linktree-logo.png                 text-h-four.png
-chat-slash.png                      linux-logo.png                    text-h-one.png
-chats-teardrop.png                  list.png                          text-h-six.png
-chat-teardrop.png                   list-bullets.png                  text-h-three.png
-chat-teardrop-dots.png              list-checks.png                   text-h-two.png
-chat-teardrop-slash.png             list-dashes.png                   text-indent.png
-chat-teardrop-text.png              list-heart.png                    text-italic.png
-chat-text.png                       list-magnifying-glass.png         text-outdent.png
-check.png                           list-numbers.png                  text-strikethrough.png
-check-circle.png                    list-plus.png                     text-subscript.png
-checkerboard.png                    list-star.png                     text-superscript.png
-check-fat.png                       lock.png                          text-t.png
-checks.png                          lockers.png                       text-t-slash.png
-check-square.png                    lock-key.png                      text-underline.png
-check-square-offset.png             lock-key-open.png                 thermometer.png
-cheers.png                          lock-laminated.png                thermometer-cold.png
-cheese.png                          lock-laminated-open.png           thermometer-hot.png
-chef-hat.png                        lock-open.png                     thermometer-simple.png
-cherries.png                        lock-simple.png                   threads-logo.png
-church.png                          lock-simple-open.png              three-d.png
-cigarette.png                       log.png                           thumbs-down.png
-cigarette-slash.png                 magic-wand.png                    thumbs-up.png
-circle.png                          magnet.png                        ticket.png
-circle-dashed.png                   magnet-straight.png               tidal-logo.png
-circle-half.png                     magnifying-glass.png              tiktok-logo.png
-circle-half-tilt.png                magnifying-glass-minus.png        tilde.png
-circle-notch.png                    magnifying-glass-plus.png         timer.png
-circles-four.png                    mailbox.png                       tipi.png
-circles-three.png                   map-pin.png                       tip-jar.png
-circles-three-plus.png              map-pin-area.png                  tire.png
-circuitry.png                       map-pin-line.png                  toggle-left.png
-city.png                            map-pin-plus.png                  toggle-right.png
-clipboard.png                       map-pin-simple.png                toilet.png
-clipboard-text.png                  map-pin-simple-area.png           toilet-paper.png
-clock.png                           map-pin-simple-line.png           toolbox.png
-clock-afternoon.png                 map-trifold.png                   tooth.png
-clock-clockwise.png                 markdown-logo.png                 tornado.png
-clock-countdown.png                 marker-circle.png                 tote.png
-clock-counter-clockwise.png         martini.png                       tote-simple.png
-clock-user.png                      mask-happy.png                    towel.png
-closed-captioning.png               mask-sad.png                      tractor.png
-cloud.png                           mastodon-logo.png                 trademark.png
-cloud-arrow-down.png                math-operations.png               trademark-registered.png
-cloud-arrow-up.png                  matrix-logo.png                   traffic-cone.png
-cloud-check.png                     medal.png                         traffic-sign.png
-cloud-fog.png                       medal-military.png                traffic-signal.png
-cloud-lightning.png                 medium-logo.png                   train.png
-cloud-moon.png                      megaphone.png                     train-regional.png
-cloud-rain.png                      megaphone-simple.png              train-simple.png
-cloud-slash.png                     member-of.png                     tram.png
-cloud-snow.png                      memory.png                        translate.png
-cloud-sun.png                       messenger-logo.png                trash.png
-cloud-warning.png                   meta-logo.png                     trash-simple.png
-cloud-x.png                         meteor.png                        tray.png
-clover.png                          metronome.png                     tray-arrow-down.png
-club.png                            microphone.png                    tray-arrow-up.png
-coat-hanger.png                     microphone-slash.png              treasure-chest.png
-coda-logo.png                       microphone-stage.png              tree.png
-code.png                            microscope.png                    tree-evergreen.png
-code-block.png                      microsoft-excel-logo.png          tree-palm.png
-codepen-logo.png                    microsoft-outlook-logo.png        tree-structure.png
-codesandbox-logo.png                microsoft-powerpoint-logo.png     tree-view.png
-code-simple.png                     microsoft-teams-logo.png          trend-down.png
-coffee.png                          microsoft-word-logo.png           trend-up.png
-coffee-bean.png                     minus.png                         triangle.png
-coin.png                            minus-circle.png                  triangle-dashed.png
-coins.png                           minus-square.png                  trolley.png
-coin-vertical.png                   money.png                         trolley-suitcase.png
-columns.png                         money-wavy.png                    trophy.png
-columns-plus-left.png               monitor.png                       truck.png
-columns-plus-right.png              monitor-arrow-up.png              truck-trailer.png
-command.png                         monitor-play.png                  t-shirt.png
-compass.png                         moon.png                          tumblr-logo.png
-compass-rose.png                    moon-stars.png                    twitch-logo.png
-compass-tool.png                    moped.png                         twitter-logo.png
-computer-tower.png                  moped-front.png                   umbrella.png
-confetti.png                        mosque.png                        umbrella-simple.png
-contactless-payment.png             motorcycle.png                    union.png
-control.png                         mountains.png                     unite.png
-cookie.png                          mouse.png                         unite-square.png
-cooking-pot.png                     mouse-left-click.png              upload.png
-copy.png                            mouse-middle-click.png            upload-simple.png
-copyleft.png                        mouse-right-click.png             usb.png
-copyright.png                       mouse-scroll.png                  user.png
-copy-simple.png                     mouse-simple.png                  user-check.png
-corners-in.png                      music-note.png                    user-circle.png
-corners-out.png                     music-notes.png                   user-circle-check.png
-couch.png                           music-note-simple.png             user-circle-dashed.png
-court-basketball.png                music-notes-minus.png             user-circle-gear.png
-cow.png                             music-notes-plus.png              user-circle-minus.png
-cowboy-hat.png                      music-notes-simple.png            user-circle-plus.png
-cpu.png                             navigation-arrow.png              user-focus.png
-crane.png                           needle.png                        user-gear.png
-crane-tower.png                     network.png                       user-list.png
-credit-card.png                     network-slash.png                 user-minus.png
-cricket.png                         network-x.png                     user-plus.png
-crop.png                            newspaper.png                     user-rectangle.png
-cross.png                           newspaper-clipping.png            users.png
-crosshair.png                       notches.png                       users-four.png
-crosshair-simple.png                note.png                          user-sound.png
-crown.png                           note-blank.png                    user-square.png
-crown-cross.png                     notebook.png                      users-three.png
-crown-simple.png                    notepad.png                       user-switch.png
-cube.png                            note-pencil.png                   van.png
-cube-focus.png                      not-equals.png                    vault.png
-cube-transparent.png                notification.png                  vector-three.png
-currency-btc.png                    notion-logo.png                   vector-two.png
-currency-circle-dollar.png          not-member-of.png                 vibrate.png
-currency-cny.png                    not-subset-of.png                 video.png
-currency-dollar.png                 not-superset-of.png               video-camera.png
-currency-dollar-simple.png          nuclear-plant.png                 video-camera-slash.png
-currency-eth.png                    number-circle-eight.png           video-conference.png
-currency-eur.png                    number-circle-five.png            vignette.png
-currency-gbp.png                    number-circle-four.png            vinyl-record.png
-currency-inr.png                    number-circle-nine.png            virtual-reality.png
-currency-jpy.png                    number-circle-one.png             virus.png
-currency-krw.png                    number-circle-seven.png           visor.png
-currency-kzt.png                    number-circle-six.png             voicemail.png
-currency-ngn.png                    number-circle-three.png           volleyball.png
-currency-rub.png                    number-circle-two.png             wall.png
-cursor.png                          number-circle-zero.png            wallet.png
-cursor-click.png                    number-eight.png                  warehouse.png
-cursor-text.png                     number-five.png                   warning.png
-cylinder.png                        number-four.png                   warning-circle.png
-database.png                        number-nine.png                   warning-diamond.png
-desk.png                            number-one.png                    warning-octagon.png
-desktop.png                         number-seven.png                  washing-machine.png
-desktop-tower.png                   number-six.png                    watch.png
-detective.png                       number-square-eight.png           waveform.png
-device-mobile.png                   number-square-five.png            waveform-slash.png
-device-mobile-camera.png            number-square-four.png            waves.png
-device-mobile-slash.png             number-square-nine.png            wave-sawtooth.png
-device-mobile-speaker.png           number-square-one.png             wave-sine.png
-device-rotate.png                   number-square-seven.png           wave-square.png
-devices.png                         number-square-six.png             wave-triangle.png
-device-tablet.png                   number-square-three.png           webcam.png
-device-tablet-camera.png            number-square-two.png             webcam-slash.png
-device-tablet-speaker.png           number-square-zero.png            webhooks-logo.png
-dev-to-logo.png                     number-three.png                  wechat-logo.png
-diamond.png                         number-two.png                    whatsapp-logo.png
-diamonds-four.png                   number-zero.png                   wheelchair.png
-dice-five.png                       numpad.png                        wheelchair-motion.png
-dice-four.png                       nut.png                           wifi-high.png
-dice-one.png                        ny-times-logo.png                 wifi-low.png
-dice-six.png                        octagon.png                       wifi-medium.png
-dice-three.png                      office-chair.png                  wifi-none.png
-dice-two.png                        onigiri.png                       wifi-slash.png
-disc.png                            open-ai-logo.png                  wifi-x.png
-disco-ball.png                      option.png                        wind.png
-discord-logo.png                    orange.png                        windmill.png
-divide.png                          orange-slice.png                  windows-logo.png
-dna.png                             oven.png                          wine.png
-dog.png                             package.png                       wrench.png
-door.png                            paint-brush.png                   x.png
-door-open.png                       paint-brush-broad.png             x-circle.png
-dot.png                             paint-brush-household.png         x-logo.png
-dot-outline.png                     paint-bucket.png                  x-square.png
-dots-nine.png                       paint-roller.png                  yarn.png
-dots-six.png                        palette.png                       yin-yang.png
-dots-six-vertical.png               panorama.png                      youtube-logo.png
+acorn.png
+address-book.png
+address-book-tabs.png
+airplane.png
+airplane-in-flight.png
+airplane-landing.png
+airplane-takeoff.png
+airplane-taxiing.png
+airplane-tilt.png
+airplay.png
+air-traffic-control.png
+alarm.png
+alien.png
+align-bottom.png
+align-bottom-simple.png
+align-center-horizontal.png
+align-center-horizontal-simple.png
+align-center-vertical.png
+align-center-vertical-simple.png
+align-left.png
+align-left-simple.png
+align-right.png
+align-right-simple.png
+align-top.png
+align-top-simple.png
+amazon-logo.png
+ambulance.png
+anchor.png
+anchor-simple.png
+android-logo.png
+angle.png
+angular-logo.png
+aperture.png
+apple-logo.png
+apple-podcasts-logo.png
+approximate-equals.png
+app-store-logo.png
+app-window.png
+archive.png
+armchair.png
+arrow-arc-left.png
+arrow-arc-right.png
+arrow-bend-double-up-left.png
+arrow-bend-double-up-right.png
+arrow-bend-down-left.png
+arrow-bend-down-right.png
+arrow-bend-left-down.png
+arrow-bend-left-up.png
+arrow-bend-right-down.png
+arrow-bend-right-up.png
+arrow-bend-up-left.png
+arrow-bend-up-right.png
+arrow-circle-down.png
+arrow-circle-down-left.png
+arrow-circle-down-right.png
+arrow-circle-left.png
+arrow-circle-right.png
+arrow-circle-up.png
+arrow-circle-up-left.png
+arrow-circle-up-right.png
+arrow-clockwise.png
+arrow-counter-clockwise.png
+arrow-down.png
+arrow-down-left.png
+arrow-down-right.png
+arrow-elbow-down-left.png
+arrow-elbow-down-right.png
+arrow-elbow-left.png
+arrow-elbow-left-down.png
+arrow-elbow-left-up.png
+arrow-elbow-right.png
+arrow-elbow-right-down.png
+arrow-elbow-right-up.png
+arrow-elbow-up-left.png
+arrow-elbow-up-right.png
+arrow-fat-down.png
+arrow-fat-left.png
+arrow-fat-line-down.png
+arrow-fat-line-left.png
+arrow-fat-line-right.png
+arrow-fat-lines-down.png
+arrow-fat-lines-left.png
+arrow-fat-lines-right.png
+arrow-fat-lines-up.png
+arrow-fat-line-up.png
+arrow-fat-right.png
+arrow-fat-up.png
+arrow-left.png
+arrow-line-down.png
+arrow-line-down-left.png
+arrow-line-down-right.png
+arrow-line-left.png
+arrow-line-right.png
+arrow-line-up.png
+arrow-line-up-left.png
+arrow-line-up-right.png
+arrow-right.png
+arrows-clockwise.png
+arrows-counter-clockwise.png
+arrows-down-up.png
+arrows-horizontal.png
+arrows-in.png
+arrows-in-cardinal.png
+arrows-in-line-horizontal.png
+arrows-in-line-vertical.png
+arrows-in-simple.png
+arrows-left-right.png
+arrows-merge.png
+arrows-out.png
+arrows-out-cardinal.png
+arrows-out-line-horizontal.png
+arrows-out-line-vertical.png
+arrows-out-simple.png
+arrow-square-down.png
+arrow-square-down-left.png
+arrow-square-down-right.png
+arrow-square-in.png
+arrow-square-left.png
+arrow-square-out.png
+arrow-square-right.png
+arrow-square-up.png
+arrow-square-up-left.png
+arrow-square-up-right.png
+arrows-split.png
+arrows-vertical.png
+arrow-u-down-left.png
+arrow-u-down-right.png
+arrow-u-left-down.png
+arrow-u-left-up.png
+arrow-up.png
+arrow-up-left.png
+arrow-up-right.png
+arrow-u-right-down.png
+arrow-u-right-up.png
+arrow-u-up-left.png
+arrow-u-up-right.png
+article.png
+article-medium.png
+article-ny-times.png
+asclepius.png
+asterisk.png
+asterisk-simple.png
+at.png
+atom.png
+avocado.png
+axe.png
+baby.png
+baby-carriage.png
+backpack.png
+backspace.png
+bag.png
+bag-simple.png
+balloon.png
+bandaids.png
+bank.png
+barbell.png
+barcode.png
+barn.png
+barricade.png
+baseball.png
+baseball-cap.png
+baseball-helmet.png
+basket.png
+basketball.png
+bathtub.png
+battery-charging.png
+battery-charging-vertical.png
+battery-empty.png
+battery-full.png
+battery-high.png
+battery-low.png
+battery-medium.png
+battery-plus.png
+battery-plus-vertical.png
+battery-vertical-empty.png
+battery-vertical-full.png
+battery-vertical-high.png
+battery-vertical-low.png
+battery-vertical-medium.png
+battery-warning.png
+battery-warning-vertical.png
+beach-ball.png
+beanie.png
+bed.png
+beer-bottle.png
+beer-stein.png
+behance-logo.png
+bell.png
+bell-ringing.png
+bell-simple.png
+bell-simple-ringing.png
+bell-simple-slash.png
+bell-simple-z.png
+bell-slash.png
+bell-z.png
+belt.png
+bezier-curve.png
+bicycle.png
+binary.png
+binoculars.png
+biohazard.png
+bird.png
+blueprint.png
+bluetooth.png
+bluetooth-connected.png
+bluetooth-slash.png
+bluetooth-x.png
+boat.png
+bomb.png
+bone.png
+book.png
+book-bookmark.png
+bookmark.png
+bookmarks.png
+bookmark-simple.png
+bookmarks-simple.png
+book-open.png
+book-open-text.png
+book-open-user.png
+books.png
+boot.png
+boules.png
+bounding-box.png
+bowl-food.png
+bowling-ball.png
+bowl-steam.png
+box-arrow-down.png
+box-arrow-up.png
+boxing-glove.png
+brackets-angle.png
+brackets-curly.png
+brackets-round.png
+brackets-square.png
+brain.png
+brandy.png
+bread.png
+bridge.png
+briefcase.png
+briefcase-metal.png
+broadcast.png
+broom.png
+browser.png
+browsers.png
+bug.png
+bug-beetle.png
+bug-droid.png
+building.png
+building-apartment.png
+building-office.png
+buildings.png
+bulldozer.png
+bus.png
+butterfly.png
+cable-car.png
+cactus.png
+cake.png
+calculator.png
+calendar.png
+calendar-blank.png
+calendar-check.png
+calendar-dot.png
+calendar-dots.png
+calendar-heart.png
+calendar-minus.png
+calendar-plus.png
+calendar-slash.png
+calendar-star.png
+calendar-x.png
+call-bell.png
+camera.png
+camera-plus.png
+camera-rotate.png
+camera-slash.png
+campfire.png
+car.png
+car-battery.png
+cardholder.png
+cards.png
+cards-three.png
+caret-circle-double-down.png
+caret-circle-double-left.png
+caret-circle-double-right.png
+caret-circle-double-up.png
+caret-circle-down.png
+caret-circle-left.png
+caret-circle-right.png
+caret-circle-up.png
+caret-circle-up-down.png
+caret-double-down.png
+caret-double-left.png
+caret-double-right.png
+caret-double-up.png
+caret-down.png
+caret-left.png
+caret-line-down.png
+caret-line-left.png
+caret-line-right.png
+caret-line-up.png
+caret-right.png
+caret-up.png
+caret-up-down.png
+car-profile.png
+carrot.png
+car-simple.png
+cash-register.png
+cassette-tape.png
+castle-turret.png
+cat.png
+cell-signal-full.png
+cell-signal-high.png
+cell-signal-low.png
+cell-signal-medium.png
+cell-signal-none.png
+cell-signal-slash.png
+cell-signal-x.png
+cell-tower.png
+certificate.png
+chair.png
+chalkboard.png
+chalkboard-simple.png
+chalkboard-teacher.png
+champagne.png
+charging-station.png
+chart-bar.png
+chart-bar-horizontal.png
+chart-donut.png
+chart-line.png
+chart-line-down.png
+chart-line-up.png
+chart-pie.png
+chart-pie-slice.png
+chart-polar.png
+chart-scatter.png
+chat.png
+chat-centered.png
+chat-centered-dots.png
+chat-centered-slash.png
+chat-centered-text.png
+chat-circle.png
+chat-circle-dots.png
+chat-circle-slash.png
+chat-circle-text.png
+chat-dots.png
+chats.png
+chats-circle.png
+chat-slash.png
+chats-teardrop.png
+chat-teardrop.png
+chat-teardrop-dots.png
+chat-teardrop-slash.png
+chat-teardrop-text.png
+chat-text.png
+check.png
+check-circle.png
+checkerboard.png
+check-fat.png
+checks.png
+check-square.png
+check-square-offset.png
+cheers.png
+cheese.png
+chef-hat.png
+cherries.png
+church.png
+cigarette.png
+cigarette-slash.png
+circle.png
+circle-dashed.png
+circle-half.png
+circle-half-tilt.png
+circle-notch.png
+circles-four.png
+circles-three.png
+circles-three-plus.png
+circuitry.png
+city.png
+clipboard.png
+clipboard-text.png
+clock.png
+clock-afternoon.png
+clock-clockwise.png
+clock-countdown.png
+clock-counter-clockwise.png
+clock-user.png
+closed-captioning.png
+cloud.png
+cloud-arrow-down.png
+cloud-arrow-up.png
+cloud-check.png
+cloud-fog.png
+cloud-lightning.png
+cloud-moon.png
+cloud-rain.png
+cloud-slash.png
+cloud-snow.png
+cloud-sun.png
+cloud-warning.png
+cloud-x.png
+clover.png
+club.png
+coat-hanger.png
+coda-logo.png
+code.png
+code-block.png
+codepen-logo.png
+codesandbox-logo.png
+code-simple.png
+coffee.png
+coffee-bean.png
+coin.png
+coins.png
+coin-vertical.png
+columns.png
+columns-plus-left.png
+columns-plus-right.png
+command.png
+compass.png
+compass-rose.png
+compass-tool.png
+computer-tower.png
+confetti.png
+contactless-payment.png
+control.png
+cookie.png
+cooking-pot.png
+copy.png
+copyleft.png
+copyright.png
+copy-simple.png
+corners-in.png
+corners-out.png
+couch.png
+court-basketball.png
+cow.png
+cowboy-hat.png
+cpu.png
+crane.png
+crane-tower.png
+credit-card.png
+cricket.png
+crop.png
+cross.png
+crosshair.png
+crosshair-simple.png
+crown.png
+crown-cross.png
+crown-simple.png
+cube.png
+cube-focus.png
+cube-transparent.png
+currency-btc.png
+currency-circle-dollar.png
+currency-cny.png
+currency-dollar.png
+currency-dollar-simple.png
+currency-eth.png
+currency-eur.png
+currency-gbp.png
+currency-inr.png
+currency-jpy.png
+currency-krw.png
+currency-kzt.png
+currency-ngn.png
+currency-rub.png
+cursor.png
+cursor-click.png
+cursor-text.png
+cylinder.png
+database.png
+desk.png
+desktop.png
+desktop-tower.png
+detective.png
+device-mobile.png
+device-mobile-camera.png
+device-mobile-slash.png
+device-mobile-speaker.png
+device-rotate.png
+devices.png
+device-tablet.png
+device-tablet-camera.png
+device-tablet-speaker.png
+dev-to-logo.png
+diamond.png
+diamonds-four.png
+dice-five.png
+dice-four.png
+dice-one.png
+dice-six.png
+dice-three.png
+dice-two.png
+disc.png
+disco-ball.png
+discord-logo.png
+divide.png
+dna.png
+dog.png
+door.png
+door-open.png
+dot.png
+dot-outline.png
+dots-nine.png
+dots-six.png
+dots-six-vertical.png
+dots-three.png
+dots-three-circle.png
+dots-three-circle-vertical.png
+dots-three-outline.png
+dots-three-outline-vertical.png
+dots-three-vertical.png
+download.png
+download-simple.png
+dress.png
+dresser.png
+dribbble-logo.png
+drone.png
+drop.png
+dropbox-logo.png
+drop-half.png
+drop-half-bottom.png
+drop-simple.png
+drop-slash.png
+ear.png
+ear-slash.png
+egg.png
+egg-crack.png
+eject.png
+eject-simple.png
+elevator.png
+empty.png
+engine.png
+envelope.png
+envelope-open.png
+envelope-simple.png
+envelope-simple-open.png
+equalizer.png
+equals.png
+eraser.png
+escalator-down.png
+escalator-up.png
+exam.png
+exclamation-mark.png
+exclude.png
+exclude-square.png
+export.png
+eye.png
+eye-closed.png
+eyedropper.png
+eyedropper-sample.png
+eyeglasses.png
+eyes.png
+eye-slash.png
+facebook-logo.png
+face-mask.png
+factory.png
+faders.png
+faders-horizontal.png
+fallout-shelter.png
+fan.png
+farm.png
+fast-forward.png
+fast-forward-circle.png
+feather.png
+fediverse-logo.png
+figma-logo.png
+file.png
+file-archive.png
+file-arrow-down.png
+file-arrow-up.png
+file-audio.png
+file-c.png
+file-cloud.png
+file-code.png
+file-cpp.png
+file-c-sharp.png
+file-css.png
+file-csv.png
+file-dashed.png
+file-doc.png
+file-html.png
+file-image.png
+file-ini.png
+file-jpg.png
+file-js.png
+file-jsx.png
+file-lock.png
+file-magnifying-glass.png
+file-md.png
+file-minus.png
+file-pdf.png
+file-plus.png
+file-png.png
+file-ppt.png
+file-py.png
+file-rs.png
+files.png
+file-sql.png
+file-svg.png
+file-text.png
+file-ts.png
+file-tsx.png
+file-txt.png
+file-video.png
+file-vue.png
+file-x.png
+file-xls.png
+file-zip.png
+film-reel.png
+film-script.png
+film-slate.png
+film-strip.png
+fingerprint.png
+fingerprint-simple.png
+finn-the-human.png
+fire.png
+fire-extinguisher.png
+fire-simple.png
+fire-truck.png
+first-aid.png
+first-aid-kit.png
+fish.png
+fish-simple.png
+flag.png
+flag-banner.png
+flag-banner-fold.png
+flag-checkered.png
+flag-pennant.png
+flame.png
+flashlight.png
+flask.png
+flip-horizontal.png
+flip-vertical.png
+floppy-disk.png
+floppy-disk-back.png
+flow-arrow.png
+flower.png
+flower-lotus.png
+flower-tulip.png
+flying-saucer.png
+folder.png
+folder-dashed.png
+folder-lock.png
+folder-minus.png
+folder-open.png
+folder-plus.png
+folders.png
+folder-simple.png
+folder-simple-dashed.png
+folder-simple-lock.png
+folder-simple-minus.png
+folder-simple-plus.png
+folder-simple-star.png
+folder-simple-user.png
+folder-star.png
+folder-user.png
+football.png
+football-helmet.png
+footprints.png
+fork-knife.png
+four-k.png
+frame-corners.png
+framer-logo.png
+function.png
+funnel.png
+funnel-simple.png
+funnel-simple-x.png
+funnel-x.png
+game-controller.png
+garage.png
+gas-can.png
+gas-pump.png
+gauge.png
+gavel.png
+gear.png
+gear-fine.png
+gear-six.png
+gender-female.png
+gender-intersex.png
+gender-male.png
+gender-neuter.png
+gender-nonbinary.png
+gender-transgender.png
+ghost.png
+gif.png
+gift.png
+git-branch.png
+git-commit.png
+git-diff.png
+git-fork.png
+github-logo.png
+gitlab-logo.png
+gitlab-logo-simple.png
+git-merge.png
+git-pull-request.png
+globe.png
+globe-hemisphere-east.png
+globe-hemisphere-west.png
+globe-simple.png
+globe-simple-x.png
+globe-stand.png
+globe-x.png
+goggles.png
+golf.png
+goodreads-logo.png
+google-cardboard-logo.png
+google-chrome-logo.png
+google-drive-logo.png
+google-logo.png
+google-photos-logo.png
+google-play-logo.png
+google-podcasts-logo.png
+gps.png
+gps-fix.png
+gps-slash.png
+gradient.png
+graduation-cap.png
+grains.png
+grains-slash.png
+graph.png
+graphics-card.png
+greater-than.png
+greater-than-or-equal.png
+grid-four.png
+grid-nine.png
+guitar.png
+hair-dryer.png
+hamburger.png
+hammer.png
+hand.png
+hand-arrow-down.png
+hand-arrow-up.png
+handbag.png
+handbag-simple.png
+hand-coins.png
+hand-deposit.png
+hand-eye.png
+hand-fist.png
+hand-grabbing.png
+hand-heart.png
+hand-palm.png
+hand-peace.png
+hand-pointing.png
+hands-clapping.png
+handshake.png
+hand-soap.png
+hands-praying.png
+hand-swipe-left.png
+hand-swipe-right.png
+hand-tap.png
+hand-waving.png
+hand-withdraw.png
+hard-drive.png
+hard-drives.png
+hard-hat.png
+hash.png
+hash-straight.png
+head-circuit.png
+headlights.png
+headphones.png
+headset.png
+heart.png
+heartbeat.png
+heart-break.png
+heart-half.png
+heart-straight.png
+heart-straight-break.png
+hexagon.png
+high-definition.png
+high-heel.png
+highlighter.png
+highlighter-circle.png
+hockey.png
+hoodie.png
+horse.png
+hospital.png
+hourglass.png
+hourglass-high.png
+hourglass-low.png
+hourglass-medium.png
+hourglass-simple.png
+hourglass-simple-high.png
+hourglass-simple-low.png
+hourglass-simple-medium.png
+house.png
+house-line.png
+house-simple.png
+hurricane.png
+ice-cream.png
+identification-badge.png
+identification-card.png
+image.png
+image-broken.png
+images.png
+image-square.png
+images-square.png
+infinity.png
+info.png
+instagram-logo.png
+intersect.png
+intersection.png
+intersect-square.png
+intersect-three.png
+invoice.png
+island.png
+jar.png
+jar-label.png
+jeep.png
+joystick.png
+kanban.png
+key.png
+keyboard.png
+keyhole.png
+key-return.png
+knife.png
+ladder.png
+ladder-simple.png
+lamp.png
+lamp-pendant.png
+laptop.png
+lasso.png
+lastfm-logo.png
+layout.png
+leaf.png
+lectern.png
+lego.png
+lego-smiley.png
+less-than.png
+less-than-or-equal.png
+letter-circle-h.png
+letter-circle-p.png
+letter-circle-v.png
+lifebuoy.png
+lightbulb.png
+lightbulb-filament.png
+lighthouse.png
+lightning.png
+lightning-a.png
+lightning-slash.png
+line-segment.png
+line-segments.png
+line-vertical.png
+link.png
+link-break.png
+linkedin-logo.png
+link-simple.png
+link-simple-break.png
+link-simple-horizontal.png
+link-simple-horizontal-break.png
+linktree-logo.png
+linux-logo.png
+list.png
+list-bullets.png
+list-checks.png
+list-dashes.png
+list-heart.png
+list-magnifying-glass.png
+list-numbers.png
+list-plus.png
+list-star.png
+lock.png
+lockers.png
+lock-key.png
+lock-key-open.png
+lock-laminated.png
+lock-laminated-open.png
+lock-open.png
+lock-simple.png
+lock-simple-open.png
+log.png
+magic-wand.png
+magnet.png
+magnet-straight.png
+magnifying-glass.png
+magnifying-glass-minus.png
+magnifying-glass-plus.png
+mailbox.png
+map-pin.png
+map-pin-area.png
+map-pin-line.png
+map-pin-plus.png
+map-pin-simple.png
+map-pin-simple-area.png
+map-pin-simple-line.png
+map-trifold.png
+markdown-logo.png
+marker-circle.png
+martini.png
+mask-happy.png
+mask-sad.png
+mastodon-logo.png
+math-operations.png
+matrix-logo.png
+medal.png
+medal-military.png
+medium-logo.png
+megaphone.png
+megaphone-simple.png
+member-of.png
+memory.png
+messenger-logo.png
+meta-logo.png
+meteor.png
+metronome.png
+microphone.png
+microphone-slash.png
+microphone-stage.png
+microscope.png
+microsoft-excel-logo.png
+microsoft-outlook-logo.png
+microsoft-powerpoint-logo.png
+microsoft-teams-logo.png
+microsoft-word-logo.png
+minus.png
+minus-circle.png
+minus-square.png
+money.png
+money-wavy.png
+monitor.png
+monitor-arrow-up.png
+monitor-play.png
+moon.png
+moon-stars.png
+moped.png
+moped-front.png
+mosque.png
+motorcycle.png
+mountains.png
+mouse.png
+mouse-left-click.png
+mouse-middle-click.png
+mouse-right-click.png
+mouse-scroll.png
+mouse-simple.png
+music-note.png
+music-notes.png
+music-note-simple.png
+music-notes-minus.png
+music-notes-plus.png
+music-notes-simple.png
+navigation-arrow.png
+needle.png
+network.png
+network-slash.png
+network-x.png
+newspaper.png
+newspaper-clipping.png
+notches.png
+note.png
+note-blank.png
+notebook.png
+notepad.png
+note-pencil.png
+not-equals.png
+notification.png
+notion-logo.png
+not-member-of.png
+not-subset-of.png
+not-superset-of.png
+nuclear-plant.png
+number-circle-eight.png
+number-circle-five.png
+number-circle-four.png
+number-circle-nine.png
+number-circle-one.png
+number-circle-seven.png
+number-circle-six.png
+number-circle-three.png
+number-circle-two.png
+number-circle-zero.png
+number-eight.png
+number-five.png
+number-four.png
+number-nine.png
+number-one.png
+number-seven.png
+number-six.png
+number-square-eight.png
+number-square-five.png
+number-square-four.png
+number-square-nine.png
+number-square-one.png
+number-square-seven.png
+number-square-six.png
+number-square-three.png
+number-square-two.png
+number-square-zero.png
+number-three.png
+number-two.png
+number-zero.png
+numpad.png
+nut.png
+ny-times-logo.png
+octagon.png
+office-chair.png
+onigiri.png
+open-ai-logo.png
+option.png
+orange.png
+orange-slice.png
+oven.png
+package.png
+paint-brush.png
+paint-brush-broad.png
+paint-brush-household.png
+paint-bucket.png
+paint-roller.png
+palette.png
+panorama.png
+pants.png
+paperclip.png
+paperclip-horizontal.png
+paper-plane.png
+paper-plane-right.png
+paper-plane-tilt.png
+parachute.png
+paragraph.png
+parallelogram.png
+park.png
+password.png
+path.png
+patreon-logo.png
+pause.png
+pause-circle.png
+paw-print.png
+paypal-logo.png
+peace.png
+pen.png
+pencil.png
+pencil-circle.png
+pencil-line.png
+pencil-ruler.png
+pencil-simple.png
+pencil-simple-line.png
+pencil-simple-slash.png
+pencil-slash.png
+pen-nib.png
+pen-nib-straight.png
+pentagon.png
+pentagram.png
+pepper.png
+percent.png
+person.png
+person-arms-spread.png
+person-simple.png
+person-simple-bike.png
+person-simple-circle.png
+person-simple-hike.png
+person-simple-run.png
+person-simple-ski.png
+person-simple-snowboard.png
+person-simple-swim.png
+person-simple-tai-chi.png
+person-simple-throw.png
+person-simple-walk.png
+perspective.png
+phone.png
+phone-call.png
+phone-disconnect.png
+phone-incoming.png
+phone-list.png
+phone-outgoing.png
+phone-pause.png
+phone-plus.png
+phone-slash.png
+phone-transfer.png
+phone-x.png
+phosphor-logo.png
+pi.png
+piano-keys.png
+picnic-table.png
+picture-in-picture.png
+piggy-bank.png
+pill.png
+ping-pong.png
+pinterest-logo.png
+pint-glass.png
+pinwheel.png
+pipe.png
+pipe-wrench.png
+pix-logo.png
+pizza.png
+placeholder.png
+planet.png
+plant.png
+play.png
+play-circle.png
+playlist.png
+play-pause.png
+plug.png
+plug-charging.png
+plugs.png
+plugs-connected.png
+plus.png
+plus-circle.png
+plus-minus.png
+plus-square.png
+poker-chip.png
+police-car.png
+polygon.png
+popcorn.png
+popsicle.png
+potted-plant.png
+power.png
+prescription.png
+presentation.png
+presentation-chart.png
+printer.png
+prohibit.png
+prohibit-inset.png
+projector-screen.png
+projector-screen-chart.png
+pulse.png
+push-pin.png
+push-pin-simple.png
+push-pin-simple-slash.png
+push-pin-slash.png
+puzzle-piece.png
+qr-code.png
+question.png
+question-mark.png
+queue.png
+quotes.png
+rabbit.png
+racquet.png
+radical.png
+radio.png
+radioactive.png
+radio-button.png
+rainbow.png
+rainbow-cloud.png
+ranking.png
+read-cv-logo.png
+receipt.png
+receipt-x.png
+record.png
+rectangle.png
+rectangle-dashed.png
+recycle.png
+reddit-logo.png
+repeat.png
+repeat-once.png
+replit-logo.png
+resize.png
+rewind.png
+rewind-circle.png
+road-horizon.png
+robot.png
+rocket.png
+rocket-launch.png
+rows.png
+rows-plus-bottom.png
+rows-plus-top.png
+rss.png
+rss-simple.png
+rug.png
+ruler.png
+sailboat.png
+scales.png
+scan.png
+scan-smiley.png
+scissors.png
+scooter.png
+screencast.png
+screwdriver.png
+scribble.png
+scribble-loop.png
+scroll.png
+seal.png
+seal-check.png
+seal-percent.png
+seal-question.png
+seal-warning.png
+seat.png
+seatbelt.png
+security-camera.png
+selection.png
+selection-all.png
+selection-background.png
+selection-foreground.png
+selection-inverse.png
+selection-plus.png
+selection-slash.png
+shapes.png
+share.png
+share-fat.png
+share-network.png
+shield.png
+shield-check.png
+shield-checkered.png
+shield-chevron.png
+shield-plus.png
+shield-slash.png
+shield-star.png
+shield-warning.png
+shipping-container.png
+shirt-folded.png
+shooting-star.png
+shopping-bag.png
+shopping-bag-open.png
+shopping-cart.png
+shopping-cart-simple.png
+shovel.png
+shower.png
+shrimp.png
+shuffle.png
+shuffle-angular.png
+shuffle-simple.png
+sidebar.png
+sidebar-simple.png
+sigma.png
+signature.png
+sign-in.png
+sign-out.png
+signpost.png
+sim-card.png
+siren.png
+sketch-logo.png
+skip-back.png
+skip-back-circle.png
+skip-forward.png
+skip-forward-circle.png
+skull.png
+skype-logo.png
+slack-logo.png
+sliders.png
+sliders-horizontal.png
+slideshow.png
+smiley.png
+smiley-angry.png
+smiley-blank.png
+smiley-meh.png
+smiley-melting.png
+smiley-nervous.png
+smiley-sad.png
+smiley-sticker.png
+smiley-wink.png
+smiley-x-eyes.png
+snapchat-logo.png
+sneaker.png
+sneaker-move.png
+snowflake.png
+soccer-ball.png
+sock.png
+solar-panel.png
+solar-roof.png
+sort-ascending.png
+sort-descending.png
+soundcloud-logo.png
+spade.png
+sparkle.png
+speaker-hifi.png
+speaker-high.png
+speaker-low.png
+speaker-none.png
+speaker-simple-high.png
+speaker-simple-low.png
+speaker-simple-none.png
+speaker-simple-slash.png
+speaker-simple-x.png
+speaker-slash.png
+speaker-x.png
+speedometer.png
+sphere.png
+spinner.png
+spinner-ball.png
+spinner-gap.png
+spiral.png
+split-horizontal.png
+split-vertical.png
+spotify-logo.png
+spray-bottle.png
+square.png
+square-half.png
+square-half-bottom.png
+square-logo.png
+squares-four.png
+square-split-horizontal.png
+square-split-vertical.png
+stack.png
+stack-minus.png
+stack-overflow-logo.png
+stack-plus.png
+stack-simple.png
+stairs.png
+stamp.png
+standard-definition.png
+star.png
+star-and-crescent.png
+star-four.png
+star-half.png
+star-of-david.png
+steam-logo.png
+steering-wheel.png
+steps.png
+stethoscope.png
+sticker.png
+stool.png
+stop.png
+stop-circle.png
+storefront.png
+strategy.png
+stripe-logo.png
+student.png
+subset-of.png
+subset-proper-of.png
+subtitles.png
+subtitles-slash.png
+subtract.png
+subtract-square.png
+subway.png
+suitcase.png
+suitcase-rolling.png
+suitcase-simple.png
+sun.png
+sun-dim.png
+sunglasses.png
+sun-horizon.png
+superset-of.png
+superset-proper-of.png
+swap.png
+swatches.png
+swimming-pool.png
+sword.png
+synagogue.png
+syringe.png
+table.png
+tabs.png
+tag.png
+tag-chevron.png
+tag-simple.png
+target.png
+taxi.png
+tea-bag.png
+telegram-logo.png
+television.png
+television-simple.png
+tennis-ball.png
+tent.png
+terminal.png
+terminal-window.png
+test-tube.png
+text-aa.png
+text-align-center.png
+text-align-justify.png
+text-align-left.png
+text-align-right.png
+text-a-underline.png
+text-b.png
+textbox.png
+text-columns.png
+text-h.png
+text-h-five.png
+text-h-four.png
+text-h-one.png
+text-h-six.png
+text-h-three.png
+text-h-two.png
+text-indent.png
+text-italic.png
+text-outdent.png
+text-strikethrough.png
+text-subscript.png
+text-superscript.png
+text-t.png
+text-t-slash.png
+text-underline.png
+thermometer.png
+thermometer-cold.png
+thermometer-hot.png
+thermometer-simple.png
+threads-logo.png
+three-d.png
+thumbs-down.png
+thumbs-up.png
+ticket.png
+tidal-logo.png
+tiktok-logo.png
+tilde.png
+timer.png
+tipi.png
+tip-jar.png
+tire.png
+toggle-left.png
+toggle-right.png
+toilet.png
+toilet-paper.png
+toolbox.png
+tooth.png
+tornado.png
+tote.png
+tote-simple.png
+towel.png
+tractor.png
+trademark.png
+trademark-registered.png
+traffic-cone.png
+traffic-sign.png
+traffic-signal.png
+train.png
+train-regional.png
+train-simple.png
+tram.png
+translate.png
+trash.png
+trash-simple.png
+tray.png
+tray-arrow-down.png
+tray-arrow-up.png
+treasure-chest.png
+tree.png
+tree-evergreen.png
+tree-palm.png
+tree-structure.png
+tree-view.png
+trend-down.png
+trend-up.png
+triangle.png
+triangle-dashed.png
+trolley.png
+trolley-suitcase.png
+trophy.png
+truck.png
+truck-trailer.png
+t-shirt.png
+tumblr-logo.png
+twitch-logo.png
+twitter-logo.png
+umbrella.png
+umbrella-simple.png
+union.png
+unite.png
+unite-square.png
+upload.png
+upload-simple.png
+usb.png
+user.png
+user-check.png
+user-circle.png
+user-circle-check.png
+user-circle-dashed.png
+user-circle-gear.png
+user-circle-minus.png
+user-circle-plus.png
+user-focus.png
+user-gear.png
+user-list.png
+user-minus.png
+user-plus.png
+user-rectangle.png
+users.png
+users-four.png
+user-sound.png
+user-square.png
+users-three.png
+user-switch.png
+van.png
+vault.png
+vector-three.png
+vector-two.png
+vibrate.png
+video.png
+video-camera.png
+video-camera-slash.png
+video-conference.png
+vignette.png
+vinyl-record.png
+virtual-reality.png
+virus.png
+visor.png
+voicemail.png
+volleyball.png
+wall.png
+wallet.png
+warehouse.png
+warning.png
+warning-circle.png
+warning-diamond.png
+warning-octagon.png
+washing-machine.png
+watch.png
+waveform.png
+waveform-slash.png
+waves.png
+wave-sawtooth.png
+wave-sine.png
+wave-square.png
+wave-triangle.png
+webcam.png
+webcam-slash.png
+webhooks-logo.png
+wechat-logo.png
+whatsapp-logo.png
+wheelchair.png
+wheelchair-motion.png
+wifi-high.png
+wifi-low.png
+wifi-medium.png
+wifi-none.png
+wifi-slash.png
+wifi-x.png
+wind.png
+windmill.png
+windows-logo.png
+wine.png
+wrench.png
+x.png
+x-circle.png
+x-logo.png
+x-square.png
+yarn.png
+yin-yang.png
+youtube-logo.png

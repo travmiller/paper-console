@@ -377,20 +377,32 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
 def _get_icon_type(condition: str) -> str:
     """Map weather condition to icon type based on WMO weather codes.
     
-    Maps to Phosphor PNG icons:
+    Maps to Phosphor PNG icons with improved specificity:
     - Clear (0) → sun
     - Mainly Clear (1) → cloud-sun
     - Partly Cloudy (2) → cloud-sun
     - Overcast (3) → cloud
     - Fog (45, 48) → cloud-fog
     - Drizzle/Freezing Drizzle/Rain/Freezing Rain/Rain Showers (51-82) → cloud-rain
-    - Snow/Snow Grains/Snow Showers (71-86) → cloud-snow
+    - Snow/Snow Grains/Snow Showers (71-86) → snowflake (more specific than cloud-snow)
     - Thunderstorm/Thunderstorm Hail (95-99) → cloud-lightning
     """
     condition_lower = condition.lower()
     
+    # Thunderstorm (codes 95, 96, 99) - check FIRST to avoid false matches
+    if "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+        return "storm"  # Maps to cloud-lightning.png
+    
+    # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
+    elif "snow" in condition_lower:
+        return "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
+    
+    # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
+    elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
+        return "rain"  # Maps to cloud-rain.png
+    
     # Clear sky (code 0)
-    if condition_lower == "clear":
+    elif condition_lower == "clear":
         return "sun"  # Maps to sun.png
     
     # Mainly clear (code 1) or Partly cloudy (code 2)
@@ -404,18 +416,6 @@ def _get_icon_type(condition: str) -> str:
     # Fog (codes 45, 48)
     elif condition_lower == "fog" or "mist" in condition_lower:
         return "cloud-fog"  # Maps to cloud-fog.png
-    
-    # Thunderstorm (codes 95, 96, 99) - check before rain to avoid false matches
-    elif "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
-        return "storm"  # Maps to cloud-lightning.png
-    
-    # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
-    elif "snow" in condition_lower:
-        return "snow"  # Maps to cloud-snow.png
-    
-    # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
-    elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
-        return "rain"  # Maps to cloud-rain.png
     
     # Default fallback
     else:
