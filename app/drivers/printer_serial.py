@@ -1,11 +1,12 @@
-import serial
-import platform
+import math
 import os
-import unicodedata
+import platform
 import time
-from typing import Optional, List
+import unicodedata
+from typing import List, Optional
+
+import serial
 from PIL import Image, ImageDraw, ImageFont
-from io import BytesIO
 
 
 class PrinterDriver:
@@ -50,13 +51,18 @@ class PrinterDriver:
     PRINTER_DPI = 203  # dots per inch
     PRINTER_WIDTH_DOTS = 384  # 58mm paper at 203 DPI
 
+    # Fixed typography and spacing constants (pixels)
+    FONT_SIZE = 14  # Base font size for body text
+    LINE_HEIGHT = 18  # Font size + line spacing
+    SPACING_SMALL = 4  # Tight spacing (after inline elements)
+    SPACING_MEDIUM = 8  # Standard spacing (between content blocks)
+    SPACING_LARGE = 16  # Section spacing (between modules)
+
     def __init__(
         self,
         width: int = 42,  # Characters per line
         port: Optional[str] = None,
         baudrate: int = 9600,  # QR204 only supports 9600
-        font_size: int = 12,  # Font size in pixels (8-24)
-        line_spacing: int = 2,  # Extra pixels between lines
     ):
         self.width = width
         self.ser = None
@@ -68,21 +74,13 @@ class PrinterDriver:
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
         self._max_lines_hit = False  # Flag set when max lines exceeded during flush
 
-        # Font settings for bitmap rendering (configurable)
-        self.font_size = max(8, min(24, font_size))  # Clamp to valid range
-        self.line_spacing = max(0, min(8, line_spacing))  # Clamp to valid range
-        self.line_height = self.font_size + self.line_spacing
+        # Font settings (fixed values)
+        self.font_size = self.FONT_SIZE
+        self.line_spacing = self.LINE_HEIGHT - self.FONT_SIZE
+        self.line_height = self.LINE_HEIGHT
 
         # Load font family for styled text
         self._fonts = self._load_font_family()
-        
-        # Debug: Log which fonts were loaded
-        import logging
-        if self._fonts.get("regular"):
-            font_name = getattr(self._fonts["regular"], "path", "unknown")
-            logging.info(f"Loaded Orbitron fonts from: {font_name}")
-        else:
-            logging.warning("Orbitron fonts not found, using fallback fonts")
 
         # Auto-detect serial port if not specified
         if port is None:
@@ -125,10 +123,7 @@ class PrinterDriver:
                 self.ser.reset_input_buffer()
             self.ser.reset_output_buffer()
 
-            import time
-
             time.sleep(0.5)
-
             self._initialize_printer()
 
         except serial.SerialException:
@@ -136,14 +131,11 @@ class PrinterDriver:
 
     def _load_font_family(self) -> dict:
         """Load Orbitron font family with multiple weights.
-        
+
         Orbitron is a geometric sans-serif font designed for display purposes.
-        Download from: https://fonts.google.com/specimen/Orbitron
-        Place font files in: web/public/fonts/Orbitron/
+        Place font files in: fonts/Orbitron/static/
         Required files: Orbitron-Regular.ttf, Orbitron-Medium.ttf, Orbitron-Bold.ttf
         """
-        import os
-
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         project_root = os.path.dirname(app_dir)
@@ -193,11 +185,9 @@ class PrinterDriver:
                         )
                         font_loaded = True
                         break
-                    except Exception as e:
-                        import logging
-                        logging.warning(f"Failed to load font {font_path}: {e}")
+                    except Exception:
                         continue
-            
+
             # Fallback for semibold if SemiBold not found
             if variant_name == "semibold" and not font_loaded:
                 # Try using Bold as fallback
@@ -225,18 +215,26 @@ class PrinterDriver:
                 expanded_path = os.path.expanduser(path)
                 if os.path.exists(expanded_path):
                     try:
-                        fonts["regular"] = ImageFont.truetype(expanded_path, self.font_size)
-                        fonts["bold"] = ImageFont.truetype(
-                            expanded_path.replace("Regular", "Bold"), self.font_size
-                        ) if os.path.exists(expanded_path.replace("Regular", "Bold")) else fonts["regular"]
-                        fonts["regular_lg"] = ImageFont.truetype(expanded_path, self.font_size + 6)
+                        fonts["regular"] = ImageFont.truetype(
+                            expanded_path, self.font_size
+                        )
+                        fonts["bold"] = (
+                            ImageFont.truetype(
+                                expanded_path.replace("Regular", "Bold"), self.font_size
+                            )
+                            if os.path.exists(expanded_path.replace("Regular", "Bold"))
+                            else fonts["regular"]
+                        )
+                        fonts["regular_lg"] = ImageFont.truetype(
+                            expanded_path, self.font_size + 6
+                        )
                         fonts["regular_sm"] = ImageFont.truetype(
                             expanded_path, max(10, self.font_size - 4)
                         )
                         break
                     except Exception:
                         continue
-            
+
             # If still not found, try generic monospace fonts
             if "regular" not in fonts:
                 fallback_paths = [
@@ -323,6 +321,10 @@ class PrinterDriver:
         - Continuous data stream to printer
 
         Supports styled text with different fonts and sizes.
+        Uses fixed spacing constants for consistency:
+        - SPACING_SMALL (4px): after inline elements
+        - SPACING_MEDIUM (8px): between content blocks
+        - SPACING_LARGE (16px): between sections/modules
         """
         import qrcode as qr_lib
 
@@ -330,7 +332,7 @@ class PrinterDriver:
             return None
 
         # First pass: calculate total height needed
-        total_height = 4  # Padding
+        total_height = self.SPACING_SMALL  # Top padding
 
         for op_type, op_data in ops:
             if op_type == "styled":
@@ -346,125 +348,99 @@ class PrinterDriver:
             elif op_type == "box":
                 # Box with text inside: border + padding + text + padding + border
                 style = op_data.get("style", "bold_lg")
-                padding = op_data.get("padding", 8)
+                padding = op_data.get("padding", self.SPACING_MEDIUM)
                 border = op_data.get("border", 2)
-                icon_type = op_data.get("icon")  # Optional inline icon
+                icon_type = op_data.get("icon")
                 text_height = self._get_line_height_for_style(style)
-                # If icon, make box taller to accommodate icon
                 icon_size = op_data.get("icon_size", 24) if icon_type else 0
                 box_height = (
                     border + padding + max(text_height, icon_size) + padding + border
                 )
-                total_height += box_height + 4  # +4 for spacing around box
+                total_height += box_height + self.SPACING_MEDIUM
             elif op_type == "moon":
-                # Moon phase graphic: circle with shadow
-                size = op_data.get("size", 60)  # Diameter in pixels
-                total_height += size + 8  # Moon + spacing
+                size = op_data.get("size", 60)
+                total_height += size + self.SPACING_MEDIUM
             elif op_type == "maze":
-                # Maze graphic: grid of cells
                 grid = op_data.get("grid", [])
-                cell_size = op_data.get("cell_size", 4)  # Pixels per cell
+                cell_size = op_data.get("cell_size", 4)
                 if grid:
                     maze_height = len(grid) * cell_size
-                    total_height += maze_height + 8  # Maze + spacing
+                    total_height += maze_height + self.SPACING_MEDIUM
             elif op_type == "sudoku":
-                # Sudoku grid: 9x9 with thick borders
                 grid = op_data.get("grid", [])
-                cell_size = op_data.get("cell_size", 8)  # Pixels per cell
+                cell_size = op_data.get("cell_size", 8)
                 if grid:
-                    # 9 cells * cell_size + borders
-                    sudoku_size = 9 * cell_size + 4  # +4 for borders
-                    total_height += sudoku_size + 8  # Sudoku + spacing
+                    sudoku_size = 9 * cell_size + self.SPACING_SMALL
+                    total_height += sudoku_size + self.SPACING_MEDIUM
             elif op_type == "icon":
-                # Small icon graphic
                 icon_type = op_data.get("type", "sun")
                 size = op_data.get("size", 32)
-                total_height += size + 4  # Icon + spacing
+                total_height += size + self.SPACING_SMALL
             elif op_type == "weather_forecast":
-                # 7-day weather forecast row
-                # Each day: icon (24px) + day name + high/low temps
-                # Height = icon + text lines + spacing
-                total_height += (
-                    24 + 12 + 12 + 12 + 8
-                )  # icon + day + high + low + spacing
+                # 7-day forecast: icon (24px) + day + high + low + spacing
+                total_height += 24 + 12 + 12 + 12 + self.SPACING_MEDIUM
             elif op_type == "hourly_forecast":
-                # 24-hour hourly forecast
-                # Group into rows of 6 hours each
                 hourly_forecast = op_data.get("hourly_forecast", [])
-                num_rows = (len(hourly_forecast) + 5) // 6  # 6 hours per row
-                # Each row: icon (20px) + time + temp
-                total_height += num_rows * (20 + 12 + 8)  # icon + text + spacing
+                num_rows = (len(hourly_forecast) + 5) // 6
+                total_height += num_rows * (20 + 12 + self.SPACING_MEDIUM)
             elif op_type == "progress_bar":
-                # Progress bar graphic
                 height = op_data.get("height", 12)
-                total_height += height + 4  # Bar + spacing
+                total_height += height + self.SPACING_SMALL
             elif op_type == "calendar_grid":
-                # Calendar grid view
                 weeks = op_data.get("weeks", 4)
                 cell_size = op_data.get("cell_size", 8)
-                grid_height = weeks * cell_size + 4  # +4 for header
-                total_height += grid_height + 8
+                grid_height = weeks * cell_size + self.SPACING_SMALL
+                total_height += grid_height + self.SPACING_MEDIUM
             elif op_type == "timeline":
-                # Timeline graphic
                 items = op_data.get("items", [])
                 item_height = op_data.get("item_height", 20)
-                total_height += len(items) * item_height + 8
+                total_height += len(items) * item_height + self.SPACING_MEDIUM
             elif op_type == "checkbox":
-                # Bitmap checkbox
                 size = op_data.get("size", 12)
                 total_height += size + 2
             elif op_type == "separator":
-                # Decorative separator
-                height = op_data.get("height", 8)
-                total_height += height + 4
+                height = op_data.get("height", self.SPACING_MEDIUM)
+                total_height += height + self.SPACING_SMALL
             elif op_type == "bar_chart":
-                # Simple bar chart
                 bars = op_data.get("bars", [])
                 bar_height = op_data.get("bar_height", 12)
                 chart_height = (
-                    len(bars) * (bar_height + 4) + 8
-                )  # +4 spacing between bars
+                    len(bars) * (bar_height + self.SPACING_SMALL) + self.SPACING_MEDIUM
+                )
                 total_height += chart_height
             elif op_type == "feed":
-                total_height += op_data * self.line_height
+                # feed(n) adds n * SPACING_LARGE pixels (module separator spacing)
+                total_height += op_data * self.SPACING_LARGE
             elif op_type == "article_block":
-                # Article with QR code on left, text on right
                 qr_size = op_data.get("qr_size", 64)
-                # Pre-render QR code
-                qr_img = self._generate_qr_image(
-                    op_data.get("url", ""),
-                    2,
-                    "L",
-                    True,
-                )
+                qr_img = self._generate_qr_image(op_data.get("url", ""), 2, "L", True)
                 if qr_img:
-                    # Resize QR to target size
                     qr_img = qr_img.resize((qr_size, qr_size), Image.NEAREST)
                 op_data["_qr_img"] = qr_img
-                
-                # Calculate text height
+
                 source_height = self._get_line_height_for_style("caption")
                 title_lines = op_data.get("title_lines", 1)
                 title_height = title_lines * self._get_line_height_for_style("bold")
                 summary_lines = op_data.get("summary_lines", 0)
-                summary_height = summary_lines * self._get_line_height_for_style("regular_sm")
-                
-                text_height = source_height + title_height + summary_height + 4
-                # Block height is max of QR or text
-                block_height = max(qr_size + 4, text_height)
-                total_height += block_height + 8  # +8 for spacing
+                summary_height = summary_lines * self._get_line_height_for_style(
+                    "regular_sm"
+                )
+
+                text_height = (
+                    source_height + title_height + summary_height + self.SPACING_SMALL
+                )
+                block_height = max(qr_size + self.SPACING_SMALL, text_height)
+                total_height += block_height + self.SPACING_MEDIUM
             elif op_type == "qr":
-                # Pre-render QR code to get its height and store in op_data
                 qr_img = self._generate_qr_image(
                     op_data["data"],
                     op_data["size"],
                     op_data["ec"],
                     op_data.get("fixed", False),
                 )
-                # Store QR image directly in op_data for later use
                 op_data["_qr_img"] = qr_img
                 if qr_img:
-                    total_height += qr_img.height + 4  # +4 for spacing
+                    total_height += qr_img.height + self.SPACING_SMALL
 
         # Create the unified image
         width = self.PRINTER_WIDTH_DOTS
@@ -502,26 +478,23 @@ class PrinterDriver:
                 # Draw a full-width box with text centered inside
                 text = self._sanitize_text(op_data.get("text", ""))
                 style = op_data.get("style", "bold_lg")
-                padding = op_data.get("padding", 8)
+                padding = op_data.get("padding", self.SPACING_MEDIUM)
                 border = op_data.get("border", 2)
-                icon_type = op_data.get("icon")  # Optional inline icon
+                icon_type = op_data.get("icon")
                 icon_size = op_data.get("icon_size", 24) if icon_type else 0
                 font = self._get_font(style)
                 text_height = self._get_line_height_for_style(style)
 
-                # Full width box
-                box_width = width - 4  # Leave 2px margin on each side
+                box_width = width - self.SPACING_SMALL
                 box_height = max(text_height, icon_size) + (padding * 2) + (border * 2)
-
-                box_x = 2  # Small left margin
-                box_y = y + 2  # Small top margin
+                box_x = 2
+                box_y = y + 2
 
                 # Draw outer rectangle (black border)
                 draw.rectangle(
-                    [box_x, box_y, box_x + box_width, box_y + box_height],
-                    fill=0,  # Black
+                    [box_x, box_y, box_x + box_width, box_y + box_height], fill=0
                 )
-                # Draw inner rectangle (white) - creates the border effect
+                # Draw inner rectangle (white) - creates border effect
                 draw.rectangle(
                     [
                         box_x + border,
@@ -529,7 +502,7 @@ class PrinterDriver:
                         box_x + box_width - border,
                         box_y + box_height - border,
                     ],
-                    fill=1,  # White
+                    fill=1,
                 )
 
                 # Calculate text width
@@ -539,23 +512,19 @@ class PrinterDriver:
                 else:
                     text_width = len(text) * 10
 
-                # Calculate total width (text + icon + spacing)
                 icon_spacing = 6 if icon_type else 0
                 total_content_width = (
                     text_width + icon_size + icon_spacing if icon_type else text_width
                 )
 
-                # Center everything together
                 content_start_x = box_x + (box_width - total_content_width) // 2
                 content_y = box_y + border + padding
 
-                # Draw icon if present (to the left of text)
                 if icon_type:
                     icon_x = content_start_x
                     icon_y = content_y + (text_height - icon_size) // 2
                     self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
 
-                # Draw text (to the right of icon, or centered if no icon)
                 text_x = (
                     content_start_x + icon_size + icon_spacing
                     if icon_type
@@ -567,89 +536,60 @@ class PrinterDriver:
                 else:
                     draw.text((text_x, text_y), text, fill=0)
 
-                y += box_height + 4  # Move past box + spacing
+                y += box_height + self.SPACING_MEDIUM
             elif op_type == "moon":
-                # Draw moon phase graphic
-                phase = op_data.get("phase", 0)  # 0-28 day cycle
+                phase = op_data.get("phase", 0)
                 size = op_data.get("size", 60)
-
-                # Center moon horizontally
                 moon_x = (width - size) // 2
-                moon_y = y + 4
-
-                # Draw moon using ellipses to create the phase effect
+                moon_y = y + self.SPACING_SMALL
                 self._draw_moon_phase(draw, moon_x, moon_y, size, phase)
-
-                y += size + 8
+                y += size + self.SPACING_MEDIUM
             elif op_type == "maze":
-                # Draw maze bitmap
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 4)
-
                 if grid:
                     maze_width = len(grid[0]) * cell_size if grid else 0
                     maze_height = len(grid) * cell_size
-
-                    # Center maze horizontally
                     maze_x = (width - maze_width) // 2
-                    maze_y = y + 4
-
+                    maze_y = y + self.SPACING_SMALL
                     self._draw_maze(draw, maze_x, maze_y, grid, cell_size)
-
-                    y += maze_height + 8
+                    y += maze_height + self.SPACING_MEDIUM
             elif op_type == "sudoku":
-                # Draw sudoku grid bitmap
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 8)
                 font = self._get_font("regular")
-
                 if grid:
-                    sudoku_size = 9 * cell_size + 4  # +4 for borders
-                    # Center sudoku horizontally
+                    sudoku_size = 9 * cell_size + self.SPACING_SMALL
                     sudoku_x = (width - sudoku_size) // 2
-                    sudoku_y = y + 4
-
+                    sudoku_y = y + self.SPACING_SMALL
                     self._draw_sudoku_grid(
                         draw, sudoku_x, sudoku_y, grid, cell_size, font
                     )
-
-                    y += sudoku_size + 8
+                    y += sudoku_size + self.SPACING_MEDIUM
             elif op_type == "icon":
-                # Draw weather/status icon
                 icon_type = op_data.get("type", "sun")
                 size = op_data.get("size", 32)
-
-                # Center icon horizontally
                 icon_x = (width - size) // 2
-                icon_y = y + 4
-
+                icon_y = y + self.SPACING_SMALL
                 self._draw_icon(draw, icon_x, icon_y, icon_type, size)
-
-                y += size + 8
+                y += size + self.SPACING_MEDIUM
             elif op_type == "weather_forecast":
-                # Draw 7-day weather forecast
                 forecast = op_data.get("forecast", [])
                 self._draw_weather_forecast(draw, 0, y, width, forecast)
-                y += 24 + 12 + 12 + 12 + 8  # icon + day + high + low + spacing
+                y += 24 + 12 + 12 + 12 + self.SPACING_MEDIUM
             elif op_type == "hourly_forecast":
-                # Draw 24-hour hourly forecast
                 hourly_forecast = op_data.get("hourly_forecast", [])
                 self._draw_hourly_forecast(draw, 0, y, width, hourly_forecast)
-                # Calculate height based on number of rows (6 hours per row)
                 num_rows = (len(hourly_forecast) + 5) // 6
-                y += num_rows * (20 + 12 + 8)  # icon + text + spacing
+                y += num_rows * (20 + 12 + self.SPACING_MEDIUM)
             elif op_type == "progress_bar":
-                # Draw progress bar
-                value = op_data.get("value", 0)  # 0-100
+                value = op_data.get("value", 0)
                 max_value = op_data.get("max_value", 100)
-                bar_width = op_data.get("width", width - 8)
+                bar_width = op_data.get("width", width - self.SPACING_MEDIUM)
                 bar_height = op_data.get("height", 12)
                 label = op_data.get("label", "")
-
-                # Center bar horizontally
                 bar_x = (width - bar_width) // 2
-                bar_y = y + 4
-
+                bar_y = y + self.SPACING_SMALL
                 self._draw_progress_bar(
                     draw,
                     bar_x,
@@ -661,18 +601,14 @@ class PrinterDriver:
                     label,
                     self._get_font("regular_sm"),
                 )
-
-                y += bar_height + 8
+                y += bar_height + self.SPACING_MEDIUM
             elif op_type == "calendar_grid":
-                # Draw calendar grid
                 weeks = op_data.get("weeks", 4)
                 cell_size = op_data.get("cell_size", 8)
                 start_date = op_data.get("start_date")
                 events_by_date = op_data.get("events_by_date", {})
-
-                grid_x = 4
-                grid_y = y + 4
-
+                grid_x = self.SPACING_SMALL
+                grid_y = y + self.SPACING_SMALL
                 self._draw_calendar_grid(
                     draw,
                     grid_x,
@@ -683,16 +619,13 @@ class PrinterDriver:
                     events_by_date,
                     self._get_font("regular_sm"),
                 )
-
-                grid_height = weeks * cell_size + 4
-                y += grid_height + 8
+                grid_height = weeks * cell_size + self.SPACING_SMALL
+                y += grid_height + self.SPACING_MEDIUM
             elif op_type == "timeline":
-                # Draw timeline
                 items = op_data.get("items", [])
                 item_height = op_data.get("item_height", 20)
-                timeline_x = 8
-                timeline_y = y + 4
-
+                timeline_x = self.SPACING_MEDIUM
+                timeline_y = y + self.SPACING_SMALL
                 self._draw_timeline(
                     draw,
                     timeline_x,
@@ -701,36 +634,29 @@ class PrinterDriver:
                     item_height,
                     self._get_font("regular"),
                 )
-
-                y += len(items) * item_height + 8
+                y += len(items) * item_height + self.SPACING_MEDIUM
             elif op_type == "checkbox":
-                # Draw checkbox
                 checked = op_data.get("checked", False)
                 size = op_data.get("size", 12)
-                checkbox_x = 4
+                checkbox_x = self.SPACING_SMALL
                 checkbox_y = y + 2
-
                 self._draw_checkbox(draw, checkbox_x, checkbox_y, size, checked)
-
-                y += size + 4
+                y += size + self.SPACING_SMALL
             elif op_type == "separator":
-                # Draw decorative separator
                 style = op_data.get("style", "dots")
-                sep_height = op_data.get("height", 8)
-                sep_x = 4
+                sep_height = op_data.get("height", self.SPACING_MEDIUM)
+                sep_x = self.SPACING_SMALL
                 sep_y = y + 2
-
-                self._draw_separator(draw, sep_x, sep_y, width - 8, sep_height, style)
-
-                y += sep_height + 4
+                self._draw_separator(
+                    draw, sep_x, sep_y, width - self.SPACING_MEDIUM, sep_height, style
+                )
+                y += sep_height + self.SPACING_SMALL
             elif op_type == "bar_chart":
-                # Draw bar chart
                 bars = op_data.get("bars", [])
                 bar_height = op_data.get("bar_height", 12)
-                chart_width = op_data.get("width", width - 8)
+                chart_width = op_data.get("width", width - self.SPACING_MEDIUM)
                 chart_x = (width - chart_width) // 2
-                chart_y = y + 4
-
+                chart_y = y + self.SPACING_SMALL
                 self._draw_bar_chart(
                     draw,
                     chart_x,
@@ -740,47 +666,38 @@ class PrinterDriver:
                     bars,
                     self._get_font("regular_sm"),
                 )
-
-                y += len(bars) * (bar_height + 4) + 8
+                y += len(bars) * (bar_height + self.SPACING_SMALL) + self.SPACING_MEDIUM
             elif op_type == "feed":
-                y += op_data * self.line_height
+                # feed(n) adds n * SPACING_LARGE for module separation
+                y += op_data * self.SPACING_LARGE
             elif op_type == "article_block":
-                # Article with QR code on left, text on right
                 qr_size = op_data.get("qr_size", 64)
                 qr_img = op_data.get("_qr_img")
-                
-                # Layout: QR on left, text on right
-                qr_x = 4
+                qr_x = self.SPACING_SMALL
                 qr_y = y + 2
-                text_x = qr_size + 12  # QR + gap
+                text_x = qr_size + 12
                 text_y = y + 2
-                
-                # Draw QR code if available
+
                 if qr_img:
                     img.paste(qr_img, (qr_x, qr_y))
-                
-                # Calculate text area width
-                text_width = width - text_x - 4
-                
-                # Draw source (caption style)
+
                 source = op_data.get("source", "")
                 source_font = self._get_font("caption")
                 source_height = self._get_line_height_for_style("caption")
                 if source and source_font:
-                    draw.text((text_x, text_y), source.upper()[:24], font=source_font, fill=0)
+                    draw.text(
+                        (text_x, text_y), source.upper()[:24], font=source_font, fill=0
+                    )
                 text_y += source_height
-                
-                # Draw title (bold, wrapped)
-                title = op_data.get("title", "")
+
                 title_font = self._get_font("bold")
                 title_line_height = self._get_line_height_for_style("bold")
-                title_lines = op_data.get("title_wrapped", [title])
+                title_lines = op_data.get("title_wrapped", [op_data.get("title", "")])
                 for line in title_lines:
                     if title_font:
                         draw.text((text_x, text_y), line, font=title_font, fill=0)
                     text_y += title_line_height
-                
-                # Draw summary (regular small, wrapped)
+
                 summary_lines = op_data.get("summary_wrapped", [])
                 summary_font = self._get_font("regular_sm")
                 summary_line_height = self._get_line_height_for_style("regular_sm")
@@ -788,18 +705,15 @@ class PrinterDriver:
                     if summary_font:
                         draw.text((text_x, text_y), line, font=summary_font, fill=0)
                     text_y += summary_line_height
-                
-                # Calculate block height
+
                 text_height = text_y - (y + 2)
-                block_height = max(qr_size + 4, text_height)
-                y += block_height + 8
+                block_height = max(qr_size + self.SPACING_SMALL, text_height)
+                y += block_height + self.SPACING_MEDIUM
             elif op_type == "qr":
-                # Get the pre-rendered QR image from op_data
                 qr_img = op_data.get("_qr_img")
                 if qr_img:
-                    # Left-align QR code with small margin
-                    img.paste(qr_img, (4, y + 2))
-                    y += qr_img.height + 4
+                    img.paste(qr_img, (self.SPACING_SMALL, y + 2))
+                    y += qr_img.height + self.SPACING_SMALL
 
         # Rotate 180° for upside-down printing
         img = img.rotate(180)
@@ -821,8 +735,6 @@ class PrinterDriver:
                    14 = Full Moon (fully lit)
                    21 = Last Quarter (left half lit)
         """
-        import math
-
         # Normalize phase to 0-1 (0 = new, 0.5 = full, 1 = new)
         phase_normalized = (phase % 28) / 28.0
 
@@ -1120,7 +1032,7 @@ class PrinterDriver:
         self, draw: ImageDraw.Draw, x: int, y: int, icon_type: str, size: int
     ):
         """Draw an icon bitmap, loading from PNG files in icons/regular folder only.
-        
+
         Only icons from the icons/regular folder are used. If an icon PNG file is not found,
         the function returns early without drawing anything.
 
@@ -1130,11 +1042,9 @@ class PrinterDriver:
             icon_type: Type of icon (sun, cloud, rain, snow, storm, etc.)
             size: Icon size in pixels
         """
-        import math
-        import os
-
-        # Map aliases to file names (Phosphor icon naming)
-        icon_map = {
+        # Map icon names to Phosphor icon file names
+        icon_aliases = {
+            # Common aliases
             "mail": "envelope",
             "email": "envelope",
             "time": "clock",
@@ -1175,25 +1085,25 @@ class PrinterDriver:
             # Weather icons
             "rain": "cloud-rain",
             "snow": "cloud-snow",
-            "snowflake": "snowflake",  # More specific icon for snow conditions
+            "snowflake": "snowflake",
             "storm": "cloud-lightning",
             "thunder": "cloud-lightning",
             "lightning": "cloud-lightning",
             "cloud-fog": "cloud-fog",
             "fog": "cloud-fog",
             "mist": "cloud-fog",
-            "cloud-moon": "cloud-moon",  # For night conditions
-            "sun-horizon": "sun-horizon",  # For sunrise/sunset
-            "thermometer": "thermometer",  # For temperature display
-            "thermometer-hot": "thermometer-hot",  # For hot temperatures
-            "thermometer-cold": "thermometer-cold",  # For cold temperatures
-            "wind": "wind",  # For wind information
-            "rainbow": "rainbow",  # For rainbow conditions
-            "rainbow-cloud": "rainbow-cloud",  # Alternative rainbow icon
+            "cloud-moon": "cloud-moon",
+            "sun-horizon": "sun-horizon",
+            "thermometer": "thermometer",
+            "thermometer-hot": "thermometer-hot",
+            "thermometer-cold": "thermometer-cold",
+            "wind": "wind",
+            "rainbow": "rainbow",
+            "rainbow-cloud": "rainbow-cloud",
         }
 
-        # Use mapped name or original
-        file_name = icon_map.get(icon_type.lower(), icon_type.lower())
+        # Use mapped alias or original icon name
+        file_name = icon_aliases.get(icon_type.lower(), icon_type.lower())
 
         # Try to load PNG from icons/regular directory
         # Get project root (go up from app/drivers/ to app/, then up to project root)
@@ -1227,23 +1137,10 @@ class PrinterDriver:
                             draw.point((x + px, y + py), fill=0)
 
                 return  # Successfully drew from file
-            except Exception as e:
-                # Log error but don't fall back to programmatic drawing
-                import logging
-                try:
-                    logging.warning(f"Failed to load icon {file_name}.png: {e}")
-                except:
-                    pass
-                # Return early - only use PNG icons from icons/regular folder
-                return
+            except Exception:
+                return  # Failed to load, skip icon
 
-        # If PNG file doesn't exist, return early (no programmatic fallback)
-        # Only icons from icons/regular folder are used
-        import logging
-        try:
-            logging.warning(f"Icon not found: {file_name}.png (requested as {icon_type})")
-        except:
-            pass
+        # PNG file doesn't exist - skip (no programmatic fallback)
         return
 
     def _draw_weather_forecast(
@@ -1263,35 +1160,47 @@ class PrinterDriver:
         # Map conditions to icon types based on WMO weather codes (matches weather module logic)
         def get_icon_type(condition: str) -> str:
             condition_lower = condition.lower() if condition else ""
-            
+
             # Clear sky (code 0)
             if condition_lower == "clear":
                 return "sun"  # Maps to sun.png
-            
+
             # Mainly clear (code 1) or Partly cloudy (code 2)
-            elif condition_lower == "mainly clear" or condition_lower == "partly cloudy":
+            elif (
+                condition_lower == "mainly clear" or condition_lower == "partly cloudy"
+            ):
                 return "cloud-sun"  # Maps to cloud-sun.png
-            
+
             # Overcast (code 3)
             elif condition_lower == "overcast":
                 return "cloud"  # Maps to cloud.png
-            
+
             # Fog (codes 45, 48)
             elif condition_lower == "fog" or "mist" in condition_lower:
                 return "cloud-fog"  # Maps to cloud-fog.png
-            
+
             # Thunderstorm (codes 95, 96, 99) - check FIRST to avoid false matches
-            if "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+            if (
+                "thunderstorm" in condition_lower
+                or "thunder" in condition_lower
+                or "lightning" in condition_lower
+            ):
                 return "storm"  # Maps to cloud-lightning.png
-            
+
             # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
             elif "snow" in condition_lower:
-                return "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
-            
+                return (
+                    "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
+                )
+
             # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
-            elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
+            elif (
+                "rain" in condition_lower
+                or "drizzle" in condition_lower
+                or "showers" in condition_lower
+            ):
                 return "rain"  # Maps to cloud-rain.png
-            
+
             # Default fallback
             else:
                 return "cloud"  # Maps to cloud.png
@@ -1344,7 +1253,12 @@ class PrinterDriver:
                 draw.text((text_x, low_y), low_str, font=font, fill=0)
 
     def _draw_hourly_forecast(
-        self, draw: ImageDraw.Draw, x: int, y: int, total_width: int, hourly_forecast: list
+        self,
+        draw: ImageDraw.Draw,
+        x: int,
+        y: int,
+        total_width: int,
+        hourly_forecast: list,
     ):
         """Draw a 24-hour hourly weather forecast in rows.
 
@@ -1360,35 +1274,47 @@ class PrinterDriver:
         # Map conditions to icon types based on WMO weather codes (matches weather module logic)
         def get_icon_type(condition: str) -> str:
             condition_lower = condition.lower() if condition else ""
-            
+
             # Clear sky (code 0)
             if condition_lower == "clear":
                 return "sun"  # Maps to sun.png
-            
+
             # Mainly clear (code 1) or Partly cloudy (code 2)
-            elif condition_lower == "mainly clear" or condition_lower == "partly cloudy":
+            elif (
+                condition_lower == "mainly clear" or condition_lower == "partly cloudy"
+            ):
                 return "cloud-sun"  # Maps to cloud-sun.png
-            
+
             # Overcast (code 3)
             elif condition_lower == "overcast":
                 return "cloud"  # Maps to cloud.png
-            
+
             # Fog (codes 45, 48)
             elif condition_lower == "fog" or "mist" in condition_lower:
                 return "cloud-fog"  # Maps to cloud-fog.png
-            
+
             # Thunderstorm (codes 95, 96, 99) - check FIRST to avoid false matches
-            if "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+            if (
+                "thunderstorm" in condition_lower
+                or "thunder" in condition_lower
+                or "lightning" in condition_lower
+            ):
                 return "storm"  # Maps to cloud-lightning.png
-            
+
             # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
             elif "snow" in condition_lower:
-                return "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
-            
+                return (
+                    "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
+                )
+
             # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
-            elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
+            elif (
+                "rain" in condition_lower
+                or "drizzle" in condition_lower
+                or "showers" in condition_lower
+            ):
                 return "rain"  # Maps to cloud-rain.png
-            
+
             # Default fallback
             else:
                 return "cloud"  # Maps to cloud.png
@@ -1662,8 +1588,6 @@ class PrinterDriver:
                 px += dash_length + gap
         elif style == "wave":
             # Wavy line
-            import math
-
             center_y = y + height // 2
             amplitude = 2
             frequency = 0.1
@@ -1729,7 +1653,7 @@ class PrinterDriver:
         self, data: str, size: int, error_correction: str, fixed_size: bool
     ) -> Image.Image:
         """Generate a QR code as a PIL Image.
-        
+
         Args:
             data: Data to encode
             size: Target size in pixels (used when fixed_size=True)
@@ -1738,7 +1662,7 @@ class PrinterDriver:
         """
         if not data:
             return None
-            
+
         try:
             import qrcode
 
@@ -1764,22 +1688,20 @@ class PrinterDriver:
 
             qr_img = qr.make_image(fill_color="black", back_color="white")
             qr_img = qr_img.convert("1")
-            
+
             # If fixed_size, resize all QR codes to the same dimensions
             if fixed_size:
                 # Target size: 80x80 pixels for consistent appearance
                 target_size = 80
                 qr_img = qr_img.resize((target_size, target_size), Image.NEAREST)
-            
+
             return qr_img
-        except Exception as e:
-            import logging
-            logging.warning(f"Failed to generate QR code for data: {data[:50]}... Error: {e}")
+        except Exception:
             return None
 
     def _send_bitmap(self, img: Image.Image):
         """Send a bitmap image to the printer using GS v 0 raster command.
-        
+
         Optimized for speed: builds the entire command as one buffer
         and sends it in a single write operation.
         """
@@ -1816,14 +1738,14 @@ class PrinterDriver:
             command = bytearray(8 + len(pixels))
             command[0:4] = b"\x1d\x76\x30\x00"  # GS v 0 command
             command[4:8] = bytes([xL, xH, yL, yH])
-            
+
             # PIL 1-bit mode: 0 = black, 255 = white (packed into bytes)
             # Printer expects: 1 = black dot, 0 = white
             # PIL packs 8 pixels per byte, MSB first, but inverted from what printer expects
             # So we need to invert the bytes
             for i, byte in enumerate(pixels):
                 command[8 + i] = byte ^ 0xFF  # Invert bits
-            
+
             # Send entire image in one write
             self._write(bytes(command))
 
@@ -1832,7 +1754,7 @@ class PrinterDriver:
 
     def _write(self, data: bytes):
         """Internal helper to write bytes to serial interface.
-        
+
         Sends data without waiting for transmission to complete.
         This allows the printer to buffer data while we continue processing.
         """
@@ -2432,57 +2354,47 @@ class PrinterDriver:
         All text, feeds, and QR codes are rendered into a single tall image,
         rotated 180°, and sent as one raster graphics command.
         """
-        import logging
-        logger = logging.getLogger(__name__)
-        
-        if len(self.print_buffer) == 0:
+        if not self.print_buffer:
             return
 
-        try:
-            # If max_lines is set, trim content from END of buffer
-            total_lines_in_buffer = 0
-            if self.max_lines > 0:
-                for op_type, op_data in self.print_buffer:
-                    if op_type == "text":
-                        total_lines_in_buffer += op_data.count("\n") + 1
+        # If max_lines is set, trim content from END of buffer
+        total_lines_in_buffer = 0
+        if self.max_lines > 0:
+            for op_type, op_data in self.print_buffer:
+                if op_type == "text":
+                    total_lines_in_buffer += op_data.count("\n") + 1
 
-                lines_counted = 0
-                trim_index = len(self.print_buffer)
+            lines_counted = 0
+            trim_index = len(self.print_buffer)
 
-                for i, (op_type, op_data) in enumerate(self.print_buffer):
-                    if op_type == "text":
-                        lines_in_item = op_data.count("\n") + 1
-                        if lines_counted + lines_in_item > self.max_lines:
-                            trim_index = i
-                            self._max_lines_hit = True
-                            break
-                        lines_counted += lines_in_item
+            for i, (op_type, op_data) in enumerate(self.print_buffer):
+                if op_type == "text":
+                    lines_in_item = op_data.count("\n") + 1
+                    if lines_counted + lines_in_item > self.max_lines:
+                        trim_index = i
+                        self._max_lines_hit = True
+                        break
+                    lines_counted += lines_in_item
 
-                if self._max_lines_hit:
-                    self.print_buffer = self.print_buffer[:trim_index]
-
-            # Add truncation message if needed
             if self._max_lines_hit:
-                self.print_buffer.append(
-                    ("text", f"-- TRUNCATED ({self.max_lines}/{total_lines_in_buffer}) --")
-                )
+                self.print_buffer = self.print_buffer[:trim_index]
 
-            # Render everything as one unified bitmap
-            ops = list(self.print_buffer)
-            self.print_buffer.clear()
+        # Add truncation message if needed
+        if self._max_lines_hit:
+            self.print_buffer.append(
+                ("text", f"-- TRUNCATED ({self.max_lines}/{total_lines_in_buffer}) --")
+            )
 
-            img = self._render_unified_bitmap(ops)
-            if img:
-                self._send_bitmap(img)
-                # Ensure all data is transmitted before returning
-                if self.ser and self.ser.is_open:
-                    self.ser.flush()
-            else:
-                logger.error("flush_buffer: _render_unified_bitmap returned None")
-        except Exception as e:
-            logger.error(f"flush_buffer error: {e}", exc_info=True)
-            # Re-raise so the caller knows something went wrong
-            raise
+        # Render everything as one unified bitmap
+        ops = list(self.print_buffer)
+        self.print_buffer.clear()
+
+        img = self._render_unified_bitmap(ops)
+        if img:
+            self._send_bitmap(img)
+            # Ensure all data is transmitted before returning
+            if self.ser and self.ser.is_open:
+                self.ser.flush()
 
     def reset_buffer(self, max_lines: int = 0):
         """Reset/clear the print buffer (call at start of new print job).

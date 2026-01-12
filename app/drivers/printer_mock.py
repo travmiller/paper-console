@@ -1,18 +1,23 @@
 class PrinterDriver:
+    # Fixed spacing constants (match serial driver)
+    FONT_SIZE = 14
+    LINE_HEIGHT = 18
+    SPACING_SMALL = 4
+    SPACING_MEDIUM = 8
+    SPACING_LARGE = 16
+
     def __init__(
         self,
         width: int = 42,  # Characters per line
         port: str = None,
         baudrate: int = 9600,
-        font_size: int = 12,  # Font size in pixels (8-24)
-        line_spacing: int = 2,  # Extra pixels between lines
     ):
         self.width = width
         self.lines_printed = 0
         self.max_lines = 0
-        self.font_size = font_size
-        self.line_spacing = line_spacing
-        self.line_height = font_size + line_spacing
+        self.font_size = self.FONT_SIZE
+        self.line_spacing = self.LINE_HEIGHT - self.FONT_SIZE
+        self.line_height = self.LINE_HEIGHT
     
     def _load_font(self):
         """Mock font loading - returns None."""
