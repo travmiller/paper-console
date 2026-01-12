@@ -271,6 +271,14 @@ class PrinterDriver:
                 clean_text = self._sanitize_text(op_data)
                 line_count = len(clean_text.split("\n"))
                 total_height += line_count * self.line_height
+            elif op_type == "box":
+                # Box with text inside: border + padding + text + padding + border
+                style = op_data.get("style", "bold_lg")
+                padding = op_data.get("padding", 8)
+                border = op_data.get("border", 2)
+                text_height = self._get_line_height_for_style(style)
+                box_height = border + padding + text_height + padding + border
+                total_height += box_height + 4  # +4 for spacing around box
             elif op_type == "feed":
                 total_height += op_data * self.line_height
             elif op_type == "qr":
@@ -318,6 +326,52 @@ class PrinterDriver:
                         draw.text((2, y), line, fill=0)
                     y += self.line_height
                     self.lines_printed += 1
+            elif op_type == "box":
+                # Draw a box with text centered inside
+                text = self._sanitize_text(op_data.get("text", ""))
+                style = op_data.get("style", "bold_lg")
+                padding = op_data.get("padding", 8)
+                border = op_data.get("border", 2)
+                font = self._get_font(style)
+                text_height = self._get_line_height_for_style(style)
+                
+                # Calculate text width to size the box
+                if font:
+                    bbox = font.getbbox(text)
+                    text_width = bbox[2] - bbox[0] if bbox else len(text) * 10
+                else:
+                    text_width = len(text) * 10
+                
+                # Box dimensions
+                box_width = text_width + (padding * 2) + (border * 2)
+                box_height = text_height + (padding * 2) + (border * 2)
+                
+                # Center the box horizontally
+                box_x = (width - box_width) // 2
+                box_y = y + 2  # Small top margin
+                
+                # Draw the rectangle (filled black border, white interior)
+                # Outer rectangle (black)
+                draw.rectangle(
+                    [box_x, box_y, box_x + box_width, box_y + box_height],
+                    fill=0  # Black
+                )
+                # Inner rectangle (white) - creates the border effect
+                draw.rectangle(
+                    [box_x + border, box_y + border, 
+                     box_x + box_width - border, box_y + box_height - border],
+                    fill=1  # White
+                )
+                
+                # Draw the text centered in the box
+                text_x = box_x + border + padding
+                text_y = box_y + border + padding
+                if font:
+                    draw.text((text_x, text_y), text, font=font, fill=0)
+                else:
+                    draw.text((text_x, text_y), text, fill=0)
+                
+                y += box_height + 4  # Move past box + spacing
             elif op_type == "feed":
                 y += op_data * self.line_height
             elif op_type == "qr":
@@ -642,23 +696,16 @@ class PrinterDriver:
         self.print_buffer.append(("styled", {"text": text, "style": style}))
 
     def print_header(self, text: str):
-        """Print large bold header text in a box."""
-        text = text.upper()
-        # Calculate box width (text + padding)
-        inner_width = len(text) + 4  # 2 spaces padding on each side
-        box_width = min(inner_width, self.width)
-        
-        # Box drawing characters
-        top_border = "╔" + "═" * (box_width - 2) + "╗"
-        bottom_border = "╚" + "═" * (box_width - 2) + "╝"
-        
-        # Center text within box
-        text_padded = text.center(box_width - 2)
-        middle = "║" + text_padded + "║"
-        
-        self.print_text(top_border, "bold")
-        self.print_text(middle, "bold_lg")
-        self.print_text(bottom_border, "bold")
+        """Print large bold header text in a drawn box."""
+        # Add a box operation to the buffer
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("box", {
+            "text": text.upper(),
+            "style": "bold_lg",
+            "padding": 8,  # pixels of padding inside box
+            "border": 2,   # border thickness in pixels
+        }))
     
     def print_subheader(self, text: str):
         """Print medium-weight subheader."""
@@ -930,19 +977,15 @@ class PrinterDriver:
             self._write_qr_native(data, pixel_size, error_correction)
 
     def print_header(self, text: str):
-        """Print large bold header text in a box."""
-        text = text.upper()
-        inner_width = len(text) + 4
-        box_width = min(inner_width, self.width)
-        
-        top_border = "╔" + "═" * (box_width - 2) + "╗"
-        bottom_border = "╚" + "═" * (box_width - 2) + "╝"
-        text_padded = text.center(box_width - 2)
-        middle = "║" + text_padded + "║"
-        
-        self.print_text(top_border, "bold")
-        self.print_text(middle, "bold_lg")
-        self.print_text(bottom_border, "bold")
+        """Print large bold header text in a drawn box."""
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("box", {
+            "text": text.upper(),
+            "style": "bold_lg",
+            "padding": 8,
+            "border": 2,
+        }))
         self.print_line()
 
     def close(self):
