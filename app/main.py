@@ -130,14 +130,9 @@ async def email_polling_loop():
                             module_name=module.name,
                         )
 
-                        # Flush to hardware
+                        # Flush to hardware (spacing is built into bitmap)
                         if hasattr(printer, "flush_buffer"):
                             printer.flush_buffer()
-
-                        # Feed paper
-                        feed_lines = getattr(settings, "cutter_feed_lines", 7)
-                        if feed_lines > 0 and hasattr(printer, "feed_direct"):
-                            printer.feed_direct(feed_lines)
 
                 except Exception:
                     pass  # Silently skip failed email checks
@@ -291,17 +286,12 @@ async def check_first_boot():
         
         printer.print_line()
         
-        # Flush buffer
+        # Flush buffer (spacing is built into bitmap)
         if hasattr(printer, "flush_buffer"):
             try:
                 printer.flush_buffer()
             except Exception as e:
                 logger.error(f"System Ready flush_buffer error: {e}", exc_info=True)
-        
-        # Feed for cutter using setting
-        feed_lines = getattr(settings, "cutter_feed_lines", 7)
-        if feed_lines > 0 and hasattr(printer, "feed_direct"):
-            printer.feed_direct(feed_lines)
         return
     except Exception as e:
         logger.error(f"System Ready print error: {e}", exc_info=True)
@@ -389,12 +379,9 @@ async def check_first_boot():
     printer.print_line()
     printer.feed(1)
 
-    # Flush buffer to print (prints are reversed for tear-off orientation)
+    # Flush buffer to print (spacing is built into bitmap)
     if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
-    feed_lines = getattr(settings, "cutter_feed_lines", 7)
-    if feed_lines > 0 and hasattr(printer, "feed_direct"):
-        printer.feed_direct(feed_lines)
 
     # Create marker file so we don't print again
     try:
@@ -484,12 +471,9 @@ async def factory_reset_trigger():
     printer.print_text("=" * 32)
     printer.feed(2)
 
-    # Flush buffer to print
+    # Flush buffer to print (spacing is built into bitmap)
     if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
-    feed_lines = getattr(settings, "cutter_feed_lines", 7)
-    if feed_lines > 0 and hasattr(printer, "feed_direct"):
-        printer.feed_direct(feed_lines)
 
     # Wait for print to complete
     await asyncio.sleep(3)
@@ -2180,10 +2164,6 @@ async def trigger_channel(position: int):
             # Flush buffer to print
             if hasattr(printer, "flush_buffer"):
                 printer.flush_buffer()
-
-            feed_lines = getattr(settings, "cutter_feed_lines", 7)
-            if feed_lines > 0:
-                printer.feed_direct(feed_lines)
             return
 
         # Sort modules by order and execute each
@@ -2208,12 +2188,9 @@ async def trigger_channel(position: int):
                     printer.print_text("--- MAX LENGTH REACHED ---")
                     printer.feed(1)
 
-                    # Flush again for the message, then feed for cutter
+                    # Flush again for the message (spacing is built into bitmap)
                     if hasattr(printer, "flush_buffer"):
                         printer.flush_buffer()
-                    feed_lines = getattr(settings, "cutter_feed_lines", 7)
-                    if feed_lines > 0:
-                        printer.feed_direct(feed_lines)
                     return
 
                 # Add a separator between modules
@@ -2221,13 +2198,9 @@ async def trigger_channel(position: int):
                     printer.feed(1)
 
         # Flush buffer to actually print (in reverse order for tear-off orientation)
+        # Spacing is built into the bitmap (5 lines at end of each print job)
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
-
-        # Add cutter feed lines at the end of the print job
-        feed_lines = getattr(settings, "cutter_feed_lines", 7)
-        if feed_lines > 0:
-            printer.feed_direct(feed_lines)
 
     finally:
         # Always mark print as complete (thread-safe)

@@ -58,8 +58,6 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
 
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
-        if feed_lines > 0 and hasattr(printer, "feed_direct"):
-            printer.feed_direct(feed_lines)
 
     else:
         # If connection failed, restart AP mode so user can try again
@@ -76,8 +74,6 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
 
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
-        if feed_lines > 0 and hasattr(printer, "feed_direct"):
-            printer.feed_direct(feed_lines)
 
         time.sleep(2)
         wifi_manager.start_ap_mode()

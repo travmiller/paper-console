@@ -339,10 +339,11 @@ class PrinterDriver:
         # Note: bitmap is rotated 180° before printing, so:
         #   - Top of bitmap (y=0) = printed LAST (end of print)
         #   - Bottom of bitmap = printed FIRST (start of print)
-        # We want: no padding at START (bottom), no padding at END (top - feed_direct handles this)
-        # Start with cutter feed space at TOP of bitmap
-        # After 180° rotation, this becomes space at the END of print (for cutter clearance)
-        total_height = self.cutter_feed_dots
+        # We add 5 lines of space at the top (end) for consistent spacing
+        # Add 5 lines of space at TOP of bitmap (becomes END after 180° rotation)
+        # This provides consistent spacing at the end of every print job
+        # 5 lines * 24 dots/line = 120 dots
+        total_height = 5 * 24  # 120 dots
         last_spacing = 0  # Track spacing added by last operation to remove it (start padding)
 
         for op_type, op_data in ops:
@@ -481,9 +482,9 @@ class PrinterDriver:
         draw = ImageDraw.Draw(img)
 
         # Second pass: draw everything
-        # Start at y=cutter_feed_dots to leave white space at TOP of bitmap
-        # After 180° rotation, this space becomes the END of the print (for cutter clearance)
-        y = self.cutter_feed_dots
+        # Start at y=120 (5 lines) to leave white space at TOP of bitmap
+        # After 180° rotation, this space becomes the END of the print (consistent spacing)
+        y = 5 * 24  # 120 dots
 
         for op_type, op_data in ops:
             if op_type == "styled":
@@ -2457,36 +2458,34 @@ class PrinterDriver:
     def feed_direct(self, lines: int = 3):
         """Feed paper directly, bypassing the buffer (for use after flushing in invert mode).
         
-        Uses multiple methods to ensure paper feeds after bitmap printing.
+        After bitmap printing (GS v 0), we need to ensure paper feeds.
+        Uses ESC d (Print and feed n lines) which should work after any print command.
         """
         if lines <= 0:
             return
         
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.info(f"feed_direct called with lines={lines}")
-        
         try:
-            # Wait for bitmap to finish
-            time.sleep(0.1)
+            # Small delay to let bitmap finish processing
+            time.sleep(0.05)
             
-            # ESC J - Feed paper by dots (should work after bitmap)
+            # ESC d n - Print and feed n lines (0x1B 0x64 n)
+            # This command works after bitmap printing because it's a "print and feed" command
+            # Even with no data to print, it should still feed the paper
+            feed_amount = min(lines, 255)
+            self._write(b"\x1b\x64" + bytes([feed_amount]))
+            
+            # Backup: Also send ESC J (feed by dots) in case ESC d doesn't work
             dots = lines * 24
             while dots > 0:
                 chunk = min(dots, 255)
                 self._write(b"\x1b\x4a" + bytes([chunk]))
                 dots -= chunk
             
-            # Also try newlines
-            self._write(b"\n" * lines)
-            
-            # Flush
+            # Flush to ensure all data is sent
             if self.ser and self.ser.is_open:
                 self.ser.flush()
-                
-            logger.info(f"feed_direct completed")
-        except Exception as e:
-            logger.error(f"feed_direct error: {e}")
+        except Exception:
+            pass
 
     def blip(self):
         """Short paper feed for tactile feedback."""
