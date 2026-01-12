@@ -474,10 +474,11 @@ class PrinterDriver:
         # Remove last operation's trailing spacing (it becomes START padding after 180° rotation)
         total_height -= last_spacing
         
-        # Add 5 lines (120 dots) of padding at the BOTTOM of bitmap
-        # After 180° rotation, bottom becomes top (printed LAST - end of print)
+        # Add 5 lines (120 dots) of padding at the TOP of original bitmap (y=0)
+        # After 180° rotation: top of original → bottom of rotated → printed LAST (end spacing)
         # This provides consistent spacing at the end of every print job
-        total_height += 5 * 24  # 120 dots
+        padding_dots = 5 * 24  # 120 dots
+        total_height += padding_dots
 
         # Create the unified image
         width = self.PRINTER_WIDTH_DOTS
@@ -485,10 +486,11 @@ class PrinterDriver:
         draw = ImageDraw.Draw(img)
 
         # Second pass: draw everything
-        # Start at y=0 (top of bitmap) - content will be at top
-        # After 180° rotation, top (content) becomes bottom (printed FIRST)
-        # Bottom (empty padding) becomes top (printed LAST - end spacing)
-        y = 0
+        # Start drawing content BELOW the padding (at top of original bitmap)
+        # After 180° rotation:
+        #   - Padding (y=0 to y=120) → bottom of rotated → printed LAST ✓
+        #   - Content (y=120+) → top of rotated → printed FIRST ✓
+        y = padding_dots  # Start content below padding
 
         for op_type, op_data in ops:
             if op_type == "styled":
