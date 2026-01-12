@@ -268,7 +268,6 @@ class PrinterDriver:
 
         # First pass: calculate total height needed
         total_height = 4  # Padding
-        qr_images = []  # Store pre-rendered QR codes with their positions
 
         for op_type, op_data in ops:
             if op_type == "styled":
@@ -366,15 +365,16 @@ class PrinterDriver:
             elif op_type == "feed":
                 total_height += op_data * self.line_height
             elif op_type == "qr":
-                # Pre-render QR code to get its height
+                # Pre-render QR code to get its height and store in op_data
                 qr_img = self._generate_qr_image(
                     op_data["data"],
                     op_data["size"],
                     op_data["ec"],
                     op_data.get("fixed", False),
                 )
+                # Store QR image directly in op_data for later use
+                op_data["_qr_img"] = qr_img
                 if qr_img:
-                    qr_images.append((len(qr_images), qr_img))
                     total_height += qr_img.height + 4  # +4 for spacing
 
         # Create the unified image
@@ -384,7 +384,6 @@ class PrinterDriver:
 
         # Second pass: draw everything
         y = 2
-        qr_idx = 0
 
         for op_type, op_data in ops:
             if op_type == "styled":
@@ -657,13 +656,13 @@ class PrinterDriver:
             elif op_type == "feed":
                 y += op_data * self.line_height
             elif op_type == "qr":
-                if qr_idx < len(qr_images):
-                    _, qr_img = qr_images[qr_idx]
+                # Get the pre-rendered QR image from op_data
+                qr_img = op_data.get("_qr_img")
+                if qr_img:
                     # Center QR code horizontally
                     x_offset = (width - qr_img.width) // 2
                     img.paste(qr_img, (x_offset, y + 2))
                     y += qr_img.height + 4
-                    qr_idx += 1
 
         # Rotate 180° for upside-down printing
         img = img.rotate(180)
@@ -1593,6 +1592,9 @@ class PrinterDriver:
         self, data: str, size: int, error_correction: str, fixed_size: bool
     ) -> Image.Image:
         """Generate a QR code as a PIL Image."""
+        if not data:
+            return None
+            
         try:
             import qrcode
 
@@ -1617,7 +1619,9 @@ class PrinterDriver:
 
             qr_img = qr.make_image(fill_color="black", back_color="white")
             return qr_img.convert("1")
-        except Exception:
+        except Exception as e:
+            import logging
+            logging.warning(f"Failed to generate QR code for data: {data[:50]}... Error: {e}")
             return None
 
     def _send_bitmap(self, img: Image.Image):
