@@ -244,20 +244,22 @@ def _get_welcome_marker_path() -> str:
 
 async def check_first_boot():
     """Check if this is first boot and print welcome message."""
+    logger = logging.getLogger(__name__)
     marker_path = _get_welcome_marker_path()
 
     # Wait for printer to be ready (applies to all boots)
     await asyncio.sleep(2)
 
-    if hasattr(printer, "reset_buffer"):
-        printer.reset_buffer()
+    try:
+        if hasattr(printer, "reset_buffer"):
+            printer.reset_buffer()
 
-    # If marker exists, just print ready message
-    if os.path.exists(marker_path):
-        printer.feed(1)
-        
-        # Visual header with inline icon
-        printer.print_header("SYSTEM READY", icon="check", icon_size=28)
+        # If marker exists, just print ready message
+        if os.path.exists(marker_path):
+            printer.feed(1)
+            
+            # Visual header with inline icon
+            printer.print_header("SYSTEM READY", icon="check", icon_size=28)
         
         from datetime import datetime
         printer.print_bold(datetime.now().strftime("%A, %B %d, %Y"))
@@ -293,9 +295,15 @@ async def check_first_boot():
         
         # Flush buffer
         if hasattr(printer, "flush_buffer"):
-            printer.flush_buffer()
+            try:
+                printer.flush_buffer()
+            except Exception as e:
+                logger.error(f"System Ready flush_buffer error: {e}", exc_info=True)
         if hasattr(printer, "feed_direct"):
             printer.feed_direct(3)
+        return
+    except Exception as e:
+        logger.error(f"System Ready print error: {e}", exc_info=True)
         return
 
     # First boot! Print welcome message (if marker doesn't exist)
@@ -2260,6 +2268,7 @@ async def set_dial(position: int):
 async def print_channel(position: int):
     """Set dial position and trigger print atomically."""
     global print_in_progress
+    logger = logging.getLogger(__name__)
 
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
@@ -2271,10 +2280,13 @@ async def print_channel(position: int):
 
     try:
         await trigger_channel(position)
+        return {"message": f"Printing channel {position}"}
+    except Exception as e:
+        logger.error(f"Error printing channel {position}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Print failed: {str(e)}")
     finally:
         with print_lock:
             print_in_progress = False
-    return {"message": f"Printing channel {position}"}
 
 
 # --- DEBUG / VIRTUAL HARDWARE CONTROLS ---

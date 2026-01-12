@@ -3486,44 +3486,54 @@ class PrinterDriver:
         All text, feeds, and QR codes are rendered into a single tall image,
         rotated 180°, and sent as one raster graphics command.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+        
         if len(self.print_buffer) == 0:
             return
 
-        # If max_lines is set, trim content from END of buffer
-        total_lines_in_buffer = 0
-        if self.max_lines > 0:
-            for op_type, op_data in self.print_buffer:
-                if op_type == "text":
-                    total_lines_in_buffer += op_data.count("\n") + 1
+        try:
+            # If max_lines is set, trim content from END of buffer
+            total_lines_in_buffer = 0
+            if self.max_lines > 0:
+                for op_type, op_data in self.print_buffer:
+                    if op_type == "text":
+                        total_lines_in_buffer += op_data.count("\n") + 1
 
-            lines_counted = 0
-            trim_index = len(self.print_buffer)
+                lines_counted = 0
+                trim_index = len(self.print_buffer)
 
-            for i, (op_type, op_data) in enumerate(self.print_buffer):
-                if op_type == "text":
-                    lines_in_item = op_data.count("\n") + 1
-                    if lines_counted + lines_in_item > self.max_lines:
-                        trim_index = i
-                        self._max_lines_hit = True
-                        break
-                    lines_counted += lines_in_item
+                for i, (op_type, op_data) in enumerate(self.print_buffer):
+                    if op_type == "text":
+                        lines_in_item = op_data.count("\n") + 1
+                        if lines_counted + lines_in_item > self.max_lines:
+                            trim_index = i
+                            self._max_lines_hit = True
+                            break
+                        lines_counted += lines_in_item
 
+                if self._max_lines_hit:
+                    self.print_buffer = self.print_buffer[:trim_index]
+
+            # Add truncation message if needed
             if self._max_lines_hit:
-                self.print_buffer = self.print_buffer[:trim_index]
+                self.print_buffer.append(
+                    ("text", f"-- TRUNCATED ({self.max_lines}/{total_lines_in_buffer}) --")
+                )
 
-        # Add truncation message if needed
-        if self._max_lines_hit:
-            self.print_buffer.append(
-                ("text", f"-- TRUNCATED ({self.max_lines}/{total_lines_in_buffer}) --")
-            )
+            # Render everything as one unified bitmap
+            ops = list(self.print_buffer)
+            self.print_buffer.clear()
 
-        # Render everything as one unified bitmap
-        ops = list(self.print_buffer)
-        self.print_buffer.clear()
-
-        img = self._render_unified_bitmap(ops)
-        if img:
-            self._send_bitmap(img)
+            img = self._render_unified_bitmap(ops)
+            if img:
+                self._send_bitmap(img)
+            else:
+                logger.error("flush_buffer: _render_unified_bitmap returned None")
+        except Exception as e:
+            logger.error(f"flush_buffer error: {e}", exc_info=True)
+            # Re-raise so the caller knows something went wrong
+            raise
 
     def reset_buffer(self, max_lines: int = 0):
         """Reset/clear the print buffer (call at start of new print job).
