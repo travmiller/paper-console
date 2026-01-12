@@ -136,10 +136,15 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                     
                     if forecast_resp.status_code == 200:
                         # Group by day and get daily highs/lows
+                        # Skip today - get forecast starting from tomorrow
+                        today_key = datetime.now().strftime("%Y-%m-%d")
                         days_seen = {}
                         for item in forecast_data.get("list", []):
                             dt = datetime.fromtimestamp(item["dt"])
                             day_key = dt.strftime("%Y-%m-%d")
+                            # Skip today - we show it separately in current conditions
+                            if day_key == today_key:
+                                continue
                             if day_key not in days_seen:
                                 days_seen[day_key] = {
                                     "day": dt.strftime("%a"),
@@ -151,6 +156,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                                 days_seen[day_key]["high"] = max(days_seen[day_key]["high"], int(item["main"]["temp_max"]))
                                 days_seen[day_key]["low"] = min(days_seen[day_key]["low"], int(item["main"]["temp_min"]))
                         
+                        # Get next 7 days (skip today)
                         forecast = list(days_seen.values())[:7]
                 except Exception:
                     pass
@@ -177,7 +183,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             "daily": "weathercode,temperature_2m_max,temperature_2m_min",
             "timezone": timezone,
             "temperature_unit": "fahrenheit",
-            "forecast_days": 7,
+            "forecast_days": 8,  # Request 8 days so we get 7 after skipping today
         }
 
         resp = requests.get(url, params=params, timeout=10)
@@ -186,9 +192,10 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         current = data["current_weather"]
         daily = data["daily"]
 
-        # Build 7-day forecast
+        # Build 7-day forecast (skip today, start from tomorrow)
         forecast = []
-        for i in range(len(daily.get("time", []))):
+        # Start from index 1 to skip today (index 0 is today, which we show separately)
+        for i in range(1, min(len(daily.get("time", [])), 8)):  # Get next 7 days (indices 1-7)
             date_str = daily["time"][i]
             dt = datetime.strptime(date_str, "%Y-%m-%d")
             weather_code = daily["weathercode"][i] if "weathercode" in daily else 0
