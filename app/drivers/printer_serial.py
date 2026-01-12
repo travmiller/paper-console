@@ -138,8 +138,8 @@ class PrinterDriver:
 
         Share Tech Mono is a monospace font designed for technical and display purposes.
         Place font files in: web/public/fonts/Share_Tech_Mono/
-        Required files: ShareTechMono-Regular.ttf (used as base), ShareTechMono-Bold.ttf
-        Uses Regular as base weight, Bold for headings.
+        Required files: ShareTechMono-Regular.ttf (used as base), ShareTechMono-Bold.ttf (optional)
+        Uses Regular as base weight, Bold for headings (falls back to Regular if Bold not available).
         """
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -190,9 +190,17 @@ class PrinterDriver:
                     except Exception:
                         continue
 
+            # Fallback for bold if Bold not found (Share Tech Mono may only have Regular)
+            if variant_name == "bold" and not font_loaded:
+                # Use Regular as fallback
+                if "regular" in fonts:
+                    fonts["bold"] = fonts["regular"]
+                    fonts["bold_lg"] = fonts.get("regular_lg", fonts["regular"])
+                    fonts["bold_sm"] = fonts.get("regular_sm", fonts["regular"])
+            
             # Fallback for semibold if SemiBold not found (Share Tech Mono doesn't have SemiBold)
             if variant_name == "semibold" and not font_loaded:
-                # Use Bold as fallback (Share Tech Mono only has Regular and Bold)
+                # Use Bold as fallback, or Regular if Bold not available
                 if "bold" in fonts:
                     fonts["semibold"] = fonts["bold"]
                     fonts["semibold_lg"] = fonts.get("bold_lg", fonts["bold"])
