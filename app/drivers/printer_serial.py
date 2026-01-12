@@ -13,6 +13,10 @@ class PrinterDriver:
     """
     Real hardware driver for thermal receipt printer (QR204/CSN-A2).
     Uses serial communication via GPIO pins or USB-to-serial adapters.
+    
+    All rendering is done in binary 1-bit mode (black/white only) to match
+    thermal printer capabilities. Text is rendered via grayscale intermediate
+    then thresholded to ensure crisp binary output without anti-aliasing artifacts.
     """
 
     # Maximum buffer size to prevent memory issues (roughly 1000 lines)
@@ -274,6 +278,60 @@ class PrinterDriver:
         """Get a font by style name."""
         return self._fonts.get(style, self._fonts.get("regular"))
 
+    def _draw_text_binary(self, draw: ImageDraw.Draw, xy: tuple, text: str, font: Optional[ImageFont.FreeTypeFont] = None):
+        """Draw text in binary black/white mode, ensuring crisp rendering without anti-aliasing artifacts.
+        
+        Renders text to a temporary grayscale image first, then converts to 1-bit with threshold
+        to ensure pure black/white output matching thermal printer capabilities.
+        """
+        if not text:
+            return
+        
+        # Get text bounding box to determine size needed
+        if font:
+            try:
+                bbox = font.getbbox(text)
+                if bbox and len(bbox) >= 4:
+                    text_width = bbox[2] - bbox[0]
+                    text_height = bbox[3] - bbox[1]
+                else:
+                    # Fallback if bbox is invalid
+                    text_width = len(text) * (font.size // 2)
+                    text_height = font.size
+            except Exception:
+                # Fallback on any error
+                text_width = len(text) * (font.size // 2) if hasattr(font, 'size') else len(text) * 10
+                text_height = font.size if hasattr(font, 'size') else 14
+        else:
+            text_width = len(text) * 10
+            text_height = 14  # Default font size
+        
+        # Add padding to avoid edge clipping
+        padding = 4
+        temp_width = text_width + (padding * 2)
+        temp_height = text_height + (padding * 2)
+        
+        # Render to temporary grayscale image (allows proper anti-aliasing)
+        temp_img = Image.new("L", (temp_width, temp_height), 255)  # White background
+        temp_draw = ImageDraw.Draw(temp_img)
+        
+        # Draw text in black (0 = black in L mode)
+        if font:
+            temp_draw.text((padding, padding), text, font=font, fill=0)
+        else:
+            temp_draw.text((padding, padding), text, fill=0)
+        
+        # Convert to 1-bit with threshold (no dithering) for crisp binary output
+        # convert("1") uses threshold at 128: pixels < 128 become black (0), >= 128 become white (1)
+        # Default behavior is no dithering, which gives us crisp binary output
+        temp_img = temp_img.convert("1")
+        
+        # Paste the binary text onto the main image at the specified position
+        x, y = xy
+        # Access the underlying image from ImageDraw (im is the standard attribute)
+        main_img = draw.im
+        main_img.paste(temp_img, (x - padding, y - padding))
+
     def _render_text_bitmap(self, lines: list) -> Image.Image:
         """Render text lines to a bitmap image, rotated 180° for upside-down printing."""
         if not lines:
@@ -290,12 +348,10 @@ class PrinterDriver:
         # Draw lines in order - after 180° rotation, first line will be at bottom
         # (Content appears at tear-off edge, headers appear after when viewing upside-down)
         y = 2  # Start with small padding
-        for line in lines:
-            if self._font:
-                draw.text((2, y), line, font=self._font, fill=0)  # Black text
-            else:
-                draw.text((2, y), line, fill=0)
-            y += self.line_height
+            for line in lines:
+                if line:  # Only draw non-empty lines
+                    self._draw_text_binary(draw, (2, y), line, self._font)
+                y += self.line_height
 
         # Rotate 180° for upside-down printing
         img = img.rotate(180)
@@ -497,20 +553,16 @@ class PrinterDriver:
                 line_height = self._get_line_height_for_style(style)
 
                 for line in clean_text.split("\n"):
-                    if font:
-                        draw.text((2, y), line, font=font, fill=0)
-                    else:
-                        draw.text((2, y), line, fill=0)
+                    if line:  # Only draw non-empty lines
+                        self._draw_text_binary(draw, (2, y), line, font)
                     y += line_height
             elif op_type == "text":
                 # Legacy support
                 clean_text = self._sanitize_text(op_data)
                 font = self._get_font("regular")
                 for line in clean_text.split("\n"):
-                    if font:
-                        draw.text((2, y), line, font=font, fill=0)
-                    else:
-                        draw.text((2, y), line, fill=0)
+                    if line:  # Only draw non-empty lines
+                        self._draw_text_binary(draw, (2, y), line, font)
                     y += self.line_height
                     self.lines_printed += 1
             elif op_type == "box":
@@ -570,10 +622,8 @@ class PrinterDriver:
                     else content_start_x
                 )
                 text_y = content_y
-                if font:
-                    draw.text((text_x, text_y), text, font=font, fill=0)
-                else:
-                    draw.text((text_x, text_y), text, fill=0)
+                if text:  # Only draw non-empty text
+                    self._draw_text_binary(draw, (text_x, text_y), text, font)
 
                 # +2 matches the box_y = y + 2 offset
                 y += 2 + box_height + self.SPACING_MEDIUM
