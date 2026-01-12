@@ -1082,7 +1082,7 @@ class PrinterDriver:
         elif icon_type.lower() == "rain":
             # Draw cloud with rain drops
             # Cloud (smaller)
-            cloud_radius = radius * 0.7
+            cloud_radius = int(radius * 0.7)
             draw.ellipse(
                 [
                     center_x - cloud_radius,
@@ -1105,7 +1105,7 @@ class PrinterDriver:
         elif icon_type.lower() == "snow":
             # Draw cloud with snowflakes
             # Cloud
-            cloud_radius = radius * 0.7
+            cloud_radius = int(radius * 0.7)
             draw.ellipse(
                 [
                     center_x - cloud_radius,
@@ -1152,7 +1152,7 @@ class PrinterDriver:
         elif icon_type.lower() == "storm":
             # Draw cloud with lightning
             # Cloud
-            cloud_radius = radius * 0.7
+            cloud_radius = int(radius * 0.7)
             draw.ellipse(
                 [
                     center_x - cloud_radius,
@@ -1600,8 +1600,8 @@ class PrinterDriver:
 
         elif icon_type.lower() == "calendar":
             # Calendar icon: rectangle with lines
-            cal_w = radius * 1.4
-            cal_h = radius * 1.2
+            cal_w = int(radius * 1.4)
+            cal_h = int(radius * 1.2)
             # Calendar body
             draw.rectangle(
                 [
@@ -2277,8 +2277,8 @@ class PrinterDriver:
 
         elif icon_type.lower() == "hourglass":
             # Hourglass icon
-            glass_w = radius * 0.8
-            glass_h = radius * 1.2
+            glass_w = int(radius * 0.8)
+            glass_h = int(radius * 1.2)
             # Top half (trapezoid)
             top_points = [
                 (center_x - glass_w // 2, center_y - glass_h // 2),
