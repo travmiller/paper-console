@@ -111,6 +111,11 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     # Location
     printer.print_subheader(app.config.settings.city_name.upper())
     
+    # Current time
+    printer.print_bold("CURRENT TIME")
+    printer.print_caption(format_time(data['current_time']))
+    printer.print_line()
+    
     # Sun path visualization
     printer.print_sun_path(
         sun_path=data['sun_path'],

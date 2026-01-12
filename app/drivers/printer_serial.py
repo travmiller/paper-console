@@ -1,6 +1,7 @@
 import math
 import os
 import platform
+import random
 import time
 import unicodedata
 from datetime import datetime, date
@@ -979,7 +980,7 @@ class PrinterDriver:
     def _draw_moon_phase(
         self, draw: ImageDraw.Draw, x: int, y: int, size: int, phase: float
     ):
-        """Draw a moon phase graphic.
+        """Draw an improved moon phase graphic with smooth terminator and surface detail.
 
         Args:
             draw: ImageDraw object
@@ -1001,76 +1002,104 @@ class PrinterDriver:
         center_x = x + size // 2
         center_y = y + size // 2
         radius = size // 2
+        inner_radius = radius - 2  # Account for outline
 
         # Draw the moon outline (black circle)
         draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
 
+        # Handle new moon (completely dark)
+        if illumination < 0.01:
+            # Just draw the outline, leave interior dark
+            return
+
+        # Fill the whole moon white first (lit portion)
+        draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
+
+        # Calculate terminator position using proper geometry
+        # The terminator is a vertical line that moves across the moon
+        # At new moon: terminator at right edge (illumination = 0)
+        # At full moon: terminator at left edge (illumination = 1)
+        
+        # Terminator X position: moves from right edge to left edge as illumination increases
+        # At illumination=0 (new): terminator_x = right edge
+        # At illumination=1 (full): terminator_x = left edge
+        terminator_x = center_x - (illumination * 2 - 1) * inner_radius
+        
+        # Draw shadow efficiently using pixel-by-pixel for smooth terminator
         if phase_normalized < 0.5:
             # Waxing: right side illuminated, left side dark
-            # Draw white (lit) right half
-            # Then overlay dark portion from left
-
-            # Fill the whole moon white first
-            draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
-
-            # Calculate the terminator (shadow edge) position
-            # At new moon (phase=0), shadow covers everything
-            # At first quarter (phase=0.25), shadow covers left half
-            # At full moon (phase=0.5), no shadow
-            shadow_width = (
-                int((1 - illumination * 2) * radius) if illumination < 0.5 else 0
-            )
-
-            if shadow_width > 0:
-                # Draw shadow on the left side
-                # Use an ellipse that gets narrower as moon waxes
-                for px in range(x + 2, center_x):
-                    # Calculate how much of this column is in shadow
-                    dist_from_center = center_x - px
-                    shadow_depth = (
-                        shadow_width * (dist_from_center / radius) if radius > 0 else 0
-                    )
-
-                    if dist_from_center > shadow_width:
-                        # Full shadow for this column
-                        col_height = int(
-                            math.sqrt(max(0, radius**2 - (px - center_x) ** 2))
-                        )
-                        if col_height > 0:
-                            draw.line(
-                                [
-                                    (px, center_y - col_height),
-                                    (px, center_y + col_height),
-                                ],
-                                fill=0,
-                            )
+            # Shadow is on the left side (px < terminator_x)
+            for py in range(y + 2, y + size - 2):
+                for px in range(x + 2, min(int(terminator_x) + 1, x + size - 2)):
+                    dx = px - center_x
+                    dy = py - center_y
+                    dist_sq = dx * dx + dy * dy
+                    
+                    # Check if point is within moon circle and in shadow
+                    if dist_sq <= inner_radius * inner_radius and px < terminator_x:
+                        draw.point((px, py), fill=0)
         else:
             # Waning: left side illuminated, right side dark
-            # Fill the whole moon white first
-            draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
+            # Shadow is on the right side (px > terminator_x)
+            for py in range(y + 2, y + size - 2):
+                for px in range(max(int(terminator_x), x + 2), x + size - 2):
+                    dx = px - center_x
+                    dy = py - center_y
+                    dist_sq = dx * dx + dy * dy
+                    
+                    # Check if point is within moon circle and in shadow
+                    if dist_sq <= inner_radius * inner_radius and px > terminator_x:
+                        draw.point((px, py), fill=0)
 
-            # Calculate shadow width for waning phase
-            wane_progress = (phase_normalized - 0.5) * 2  # 0 at full, 1 at new
-            shadow_width = int(wane_progress * radius)
-
-            if shadow_width > 0:
-                # Draw shadow on the right side
-                for px in range(center_x, x + size - 2):
-                    dist_from_center = px - center_x
-
-                    if dist_from_center > (radius - shadow_width):
-                        # Shadow for this column
-                        col_height = int(
-                            math.sqrt(max(0, radius**2 - (px - center_x) ** 2))
-                        )
-                        if col_height > 0:
-                            draw.line(
-                                [
-                                    (px, center_y - col_height),
-                                    (px, center_y + col_height),
-                                ],
-                                fill=0,
-                            )
+        # Add subtle surface texture (craters) for realism
+        # Only add texture to the lit portion
+        random.seed(int(phase * 100))  # Deterministic based on phase
+        
+        num_craters = max(3, size // 20)  # Scale with moon size
+        for _ in range(num_craters):
+            # Random position within moon circle
+            angle = random.uniform(0, 2 * math.pi)
+            dist = random.uniform(0, inner_radius * 0.7)  # Keep craters away from edge
+            crater_x = int(center_x + dist * math.cos(angle))
+            crater_y = int(center_y + dist * math.sin(angle))
+            
+            # Check if crater is within moon bounds
+            dx = crater_x - center_x
+            dy = crater_y - center_y
+            if dx * dx + dy * dy > inner_radius * inner_radius:
+                continue
+            
+            # Only draw crater if it's in the lit portion
+            if phase_normalized < 0.5:
+                # Waxing: right side lit (crater_x > terminator_x)
+                if crater_x > terminator_x:
+                    crater_size = random.randint(1, max(1, size // 30))
+                    draw.ellipse(
+                        [
+                            crater_x - crater_size,
+                            crater_y - crater_size,
+                            crater_x + crater_size,
+                            crater_y + crater_size,
+                        ],
+                        fill=0,
+                        outline=1,
+                        width=1,
+                    )
+            else:
+                # Waning: left side lit (crater_x < terminator_x)
+                if crater_x < terminator_x:
+                    crater_size = random.randint(1, max(1, size // 30))
+                    draw.ellipse(
+                        [
+                            crater_x - crater_size,
+                            crater_y - crater_size,
+                            crater_x + crater_size,
+                            crater_y + crater_size,
+                        ],
+                        fill=0,
+                        outline=1,
+                        width=1,
+                    )
 
         # Redraw outline to ensure clean edges
         draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
