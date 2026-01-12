@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, List, Any, Union
 from datetime import datetime
 import json
@@ -296,8 +296,8 @@ class Settings(BaseModel):
             return "America/New_York"
         return v
 
-    class Config:
-        pass
+    # Ignore extra fields (allows old configs with removed settings to still load)
+    model_config = ConfigDict(extra="ignore")
 
 
 def migrate_old_config(data: dict) -> dict:
