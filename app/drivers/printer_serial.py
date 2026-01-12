@@ -364,6 +364,32 @@ class PrinterDriver:
                 total_height += chart_height
             elif op_type == "feed":
                 total_height += op_data * self.line_height
+            elif op_type == "article_block":
+                # Article with QR code on left, text on right
+                qr_size = op_data.get("qr_size", 64)
+                # Pre-render QR code
+                qr_img = self._generate_qr_image(
+                    op_data.get("url", ""),
+                    2,
+                    "L",
+                    True,
+                )
+                if qr_img:
+                    # Resize QR to target size
+                    qr_img = qr_img.resize((qr_size, qr_size), Image.NEAREST)
+                op_data["_qr_img"] = qr_img
+                
+                # Calculate text height
+                source_height = self._get_line_height_for_style("caption")
+                title_lines = op_data.get("title_lines", 1)
+                title_height = title_lines * self._get_line_height_for_style("bold")
+                summary_lines = op_data.get("summary_lines", 0)
+                summary_height = summary_lines * self._get_line_height_for_style("regular_sm")
+                
+                text_height = source_height + title_height + summary_height + 4
+                # Block height is max of QR or text
+                block_height = max(qr_size + 4, text_height)
+                total_height += block_height + 8  # +8 for spacing
             elif op_type == "qr":
                 # Pre-render QR code to get its height and store in op_data
                 qr_img = self._generate_qr_image(
@@ -655,6 +681,55 @@ class PrinterDriver:
                 y += len(bars) * (bar_height + 4) + 8
             elif op_type == "feed":
                 y += op_data * self.line_height
+            elif op_type == "article_block":
+                # Article with QR code on left, text on right
+                qr_size = op_data.get("qr_size", 64)
+                qr_img = op_data.get("_qr_img")
+                
+                # Layout: QR on left, text on right
+                qr_x = 4
+                qr_y = y + 2
+                text_x = qr_size + 12  # QR + gap
+                text_y = y + 2
+                
+                # Draw QR code if available
+                if qr_img:
+                    img.paste(qr_img, (qr_x, qr_y))
+                
+                # Calculate text area width
+                text_width = width - text_x - 4
+                
+                # Draw source (caption style)
+                source = op_data.get("source", "")
+                source_font = self._get_font("caption")
+                source_height = self._get_line_height_for_style("caption")
+                if source and source_font:
+                    draw.text((text_x, text_y), source.upper()[:24], font=source_font, fill=0)
+                text_y += source_height
+                
+                # Draw title (bold, wrapped)
+                title = op_data.get("title", "")
+                title_font = self._get_font("bold")
+                title_line_height = self._get_line_height_for_style("bold")
+                title_lines = op_data.get("title_wrapped", [title])
+                for line in title_lines:
+                    if title_font:
+                        draw.text((text_x, text_y), line, font=title_font, fill=0)
+                    text_y += title_line_height
+                
+                # Draw summary (regular small, wrapped)
+                summary_lines = op_data.get("summary_wrapped", [])
+                summary_font = self._get_font("regular_sm")
+                summary_line_height = self._get_line_height_for_style("regular_sm")
+                for line in summary_lines:
+                    if summary_font:
+                        draw.text((text_x, text_y), line, font=summary_font, fill=0)
+                    text_y += summary_line_height
+                
+                # Calculate block height
+                text_height = text_y - (y + 2)
+                block_height = max(qr_size + 4, text_height)
+                y += block_height + 8
             elif op_type == "qr":
                 # Get the pre-rendered QR image from op_data
                 qr_img = op_data.get("_qr_img")
@@ -1958,6 +2033,55 @@ class PrinterDriver:
         # Use a stylish dot pattern instead of plain dashes
         line = "· " * (self.width // 2)
         self.print_text(line.strip(), "light")
+
+    def print_article_block(
+        self,
+        source: str,
+        title: str,
+        summary: str = "",
+        url: str = "",
+        qr_size: int = 64,
+        title_width: int = 28,
+        summary_width: int = 32,
+        max_summary_lines: int = 3,
+    ):
+        """Print an article with QR code inline on the left.
+
+        Args:
+            source: News source name
+            title: Article headline
+            summary: Article summary/description
+            url: URL to encode as QR code
+            qr_size: Size of QR code in pixels (default 64)
+            title_width: Characters per line for title wrapping
+            summary_width: Characters per line for summary wrapping
+            max_summary_lines: Maximum summary lines to show
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+
+        # Wrap title and summary to fit next to QR code
+        from app.utils import wrap_text
+
+        title_wrapped = wrap_text(title, width=title_width, indent=0)
+        summary_wrapped = []
+        if summary:
+            summary_wrapped = wrap_text(summary, width=summary_width, indent=0)[
+                :max_summary_lines
+            ]
+
+        article_data = {
+            "source": source,
+            "title": title,
+            "title_wrapped": title_wrapped,
+            "summary_wrapped": summary_wrapped,
+            "url": url,
+            "qr_size": qr_size,
+            "title_lines": len(title_wrapped),
+            "summary_lines": len(summary_wrapped),
+        }
+
+        self.print_buffer.append(("article_block", article_data))
 
     def print_thick_line(self):
         """Print a bold separator line."""

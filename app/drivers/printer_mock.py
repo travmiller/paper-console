@@ -83,6 +83,48 @@ class PrinterDriver:
         """Prints a decorative separator line."""
         print(f"[PRINT] {'· ' * (self.width // 2)}")
         self.lines_printed += 1
+
+    def print_article_block(
+        self,
+        source: str,
+        title: str,
+        summary: str = "",
+        url: str = "",
+        qr_size: int = 64,
+        title_width: int = 28,
+        summary_width: int = 32,
+        max_summary_lines: int = 3,
+    ):
+        """Prints an article with QR code inline on the left (simulated)."""
+        print(f"[PRINT] ┌────────┬{'─' * 28}┐")
+        print(f"[PRINT] │        │ {source.upper()[:26]:<26} │")
+        
+        # Wrap title
+        words = title.split()
+        lines = []
+        current = ""
+        for word in words:
+            if len(current) + len(word) + 1 <= title_width:
+                current = f"{current} {word}".strip()
+            else:
+                if current:
+                    lines.append(current)
+                current = word
+        if current:
+            lines.append(current)
+        
+        for i, line in enumerate(lines[:3]):
+            if i == 0:
+                print(f"[PRINT] │ [QR]   │ {line:<26} │")
+            else:
+                print(f"[PRINT] │        │ {line:<26} │")
+        
+        # Summary preview
+        if summary:
+            print(f"[PRINT] │        │ {summary[:26]:<26} │")
+        
+        print(f"[PRINT] └────────┴{'─' * 28}┘")
+        self.lines_printed += len(lines) + 4
     
     def print_thick_line(self):
         """Prints a bold separator line."""

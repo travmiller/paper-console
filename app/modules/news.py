@@ -82,26 +82,16 @@ def format_news_receipt(
         printer.print_caption("Check your API key.")
     else:
         for i, article in enumerate(news_data):
-            # Source as subheader
-            source = article["source"].upper()[:24]
-            printer.print_subheader(source)
-
-            # Headline in bold
-            wrapped_lines = wrap_text(article["title"], width=42, indent=0)
-            for line in wrapped_lines:
-                printer.print_bold(line)
-
-            # Summary in regular body text
-            if article["summary"]:
-                wrapped_summary = wrap_text(article["summary"], width=42, indent=0)
-                for line in wrapped_summary[:4]:
-                    printer.print_body(line)
-                if len(wrapped_summary) > 4:
-                    printer.print_caption("...")
-
-            # QR code linking to full article (cleaned URL for smaller QR)
-            if article.get("url"):
-                cleaned_url = clean_url(article["url"])
-                printer.print_qr(cleaned_url, size=2, error_correction="L", fixed_size=True)
-
+            # Print article with inline QR code on the left
+            cleaned_url = clean_url(article.get("url", ""))
+            printer.print_article_block(
+                source=article["source"],
+                title=article["title"],
+                summary=article.get("summary", ""),
+                url=cleaned_url,
+                qr_size=64,
+                title_width=28,
+                summary_width=32,
+                max_summary_lines=2,
+            )
             printer.print_line()
