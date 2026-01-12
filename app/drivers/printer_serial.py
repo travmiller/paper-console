@@ -474,10 +474,10 @@ class PrinterDriver:
         # Remove last operation's trailing spacing (it becomes START padding after 180° rotation)
         total_height -= last_spacing
         
-        # Add 5 lines (120 dots) of padding at the TOP of original bitmap (y=0)
+        # Add 7 lines (168 dots) of padding at the TOP of original bitmap (y=0)
         # After 180° rotation: top of original → bottom of rotated → printed LAST (end spacing)
         # This provides consistent spacing at the end of every print job
-        padding_dots = 5 * 24  # 120 dots
+        padding_dots = 7 * 24  # 168 dots
         total_height += padding_dots
 
         # Create the unified image
