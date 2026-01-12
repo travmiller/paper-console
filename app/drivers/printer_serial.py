@@ -348,10 +348,10 @@ class PrinterDriver:
         # Draw lines in order - after 180° rotation, first line will be at bottom
         # (Content appears at tear-off edge, headers appear after when viewing upside-down)
         y = 2  # Start with small padding
-            for line in lines:
-                if line:  # Only draw non-empty lines
-                    self._draw_text_binary(draw, (2, y), line, self._font)
-                y += self.line_height
+        for line in lines:
+            if line:  # Only draw non-empty lines
+                self._draw_text_binary(draw, (2, y), line, self._font)
+            y += self.line_height
 
         # Rotate 180° for upside-down printing
         img = img.rotate(180)
