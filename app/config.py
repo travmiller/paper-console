@@ -238,7 +238,7 @@ class Settings(BaseModel):
     max_print_lines: int = 200  # Maximum lines per print job (0 = no limit)
     
     # Font/text settings for bitmap rendering
-    font_size: int = 12  # Font size in pixels (8-24)
+    font_size: int = 16  # Font size in pixels (8-24) - 16 shows weight differences
     line_spacing: int = 2  # Extra pixels between lines (0-8)
 
     # Module Instances: Dictionary of module_id -> ModuleInstance

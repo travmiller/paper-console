@@ -152,6 +152,7 @@ class PrinterDriver:
         ]
         
         # Load each variant at different sizes
+        # Size jumps: +6 for headers, -4 for captions (visible hierarchy)
         for variant_name, filename in font_variants.items():
             for base_path in base_paths:
                 font_path = os.path.join(base_path, filename)
@@ -159,10 +160,10 @@ class PrinterDriver:
                     try:
                         # Load at regular size
                         fonts[variant_name] = ImageFont.truetype(font_path, self.font_size)
-                        # Load at header size (larger)
-                        fonts[f"{variant_name}_lg"] = ImageFont.truetype(font_path, self.font_size + 4)
-                        # Load at small size
-                        fonts[f"{variant_name}_sm"] = ImageFont.truetype(font_path, max(8, self.font_size - 2))
+                        # Load at header size (6px larger for clear hierarchy)
+                        fonts[f"{variant_name}_lg"] = ImageFont.truetype(font_path, self.font_size + 6)
+                        # Load at small/caption size (4px smaller)
+                        fonts[f"{variant_name}_sm"] = ImageFont.truetype(font_path, max(10, self.font_size - 4))
                         break
                     except Exception:
                         continue
@@ -180,8 +181,8 @@ class PrinterDriver:
                     try:
                         fonts["regular"] = ImageFont.truetype(path, self.font_size)
                         fonts["bold"] = fonts["regular"]  # No bold variant
-                        fonts["regular_lg"] = ImageFont.truetype(path, self.font_size + 4)
-                        fonts["regular_sm"] = ImageFont.truetype(path, max(8, self.font_size - 2))
+                        fonts["regular_lg"] = ImageFont.truetype(path, self.font_size + 6)
+                        fonts["regular_sm"] = ImageFont.truetype(path, max(10, self.font_size - 4))
                         break
                     except Exception:
                         continue
@@ -236,9 +237,9 @@ class PrinterDriver:
             return font.size + self.line_spacing
         # Estimate based on style name
         if "_lg" in style:
-            return self.font_size + 4 + self.line_spacing
+            return self.font_size + 6 + self.line_spacing
         elif "_sm" in style:
-            return max(8, self.font_size - 2) + self.line_spacing
+            return max(10, self.font_size - 4) + self.line_spacing
         return self.line_height
 
     def _render_unified_bitmap(self, ops: list) -> Image.Image:
