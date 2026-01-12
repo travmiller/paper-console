@@ -298,6 +298,40 @@ class PrinterDriver:
                     # 9 cells * cell_size + borders
                     sudoku_size = 9 * cell_size + 4  # +4 for borders
                     total_height += sudoku_size + 8  # Sudoku + spacing
+            elif op_type == "icon":
+                # Small icon graphic
+                icon_type = op_data.get("type", "sun")
+                size = op_data.get("size", 32)
+                total_height += size + 4  # Icon + spacing
+            elif op_type == "progress_bar":
+                # Progress bar graphic
+                height = op_data.get("height", 12)
+                total_height += height + 4  # Bar + spacing
+            elif op_type == "calendar_grid":
+                # Calendar grid view
+                weeks = op_data.get("weeks", 4)
+                cell_size = op_data.get("cell_size", 8)
+                grid_height = weeks * cell_size + 4  # +4 for header
+                total_height += grid_height + 8
+            elif op_type == "timeline":
+                # Timeline graphic
+                items = op_data.get("items", [])
+                item_height = op_data.get("item_height", 20)
+                total_height += len(items) * item_height + 8
+            elif op_type == "checkbox":
+                # Bitmap checkbox
+                size = op_data.get("size", 12)
+                total_height += size + 2
+            elif op_type == "separator":
+                # Decorative separator
+                height = op_data.get("height", 8)
+                total_height += height + 4
+            elif op_type == "bar_chart":
+                # Simple bar chart
+                bars = op_data.get("bars", [])
+                bar_height = op_data.get("bar_height", 12)
+                chart_height = len(bars) * (bar_height + 4) + 8  # +4 spacing between bars
+                total_height += chart_height
             elif op_type == "feed":
                 total_height += op_data * self.line_height
             elif op_type == "qr":
@@ -432,6 +466,88 @@ class PrinterDriver:
                     self._draw_sudoku_grid(draw, sudoku_x, sudoku_y, grid, cell_size, font)
                     
                     y += sudoku_size + 8
+            elif op_type == "icon":
+                # Draw weather/status icon
+                icon_type = op_data.get("type", "sun")
+                size = op_data.get("size", 32)
+                
+                # Center icon horizontally
+                icon_x = (width - size) // 2
+                icon_y = y + 4
+                
+                self._draw_icon(draw, icon_x, icon_y, icon_type, size)
+                
+                y += size + 8
+            elif op_type == "progress_bar":
+                # Draw progress bar
+                value = op_data.get("value", 0)  # 0-100
+                max_value = op_data.get("max_value", 100)
+                bar_width = op_data.get("width", width - 8)
+                bar_height = op_data.get("height", 12)
+                label = op_data.get("label", "")
+                
+                # Center bar horizontally
+                bar_x = (width - bar_width) // 2
+                bar_y = y + 4
+                
+                self._draw_progress_bar(draw, bar_x, bar_y, bar_width, bar_height, value, max_value, label, self._get_font("regular_sm"))
+                
+                y += bar_height + 8
+            elif op_type == "calendar_grid":
+                # Draw calendar grid
+                weeks = op_data.get("weeks", 4)
+                cell_size = op_data.get("cell_size", 8)
+                start_date = op_data.get("start_date")
+                events_by_date = op_data.get("events_by_date", {})
+                
+                grid_x = 4
+                grid_y = y + 4
+                
+                self._draw_calendar_grid(draw, grid_x, grid_y, weeks, cell_size, start_date, events_by_date, self._get_font("regular_sm"))
+                
+                grid_height = weeks * cell_size + 4
+                y += grid_height + 8
+            elif op_type == "timeline":
+                # Draw timeline
+                items = op_data.get("items", [])
+                item_height = op_data.get("item_height", 20)
+                timeline_x = 8
+                timeline_y = y + 4
+                
+                self._draw_timeline(draw, timeline_x, timeline_y, items, item_height, self._get_font("regular"))
+                
+                y += len(items) * item_height + 8
+            elif op_type == "checkbox":
+                # Draw checkbox
+                checked = op_data.get("checked", False)
+                size = op_data.get("size", 12)
+                checkbox_x = 4
+                checkbox_y = y + 2
+                
+                self._draw_checkbox(draw, checkbox_x, checkbox_y, size, checked)
+                
+                y += size + 4
+            elif op_type == "separator":
+                # Draw decorative separator
+                style = op_data.get("style", "dots")
+                sep_height = op_data.get("height", 8)
+                sep_x = 4
+                sep_y = y + 2
+                
+                self._draw_separator(draw, sep_x, sep_y, width - 8, sep_height, style)
+                
+                y += sep_height + 4
+            elif op_type == "bar_chart":
+                # Draw bar chart
+                bars = op_data.get("bars", [])
+                bar_height = op_data.get("bar_height", 12)
+                chart_width = op_data.get("width", width - 8)
+                chart_x = (width - chart_width) // 2
+                chart_y = y + 4
+                
+                self._draw_bar_chart(draw, chart_x, chart_y, chart_width, bar_height, bars, self._get_font("regular_sm"))
+                
+                y += len(bars) * (bar_height + 4) + 8
             elif op_type == "feed":
                 y += op_data * self.line_height
             elif op_type == "qr":
@@ -654,6 +770,343 @@ class PrinterDriver:
                         draw.text((text_x, text_y), num_str, font=font, fill=0)
                     else:
                         draw.text((text_x, text_y), num_str, fill=0)
+
+    def _draw_icon(self, draw: ImageDraw.Draw, x: int, y: int, icon_type: str, size: int):
+        """Draw a simple icon bitmap.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            icon_type: Type of icon (sun, cloud, rain, snow, storm, etc.)
+            size: Icon size in pixels
+        """
+        import math
+        
+        center_x = x + size // 2
+        center_y = y + size // 2
+        radius = size // 3
+        
+        if icon_type.lower() == "sun":
+            # Draw sun: circle with rays
+            # Main circle
+            draw.ellipse([center_x - radius, center_y - radius, 
+                         center_x + radius, center_y + radius], 
+                        fill=0, outline=0, width=2)
+            # Rays (8 rays)
+            ray_length = radius + 4
+            for angle in range(0, 360, 45):
+                rad = math.radians(angle)
+                start_x = center_x + radius * math.cos(rad)
+                start_y = center_y + radius * math.sin(rad)
+                end_x = center_x + ray_length * math.cos(rad)
+                end_y = center_y + ray_length * math.sin(rad)
+                draw.line([(start_x, start_y), (end_x, end_y)], fill=0, width=2)
+        
+        elif icon_type.lower() == "cloud":
+            # Draw cloud: overlapping circles
+            cloud_x = center_x
+            cloud_y = center_y
+            # Main cloud body
+            draw.ellipse([cloud_x - radius, cloud_y - radius//2, 
+                         cloud_x + radius, cloud_y + radius//2], fill=0)
+            # Left puff
+            draw.ellipse([cloud_x - radius*1.2, cloud_y - radius//3, 
+                         cloud_x - radius*0.3, cloud_y + radius//3], fill=0)
+            # Right puff
+            draw.ellipse([cloud_x + radius*0.3, cloud_y - radius//3, 
+                         cloud_x + radius*1.2, cloud_y + radius//3], fill=0)
+            # Top puff
+            draw.ellipse([cloud_x - radius*0.6, cloud_y - radius*0.8, 
+                         cloud_x + radius*0.6, cloud_y - radius*0.2], fill=0)
+        
+        elif icon_type.lower() == "rain":
+            # Draw cloud with rain drops
+            # Cloud (smaller)
+            cloud_radius = radius * 0.7
+            draw.ellipse([center_x - cloud_radius, center_y - cloud_radius//2, 
+                         center_x + cloud_radius, center_y + cloud_radius//2], fill=0)
+            # Rain drops (vertical lines)
+            for drop_x in range(center_x - cloud_radius//2, center_x + cloud_radius//2, 4):
+                drop_y_start = center_y + cloud_radius//2
+                drop_y_end = center_y + radius
+                draw.line([(drop_x, drop_y_start), (drop_x, drop_y_end)], fill=0, width=2)
+        
+        elif icon_type.lower() == "snow":
+            # Draw cloud with snowflakes
+            # Cloud
+            cloud_radius = radius * 0.7
+            draw.ellipse([center_x - cloud_radius, center_y - cloud_radius//2, 
+                         center_x + cloud_radius, center_y + cloud_radius//2], fill=0)
+            # Snowflakes (asterisk pattern)
+            flake_size = 4
+            for flake_y in range(center_y + cloud_radius//2, center_y + radius, 8):
+                flake_x = center_x
+                # Horizontal line
+                draw.line([(flake_x - flake_size, flake_y), (flake_x + flake_size, flake_y)], fill=0, width=1)
+                # Vertical line
+                draw.line([(flake_x, flake_y - flake_size), (flake_x, flake_y + flake_size)], fill=0, width=1)
+                # Diagonals
+                draw.line([(flake_x - flake_size//2, flake_y - flake_size//2), 
+                          (flake_x + flake_size//2, flake_y + flake_size//2)], fill=0, width=1)
+                draw.line([(flake_x + flake_size//2, flake_y - flake_size//2), 
+                          (flake_x - flake_size//2, flake_y + flake_size//2)], fill=0, width=1)
+        
+        elif icon_type.lower() == "storm":
+            # Draw cloud with lightning
+            # Cloud
+            cloud_radius = radius * 0.7
+            draw.ellipse([center_x - cloud_radius, center_y - cloud_radius//2, 
+                         center_x + cloud_radius, center_y + cloud_radius//2], fill=0)
+            # Lightning bolt (zigzag)
+            bolt_x = center_x
+            bolt_y_start = center_y + cloud_radius//2
+            bolt_y_end = center_y + radius
+            # Simple zigzag
+            points = [
+                (bolt_x, bolt_y_start),
+                (bolt_x - 2, bolt_y_start + 4),
+                (bolt_x + 2, bolt_y_start + 8),
+                (bolt_x, bolt_y_end)
+            ]
+            for i in range(len(points) - 1):
+                draw.line([points[i], points[i+1]], fill=1, width=2)  # White lightning
+        
+        elif icon_type.lower() == "clear":
+            # Simple circle (like sun but no rays)
+            draw.ellipse([center_x - radius, center_y - radius, 
+                         center_x + radius, center_y + radius], 
+                        fill=0, outline=0, width=2)
+
+    def _draw_progress_bar(self, draw: ImageDraw.Draw, x: int, y: int, width: int, height: int,
+                          value: float, max_value: float, label: str, font):
+        """Draw a progress bar.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            width: Bar width in pixels
+            height: Bar height in pixels
+            value: Current value
+            max_value: Maximum value
+            label: Optional label text
+            font: Font for label
+        """
+        # Draw border
+        draw.rectangle([x, y, x + width, y + height], outline=0, width=2)
+        
+        # Calculate fill width
+        if max_value > 0:
+            fill_width = int((value / max_value) * (width - 4))  # -4 for border
+            fill_width = max(0, min(fill_width, width - 4))
+        else:
+            fill_width = 0
+        
+        # Draw filled portion (checkerboard pattern for visual interest)
+        if fill_width > 0:
+            for px in range(x + 2, x + 2 + fill_width):
+                for py in range(y + 2, y + height - 2):
+                    # Checkerboard pattern
+                    if ((px - x) + (py - y)) % 4 < 2:
+                        draw.point((px, py), fill=0)
+        
+        # Draw label if provided
+        if label and font:
+            # Position label to the right of bar
+            label_x = x + width + 4
+            label_y = y + (height - font.size) // 2 if hasattr(font, 'size') else y
+            draw.text((label_x, label_y), label, font=font, fill=0)
+
+    def _draw_calendar_grid(self, draw: ImageDraw.Draw, x: int, y: int, weeks: int, 
+                           cell_size: int, start_date, events_by_date: dict, font):
+        """Draw a calendar grid.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            weeks: Number of weeks to show
+            cell_size: Size of each day cell
+            start_date: First date to show
+            events_by_date: Dict mapping dates to event counts
+            font: Font for numbers
+        """
+        from datetime import datetime, timedelta
+        
+        # Day headers (S M T W T F S)
+        day_names = ["S", "M", "T", "W", "T", "F", "S"]
+        header_y = y
+        for i, day_name in enumerate(day_names):
+            day_x = x + i * cell_size
+            if font:
+                bbox = font.getbbox(day_name)
+                text_w = bbox[2] - bbox[0] if bbox else cell_size // 2
+                text_x = day_x + (cell_size - text_w) // 2
+                draw.text((text_x, header_y), day_name, font=font, fill=0)
+        
+        # Draw grid cells
+        current_date = start_date if start_date else datetime.now().date()
+        # Find first Sunday before or on start_date
+        days_since_sunday = current_date.weekday() + 1  # Monday=0, so +1
+        grid_start = current_date - timedelta(days=days_since_sunday % 7)
+        
+        for week in range(weeks):
+            for day in range(7):
+                cell_x = x + day * cell_size
+                cell_y = y + 8 + week * cell_size  # +8 for header
+                
+                # Draw cell border
+                draw.rectangle([cell_x, cell_y, cell_x + cell_size - 1, cell_y + cell_size - 1], 
+                             outline=0, width=1)
+                
+                # Get date for this cell
+                cell_date = grid_start + timedelta(days=week * 7 + day)
+                
+                # Draw day number
+                day_num = str(cell_date.day)
+                if font:
+                    bbox = font.getbbox(day_num)
+                    text_w = bbox[2] - bbox[0] if bbox else cell_size // 2
+                    text_h = bbox[3] - bbox[1] if bbox else cell_size // 2
+                    text_x = cell_x + 2
+                    text_y = cell_y + 2
+                    draw.text((text_x, text_y), day_num, font=font, fill=0)
+                
+                # Draw event indicator (dot)
+                date_key = cell_date.isoformat()
+                if date_key in events_by_date and events_by_date[date_key] > 0:
+                    dot_x = cell_x + cell_size - 4
+                    dot_y = cell_y + cell_size - 4
+                    draw.ellipse([dot_x - 1, dot_y - 1, dot_x + 1, dot_y + 1], fill=0)
+
+    def _draw_timeline(self, draw: ImageDraw.Draw, x: int, y: int, items: list, 
+                      item_height: int, font):
+        """Draw a timeline graphic.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            items: List of dicts with 'year', 'text' keys
+            item_height: Height per timeline item
+            font: Font for text
+        """
+        line_x = x + 20  # Vertical line position
+        
+        for i, item in enumerate(items):
+            item_y = y + i * item_height
+            
+            # Draw vertical timeline line
+            if i < len(items) - 1:
+                draw.line([(line_x, item_y), (line_x, item_y + item_height)], fill=0, width=2)
+            
+            # Draw circle/node on timeline
+            node_radius = 4
+            draw.ellipse([line_x - node_radius, item_y - node_radius,
+                         line_x + node_radius, item_y + node_radius], fill=0)
+            
+            # Draw year label (left of line)
+            year = str(item.get('year', ''))
+            if font and year:
+                draw.text((x, item_y - 4), year, font=font, fill=0)
+            
+            # Draw text (right of line)
+            text = item.get('text', '')
+            if font and text:
+                # Truncate if too long
+                max_width = self.PRINTER_WIDTH_DOTS - line_x - 30
+                if len(text) > max_width // 6:  # Rough estimate
+                    text = text[:max_width // 6 - 3] + "..."
+                draw.text((line_x + 10, item_y - 4), text, font=font, fill=0)
+
+    def _draw_checkbox(self, draw: ImageDraw.Draw, x: int, y: int, size: int, checked: bool):
+        """Draw a checkbox.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            size: Checkbox size in pixels
+            checked: Whether checkbox is checked
+        """
+        # Draw box border
+        draw.rectangle([x, y, x + size, y + size], outline=0, width=2)
+        
+        if checked:
+            # Draw checkmark (X pattern)
+            # Diagonal lines
+            draw.line([(x + 2, y + 2), (x + size - 2, y + size - 2)], fill=0, width=2)
+            draw.line([(x + size - 2, y + 2), (x + 2, y + size - 2)], fill=0, width=2)
+
+    def _draw_separator(self, draw: ImageDraw.Draw, x: int, y: int, width: int, height: int, style: str):
+        """Draw a decorative separator.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            width: Separator width
+            height: Separator height
+            style: Style ('dots', 'dashed', 'wave')
+        """
+        if style == "dots":
+            # Dotted line
+            dot_spacing = 4
+            for px in range(x, x + width, dot_spacing):
+                dot_y = y + height // 2
+                draw.ellipse([px - 1, dot_y - 1, px + 1, dot_y + 1], fill=0)
+        elif style == "dashed":
+            # Dashed line
+            dash_length = 8
+            gap = 4
+            px = x
+            while px < x + width:
+                draw.line([(px, y + height // 2), (px + dash_length, y + height // 2)], fill=0, width=2)
+                px += dash_length + gap
+        elif style == "wave":
+            # Wavy line
+            import math
+            center_y = y + height // 2
+            amplitude = 2
+            frequency = 0.1
+            for px in range(x, x + width):
+                wave_y = center_y + int(amplitude * math.sin(px * frequency))
+                draw.point((px, wave_y), fill=0)
+                if px > x:
+                    prev_y = center_y + int(amplitude * math.sin((px - 1) * frequency))
+                    draw.line([(px - 1, prev_y), (px, wave_y)], fill=0, width=1)
+
+    def _draw_bar_chart(self, draw: ImageDraw.Draw, x: int, y: int, width: int, 
+                       bar_height: int, bars: list, font):
+        """Draw a simple bar chart.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            width: Chart width
+            bar_height: Height of each bar
+            bars: List of dicts with 'label', 'value', 'max_value' keys
+            font: Font for labels
+        """
+        max_bar_width = width - 40  # Leave space for labels
+        
+        for i, bar_data in enumerate(bars):
+            bar_y = y + i * (bar_height + 4)
+            label = bar_data.get('label', '')
+            value = bar_data.get('value', 0)
+            max_value = bar_data.get('max_value', 100)
+            
+            # Draw label
+            if font and label:
+                draw.text((x, bar_y), label[:10], font=font, fill=0)  # Truncate long labels
+            
+            # Calculate bar width
+            bar_width = int((value / max_value) * max_bar_width) if max_value > 0 else 0
+            
+            # Draw bar
+            bar_x = x + 35  # After label
+            draw.rectangle([bar_x, bar_y, bar_x + bar_width, bar_y + bar_height - 2], 
+                         fill=0, outline=0, width=1)
+            
+            # Draw value label
+            if font:
+                value_str = f"{value:.0f}"
+                draw.text((bar_x + bar_width + 4, bar_y), value_str, font=font, fill=0)
 
     def _generate_qr_image(
         self, data: str, size: int, error_correction: str, fixed_size: bool
@@ -1041,6 +1494,122 @@ class PrinterDriver:
         self.print_buffer.append(("sudoku", {
             "grid": grid,
             "cell_size": cell_size,
+        }))
+
+    def print_icon(self, icon_type: str, size: int = 32):
+        """Print a weather/status icon.
+        
+        Args:
+            icon_type: Type of icon (sun, cloud, rain, snow, storm, clear)
+            size: Icon size in pixels (default 32)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("icon", {
+            "type": icon_type,
+            "size": size,
+        }))
+
+    def print_progress_bar(self, value: float, max_value: float = 100, 
+                         width: int = None, height: int = 12, label: str = ""):
+        """Print a progress bar.
+        
+        Args:
+            value: Current value
+            max_value: Maximum value (default 100)
+            width: Bar width in pixels (default: full width minus margins)
+            height: Bar height in pixels (default 12)
+            label: Optional label text
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        if width is None:
+            width = self.PRINTER_WIDTH_DOTS - 8  # Full width minus margins
+        self.print_buffer.append(("progress_bar", {
+            "value": value,
+            "max_value": max_value,
+            "width": width,
+            "height": height,
+            "label": label,
+        }))
+
+    def print_calendar_grid(self, weeks: int = 4, cell_size: int = 8, 
+                           start_date=None, events_by_date: dict = None):
+        """Print a visual calendar grid.
+        
+        Args:
+            weeks: Number of weeks to show (default 4)
+            cell_size: Size of each day cell in pixels (default 8)
+            start_date: First date to show (default: today)
+            events_by_date: Dict mapping date strings to event counts
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("calendar_grid", {
+            "weeks": weeks,
+            "cell_size": cell_size,
+            "start_date": start_date,
+            "events_by_date": events_by_date or {},
+        }))
+
+    def print_timeline(self, items: list, item_height: int = 20):
+        """Print a timeline graphic.
+        
+        Args:
+            items: List of dicts with 'year' and 'text' keys
+            item_height: Height per item in pixels (default 20)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("timeline", {
+            "items": items,
+            "item_height": item_height,
+        }))
+
+    def print_checkbox(self, checked: bool = False, size: int = 12):
+        """Print a bitmap checkbox.
+        
+        Args:
+            checked: Whether checkbox is checked
+            size: Checkbox size in pixels (default 12)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("checkbox", {
+            "checked": checked,
+            "size": size,
+        }))
+
+    def print_separator(self, style: str = "dots", height: int = 8):
+        """Print a decorative separator.
+        
+        Args:
+            style: Style ('dots', 'dashed', 'wave') (default 'dots')
+            height: Separator height in pixels (default 8)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("separator", {
+            "style": style,
+            "height": height,
+        }))
+
+    def print_bar_chart(self, bars: list, bar_height: int = 12, width: int = None):
+        """Print a simple bar chart.
+        
+        Args:
+            bars: List of dicts with 'label', 'value', 'max_value' keys
+            bar_height: Height of each bar in pixels (default 12)
+            width: Chart width in pixels (default: full width)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        if width is None:
+            width = self.PRINTER_WIDTH_DOTS - 8
+        self.print_buffer.append(("bar_chart", {
+            "bars": bars,
+            "bar_height": bar_height,
+            "width": width,
         }))
 
     def _write_feed(self, count: int):

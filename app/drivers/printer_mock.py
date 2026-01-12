@@ -145,6 +145,76 @@ class PrinterDriver:
         print("[PRINT] └───────┴───────┴───────┘")
         self.lines_printed += 11
 
+    def print_icon(self, icon_type: str, size: int = 32):
+        """Simulates printing a weather icon."""
+        icons = {
+            "sun": "☀",
+            "cloud": "☁",
+            "rain": "🌧",
+            "snow": "❄",
+            "storm": "⛈",
+            "clear": "○"
+        }
+        icon = icons.get(icon_type.lower(), "?")
+        print(f"[PRINT]     [{icon}]")
+        self.lines_printed += 1
+
+    def print_progress_bar(self, value: float, max_value: float = 100, 
+                         width: int = None, height: int = 12, label: str = ""):
+        """Simulates printing a progress bar."""
+        if width is None:
+            width = self.width - 4
+        filled = int((value / max_value) * width) if max_value > 0 else 0
+        bar = "█" * filled + "░" * (width - filled)
+        label_text = f" {label}" if label else ""
+        print(f"[PRINT] [{bar}]{label_text}")
+        self.lines_printed += 1
+
+    def print_calendar_grid(self, weeks: int = 4, cell_size: int = 8, 
+                           start_date=None, events_by_date: dict = None):
+        """Simulates printing a calendar grid."""
+        print("[PRINT] S M T W T F S")
+        print("[PRINT] ┌─┬─┬─┬─┬─┬─┬─┐")
+        for _ in range(weeks):
+            print("[PRINT] │ │ │ │ │ │ │ │")
+        print("[PRINT] └─┴─┴─┴─┴─┴─┴─┘")
+        self.lines_printed += weeks + 3
+
+    def print_timeline(self, items: list, item_height: int = 20):
+        """Simulates printing a timeline."""
+        for item in items:
+            year = item.get('year', '')
+            text = item.get('text', '')
+            print(f"[PRINT] ● {year}  {text[:30]}")
+        self.lines_printed += len(items)
+
+    def print_checkbox(self, checked: bool = False, size: int = 12):
+        """Simulates printing a checkbox."""
+        checkbox = "[✓]" if checked else "[ ]"
+        print(f"[PRINT] {checkbox}", end="")
+        self.lines_printed += 0  # Will be on same line as text
+
+    def print_separator(self, style: str = "dots", height: int = 8):
+        """Simulates printing a separator."""
+        if style == "dots":
+            print(f"[PRINT] {'·' * self.width}")
+        elif style == "dashed":
+            print(f"[PRINT] {'─' * self.width}")
+        else:
+            print(f"[PRINT] {'~' * self.width}")
+        self.lines_printed += 1
+
+    def print_bar_chart(self, bars: list, bar_height: int = 12, width: int = None):
+        """Simulates printing a bar chart."""
+        for bar in bars:
+            label = bar.get('label', '')
+            value = bar.get('value', 0)
+            max_value = bar.get('max_value', 100)
+            bar_len = int((value / max_value) * (self.width - 15)) if max_value > 0 else 0
+            bar_str = "█" * bar_len
+            print(f"[PRINT] {label[:10]:<10} {bar_str} {value:.0f}")
+        self.lines_printed += len(bars)
+
     def feed(self, lines: int = 3):
         """Simulates paper feed."""
         for _ in range(lines):

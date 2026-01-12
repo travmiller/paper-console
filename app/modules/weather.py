@@ -150,6 +150,22 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         }
 
 
+def _get_icon_type(condition: str) -> str:
+    """Map weather condition to icon type."""
+    condition_lower = condition.lower()
+    if "clear" in condition_lower:
+        return "sun"
+    elif "cloud" in condition_lower:
+        return "cloud"
+    elif "rain" in condition_lower:
+        return "rain"
+    elif "snow" in condition_lower:
+        return "snow"
+    elif "storm" in condition_lower or "thunder" in condition_lower:
+        return "storm"
+    else:
+        return "cloud"  # Default
+
 def format_weather_receipt(
     printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None
 ):
@@ -164,8 +180,13 @@ def format_weather_receipt(
     # Location
     printer.print_subheader(weather['city'].upper())
     
+    # Weather icon
+    icon_type = _get_icon_type(weather['condition'])
+    printer.print_icon(icon_type, size=48)
+    
     # Current temperature - big and bold
-    printer.print_bold(f"{weather['current']}°F  {weather['condition']}")
+    printer.print_bold(f"{weather['current']}°F")
+    printer.print_body(weather['condition'])
     
     # High/Low
     printer.print_body(f"High {weather['high']}°F  ·  Low {weather['low']}°F")

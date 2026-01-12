@@ -104,20 +104,20 @@ def format_history_receipt(
         printer.print_body("No historical records")
         printer.print_body("found for today.")
     else:
-        for i, event in enumerate(selected_events):
-            # Parse year from event string (format: "YEAR - Event description")
+        # Prepare timeline items
+        timeline_items = []
+        for event in selected_events:
             if " - " in event:
-                year, description = event.split(" - ", 1)
-                printer.print_bold(year)
-                wrapped_lines = wrap_text(description, width=printer.width, indent=0)
-                for line in wrapped_lines:
-                    printer.print_body(line)
+                year_str, description = event.split(" - ", 1)
+                try:
+                    year = int(year_str.strip())
+                except:
+                    year = 0
+                timeline_items.append({"year": year, "text": description})
             else:
-                wrapped_lines = wrap_text(event, width=printer.width, indent=0)
-                for line in wrapped_lines:
-                    printer.print_body(line)
-
-            if i < len(selected_events) - 1:
-                printer.print_line()
+                timeline_items.append({"year": 0, "text": event})
+        
+        # Print timeline graphic
+        printer.print_timeline(timeline_items, item_height=24)
 
     printer.print_line()

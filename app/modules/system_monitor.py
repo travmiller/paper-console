@@ -42,7 +42,8 @@ def format_system_monitor_receipt(
         percent = (used / total) * 100 if total > 0 else 0
 
         printer.print_subheader("STORAGE")
-        printer.print_body(f"{used_gb}GB / {total_gb}GB ({percent:.1f}%)")
+        printer.print_progress_bar(percent, 100, label=f"{percent:.0f}%")
+        printer.print_body(f"{used_gb}GB / {total_gb}GB")
         printer.print_caption(f"{free_gb}GB free")
     except Exception:
         printer.print_caption("Disk info unavailable")
@@ -68,7 +69,8 @@ def format_system_monitor_receipt(
             mem_used = mem_total - mem_available
             mem_percent = (mem_used / mem_total) * 100
             printer.print_subheader("MEMORY")
-            printer.print_body(f"{mem_used}MB / {mem_total}MB ({mem_percent:.1f}%)")
+            printer.print_progress_bar(mem_percent, 100, label=f"{mem_percent:.0f}%")
+            printer.print_body(f"{mem_used}MB / {mem_total}MB")
             has_system_info = True
     except Exception:
         pass
