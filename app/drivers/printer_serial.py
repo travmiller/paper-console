@@ -412,7 +412,7 @@ class PrinterDriver:
                 self._write_feed(op_data)
             elif op_type == "qr":
                 # Write QR code (already atomic, no reversal needed)
-                self._write_qr(op_data["data"], op_data["size"], op_data["ec"])
+                self._write_qr(op_data["data"], op_data["size"], op_data["ec"], op_data.get("fixed", False))
 
     def reset_buffer(self, max_lines: int = 0):
         """Reset/clear the print buffer (call at start of new print job).
@@ -444,22 +444,30 @@ class PrinterDriver:
         except Exception:
             pass
 
-    def print_qr(self, data: str, size: int = 4, error_correction: str = "M"):
+    def print_qr(self, data: str, size: int = 4, error_correction: str = "M", fixed_size: bool = False):
         """Print a QR code using native ESC/POS commands. Buffers for correct print order.
         
         Args:
             data: The text/URL to encode in the QR code
             size: Module size 1-16 (each module = n dots, default 4)
             error_correction: Error correction level - L(7%), M(15%), Q(25%), H(30%)
+            fixed_size: If True, generates QR with fixed version for consistent sizing
         """
         # Safety: prevent unbounded buffer growth
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
         # Buffer QR code for proper ordering with text
-        self.print_buffer.append(("qr", {"data": data, "size": size, "ec": error_correction}))
+        self.print_buffer.append(("qr", {"data": data, "size": size, "ec": error_correction, "fixed": fixed_size}))
 
-    def _write_qr(self, data: str, size: int, error_correction: str):
+    def _write_qr(self, data: str, size: int, error_correction: str, fixed_size: bool = False):
         """Internal method to write QR code directly to printer."""
+        if fixed_size:
+            self._write_qr_bitmap(data, size, error_correction)
+        else:
+            self._write_qr_native(data, size, error_correction)
+
+    def _write_qr_native(self, data: str, size: int, error_correction: str):
+        """Write QR code using native ESC/POS commands (variable size based on data)."""
         try:
             # Clamp size to valid range
             size = max(1, min(16, size))
@@ -475,23 +483,18 @@ class PrinterDriver:
             pH = (data_len >> 8) & 0xFF
             
             # Step 1: Set QR code model (Model 2)
-            # GS ( k pL pH cn fn n1 n2
             self._write(b"\x1d\x28\x6b\x04\x00\x31\x41\x32\x00")
             
             # Step 2: Set module size
-            # GS ( k pL pH cn fn n
             self._write(b"\x1d\x28\x6b\x03\x00\x31\x43" + bytes([size]))
             
             # Step 3: Set error correction level
-            # GS ( k pL pH cn fn n
             self._write(b"\x1d\x28\x6b\x03\x00\x31\x45" + bytes([ec_value]))
             
             # Step 4: Store QR code data
-            # GS ( k pL pH cn fn m d1...dk
             self._write(b"\x1d\x28\x6b" + bytes([pL, pH]) + b"\x31\x50\x30" + data_bytes)
             
             # Step 5: Print the QR code
-            # GS ( k pL pH cn fn m
             self._write(b"\x1d\x28\x6b\x03\x00\x31\x51\x30")
             
             # Add a newline after QR code
@@ -499,6 +502,78 @@ class PrinterDriver:
             
         except Exception:
             pass
+
+    def _write_qr_bitmap(self, data: str, pixel_size: int, error_correction: str):
+        """Write QR code as bitmap for fixed, consistent sizing."""
+        try:
+            import qrcode
+            from PIL import Image
+            
+            # Map error correction
+            ec_map = {
+                "L": qrcode.constants.ERROR_CORRECT_L,
+                "M": qrcode.constants.ERROR_CORRECT_M,
+                "Q": qrcode.constants.ERROR_CORRECT_Q,
+                "H": qrcode.constants.ERROR_CORRECT_H,
+            }
+            ec_level = ec_map.get(error_correction.upper(), qrcode.constants.ERROR_CORRECT_L)
+            
+            # Generate QR with fixed version 4 (33x33 modules) - fits most URLs
+            # Version 4 can hold ~78 alphanumeric chars with L correction
+            qr = qrcode.QRCode(
+                version=4,  # Fixed version for consistent size
+                error_correction=ec_level,
+                box_size=pixel_size,
+                border=1,
+            )
+            qr.add_data(data)
+            qr.make(fit=False)  # Don't auto-fit, use fixed version
+            
+            # Create image
+            img = qr.make_image(fill_color="black", back_color="white")
+            img = img.convert("1")  # Convert to 1-bit black/white
+            
+            # Get image dimensions
+            width, height = img.size
+            
+            # Ensure width is multiple of 8 for byte alignment
+            if width % 8 != 0:
+                new_width = ((width // 8) + 1) * 8
+                new_img = Image.new("1", (new_width, height), 1)  # White background
+                new_img.paste(img, (0, 0))
+                img = new_img
+                width = new_width
+            
+            # Convert to bytes (1 bit per pixel, MSB first)
+            pixels = list(img.getdata())
+            bytes_per_row = width // 8
+            
+            # Build raster data
+            raster_data = bytearray()
+            for y in range(height):
+                row_start = y * width
+                for x_byte in range(bytes_per_row):
+                    byte_val = 0
+                    for bit in range(8):
+                        pixel_idx = row_start + (x_byte * 8) + bit
+                        if pixels[pixel_idx] == 0:  # Black pixel
+                            byte_val |= (0x80 >> bit)
+                    raster_data.append(byte_val)
+            
+            # GS v 0 - Print raster bit image
+            # Format: GS v 0 m xL xH yL yH d1...dk
+            # m = 0 (normal), xL xH = bytes per row, yL yH = rows
+            xL = bytes_per_row & 0xFF
+            xH = (bytes_per_row >> 8) & 0xFF
+            yL = height & 0xFF
+            yH = (height >> 8) & 0xFF
+            
+            self._write(b"\x1d\x76\x30\x00" + bytes([xL, xH, yL, yH]) + bytes(raster_data))
+            self._write(b"\n")
+            
+        except Exception:
+            # Fallback to native if bitmap fails
+            self._write_qr_native(data, pixel_size, error_correction)
 
     def print_header(self, text: str):
         """Print centered header text."""

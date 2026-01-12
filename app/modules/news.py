@@ -90,8 +90,8 @@ def format_news_receipt(
                 if len(wrapped_summary) > 4:
                     printer.print_text("...")
 
-            # Print small QR code linking to the full article
+            # Print small fixed-size QR code linking to the full article
             if article.get("url"):
-                printer.print_qr(article["url"], size=2, error_correction="L")
+                printer.print_qr(article["url"], size=2, error_correction="L", fixed_size=True)
 
             printer.print_line()  # Separator between articles

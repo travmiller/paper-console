@@ -31,7 +31,7 @@ class PrinterDriver:
         print(f"[PRINT] {' ' * padding}{text.upper()}")
         self.print_line()
 
-    def print_qr(self, data: str, size: int = 4, error_correction: str = "M"):
+    def print_qr(self, data: str, size: int = 4, error_correction: str = "M", fixed_size: bool = False):
         """Simulates printing a QR code."""
         # Generate ASCII art representation for visual feedback
         try:
