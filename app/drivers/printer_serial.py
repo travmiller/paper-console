@@ -73,7 +73,7 @@ class PrinterDriver:
         self.lines_printed = 0
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
         self._max_lines_hit = False  # Flag set when max lines exceeded during flush
-        
+
         # Cutter feed space (pixels to add at end of print for cutter clearance)
         # Can be updated via set_cutter_feed() method
         self.cutter_feed_dots = 7 * 24  # Default: 7 lines * 24 dots/line = 168 dots
@@ -233,8 +233,12 @@ class PrinterDriver:
                             expanded_path, self.font_size
                         )
                         # Try to find Bold and SemiBold variants for headings
-                        bold_path = expanded_path.replace("Regular", "Bold").replace("Medium", "Bold")
-                        semibold_path = expanded_path.replace("Regular", "SemiBold").replace("Medium", "SemiBold")
+                        bold_path = expanded_path.replace("Regular", "Bold").replace(
+                            "Medium", "Bold"
+                        )
+                        semibold_path = expanded_path.replace(
+                            "Regular", "SemiBold"
+                        ).replace("Medium", "SemiBold")
                         fonts["bold"] = (
                             ImageFont.truetype(bold_path, self.font_size)
                             if os.path.exists(bold_path)
@@ -292,6 +296,124 @@ class PrinterDriver:
     def _get_font(self, style: str = "regular") -> ImageFont.FreeTypeFont:
         """Get a font by style name."""
         return self._fonts.get(style, self._fonts.get("regular"))
+
+    def _wrap_text_by_width(
+        self, text: str, font: ImageFont.FreeTypeFont, max_width_pixels: int
+    ) -> List[str]:
+        """Wrap text to fit within max_width_pixels using font metrics.
+
+        Args:
+            text: Text to wrap
+            font: PIL ImageFont to measure text width
+            max_width_pixels: Maximum width in pixels (accounting for margins)
+
+        Returns:
+            List of wrapped lines
+        """
+        if not text:
+            return []
+
+        # Account for left margin (2px) and right margin (2px)
+        available_width = max_width_pixels - 4
+
+        lines = []
+        words = text.split()
+        current_line = ""
+
+        for word in words:
+            # Test if adding this word fits
+            test_line = current_line + (" " if current_line else "") + word
+
+            # Measure text width using font metrics
+            if font:
+                try:
+                    # Use getbbox for accurate measurement (PIL 8.0+)
+                    bbox = font.getbbox(test_line)
+                    text_width = bbox[2] - bbox[0] if bbox else 0
+                except AttributeError:
+                    # Fallback for older PIL versions
+                    try:
+                        text_width = font.getlength(test_line)
+                    except AttributeError:
+                        # Ultimate fallback: estimate based on character count
+                        text_width = (
+                            len(test_line)
+                            * (font.size if hasattr(font, "size") else self.font_size)
+                            * 0.6
+                        )
+            else:
+                # No font: estimate based on character count
+                text_width = len(test_line) * self.font_size * 0.6
+
+            if text_width <= available_width:
+                current_line = test_line
+            else:
+                # Current line is full, start new line
+                if current_line:
+                    lines.append(current_line)
+
+                # Measure word width to decide if we need to break it
+                if font:
+                    try:
+                        bbox = font.getbbox(word)
+                        word_width = bbox[2] - bbox[0] if bbox else 0
+                    except AttributeError:
+                        try:
+                            word_width = font.getlength(word)
+                        except AttributeError:
+                            word_width = (
+                                len(word)
+                                * (
+                                    font.size
+                                    if hasattr(font, "size")
+                                    else self.font_size
+                                )
+                                * 0.6
+                            )
+                else:
+                    word_width = len(word) * self.font_size * 0.6
+
+                # Only break words if they're longer than a full line (like URLs)
+                if word_width > available_width:
+                    # Word is too long for even a single line, break it character by character
+                    current_word = ""
+                    for char in word:
+                        test_char = current_word + char
+                        if font:
+                            try:
+                                bbox = font.getbbox(test_char)
+                                char_width = bbox[2] - bbox[0] if bbox else 0
+                            except AttributeError:
+                                try:
+                                    char_width = font.getlength(test_char)
+                                except AttributeError:
+                                    char_width = (
+                                        len(test_char)
+                                        * (
+                                            font.size
+                                            if hasattr(font, "size")
+                                            else self.font_size
+                                        )
+                                        * 0.6
+                                    )
+                        else:
+                            char_width = len(test_char) * self.font_size * 0.6
+
+                        if char_width <= available_width:
+                            current_word = test_char
+                        else:
+                            if current_word:
+                                lines.append(current_word)
+                            current_word = char
+                    current_line = current_word
+                else:
+                    # Word fits on a line (even if slightly over), put it on its own line
+                    current_line = word
+
+        if current_line:
+            lines.append(current_line)
+
+        return lines if lines else [""]
 
     def _render_text_bitmap(self, lines: list) -> Image.Image:
         """Render text lines to a bitmap image, rotated 180° for upside-down printing."""
@@ -358,19 +480,42 @@ class PrinterDriver:
         # We want content at TOP (printed last) and padding at BOTTOM (printed first)
         # So we calculate content height, then add 5 lines padding at the end
         total_height = 0  # Start with content height only
-        last_spacing = 0  # Track spacing added by last operation to remove it (start padding)
+        last_spacing = (
+            0  # Track spacing added by last operation to remove it (start padding)
+        )
 
         for op_type, op_data in ops:
             if op_type == "styled":
                 clean_text = self._sanitize_text(op_data["text"])
-                line_count = len(clean_text.split("\n"))
                 style = op_data.get("style", "regular")
-                total_height += line_count * self._get_line_height_for_style(style)
+                font = self._get_font(style)
+                line_height = self._get_line_height_for_style(style)
+
+                # Calculate wrapped lines for accurate height
+                paragraphs = clean_text.split("\n")
+                total_wrapped_lines = 0
+                for paragraph in paragraphs:
+                    wrapped_lines = self._wrap_text_by_width(
+                        paragraph, font, self.PRINTER_WIDTH_DOTS
+                    )
+                    total_wrapped_lines += len(wrapped_lines)
+
+                total_height += total_wrapped_lines * line_height
                 last_spacing = 0  # Text has no trailing spacing
             elif op_type == "text":
                 clean_text = self._sanitize_text(op_data)
-                line_count = len(clean_text.split("\n"))
-                total_height += line_count * self.line_height
+                font = self._get_font("regular")
+
+                # Calculate wrapped lines for accurate height
+                paragraphs = clean_text.split("\n")
+                total_wrapped_lines = 0
+                for paragraph in paragraphs:
+                    wrapped_lines = self._wrap_text_by_width(
+                        paragraph, font, self.PRINTER_WIDTH_DOTS
+                    )
+                    total_wrapped_lines += len(wrapped_lines)
+
+                total_height += total_wrapped_lines * self.line_height
                 last_spacing = 0
             elif op_type == "box":
                 style = op_data.get("style", "bold_lg")
@@ -396,7 +541,9 @@ class PrinterDriver:
                 if grid:
                     maze_height = len(grid) * cell_size
                     # SPACING_SMALL accounts for maze_y = y + SPACING_SMALL in drawing
-                    total_height += self.SPACING_SMALL + maze_height + self.SPACING_MEDIUM
+                    total_height += (
+                        self.SPACING_SMALL + maze_height + self.SPACING_MEDIUM
+                    )
                     last_spacing = self.SPACING_MEDIUM
             elif op_type == "sudoku":
                 grid = op_data.get("grid", [])
@@ -404,7 +551,9 @@ class PrinterDriver:
                 if grid:
                     sudoku_size = 9 * cell_size + self.SPACING_SMALL
                     # SPACING_SMALL accounts for sudoku_y = y + SPACING_SMALL in drawing
-                    total_height += self.SPACING_SMALL + sudoku_size + self.SPACING_MEDIUM
+                    total_height += (
+                        self.SPACING_SMALL + sudoku_size + self.SPACING_MEDIUM
+                    )
                     last_spacing = self.SPACING_MEDIUM
             elif op_type == "icon":
                 icon_type = op_data.get("type", "sun")
@@ -489,7 +638,7 @@ class PrinterDriver:
 
         # Remove last operation's trailing spacing (it becomes START padding after 180° rotation)
         total_height -= last_spacing
-        
+
         # Add 7 lines (168 dots) of padding at the TOP of original bitmap (y=0)
         # After 180° rotation: top of original → bottom of rotated → printed LAST (end spacing)
         # This provides consistent spacing at the end of every print job
@@ -515,23 +664,33 @@ class PrinterDriver:
                 font = self._get_font(style)
                 line_height = self._get_line_height_for_style(style)
 
-                for line in clean_text.split("\n"):
-                    if font:
-                        draw.text((2, y), line, font=font, fill=0)
-                    else:
-                        draw.text((2, y), line, fill=0)
-                    y += line_height
+                # Split by newlines first, then wrap each paragraph
+                paragraphs = clean_text.split("\n")
+                for paragraph in paragraphs:
+                    # Wrap each paragraph to fit printer width
+                    wrapped_lines = self._wrap_text_by_width(paragraph, font, width)
+                    for line in wrapped_lines:
+                        if font:
+                            draw.text((2, y), line, font=font, fill=0)
+                        else:
+                            draw.text((2, y), line, fill=0)
+                        y += line_height
             elif op_type == "text":
                 # Legacy support
                 clean_text = self._sanitize_text(op_data)
                 font = self._get_font("regular")
-                for line in clean_text.split("\n"):
-                    if font:
-                        draw.text((2, y), line, font=font, fill=0)
-                    else:
-                        draw.text((2, y), line, fill=0)
-                    y += self.line_height
-                    self.lines_printed += 1
+                # Split by newlines first, then wrap each paragraph
+                paragraphs = clean_text.split("\n")
+                for paragraph in paragraphs:
+                    # Wrap each paragraph to fit printer width
+                    wrapped_lines = self._wrap_text_by_width(paragraph, font, width)
+                    for line in wrapped_lines:
+                        if font:
+                            draw.text((2, y), line, font=font, fill=0)
+                        else:
+                            draw.text((2, y), line, fill=0)
+                        y += self.line_height
+                        self.lines_printed += 1
             elif op_type == "box":
                 # Draw a full-width box with text centered inside
                 text = self._sanitize_text(op_data.get("text", ""))
@@ -2471,7 +2630,7 @@ class PrinterDriver:
 
     def set_cutter_feed(self, lines: int):
         """Set the cutter feed space (lines of white space at end of print).
-        
+
         This space is added to the bitmap itself, ensuring reliable paper feed
         after bitmap printing regardless of post-print commands.
         """
@@ -2479,30 +2638,30 @@ class PrinterDriver:
 
     def feed_direct(self, lines: int = 3):
         """Feed paper directly, bypassing the buffer (for use after flushing in invert mode).
-        
+
         After bitmap printing (GS v 0), we need to ensure paper feeds.
         Uses ESC d (Print and feed n lines) which should work after any print command.
         """
         if lines <= 0:
             return
-        
+
         try:
             # Small delay to let bitmap finish processing
             time.sleep(0.05)
-            
+
             # ESC d n - Print and feed n lines (0x1B 0x64 n)
             # This command works after bitmap printing because it's a "print and feed" command
             # Even with no data to print, it should still feed the paper
             feed_amount = min(lines, 255)
             self._write(b"\x1b\x64" + bytes([feed_amount]))
-            
+
             # Backup: Also send ESC J (feed by dots) in case ESC d doesn't work
             dots = lines * 24
             while dots > 0:
                 chunk = min(dots, 255)
                 self._write(b"\x1b\x4a" + bytes([chunk]))
                 dots -= chunk
-            
+
             # Flush to ensure all data is sent
             if self.ser and self.ser.is_open:
                 self.ser.flush()
