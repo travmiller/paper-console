@@ -1,4 +1,5 @@
-from datetime import datetime
+from datetime import datetime, date
+from typing import Optional
 
 class PrinterDriver:
     # Fixed spacing constants (match serial driver)
@@ -142,13 +143,13 @@ class PrinterDriver:
         self,
         phase: float,
         size: int = 60,
-        illumination: float = None,
-        moonrise: str = None,
-        moonset: str = None,
-        next_full_moon: date = None,
-        next_new_moon: date = None,
-        days_to_full: int = None,
-        days_to_new: int = None,
+        illumination: Optional[float] = None,
+        moonrise: Optional[str] = None,
+        moonset: Optional[str] = None,
+        next_full_moon: Optional[date] = None,
+        next_new_moon: Optional[date] = None,
+        days_to_full: Optional[int] = None,
+        days_to_new: Optional[int] = None,
     ):
         """Simulates printing an enhanced moon phase graphic."""
         from datetime import date
