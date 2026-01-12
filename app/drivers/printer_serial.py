@@ -52,8 +52,8 @@ class PrinterDriver:
     PRINTER_WIDTH_DOTS = 384  # 58mm paper at 203 DPI
 
     # Fixed typography and spacing constants (pixels)
-    FONT_SIZE = 16  # Base font size for body text (increased from 14)
-    LINE_HEIGHT = 20  # Font size + line spacing (adjusted for larger font)
+    FONT_SIZE = 18  # Base font size for body text (increased for better readability)
+    LINE_HEIGHT = 22  # Font size + line spacing (adjusted for larger font)
     SPACING_SMALL = 4  # Tight spacing (after inline elements)
     SPACING_MEDIUM = 8  # Standard spacing (between content blocks)
     SPACING_LARGE = 16  # Section spacing (between modules)
@@ -138,7 +138,8 @@ class PrinterDriver:
 
         IBM Plex Mono is a monospace font designed for technical and display purposes.
         Place font files in: web/public/fonts/IBM_Plex_Mono/
-        Required files: IBMPlexMono-Regular.ttf, IBMPlexMono-Medium.ttf, IBMPlexMono-SemiBold.ttf, IBMPlexMono-Bold.ttf
+        Required files: IBMPlexMono-SemiBold.ttf (used as base), IBMPlexMono-Medium.ttf, IBMPlexMono-Bold.ttf
+        Uses SemiBold as the lightest weight to prevent broken lines on thermal printers.
         """
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -148,12 +149,12 @@ class PrinterDriver:
 
         # Font variants we want to load
         # IBM Plex Mono has: Regular, Medium, SemiBold, Bold
-        # We prefer heavier fonts - lightest we use is Regular
+        # Using SemiBold as lightest weight to prevent broken lines on thermal printer
         font_variants = {
-            "regular": "IBMPlexMono-Regular.ttf",
+            "regular": "IBMPlexMono-SemiBold.ttf",  # Use SemiBold as base for better line continuity
             "bold": "IBMPlexMono-Bold.ttf",
             "medium": "IBMPlexMono-Medium.ttf",
-            "light": "IBMPlexMono-Regular.ttf",  # Map light to Regular (no Light font used)
+            "light": "IBMPlexMono-SemiBold.ttf",  # Map light to SemiBold (heavier for thermal printing)
             "semibold": "IBMPlexMono-SemiBold.ttf",
         }
 
@@ -180,9 +181,9 @@ class PrinterDriver:
                         fonts[f"{variant_name}_lg"] = ImageFont.truetype(
                             font_path, self.font_size + 6
                         )
-                        # Load at small/caption size (4px smaller)
+                        # Load at small/caption size (3px smaller, but minimum 14px for readability)
                         fonts[f"{variant_name}_sm"] = ImageFont.truetype(
-                            font_path, max(12, self.font_size - 4)
+                            font_path, max(14, self.font_size - 3)
                         )
                         font_loaded = True
                         break
@@ -200,15 +201,23 @@ class PrinterDriver:
         # Fallback to system fonts if IBM Plex Mono not found
         if "regular" not in fonts:
             # Try common system font locations for IBM Plex Mono
+            # Prefer SemiBold as base weight for better thermal printing
             system_font_paths = [
-                # Linux
+                # Linux - try SemiBold first
+                "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-SemiBold.ttf",
+                "/usr/share/fonts/TTF/IBMPlexMono-SemiBold.ttf",
+                "~/.fonts/IBMPlexMono-SemiBold.ttf",
+                # Windows - try SemiBold first
+                "C:/Windows/Fonts/IBMPlexMono-SemiBold.ttf",
+                # Fallback to Regular if SemiBold not found
                 "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-Regular.ttf",
                 "/usr/share/fonts/TTF/IBMPlexMono-Regular.ttf",
                 "~/.fonts/IBMPlexMono-Regular.ttf",
-                # Windows
                 "C:/Windows/Fonts/IBMPlexMono-Regular.ttf",
                 "C:/Windows/Fonts/ibmplexmono.ttf",
                 # macOS
+                "~/Library/Fonts/IBMPlexMono-SemiBold.ttf",
+                "/Library/Fonts/IBMPlexMono-SemiBold.ttf",
                 "~/Library/Fonts/IBMPlexMono-Regular.ttf",
                 "/Library/Fonts/IBMPlexMono-Regular.ttf",
             ]
@@ -219,18 +228,18 @@ class PrinterDriver:
                         fonts["regular"] = ImageFont.truetype(
                             expanded_path, self.font_size
                         )
+                        # Try to find Bold variant
+                        bold_path = expanded_path.replace("Regular", "Bold").replace("SemiBold", "Bold")
                         fonts["bold"] = (
-                            ImageFont.truetype(
-                                expanded_path.replace("Regular", "Bold"), self.font_size
-                            )
-                            if os.path.exists(expanded_path.replace("Regular", "Bold"))
+                            ImageFont.truetype(bold_path, self.font_size)
+                            if os.path.exists(bold_path)
                             else fonts["regular"]
                         )
                         fonts["regular_lg"] = ImageFont.truetype(
                             expanded_path, self.font_size + 6
                         )
                         fonts["regular_sm"] = ImageFont.truetype(
-                            expanded_path, max(12, self.font_size - 4)
+                            expanded_path, max(14, self.font_size - 3)
                         )
                         break
                     except Exception:
@@ -253,7 +262,7 @@ class PrinterDriver:
                             path, self.font_size + 6
                         )
                         fonts["regular_sm"] = ImageFont.truetype(
-                            path, max(12, self.font_size - 4)
+                            path, max(14, self.font_size - 3)
                         )
                         break
                     except Exception:
@@ -311,7 +320,7 @@ class PrinterDriver:
         if "_lg" in style:
             return self.font_size + 6 + self.line_spacing
         elif "_sm" in style:
-            return max(12, self.font_size - 4) + self.line_spacing
+            return max(14, self.font_size - 3) + self.line_spacing
         return self.line_height
 
     def _render_unified_bitmap(self, ops: list) -> Image.Image:
