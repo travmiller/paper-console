@@ -137,6 +137,7 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     current_moon_index = int(phase_normalized / days_per_moon)
     
     # Moons fill up progressively as the cycle progresses (progress bar style)
+    # This logic lives in the astronomy module (module-specific business logic)
     moon_states = [i <= current_moon_index for i in range(num_moons)]
     printer.print_moon_phase(moon_states, size=64)
     
