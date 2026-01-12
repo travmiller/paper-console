@@ -1,7 +1,7 @@
 class PrinterDriver:
     # Fixed spacing constants (match serial driver)
-    FONT_SIZE = 14
-    LINE_HEIGHT = 18
+    FONT_SIZE = 16  # Increased from 14 to match IBM Plex Mono
+    LINE_HEIGHT = 20  # Adjusted for larger font
     SPACING_SMALL = 4
     SPACING_MEDIUM = 8
     SPACING_LARGE = 16

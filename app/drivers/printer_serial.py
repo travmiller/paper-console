@@ -52,8 +52,8 @@ class PrinterDriver:
     PRINTER_WIDTH_DOTS = 384  # 58mm paper at 203 DPI
 
     # Fixed typography and spacing constants (pixels)
-    FONT_SIZE = 14  # Base font size for body text
-    LINE_HEIGHT = 18  # Font size + line spacing
+    FONT_SIZE = 16  # Base font size for body text (increased from 14)
+    LINE_HEIGHT = 20  # Font size + line spacing (adjusted for larger font)
     SPACING_SMALL = 4  # Tight spacing (after inline elements)
     SPACING_MEDIUM = 8  # Standard spacing (between content blocks)
     SPACING_LARGE = 16  # Section spacing (between modules)
@@ -134,11 +134,11 @@ class PrinterDriver:
             self.ser = None
 
     def _load_font_family(self) -> dict:
-        """Load Orbitron font family with multiple weights.
+        """Load IBM Plex Mono font family with multiple weights.
 
-        Orbitron is a geometric sans-serif font designed for display purposes.
-        Place font files in: fonts/Orbitron/static/
-        Required files: Orbitron-Regular.ttf, Orbitron-Medium.ttf, Orbitron-Bold.ttf
+        IBM Plex Mono is a monospace font designed for technical and display purposes.
+        Place font files in: web/public/fonts/IBM_Plex_Mono/
+        Required files: IBMPlexMono-Regular.ttf, IBMPlexMono-Medium.ttf, IBMPlexMono-SemiBold.ttf, IBMPlexMono-Bold.ttf
         """
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -147,24 +147,21 @@ class PrinterDriver:
         fonts = {}
 
         # Font variants we want to load
-        # Orbitron typically has: Regular, Medium, SemiBold, Bold, ExtraBold, Black
-        # We'll map our styles to available weights
+        # IBM Plex Mono has: Regular, Medium, SemiBold, Bold
+        # We prefer heavier fonts - lightest we use is Regular
         font_variants = {
-            "regular": "Orbitron-Regular.ttf",
-            "bold": "Orbitron-Bold.ttf",
-            "medium": "Orbitron-Medium.ttf",
-            "light": "Orbitron-Regular.ttf",  # Use Regular if Light not available
-            "semibold": "Orbitron-SemiBold.ttf",  # Use SemiBold if available, fallback to Bold
+            "regular": "IBMPlexMono-Regular.ttf",
+            "bold": "IBMPlexMono-Bold.ttf",
+            "medium": "IBMPlexMono-Medium.ttf",
+            "light": "IBMPlexMono-Regular.ttf",  # Map light to Regular (no Light font used)
+            "semibold": "IBMPlexMono-SemiBold.ttf",
         }
 
-        # Base paths to search (check both root and static subdirectory)
+        # Base paths to search
         base_paths = [
-            os.path.join(project_root, "web/public/fonts/Orbitron"),
-            os.path.join(project_root, "web/public/fonts/Orbitron/static"),
-            os.path.join(project_root, "web/dist/fonts/Orbitron"),
-            os.path.join(project_root, "web/dist/fonts/Orbitron/static"),
-            os.path.join(project_root, "fonts/Orbitron"),  # Alternative location
-            os.path.join(project_root, "fonts/Orbitron/static"),  # Static subdirectory
+            os.path.join(project_root, "web/public/fonts/IBM_Plex_Mono"),
+            os.path.join(project_root, "web/dist/fonts/IBM_Plex_Mono"),
+            os.path.join(project_root, "fonts/IBM_Plex_Mono"),  # Alternative location
         ]
 
         # Load each variant at different sizes
@@ -185,7 +182,7 @@ class PrinterDriver:
                         )
                         # Load at small/caption size (4px smaller)
                         fonts[f"{variant_name}_sm"] = ImageFont.truetype(
-                            font_path, max(10, self.font_size - 4)
+                            font_path, max(12, self.font_size - 4)
                         )
                         font_loaded = True
                         break
@@ -200,20 +197,20 @@ class PrinterDriver:
                     fonts["semibold_lg"] = fonts.get("bold_lg", fonts["bold"])
                     fonts["semibold_sm"] = fonts.get("bold_sm", fonts["bold"])
 
-        # Fallback to system fonts if Orbitron not found
+        # Fallback to system fonts if IBM Plex Mono not found
         if "regular" not in fonts:
-            # Try common system font locations for Orbitron
+            # Try common system font locations for IBM Plex Mono
             system_font_paths = [
                 # Linux
-                "/usr/share/fonts/truetype/orbitron/Orbitron-Regular.ttf",
-                "/usr/share/fonts/TTF/Orbitron-Regular.ttf",
-                "~/.fonts/Orbitron-Regular.ttf",
+                "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-Regular.ttf",
+                "/usr/share/fonts/TTF/IBMPlexMono-Regular.ttf",
+                "~/.fonts/IBMPlexMono-Regular.ttf",
                 # Windows
-                "C:/Windows/Fonts/Orbitron-Regular.ttf",
-                "C:/Windows/Fonts/orbitron.ttf",
+                "C:/Windows/Fonts/IBMPlexMono-Regular.ttf",
+                "C:/Windows/Fonts/ibmplexmono.ttf",
                 # macOS
-                "~/Library/Fonts/Orbitron-Regular.ttf",
-                "/Library/Fonts/Orbitron-Regular.ttf",
+                "~/Library/Fonts/IBMPlexMono-Regular.ttf",
+                "/Library/Fonts/IBMPlexMono-Regular.ttf",
             ]
             for path in system_font_paths:
                 expanded_path = os.path.expanduser(path)
@@ -233,7 +230,7 @@ class PrinterDriver:
                             expanded_path, self.font_size + 6
                         )
                         fonts["regular_sm"] = ImageFont.truetype(
-                            expanded_path, max(10, self.font_size - 4)
+                            expanded_path, max(12, self.font_size - 4)
                         )
                         break
                     except Exception:
@@ -256,7 +253,7 @@ class PrinterDriver:
                             path, self.font_size + 6
                         )
                         fonts["regular_sm"] = ImageFont.truetype(
-                            path, max(10, self.font_size - 4)
+                            path, max(12, self.font_size - 4)
                         )
                         break
                     except Exception:
@@ -314,7 +311,7 @@ class PrinterDriver:
         if "_lg" in style:
             return self.font_size + 6 + self.line_spacing
         elif "_sm" in style:
-            return max(10, self.font_size - 4) + self.line_spacing
+            return max(12, self.font_size - 4) + self.line_spacing
         return self.line_height
 
     def _render_unified_bitmap(self, ops: list) -> Image.Image:
