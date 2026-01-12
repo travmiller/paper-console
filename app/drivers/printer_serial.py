@@ -1608,14 +1608,29 @@ class PrinterDriver:
                 error_correction.upper(), qrcode.constants.ERROR_CORRECT_L
             )
 
+            # Calculate minimum version needed based on data length
+            # QR version capacity (bytes with L error correction):
+            # v1=17, v4=78, v10=271, v20=858, v30=1531, v40=2953
+            data_len = len(data.encode('utf-8'))
+            if data_len <= 78:
+                min_version = 4
+            elif data_len <= 271:
+                min_version = 10
+            elif data_len <= 858:
+                min_version = 20
+            elif data_len <= 1531:
+                min_version = 30
+            else:
+                min_version = 40
+
             qr = qrcode.QRCode(
-                version=4 if fixed_size else 1,
+                version=min_version if fixed_size else 1,
                 error_correction=ec_level,
                 box_size=max(1, min(16, size)),
                 border=1,
             )
             qr.add_data(data)
-            qr.make(fit=not fixed_size)
+            qr.make(fit=True)  # Always fit to ensure it works
 
             qr_img = qr.make_image(fill_color="black", back_color="white")
             return qr_img.convert("1")

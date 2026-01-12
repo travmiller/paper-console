@@ -1,7 +1,25 @@
 import requests
 from datetime import datetime
 from typing import Dict, Any
+from urllib.parse import urlparse, urlunparse
 from app.config import settings
+
+
+def clean_url(url: str) -> str:
+    """Clean URL by removing query parameters and fragments.
+    
+    News URLs often have very long tracking parameters that bloat QR codes.
+    Most articles load fine with just the base path.
+    """
+    if not url:
+        return url
+    try:
+        parsed = urlparse(url)
+        # Keep only scheme, netloc, and path (remove query and fragment)
+        clean = urlunparse((parsed.scheme, parsed.netloc, parsed.path, '', '', ''))
+        return clean
+    except Exception:
+        return url
 
 
 def get_newsapi_articles(config: Dict[str, Any] = None):
@@ -81,8 +99,9 @@ def format_news_receipt(
                 if len(wrapped_summary) > 4:
                     printer.print_caption("...")
 
-            # QR code linking to full article
+            # QR code linking to full article (cleaned URL for smaller QR)
             if article.get("url"):
-                printer.print_qr(article["url"], size=2, error_correction="L", fixed_size=True)
+                cleaned_url = clean_url(article["url"])
+                printer.print_qr(cleaned_url, size=2, error_correction="L", fixed_size=True)
 
             printer.print_line()
