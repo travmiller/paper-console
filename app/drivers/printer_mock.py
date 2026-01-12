@@ -37,14 +37,25 @@ class PrinterDriver:
         print(f"[PRINT] {prefix}{text}")
         self.lines_printed += text.count("\n") + 1
 
-    def print_header(self, text: str):
+    def print_header(self, text: str, icon: str = None, icon_size: int = 24):
         """Prints large bold header text in a full-width drawn box (simulated)."""
         text = text.upper()
         inner_width = self.width - 4  # Full width minus borders
         
+        # Add icon if provided
+        if icon:
+            icons = {
+                "check": "✓", "home": "⌂", "wifi": "📶", "settings": "⚙",
+                "arrow_right": "→", "sun": "☀", "cloud": "☁"
+            }
+            icon_char = icons.get(icon.lower(), "•")
+            header_text = f"{icon_char} {text}"
+        else:
+            header_text = text
+        
         # Simulate the bitmap box with ASCII
         print(f"[PRINT] ┏{'━' * inner_width}┓")
-        print(f"[PRINT] ┃{text:^{inner_width}}┃")
+        print(f"[PRINT] ┃{header_text:^{inner_width}}┃")
         print(f"[PRINT] ┗{'━' * inner_width}┛")
         self.lines_printed += 3
     

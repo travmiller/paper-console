@@ -276,8 +276,11 @@ class PrinterDriver:
                 style = op_data.get("style", "bold_lg")
                 padding = op_data.get("padding", 8)
                 border = op_data.get("border", 2)
+                icon_type = op_data.get("icon")  # Optional inline icon
                 text_height = self._get_line_height_for_style(style)
-                box_height = border + padding + text_height + padding + border
+                # If icon, make box taller to accommodate icon
+                icon_size = op_data.get("icon_size", 24) if icon_type else 0
+                box_height = border + padding + max(text_height, icon_size) + padding + border
                 total_height += box_height + 4  # +4 for spacing around box
             elif op_type == "moon":
                 # Moon phase graphic: circle with shadow
@@ -385,12 +388,14 @@ class PrinterDriver:
                 style = op_data.get("style", "bold_lg")
                 padding = op_data.get("padding", 8)
                 border = op_data.get("border", 2)
+                icon_type = op_data.get("icon")  # Optional inline icon
+                icon_size = op_data.get("icon_size", 24) if icon_type else 0
                 font = self._get_font(style)
                 text_height = self._get_line_height_for_style(style)
                 
                 # Full width box
                 box_width = width - 4  # Leave 2px margin on each side
-                box_height = text_height + (padding * 2) + (border * 2)
+                box_height = max(text_height, icon_size) + (padding * 2) + (border * 2)
                 
                 box_x = 2  # Small left margin
                 box_y = y + 2  # Small top margin
@@ -407,15 +412,30 @@ class PrinterDriver:
                     fill=1  # White
                 )
                 
-                # Center text horizontally within the box
+                # Calculate text width
                 if font:
                     bbox = font.getbbox(text)
                     text_width = bbox[2] - bbox[0] if bbox else len(text) * 10
                 else:
                     text_width = len(text) * 10
                 
-                text_x = box_x + (box_width - text_width) // 2
-                text_y = box_y + border + padding
+                # Calculate total width (text + icon + spacing)
+                icon_spacing = 6 if icon_type else 0
+                total_content_width = text_width + icon_size + icon_spacing if icon_type else text_width
+                
+                # Center everything together
+                content_start_x = box_x + (box_width - total_content_width) // 2
+                content_y = box_y + border + padding
+                
+                # Draw icon if present (to the left of text)
+                if icon_type:
+                    icon_x = content_start_x
+                    icon_y = content_y + (text_height - icon_size) // 2
+                    self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
+                
+                # Draw text (to the right of icon, or centered if no icon)
+                text_x = content_start_x + icon_size + icon_spacing if icon_type else content_start_x
+                text_y = content_y
                 if font:
                     draw.text((text_x, text_y), text, font=font, fill=0)
                 else:
@@ -1700,17 +1720,27 @@ class PrinterDriver:
             self.flush_buffer()
         self.print_buffer.append(("styled", {"text": text, "style": style}))
 
-    def print_header(self, text: str):
-        """Print large bold header text in a drawn box."""
+    def print_header(self, text: str, icon: str = None, icon_size: int = 24):
+        """Print large bold header text in a drawn box.
+        
+        Args:
+            text: Header text
+            icon: Optional icon type to display inline (e.g., "check", "home")
+            icon_size: Size of icon in pixels (default 24)
+        """
         # Add a box operation to the buffer
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
-        self.print_buffer.append(("box", {
+        box_data = {
             "text": text.upper(),
             "style": "bold_lg",
             "padding": 8,  # pixels of padding inside box
             "border": 2,   # border thickness in pixels
-        }))
+        }
+        if icon:
+            box_data["icon"] = icon
+            box_data["icon_size"] = icon_size
+        self.print_buffer.append(("box", box_data))
     
     def print_subheader(self, text: str):
         """Print medium-weight subheader."""
