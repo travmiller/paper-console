@@ -134,12 +134,12 @@ class PrinterDriver:
             self.ser = None
 
     def _load_font_family(self) -> dict:
-        """Load Share Tech Mono font family with multiple weights.
+        """Load IBM Plex Mono font family with multiple weights.
 
-        Share Tech Mono is a monospace font designed for technical and display purposes.
-        Place font files in: web/public/fonts/Share_Tech_Mono/
-        Required files: ShareTechMono-Regular.ttf (used as base), ShareTechMono-Bold.ttf (optional)
-        Uses Regular as base weight, Bold for headings (falls back to Regular if Bold not available).
+        IBM Plex Mono is a monospace font designed for technical and display purposes.
+        Place font files in: web/public/fonts/IBM_Plex_Mono/
+        Required files: IBMPlexMono-Medium.ttf (used as base), IBMPlexMono-SemiBold.ttf, IBMPlexMono-Bold.ttf
+        Uses Medium as base weight, SemiBold and Bold for headings.
         """
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -148,21 +148,21 @@ class PrinterDriver:
         fonts = {}
 
         # Font variants we want to load
-        # Share Tech Mono has: Regular, Bold (no Medium or SemiBold)
-        # Using Regular as base weight, Bold for headings
+        # IBM Plex Mono has: Regular, Medium, SemiBold, Bold
+        # Using Medium as base weight, SemiBold and Bold for headings
         font_variants = {
-            "regular": "ShareTechMono-Regular.ttf",  # Regular as base weight
-            "bold": "ShareTechMono-Bold.ttf",  # Bold for headings
-            "medium": "ShareTechMono-Regular.ttf",  # Map medium to Regular
-            "light": "ShareTechMono-Regular.ttf",  # Map light to Regular (base weight)
-            "semibold": "ShareTechMono-Bold.ttf",  # Map semibold to Bold (no SemiBold available)
+            "regular": "IBMPlexMono-Medium.ttf",  # Medium as base weight
+            "bold": "IBMPlexMono-Bold.ttf",  # Bold for headings
+            "medium": "IBMPlexMono-Medium.ttf",
+            "light": "IBMPlexMono-Medium.ttf",  # Map light to Medium (base weight)
+            "semibold": "IBMPlexMono-SemiBold.ttf",  # SemiBold for headings
         }
 
         # Base paths to search
         base_paths = [
-            os.path.join(project_root, "web/public/fonts/Share_Tech_Mono"),
-            os.path.join(project_root, "web/dist/fonts/Share_Tech_Mono"),
-            os.path.join(project_root, "fonts/Share_Tech_Mono"),  # Alternative location
+            os.path.join(project_root, "web/public/fonts/IBM_Plex_Mono"),
+            os.path.join(project_root, "web/dist/fonts/IBM_Plex_Mono"),
+            os.path.join(project_root, "fonts/IBM_Plex_Mono"),  # Alternative location
         ]
 
         # Load each variant at different sizes
@@ -190,41 +190,40 @@ class PrinterDriver:
                     except Exception:
                         continue
 
-            # Fallback for bold if Bold not found (Share Tech Mono may only have Regular)
-            if variant_name == "bold" and not font_loaded:
-                # Use Regular as fallback
-                if "regular" in fonts:
-                    fonts["bold"] = fonts["regular"]
-                    fonts["bold_lg"] = fonts.get("regular_lg", fonts["regular"])
-                    fonts["bold_sm"] = fonts.get("regular_sm", fonts["regular"])
-            
-            # Fallback for semibold if SemiBold not found (Share Tech Mono doesn't have SemiBold)
+            # Fallback for semibold if SemiBold not found
             if variant_name == "semibold" and not font_loaded:
-                # Use Bold as fallback, or Regular if Bold not available
+                # Try using Bold as fallback (heavier than Medium)
                 if "bold" in fonts:
                     fonts["semibold"] = fonts["bold"]
                     fonts["semibold_lg"] = fonts.get("bold_lg", fonts["bold"])
                     fonts["semibold_sm"] = fonts.get("bold_sm", fonts["bold"])
-                elif "regular" in fonts:
-                    fonts["semibold"] = fonts["regular"]
-                    fonts["semibold_lg"] = fonts.get("regular_lg", fonts["regular"])
-                    fonts["semibold_sm"] = fonts.get("regular_sm", fonts["regular"])
+                elif "medium" in fonts:
+                    fonts["semibold"] = fonts["medium"]
+                    fonts["semibold_lg"] = fonts.get("medium_lg", fonts["medium"])
+                    fonts["semibold_sm"] = fonts.get("medium_sm", fonts["medium"])
 
-        # Fallback to system fonts if Share Tech Mono not found
+        # Fallback to system fonts if IBM Plex Mono not found
         if "regular" not in fonts:
-            # Try common system font locations for Share Tech Mono
-            # Share Tech Mono typically has Regular and Bold weights
+            # Try common system font locations for IBM Plex Mono
+            # Prefer Medium as base weight
             system_font_paths = [
-                # Linux - try Regular first
-                "/usr/share/fonts/truetype/share-tech-mono/ShareTechMono-Regular.ttf",
-                "/usr/share/fonts/TTF/ShareTechMono-Regular.ttf",
-                "~/.fonts/ShareTechMono-Regular.ttf",
-                # Windows
-                "C:/Windows/Fonts/ShareTechMono-Regular.ttf",
-                "C:/Windows/Fonts/sharetechmono.ttf",
+                # Linux - try Medium first
+                "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-Medium.ttf",
+                "/usr/share/fonts/TTF/IBMPlexMono-Medium.ttf",
+                "~/.fonts/IBMPlexMono-Medium.ttf",
+                # Windows - try Medium first
+                "C:/Windows/Fonts/IBMPlexMono-Medium.ttf",
+                # Fallback to Regular if Medium not found
+                "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-Regular.ttf",
+                "/usr/share/fonts/TTF/IBMPlexMono-Regular.ttf",
+                "~/.fonts/IBMPlexMono-Regular.ttf",
+                "C:/Windows/Fonts/IBMPlexMono-Regular.ttf",
+                "C:/Windows/Fonts/ibmplexmono.ttf",
                 # macOS
-                "~/Library/Fonts/ShareTechMono-Regular.ttf",
-                "/Library/Fonts/ShareTechMono-Regular.ttf",
+                "~/Library/Fonts/IBMPlexMono-Medium.ttf",
+                "/Library/Fonts/IBMPlexMono-Medium.ttf",
+                "~/Library/Fonts/IBMPlexMono-Regular.ttf",
+                "/Library/Fonts/IBMPlexMono-Regular.ttf",
             ]
             for path in system_font_paths:
                 expanded_path = os.path.expanduser(path)
@@ -233,15 +232,23 @@ class PrinterDriver:
                         fonts["regular"] = ImageFont.truetype(
                             expanded_path, self.font_size
                         )
-                        # Try to find Bold variant for headings (Share Tech Mono only has Regular and Bold)
-                        bold_path = expanded_path.replace("Regular", "Bold")
+                        # Try to find Bold and SemiBold variants for headings
+                        bold_path = expanded_path.replace("Regular", "Bold").replace(
+                            "Medium", "Bold"
+                        )
+                        semibold_path = expanded_path.replace(
+                            "Regular", "SemiBold"
+                        ).replace("Medium", "SemiBold")
                         fonts["bold"] = (
                             ImageFont.truetype(bold_path, self.font_size)
                             if os.path.exists(bold_path)
                             else fonts["regular"]
                         )
-                        # Share Tech Mono doesn't have SemiBold, so use Bold
-                        fonts["semibold"] = fonts["bold"]
+                        fonts["semibold"] = (
+                            ImageFont.truetype(semibold_path, self.font_size)
+                            if os.path.exists(semibold_path)
+                            else fonts["bold"]
+                        )
                         fonts["regular_lg"] = ImageFont.truetype(
                             expanded_path, self.font_size + 6
                         )
