@@ -546,11 +546,14 @@ class PrinterDriver:
                 cell_y = y + row_idx * cell_size
                 
                 if cell == 1:
-                    # Wall - draw filled black rectangle
-                    draw.rectangle(
-                        [cell_x, cell_y, cell_x + cell_size - 1, cell_y + cell_size - 1],
-                        fill=0  # Black
-                    )
+                    # Wall - draw 50% grey checkerboard pattern
+                    for py in range(cell_size):
+                        for px in range(cell_size):
+                            # Checkerboard: black if (px + py) is even
+                            if (px + py) % 2 == 0:
+                                draw.point((cell_x + px, cell_y + py), fill=0)  # Black
+                            else:
+                                draw.point((cell_x + px, cell_y + py), fill=1)  # White
                 else:
                     # Path - draw white rectangle (or leave blank)
                     draw.rectangle(
@@ -1012,12 +1015,12 @@ class PrinterDriver:
             "size": size,
         }))
 
-    def print_maze(self, grid: List[List[int]], cell_size: int = 4):
+    def print_maze(self, grid: List[List[int]], cell_size: int = 8):
         """Print a maze as a bitmap graphic.
         
         Args:
             grid: 2D list where 1 = wall, 0 = path
-            cell_size: Size of each cell in pixels (default 4)
+            cell_size: Size of each cell in pixels (default 8)
         """
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
@@ -1026,12 +1029,12 @@ class PrinterDriver:
             "cell_size": cell_size,
         }))
 
-    def print_sudoku(self, grid: List[List[int]], cell_size: int = 8):
+    def print_sudoku(self, grid: List[List[int]], cell_size: int = 16):
         """Print a Sudoku grid as a bitmap graphic.
         
         Args:
             grid: 9x9 grid where 0 = empty, 1-9 = number
-            cell_size: Size of each cell in pixels (default 8)
+            cell_size: Size of each cell in pixels (default 16)
         """
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()

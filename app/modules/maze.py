@@ -69,8 +69,11 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     printer.print_subheader("START ↑  ·  END ↓")
     printer.print_line()
     
-    # Print maze as bitmap (4px per cell = 60px wide for 15 cells)
-    printer.print_maze(maze.grid, cell_size=4)
+    # Print maze as full width (384 dots / 15 cells = ~25px per cell)
+    # Use printer's width in dots (384 for 58mm thermal printer)
+    printer_width_dots = getattr(printer, 'PRINTER_WIDTH_DOTS', 384)
+    cell_size = printer_width_dots // width
+    printer.print_maze(maze.grid, cell_size=cell_size)
     
     printer.print_line()
     printer.print_caption("Find the path!")

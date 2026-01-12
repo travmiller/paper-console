@@ -119,8 +119,10 @@ def format_sudoku_receipt(
     printer.print_subheader(f"Difficulty: {difficulty.title()}")
     printer.print_line()
 
-    # Render grid as bitmap (8px per cell = 76px total with borders)
-    printer.print_sudoku(grid, cell_size=8)
+    # Render grid as full width (384 dots - 4px borders) / 9 cells = ~42px per cell
+    printer_width_dots = getattr(printer, 'PRINTER_WIDTH_DOTS', 384)
+    cell_size = (printer_width_dots - 4) // 9  # -4 for 2px borders on each side
+    printer.print_sudoku(grid, cell_size=cell_size)
     
     printer.print_line()
     printer.print_caption("Good luck!")
