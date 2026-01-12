@@ -332,7 +332,8 @@ class PrinterDriver:
             return None
 
         # First pass: calculate total height needed
-        total_height = self.SPACING_SMALL  # Top padding
+        # No top padding - content starts immediately
+        total_height = 0
 
         for op_type, op_data in ops:
             if op_type == "styled":
@@ -448,7 +449,8 @@ class PrinterDriver:
         draw = ImageDraw.Draw(img)
 
         # Second pass: draw everything
-        y = 2
+        # No top padding - content starts at y=0
+        y = 0
 
         for op_type, op_data in ops:
             if op_type == "styled":

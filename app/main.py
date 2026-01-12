@@ -256,9 +256,7 @@ async def check_first_boot():
 
         # If marker exists, just print ready message
         if os.path.exists(marker_path):
-            printer.feed(1)
-            
-            # Visual header with inline icon
+            # Visual header with inline icon (no feed before - content starts immediately)
             printer.print_header("SYSTEM READY", icon="check", icon_size=28)
         
         from datetime import datetime
@@ -321,9 +319,7 @@ async def check_first_boot():
 
     ssid = f"PC-1-Setup-{ssid_suffix}"
 
-    printer.feed(1)
-    
-    # Welcome header with icon
+    # Welcome header with icon (no feed before - content starts immediately)
     printer.print_header("WELCOME")
     printer.print_icon("home", size=56)
     
