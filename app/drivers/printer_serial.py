@@ -2441,10 +2441,21 @@ class PrinterDriver:
         self._ensure_ascii_mode()
 
     def feed_direct(self, lines: int = 3):
-        """Feed paper directly, bypassing the buffer (for use after flushing in invert mode)."""
+        """Feed paper directly, bypassing the buffer (for use after flushing in invert mode).
+        
+        Uses ESC J command to feed by dots for reliable spacing in bitmap mode.
+        Each line is approximately 24 dots at 203 DPI (~3mm).
+        """
         try:
-            # Send all newlines at once (more efficient)
-            self._write(b"\n" * lines)
+            # ESC J n - Feed paper by n dots (more reliable than newlines in bitmap mode)
+            # Max 255 dots per command, so send multiple commands if needed
+            dots_per_line = 24  # ~3mm per line at 203 DPI
+            total_dots = lines * dots_per_line
+            
+            while total_dots > 0:
+                feed_amount = min(total_dots, 255)
+                self._write(bytes([0x1B, 0x4A, feed_amount]))
+                total_dots -= feed_amount
         except Exception:
             pass
 
