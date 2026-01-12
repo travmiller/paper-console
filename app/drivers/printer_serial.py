@@ -335,8 +335,8 @@ class PrinterDriver:
         # Note: bitmap is rotated 180° before printing, so:
         #   - Top of bitmap (y=0) = printed LAST (end of print)
         #   - Bottom of bitmap = printed FIRST (start of print)
-        # We want: no padding at START (bottom), small padding at END (top)
-        total_height = self.SPACING_SMALL  # Small end padding (printed last after rotation)
+        # We want: no padding at START (bottom), no padding at END (top - feed_direct handles this)
+        total_height = 0  # No end padding - feed_direct adds cutter spacing after bitmap
         last_spacing = 0  # Track spacing added by last operation to remove it (start padding)
 
         for op_type, op_data in ops:
@@ -361,30 +361,35 @@ class PrinterDriver:
                 box_height = (
                     border + padding + max(text_height, icon_size) + padding + border
                 )
-                total_height += box_height + self.SPACING_MEDIUM
+                # +2 accounts for the box_y = y + 2 margin in the drawing code
+                total_height += 2 + box_height + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "moon":
                 size = op_data.get("size", 60)
-                total_height += size + self.SPACING_MEDIUM
+                # SPACING_SMALL accounts for moon_y = y + SPACING_SMALL in drawing
+                total_height += self.SPACING_SMALL + size + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "maze":
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 4)
                 if grid:
                     maze_height = len(grid) * cell_size
-                    total_height += maze_height + self.SPACING_MEDIUM
+                    # SPACING_SMALL accounts for maze_y = y + SPACING_SMALL in drawing
+                    total_height += self.SPACING_SMALL + maze_height + self.SPACING_MEDIUM
                     last_spacing = self.SPACING_MEDIUM
             elif op_type == "sudoku":
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 8)
                 if grid:
                     sudoku_size = 9 * cell_size + self.SPACING_SMALL
-                    total_height += sudoku_size + self.SPACING_MEDIUM
+                    # SPACING_SMALL accounts for sudoku_y = y + SPACING_SMALL in drawing
+                    total_height += self.SPACING_SMALL + sudoku_size + self.SPACING_MEDIUM
                     last_spacing = self.SPACING_MEDIUM
             elif op_type == "icon":
                 icon_type = op_data.get("type", "sun")
                 size = op_data.get("size", 32)
-                total_height += size + self.SPACING_SMALL
+                # SPACING_SMALL accounts for icon_y = y + SPACING_SMALL in drawing
+                total_height += self.SPACING_SMALL + size + self.SPACING_SMALL
                 last_spacing = self.SPACING_SMALL
             elif op_type == "weather_forecast":
                 total_height += 24 + 12 + 12 + 12 + self.SPACING_MEDIUM
@@ -470,8 +475,9 @@ class PrinterDriver:
         draw = ImageDraw.Draw(img)
 
         # Second pass: draw everything
-        # Start with small y offset - this becomes END padding after 180° rotation
-        y = self.SPACING_SMALL
+        # Start at y=0 - no top padding (which becomes end padding after rotation)
+        # feed_direct() handles cutter spacing after the bitmap is sent
+        y = 0
 
         for op_type, op_data in ops:
             if op_type == "styled":
@@ -559,14 +565,15 @@ class PrinterDriver:
                 else:
                     draw.text((text_x, text_y), text, fill=0)
 
-                y += box_height + self.SPACING_MEDIUM
+                # +2 matches the box_y = y + 2 offset
+                y += 2 + box_height + self.SPACING_MEDIUM
             elif op_type == "moon":
                 phase = op_data.get("phase", 0)
                 size = op_data.get("size", 60)
                 moon_x = (width - size) // 2
                 moon_y = y + self.SPACING_SMALL
                 self._draw_moon_phase(draw, moon_x, moon_y, size, phase)
-                y += size + self.SPACING_MEDIUM
+                y += self.SPACING_SMALL + size + self.SPACING_MEDIUM
             elif op_type == "maze":
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 4)
@@ -576,7 +583,7 @@ class PrinterDriver:
                     maze_x = (width - maze_width) // 2
                     maze_y = y + self.SPACING_SMALL
                     self._draw_maze(draw, maze_x, maze_y, grid, cell_size)
-                    y += maze_height + self.SPACING_MEDIUM
+                    y += self.SPACING_SMALL + maze_height + self.SPACING_MEDIUM
             elif op_type == "sudoku":
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 8)
@@ -588,14 +595,14 @@ class PrinterDriver:
                     self._draw_sudoku_grid(
                         draw, sudoku_x, sudoku_y, grid, cell_size, font
                     )
-                    y += sudoku_size + self.SPACING_MEDIUM
+                    y += self.SPACING_SMALL + sudoku_size + self.SPACING_MEDIUM
             elif op_type == "icon":
                 icon_type = op_data.get("type", "sun")
                 size = op_data.get("size", 32)
                 icon_x = (width - size) // 2
                 icon_y = y + self.SPACING_SMALL
                 self._draw_icon(draw, icon_x, icon_y, icon_type, size)
-                y += size + self.SPACING_MEDIUM
+                y += self.SPACING_SMALL + size + self.SPACING_SMALL
             elif op_type == "weather_forecast":
                 forecast = op_data.get("forecast", [])
                 self._draw_weather_forecast(draw, 0, y, width, forecast)

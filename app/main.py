@@ -2135,10 +2135,6 @@ async def trigger_channel(position: int):
     global print_in_progress
 
     try:
-        # Instant tactile feedback - tiny paper blip
-        if hasattr(printer, "blip"):
-            printer.blip()
-
         # Clear hardware buffer (reset) before starting new job to kill any ghosts
         if hasattr(printer, "clear_hardware_buffer"):
             printer.clear_hardware_buffer()
