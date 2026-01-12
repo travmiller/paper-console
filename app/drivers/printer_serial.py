@@ -175,10 +175,10 @@ class PrinterDriver:
         img = Image.new("1", (width, height), 1)  # 1-bit, white background
         draw = ImageDraw.Draw(img)
 
-        # Draw lines in REVERSE order so that after 180° rotation they appear correctly
-        # (First line in list will end up at top of rotated image = tear-off edge)
+        # Draw lines in order - after 180° rotation, first line will be at bottom
+        # (Content appears at tear-off edge, headers appear after when viewing upside-down)
         y = 2  # Start with small padding
-        for line in reversed(lines):
+        for line in lines:
             if self._font:
                 draw.text((2, y), line, font=self._font, fill=0)  # Black text
             else:
