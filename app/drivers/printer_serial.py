@@ -1081,13 +1081,28 @@ class PrinterDriver:
                 pass
 
         # Fallback to programmatic drawing
-        icon_type = file_name  # Use the mapped name for consistency
+        # Normalize icon_type: convert mapped file names back to simple names for drawing
+        # e.g., "cloud-rain" -> "rain", "cloud-snow" -> "snow", "cloud-lightning" -> "storm"
+        icon_type_lower = icon_type.lower()
+        if icon_type_lower == "cloud-rain":
+            icon_type_lower = "rain"
+        elif icon_type_lower == "cloud-snow":
+            icon_type_lower = "snow"
+        elif icon_type_lower == "cloud-lightning":
+            icon_type_lower = "storm"
+        elif icon_type_lower == "cloud-fog":
+            icon_type_lower = "fog"
+        elif icon_type_lower == "cloud-sun":
+            icon_type_lower = "cloud-sun"  # Keep as-is, handled separately
+        
+        # Replace all icon_type.lower() with icon_type_lower for consistency
+        # (This is done by using icon_type_lower variable below)
 
         center_x = x + size // 2
         center_y = y + size // 2
         radius = size // 3
 
-        if icon_type.lower() == "sun":
+        if icon_type_lower == "sun":
             # Draw sun: circle with rays
             # Main circle
             draw.ellipse(
@@ -1111,7 +1126,7 @@ class PrinterDriver:
                 end_y = center_y + ray_length * math.sin(rad)
                 draw.line([(start_x, start_y), (end_x, end_y)], fill=0, width=2)
 
-        elif icon_type.lower() == "cloud":
+        elif icon_type_lower == "cloud":
             # Draw cloud: overlapping circles
             cloud_x = center_x
             cloud_y = center_y
@@ -1156,7 +1171,7 @@ class PrinterDriver:
                 fill=0,
             )
 
-        elif icon_type.lower() == "rain":
+        elif icon_type_lower == "rain" or icon_type_lower == "cloud-rain":
             # Draw cloud with rain drops
             # Cloud (smaller)
             cloud_radius = int(radius * 0.7)
@@ -1179,7 +1194,7 @@ class PrinterDriver:
                     [(drop_x, drop_y_start), (drop_x, drop_y_end)], fill=0, width=2
                 )
 
-        elif icon_type.lower() == "snow":
+        elif icon_type_lower == "snow" or icon_type_lower == "cloud-snow":
             # Draw cloud with snowflakes
             # Cloud
             cloud_radius = int(radius * 0.7)
@@ -1226,7 +1241,7 @@ class PrinterDriver:
                     width=1,
                 )
 
-        elif icon_type.lower() == "storm":
+        elif icon_type_lower == "storm" or icon_type_lower == "cloud-lightning":
             # Draw cloud with lightning
             # Cloud
             cloud_radius = int(radius * 0.7)
