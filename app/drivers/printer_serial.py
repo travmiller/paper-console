@@ -339,11 +339,9 @@ class PrinterDriver:
         # Note: bitmap is rotated 180° before printing, so:
         #   - Top of bitmap (y=0) = printed LAST (end of print)
         #   - Bottom of bitmap = printed FIRST (start of print)
-        # We add 5 lines of space at the top (end) for consistent spacing
-        # Add 5 lines of space at TOP of bitmap (becomes END after 180° rotation)
-        # This provides consistent spacing at the end of every print job
-        # 5 lines * 24 dots/line = 120 dots
-        total_height = 5 * 24  # 120 dots
+        # We want content at TOP (printed last) and padding at BOTTOM (printed first)
+        # So we calculate content height, then add 5 lines padding at the end
+        total_height = 0  # Start with content height only
         last_spacing = 0  # Track spacing added by last operation to remove it (start padding)
 
         for op_type, op_data in ops:
@@ -475,6 +473,11 @@ class PrinterDriver:
 
         # Remove last operation's trailing spacing (it becomes START padding after 180° rotation)
         total_height -= last_spacing
+        
+        # Add 5 lines (120 dots) of padding at the BOTTOM of bitmap
+        # After 180° rotation, bottom becomes top (printed LAST - end of print)
+        # This provides consistent spacing at the end of every print job
+        total_height += 5 * 24  # 120 dots
 
         # Create the unified image
         width = self.PRINTER_WIDTH_DOTS
@@ -482,9 +485,10 @@ class PrinterDriver:
         draw = ImageDraw.Draw(img)
 
         # Second pass: draw everything
-        # Start at y=120 (5 lines) to leave white space at TOP of bitmap
-        # After 180° rotation, this space becomes the END of the print (consistent spacing)
-        y = 5 * 24  # 120 dots
+        # Start at y=0 (top of bitmap) - content will be at top
+        # After 180° rotation, top (content) becomes bottom (printed FIRST)
+        # Bottom (empty padding) becomes top (printed LAST - end spacing)
+        y = 0
 
         for op_type, op_data in ops:
             if op_type == "styled":
