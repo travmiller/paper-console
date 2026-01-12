@@ -3,6 +3,7 @@ import os
 import platform
 import time
 import unicodedata
+from datetime import datetime
 from typing import List, Optional
 
 import serial
