@@ -59,23 +59,22 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     
     printer.print_header(module_name or "ASTRONOMY")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
-    printer.print_caption(app.config.settings.city_name)
     printer.print_line()
     
-    # Sun section
-    printer.print_subheader("SUNRISE")
-    printer.print_bold(f"  {data['sunrise']}")
-    printer.feed(1)
-    printer.print_subheader("SUNSET")
-    printer.print_bold(f"  {data['sunset']}")
-    printer.print_caption(f"  Daylight: {data['day_length']}")
+    # Location
+    printer.print_subheader(app.config.settings.city_name.upper())
+    
+    # Sun data
+    printer.print_bold("SUN")
+    printer.print_body(f"  Rise  {data['sunrise']}")
+    printer.print_body(f"  Set   {data['sunset']}")
+    printer.print_caption(f"  Day length: {data['day_length']}")
     printer.print_line()
     
-    # Moon phase graphic - nice and large
-    printer.print_moon_phase(data['moon_phase_val'], size=80)
+    # Moon phase graphic
+    printer.print_moon_phase(data['moon_phase_val'], size=64)
     
-    # Moon phase name centered
+    # Moon data text
     printer.print_bold(data['moon_phase'].upper())
-    printer.print_caption(f"Day {data['moon_phase_val']:.0f} of lunar cycle")
-    printer.print_line()
+    printer.print_caption(f"Day {data['moon_phase_val']:.0f} of 28")
 

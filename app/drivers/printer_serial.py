@@ -3,7 +3,7 @@ import platform
 import os
 import unicodedata
 import time
-from typing import Optional
+from typing import Optional, List
 from PIL import Image, ImageDraw, ImageFont
 from io import BytesIO
 
@@ -283,6 +283,21 @@ class PrinterDriver:
                 # Moon phase graphic: circle with shadow
                 size = op_data.get("size", 60)  # Diameter in pixels
                 total_height += size + 8  # Moon + spacing
+            elif op_type == "maze":
+                # Maze graphic: grid of cells
+                grid = op_data.get("grid", [])
+                cell_size = op_data.get("cell_size", 4)  # Pixels per cell
+                if grid:
+                    maze_height = len(grid) * cell_size
+                    total_height += maze_height + 8  # Maze + spacing
+            elif op_type == "sudoku":
+                # Sudoku grid: 9x9 with thick borders
+                grid = op_data.get("grid", [])
+                cell_size = op_data.get("cell_size", 8)  # Pixels per cell
+                if grid:
+                    # 9 cells * cell_size + borders
+                    sudoku_size = 9 * cell_size + 4  # +4 for borders
+                    total_height += sudoku_size + 8  # Sudoku + spacing
             elif op_type == "feed":
                 total_height += op_data * self.line_height
             elif op_type == "qr":
@@ -386,6 +401,37 @@ class PrinterDriver:
                 self._draw_moon_phase(draw, moon_x, moon_y, size, phase)
                 
                 y += size + 8
+            elif op_type == "maze":
+                # Draw maze bitmap
+                grid = op_data.get("grid", [])
+                cell_size = op_data.get("cell_size", 4)
+                
+                if grid:
+                    maze_width = len(grid[0]) * cell_size if grid else 0
+                    maze_height = len(grid) * cell_size
+                    
+                    # Center maze horizontally
+                    maze_x = (width - maze_width) // 2
+                    maze_y = y + 4
+                    
+                    self._draw_maze(draw, maze_x, maze_y, grid, cell_size)
+                    
+                    y += maze_height + 8
+            elif op_type == "sudoku":
+                # Draw sudoku grid bitmap
+                grid = op_data.get("grid", [])
+                cell_size = op_data.get("cell_size", 8)
+                font = self._get_font("regular")
+                
+                if grid:
+                    sudoku_size = 9 * cell_size + 4  # +4 for borders
+                    # Center sudoku horizontally
+                    sudoku_x = (width - sudoku_size) // 2
+                    sudoku_y = y + 4
+                    
+                    self._draw_sudoku_grid(draw, sudoku_x, sudoku_y, grid, cell_size, font)
+                    
+                    y += sudoku_size + 8
             elif op_type == "feed":
                 y += op_data * self.line_height
             elif op_type == "qr":
@@ -403,7 +449,7 @@ class PrinterDriver:
         return img
 
     def _draw_moon_phase(self, draw: ImageDraw.Draw, x: int, y: int, size: int, phase: float):
-        """Draw a moon phase graphic with proper terminator curve.
+        """Draw a moon phase graphic.
         
         Args:
             draw: ImageDraw object
@@ -417,69 +463,194 @@ class PrinterDriver:
         """
         import math
         
+        # Normalize phase to 0-1 (0 = new, 0.5 = full, 1 = new)
+        phase_normalized = (phase % 28) / 28.0
+        
+        # Calculate illumination (0 = new moon, 1 = full moon)
+        # illumination follows a cosine curve
+        illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2
+        
         center_x = x + size // 2
         center_y = y + size // 2
-        radius = size // 2 - 2  # Slightly smaller for clean edges
+        radius = size // 2
         
-        # Normalize phase to 0-1 (0 = new, 0.5 = full, 1 = new)
-        phase_norm = (phase % 28) / 28.0
+        # Draw the moon outline (black circle)
+        draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
         
-        # Draw moon pixel by pixel for accurate phase rendering
-        for py in range(y, y + size):
-            for px in range(x, x + size):
-                # Check if pixel is inside the moon circle
-                dx = px - center_x
-                dy = py - center_y
-                dist = math.sqrt(dx * dx + dy * dy)
-                
-                if dist <= radius:
-                    # Inside moon - determine if lit or dark
-                    # The terminator is an ellipse that changes based on phase
+        if phase_normalized < 0.5:
+            # Waxing: right side illuminated, left side dark
+            # Draw white (lit) right half
+            # Then overlay dark portion from left
+            
+            # Fill the whole moon white first
+            draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
+            
+            # Calculate the terminator (shadow edge) position
+            # At new moon (phase=0), shadow covers everything
+            # At first quarter (phase=0.25), shadow covers left half
+            # At full moon (phase=0.5), no shadow
+            shadow_width = int((1 - illumination * 2) * radius) if illumination < 0.5 else 0
+            
+            if shadow_width > 0:
+                # Draw shadow on the left side
+                # Use an ellipse that gets narrower as moon waxes
+                for px in range(x + 2, center_x):
+                    # Calculate how much of this column is in shadow
+                    dist_from_center = center_x - px
+                    shadow_depth = shadow_width * (dist_from_center / radius) if radius > 0 else 0
                     
-                    if phase_norm <= 0.5:
-                        # Waxing: illumination grows from right
-                        # phase_norm 0 = new (all dark), 0.25 = first quarter, 0.5 = full
-                        illum_factor = phase_norm * 2  # 0 to 1 as we go new->full
-                        
-                        # Terminator x-position based on phase
-                        # At new moon, terminator is at right edge (everything dark)
-                        # At first quarter, terminator is at center
-                        # At full moon, terminator is at left edge (everything lit)
-                        terminator_x = radius * (1 - illum_factor * 2)  # +radius to -radius
-                        
-                        # The terminator is curved - it's an ellipse edge
-                        # Calculate where the terminator is at this y-position
-                        if radius > 0 and abs(dy) < radius:
-                            # Height of moon at this y
-                            half_width = math.sqrt(radius * radius - dy * dy)
-                            # Terminator curves: use cosine of phase to determine ellipse width
-                            term_offset = terminator_x * (half_width / radius) if radius > 0 else 0
-                            
-                            # Pixel is lit if it's to the right of the terminator
-                            if dx > term_offset:
-                                draw.point((px, py), fill=1)  # White (lit)
-                            else:
-                                draw.point((px, py), fill=0)  # Black (dark)
-                    else:
-                        # Waning: shadow grows from right
-                        # phase_norm 0.5 = full, 0.75 = last quarter, 1.0 = new
-                        wane_factor = (phase_norm - 0.5) * 2  # 0 to 1 as we go full->new
-                        
-                        # Terminator moves from right to left
-                        terminator_x = radius * (wane_factor * 2 - 1)  # -radius to +radius
-                        
-                        if radius > 0 and abs(dy) < radius:
-                            half_width = math.sqrt(radius * radius - dy * dy)
-                            term_offset = terminator_x * (half_width / radius) if radius > 0 else 0
-                            
-                            # Pixel is lit if it's to the left of the terminator
-                            if dx < term_offset:
-                                draw.point((px, py), fill=1)  # White (lit)
-                            else:
-                                draw.point((px, py), fill=0)  # Black (dark)
+                    if dist_from_center > shadow_width:
+                        # Full shadow for this column
+                        col_height = int(math.sqrt(max(0, radius**2 - (px - center_x)**2)))
+                        if col_height > 0:
+                            draw.line([(px, center_y - col_height), (px, center_y + col_height)], fill=0)
+        else:
+            # Waning: left side illuminated, right side dark
+            # Fill the whole moon white first
+            draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
+            
+            # Calculate shadow width for waning phase
+            wane_progress = (phase_normalized - 0.5) * 2  # 0 at full, 1 at new
+            shadow_width = int(wane_progress * radius)
+            
+            if shadow_width > 0:
+                # Draw shadow on the right side
+                for px in range(center_x, x + size - 2):
+                    dist_from_center = px - center_x
+                    
+                    if dist_from_center > (radius - shadow_width):
+                        # Shadow for this column
+                        col_height = int(math.sqrt(max(0, radius**2 - (px - center_x)**2)))
+                        if col_height > 0:
+                            draw.line([(px, center_y - col_height), (px, center_y + col_height)], fill=0)
         
-        # Draw crisp circular outline
-        draw.ellipse([x + 1, y + 1, x + size - 1, y + size - 1], outline=0, width=2)
+        # Redraw outline to ensure clean edges
+        draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
+
+    def _draw_maze(self, draw: ImageDraw.Draw, x: int, y: int, grid: List[List[int]], cell_size: int):
+        """Draw a maze as a bitmap.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner of maze
+            grid: 2D list where 1 = wall, 0 = path
+            cell_size: Size of each cell in pixels
+        """
+        rows = len(grid)
+        cols = len(grid[0]) if grid else 0
+        
+        # Draw each cell
+        for row_idx, row in enumerate(grid):
+            for col_idx, cell in enumerate(row):
+                cell_x = x + col_idx * cell_size
+                cell_y = y + row_idx * cell_size
+                
+                if cell == 1:
+                    # Wall - draw filled black rectangle
+                    draw.rectangle(
+                        [cell_x, cell_y, cell_x + cell_size - 1, cell_y + cell_size - 1],
+                        fill=0  # Black
+                    )
+                else:
+                    # Path - draw white rectangle (or leave blank)
+                    draw.rectangle(
+                        [cell_x, cell_y, cell_x + cell_size - 1, cell_y + cell_size - 1],
+                        fill=1,  # White
+                        outline=0,  # Black border
+                        width=1
+                    )
+        
+        # Draw entrance marker (top center)
+        if rows > 0 and cols > 1:
+            entrance_col = 1  # Usually second column
+            entrance_x = x + entrance_col * cell_size
+            entrance_y = y
+            # Draw arrow pointing down
+            draw.line([entrance_x + cell_size // 2, entrance_y, 
+                      entrance_x + cell_size // 2, entrance_y + cell_size // 2], fill=0, width=2)
+            # Arrow head
+            arrow_size = 3
+            arrow_x = entrance_x + cell_size // 2
+            arrow_y = entrance_y + cell_size // 2
+            draw.line([arrow_x, arrow_y, arrow_x - arrow_size, arrow_y - arrow_size], fill=0, width=2)
+            draw.line([arrow_x, arrow_y, arrow_x + arrow_size, arrow_y - arrow_size], fill=0, width=2)
+        
+        # Draw exit marker (bottom)
+        if rows > 0 and cols > 1:
+            exit_col = cols - 2  # Usually second-to-last column
+            exit_x = x + exit_col * cell_size
+            exit_y = y + (rows - 1) * cell_size
+            # Draw arrow pointing down
+            arrow_x = exit_x + cell_size // 2
+            arrow_y = exit_y + cell_size - cell_size // 2
+            draw.line([arrow_x, arrow_y - cell_size // 2, arrow_x, arrow_y], fill=0, width=2)
+            # Arrow head pointing down
+            draw.line([arrow_x, arrow_y, arrow_x - arrow_size, arrow_y + arrow_size], fill=0, width=2)
+            draw.line([arrow_x, arrow_y, arrow_x + arrow_size, arrow_y + arrow_size], fill=0, width=2)
+
+    def _draw_sudoku_grid(self, draw: ImageDraw.Draw, x: int, y: int, grid: List[List[int]], 
+                          cell_size: int, font):
+        """Draw a Sudoku grid as a bitmap.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner of grid
+            grid: 9x9 grid where 0 = empty, 1-9 = number
+            cell_size: Size of each cell in pixels
+            font: Font for drawing numbers
+        """
+        border_width = 2  # Thick border for outer edges
+        thin_width = 1     # Thin border for inner cells
+        
+        total_size = 9 * cell_size + 2 * border_width
+        
+        # Draw outer border
+        draw.rectangle([x, y, x + total_size, y + total_size], outline=0, width=border_width)
+        
+        # Draw grid lines and numbers
+        for row in range(9):
+            for col in range(9):
+                cell_x = x + border_width + col * cell_size
+                cell_y = y + border_width + row * cell_size
+                
+                # Determine border width (thick for 3x3 boundaries)
+                top_width = border_width if row % 3 == 0 else thin_width
+                left_width = border_width if col % 3 == 0 else thin_width
+                bottom_width = border_width if row == 8 else (border_width if (row + 1) % 3 == 0 else thin_width)
+                right_width = border_width if col == 8 else (border_width if (col + 1) % 3 == 0 else thin_width)
+                
+                # Draw cell borders
+                # Top
+                if row == 0 or row % 3 == 0:
+                    draw.line([cell_x, cell_y, cell_x + cell_size, cell_y], fill=0, width=top_width)
+                # Left
+                if col == 0 or col % 3 == 0:
+                    draw.line([cell_x, cell_y, cell_x, cell_y + cell_size], fill=0, width=left_width)
+                # Bottom
+                draw.line([cell_x, cell_y + cell_size, cell_x + cell_size, cell_y + cell_size], fill=0, width=bottom_width)
+                # Right
+                draw.line([cell_x + cell_size, cell_y, cell_x + cell_size, cell_y + cell_size], fill=0, width=right_width)
+                
+                # Draw number if present
+                value = grid[row][col]
+                if value != 0:
+                    num_str = str(value)
+                    # Center text in cell
+                    if font:
+                        bbox = font.getbbox(num_str)
+                        text_width = bbox[2] - bbox[0] if bbox else cell_size // 2
+                        text_height = bbox[3] - bbox[1] if bbox else cell_size // 2
+                    else:
+                        text_width = cell_size // 2
+                        text_height = cell_size // 2
+                    
+                    text_x = cell_x + (cell_size - text_width) // 2
+                    text_y = cell_y + (cell_size - text_height) // 2
+                    
+                    if font:
+                        draw.text((text_x, text_y), num_str, font=font, fill=0)
+                    else:
+                        draw.text((text_x, text_y), num_str, fill=0)
 
     def _generate_qr_image(
         self, data: str, size: int, error_correction: str, fixed_size: bool
@@ -839,6 +1010,34 @@ class PrinterDriver:
         self.print_buffer.append(("moon", {
             "phase": phase,
             "size": size,
+        }))
+
+    def print_maze(self, grid: List[List[int]], cell_size: int = 4):
+        """Print a maze as a bitmap graphic.
+        
+        Args:
+            grid: 2D list where 1 = wall, 0 = path
+            cell_size: Size of each cell in pixels (default 4)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("maze", {
+            "grid": grid,
+            "cell_size": cell_size,
+        }))
+
+    def print_sudoku(self, grid: List[List[int]], cell_size: int = 8):
+        """Print a Sudoku grid as a bitmap graphic.
+        
+        Args:
+            grid: 9x9 grid where 0 = empty, 1-9 = number
+            cell_size: Size of each cell in pixels (default 8)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("sudoku", {
+            "grid": grid,
+            "cell_size": cell_size,
         }))
 
     def _write_feed(self, count: int):

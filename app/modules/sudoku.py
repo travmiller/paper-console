@@ -119,25 +119,8 @@ def format_sudoku_receipt(
     printer.print_subheader(f"Difficulty: {difficulty.title()}")
     printer.print_line()
 
-    # Render Grid using monospace characters
-    # Top border
-    printer.print_body("┌───────┬───────┬───────┐")
-
-    for i, row in enumerate(grid):
-        if i > 0 and i % 3 == 0:
-            printer.print_body("├───────┼───────┼───────┤")
-
-        line_str = "│"
-        for j, val in enumerate(row):
-            char = str(val) if val != 0 else "·"
-            line_str += f" {char}"
-            if (j + 1) % 3 == 0:
-                line_str += " │"
-
-        printer.print_body(line_str)
-
-    # Bottom border
-    printer.print_body("└───────┴───────┴───────┘")
+    # Render grid as bitmap (8px per cell = 76px total with borders)
+    printer.print_sudoku(grid, cell_size=8)
     
     printer.print_line()
     printer.print_caption("Good luck!")

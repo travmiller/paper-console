@@ -66,31 +66,12 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     printer.print_header(module_name or "MAZE")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
-    printer.print_subheader("↓ START  ·  END ↓")
+    printer.print_subheader("START ↑  ·  END ↓")
     printer.print_line()
     
-    # Use block characters for cleaner look
-    use_double_width = (width * 2) <= 32
+    # Print maze as bitmap (4px per cell = 60px wide for 15 cells)
+    printer.print_maze(maze.grid, cell_size=4)
     
-    if use_double_width:
-        wall_char = "██"
-        path_char = "  "
-    else:
-        wall_char = "█"
-        path_char = " "
-
-    for row in maze.grid:
-        line = ""
-        for cell in row:
-            if cell == 1:
-                line += wall_char 
-            else:
-                line += path_char
-        
-        # Center the maze
-        padding = (32 - len(line)) // 2
-        printer.print_body(" " * padding + line)
-        
     printer.print_line()
     printer.print_caption("Find the path!")
 

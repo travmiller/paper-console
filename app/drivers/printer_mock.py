@@ -117,6 +117,34 @@ class PrinterDriver:
         print(f"[PRINT]     ╰───────────╯")
         self.lines_printed += 4
 
+    def print_maze(self, grid: list, cell_size: int = 4):
+        """Simulates printing a maze bitmap."""
+        print("[PRINT] ┌─────────────────────────────┐")
+        for row in grid:
+            line = "│"
+            for cell in row:
+                line += "██" if cell == 1 else "  "
+            line += "│"
+            print(f"[PRINT] {line}")
+        print("[PRINT] └─────────────────────────────┘")
+        self.lines_printed += len(grid) + 2
+
+    def print_sudoku(self, grid: list, cell_size: int = 8):
+        """Simulates printing a Sudoku grid bitmap."""
+        print("[PRINT] ┌───────┬───────┬───────┐")
+        for i, row in enumerate(grid):
+            if i > 0 and i % 3 == 0:
+                print("[PRINT] ├───────┼───────┼───────┤")
+            line = "│"
+            for j, val in enumerate(row):
+                char = str(val) if val != 0 else "·"
+                line += f" {char}"
+                if (j + 1) % 3 == 0:
+                    line += " │"
+            print(f"[PRINT] {line}")
+        print("[PRINT] └───────┴───────┴───────┘")
+        self.lines_printed += 11
+
     def feed(self, lines: int = 3):
         """Simulates paper feed."""
         for _ in range(lines):
