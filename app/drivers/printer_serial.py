@@ -969,7 +969,7 @@ class PrinterDriver:
     def _draw_icon(
         self, draw: ImageDraw.Draw, x: int, y: int, icon_type: str, size: int
     ):
-        """Draw a simple icon bitmap using programmatic drawing.
+        """Draw an icon bitmap, loading from PNG files first, falling back to programmatic drawing.
 
         Args:
             draw: ImageDraw object
@@ -978,33 +978,93 @@ class PrinterDriver:
             size: Icon size in pixels
         """
         import math
+        import os
 
-        # Map aliases to canonical names
+        # Map aliases to file names (Phosphor icon naming)
         icon_map = {
             "mail": "envelope",
             "email": "envelope",
             "time": "clock",
             "settings": "gear",
-            "location": "pin",
-            "map-pin": "pin",
+            "location": "map-pin",
+            "pin": "map-pin",
             "home": "house",
             "menu": "list",
-            "search": "magnifying_glass",
-            "magnifying-glass": "magnifying_glass",
-            "save": "floppy",
-            "floppy-disk": "floppy",
+            "search": "magnifying-glass",
+            "magnifying-glass": "magnifying-glass",
+            "magnifying_glass": "magnifying-glass",
+            "save": "floppy-disk",
+            "floppy": "floppy-disk",
             "checkmark": "check",
+            "check": "check",
             "close": "x",
             "delete": "trash",
             "refresh": "arrows-clockwise",
             "clear": "sun",
-            "note-pencil": "note",
-            "calendar-blank": "calendar",
-            "envelope-open": "envelope",
+            "note-pencil": "note-pencil",
+            "note": "note-pencil",
+            "calendar-blank": "calendar-blank",
+            "calendar": "calendar-blank",
+            "envelope-open": "envelope-open",
+            "cloud-sun": "cloud-sun",
+            "moon-stars": "moon-stars",
+            "grid-nine": "grid-nine",
+            "path": "path",
+            "hourglass": "hourglass",
+            "check-square": "check-square",
+            "desktop": "desktop",
+            "quotes": "quotes",
+            "plugs": "plugs",
+            "newspaper": "newspaper",
+            "rss": "rss",
+            # Weather icons
+            "rain": "cloud-rain",
+            "snow": "cloud-snow",
+            "storm": "cloud-lightning",
+            "thunder": "cloud-lightning",
+            "lightning": "cloud-lightning",
         }
 
         # Use mapped name or original
-        icon_type = icon_map.get(icon_type.lower(), icon_type.lower())
+        file_name = icon_map.get(icon_type.lower(), icon_type.lower())
+
+        # Try to load PNG from icons/regular directory
+        # Get project root (go up from app/drivers/)
+        app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        icon_path = os.path.join(app_dir, "icons", "regular", f"{file_name}.png")
+
+        if os.path.exists(icon_path):
+            try:
+                icon_img = Image.open(icon_path)
+                # Resize if needed
+                if icon_img.size != (size, size):
+                    icon_img = icon_img.resize((size, size), Image.NEAREST)
+
+                # Convert to 1-bit if not already
+                if icon_img.mode != "1":
+                    icon_img = icon_img.convert("1")
+
+                # Draw pixels onto the main image
+                # We need to access the underlying image from ImageDraw
+                # ImageDraw has a private `_image` attribute, but safer to use `draw.im`
+                # Actually, we can iterate pixels and draw them
+                width, height = icon_img.size
+                pixels = icon_img.load()
+                for py in range(height):
+                    for px in range(width):
+                        # In PIL '1' mode: 0=black, 1=white
+                        # We want to draw black pixels (0) onto white background
+                        pixel = pixels[px, py]
+                        if pixel == 0:
+                            draw.point((x + px, y + py), fill=0)
+
+                return  # Successfully drew from file
+            except Exception:
+                # Fallback to manual drawing if file load fails
+                pass
+
+        # Fallback to programmatic drawing
+        icon_type = file_name  # Use the mapped name for consistency
 
         center_x = x + size // 2
         center_y = y + size // 2
