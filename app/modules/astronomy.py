@@ -55,11 +55,12 @@ def find_next_full_moon(current_date: date) -> date:
     
     for _ in range(max_days):
         try:
+            # phase() accepts date or datetime
             phase_val = phase(search_date)
             # Full moon is around phase 14 (0-28 cycle)
             if 13.5 <= phase_val <= 14.5:
                 return search_date
-        except:
+        except Exception:
             pass
         search_date += timedelta(days=1)
     
@@ -77,11 +78,12 @@ def find_next_new_moon(current_date: date) -> date:
     
     for _ in range(max_days):
         try:
+            # phase() accepts date or datetime
             phase_val = phase(search_date)
             # New moon is around phase 0 or 28 (0-28 cycle)
             if phase_val < 1.0 or phase_val > 27.0:
                 return search_date
-        except:
+        except Exception:
             pass
         search_date += timedelta(days=1)
     
