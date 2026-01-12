@@ -113,32 +113,31 @@ def format_sudoku_receipt(
 
     grid = generate_puzzle(difficulty)
 
-    printer.print_header((module_name or "SUDOKU").upper())
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_header(module_name or "SUDOKU")
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
-    printer.print_text(f"Difficulty: {difficulty.title()}")
+    printer.print_subheader(f"Difficulty: {difficulty.title()}")
     printer.print_line()
 
-    # Render Grid
-    # We need to make it look nice.
-    # Standard width 32 chars.
-    # Grid is 9 nums + separators.
-    # Format: " 1 2 3 | 4 5 6 | 7 8 9 "
+    # Render Grid using monospace characters
+    # Top border
+    printer.print_body("┌───────┬───────┬───────┐")
 
     for i, row in enumerate(grid):
-        line_str = ""
         if i > 0 and i % 3 == 0:
-            printer.print_text("- - - + - - - + - - -")
+            printer.print_body("├───────┼───────┼───────┤")
 
+        line_str = "│"
         for j, val in enumerate(row):
-            char = str(val) if val != 0 else " "
+            char = str(val) if val != 0 else "·"
+            line_str += f" {char}"
+            if (j + 1) % 3 == 0:
+                line_str += " │"
 
-            if j > 0 and j % 3 == 0:
-                line_str += "| "
+        printer.print_body(line_str)
 
-            line_str += f"{char} "
-
-        printer.print_text(line_str)
-
+    # Bottom border
+    printer.print_body("└───────┴───────┴───────┘")
+    
     printer.print_line()
-    printer.print_text("Good Luck!")
+    printer.print_caption("Good luck!")

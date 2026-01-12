@@ -238,38 +238,34 @@ def format_email_receipt(
 
     from datetime import datetime
 
-    header_name = (module_name or "EMAIL INBOX").upper()
+    header_name = module_name or "EMAIL"
 
     if not messages:
         printer.print_header(header_name)
-        printer.print_text(datetime.now().strftime("%A, %b %d"))
+        printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
         printer.print_line()
-        printer.print_text("No new messages.")
+        printer.print_body("No new messages.")
         return
 
     printer.print_header(f"{header_name} ({len(messages)})")
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 
     for i, msg in enumerate(messages):
-        # Header: FROM
-        # Manually wrap to ensure correct inverted order
-        from_lines = wrap_text(f"FROM: {msg['from']}", PRINTER_WIDTH)
-        for line in from_lines:
-            printer.print_text(line)
-
-        # Header: SUBJECT
-        # Manually wrap to ensure correct inverted order
-        subj_lines = wrap_text(f"SUBJ: {msg['subject']}", PRINTER_WIDTH)
+        # Sender
+        from_lines = wrap_text(msg['from'], PRINTER_WIDTH)
+        printer.print_subheader(from_lines[0] if from_lines else "Unknown")
+        
+        # Subject in bold
+        subj_lines = wrap_text(msg['subject'], PRINTER_WIDTH)
         for line in subj_lines:
-            printer.print_text(line)
+            printer.print_bold(line)
             
         printer.print_line()
 
-        # Body
-        # Manually wrap
+        # Body in regular text
         body_lines = wrap_text(msg["body"], PRINTER_WIDTH)
         for line in body_lines:
-            printer.print_text(line)
+            printer.print_body(line)
 
-        printer.print_line()  # Separator between emails
+        printer.print_line()

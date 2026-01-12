@@ -63,24 +63,20 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     maze.generate()
     
     # Header
-    printer.print_header((module_name or "MAZE").upper())
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_header(module_name or "MAZE")
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
-    printer.print_text("Start: Top | End: Bottom")
+    printer.print_subheader("↓ START  ·  END ↓")
     printer.print_line()
     
-    # Strategy for better visibility:
-    # 1. Use double characters for width if space allows (makes paths wider and clearer)
-    # 2. Use a denser character than '#' for walls (like 'X' or '@')
-    
+    # Use block characters for cleaner look
     use_double_width = (width * 2) <= 32
     
     if use_double_width:
-        wall_char = "XX"
+        wall_char = "██"
         path_char = "  "
     else:
-        # For hard mode (tight space), use single char
-        wall_char = "X"
+        wall_char = "█"
         path_char = " "
 
     for row in maze.grid:
@@ -93,9 +89,8 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
         
         # Center the maze
         padding = (32 - len(line)) // 2
-        printer.print_text(" " * padding + line)
+        printer.print_body(" " * padding + line)
         
     printer.print_line()
-    printer.print_text("Find the path!")
-    printer.feed(1)
+    printer.print_caption("Find the path!")
 

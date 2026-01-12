@@ -174,25 +174,20 @@ def format_calendar_receipt(
 ):
     """Fetches and prints the calendar agenda."""
 
-    header_label = (module_name or config.label or "CALENDAR").upper()
+    header_label = module_name or config.label or "CALENDAR"
     printer.print_header(header_label)
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 
-    # Combine legacy single URL and new objects into a normalized list of URLs
-    # We only need URLs for fetching, but if we wanted to use the label in logging we could.
-    # For printing the agenda, we just want the events.
-
+    # Collect calendar sources
     sources = []
-
-    # New structure: List[CalendarSource] (dicts with .url)
     if config.ical_sources:
         for src in config.ical_sources:
             if src.url:
                 sources.append(src.url)
 
     if not sources:
-        printer.print_text("No iCal URLs configured.")
+        printer.print_body("No iCal URLs configured.")
         return
 
     all_events = {}
@@ -203,30 +198,28 @@ def format_calendar_receipt(
             events = parse_events(
                 ics_data, config.days_to_show or 2, app.config.settings.timezone
             )
-            # Merge into master list
             for d, evts in events.items():
                 if d not in all_events:
                     all_events[d] = []
                 all_events[d].extend(evts)
 
     if not all_events:
-        printer.print_text("No upcoming events found.")
+        printer.print_body("No upcoming events.")
         return
 
-    # Sort days
     sorted_dates = sorted(all_events.keys())
 
     for i, d in enumerate(sorted_dates):
-        # Sort events within the day (since we merged multiple sources)
         all_events[d].sort(key=lambda x: x["sort_key"])
 
+        # Day header
         day_name = d.strftime("%A").upper()
         if d == date.today():
             day_name = "TODAY"
         elif d == date.today() + timedelta(days=1):
             day_name = "TOMORROW"
 
-        printer.print_text(f"{day_name} ({d.strftime('%m/%d')}):")
+        printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
 
         for evt in all_events[d]:
             time_str = evt["time"]
@@ -237,7 +230,8 @@ def format_calendar_receipt(
             if len(summary) > max_len:
                 summary = summary[: max_len - 1] + ".."
 
-            printer.print_text(f"{time_str:<6} {summary}")
+            # Time in caption style, event in body
+            printer.print_body(f"{time_str:<8}{summary}")
 
         if i < len(sorted_dates) - 1:
-            printer.print_line()  # Separator between days
+            printer.print_line()

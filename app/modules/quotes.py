@@ -104,20 +104,19 @@ def format_quotes_receipt(
     author = quote.get("quoteAuthor", "Unknown")
 
     # Header
-    printer.print_header((module_name or "QUOTE").upper())
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_header(module_name or "QUOTE")
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 
-    # Print Quote Body - wrap text for proper reverse buffer handling
+    # Quote body in italics-style (using medium weight for emphasis)
     wrapped_lines = wrap_text(text, width=printer.width, indent=0)
     for line in wrapped_lines:
-        printer.print_text(line)
+        printer.print_body(f'"{line}"' if line == wrapped_lines[0] else f' {line}')
 
     printer.feed(1)
 
-    # Print Author (Right aligned if possible, or just indented)
+    # Attribution
     if author:
-        printer.print_text(f"-- {author}")
+        printer.print_caption(f"— {author}")
 
     printer.print_line()
-    printer.feed(1)

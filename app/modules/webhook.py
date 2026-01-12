@@ -13,10 +13,9 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
     """
     from datetime import datetime
 
-    # Use module_name if provided, otherwise use action.label, otherwise default
-    header_label = (module_name or action.label or "WEBHOOK").upper()
+    header_label = module_name or action.label or "WEBHOOK"
     printer.print_header(header_label)
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 
     try:
@@ -38,8 +37,8 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
             response = requests.get(action.url, headers=headers, timeout=10)
 
         if response.status_code >= 400:
-            printer.print_text(f"Error: {response.status_code}")
-            printer.print_text(response.text[:100])  # Truncate error
+            printer.print_bold(f"Error: {response.status_code}")
+            printer.print_caption(response.text[:100])
             return
 
         # Success - Parse Content
@@ -48,7 +47,6 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
         if action.json_path:
             try:
                 data = response.json()
-                # Simple dot notation support (e.g. "slip.advice")
                 keys = action.json_path.split(".")
                 value = data
                 for k in keys:
@@ -67,28 +65,22 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
                 if value and not isinstance(value, (dict, list)):
                     content_to_print = str(value)
                 else:
-                    content_to_print = (
-                        f"Path '{action.json_path}' not found or complex."
-                    )
+                    content_to_print = f"Path '{action.json_path}' not found."
             except Exception as e:
                 content_to_print = f"JSON Parse Error: {e}"
         else:
-            # No path, try to print clean text or raw body
-            # If it's JSON, pretty print it
             try:
                 data = response.json()
                 content_to_print = json.dumps(data, indent=2)
             except:
                 content_to_print = response.text
 
-        # Print the result with proper text wrapping to prevent word splitting
+        # Print result with styled text
         if content_to_print:
-            # Split by newlines first (preserve existing line breaks)
             for original_line in content_to_print.split("\n"):
-                # Wrap each line to fit printer width
                 wrapped_lines = wrap_text(original_line, width=printer.width, indent=0)
                 for wrapped_line in wrapped_lines:
-                    printer.print_text(wrapped_line)
+                    printer.print_body(wrapped_line)
 
     except Exception:
-        printer.print_text("Could not connect.")
+        printer.print_caption("Could not connect.")

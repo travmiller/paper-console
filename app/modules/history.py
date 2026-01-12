@@ -82,8 +82,6 @@ def format_history_receipt(
     events = get_events_for_today()
 
     # Filter/Select events
-    # The dataset might have MANY events. We should pick 1-5 random ones or top ones.
-    # config could specify "count"
     count = 1
     if config and "count" in config:
         try:
@@ -91,36 +89,35 @@ def format_history_receipt(
         except:
             pass
 
-    # Randomize if we have more than requested
     import random
-
     if len(events) > count:
         selected_events = random.sample(events, count)
     else:
         selected_events = events
 
     # Header
-    printer.print_header((module_name or "ON THIS DAY").upper())
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_header(module_name or "ON THIS DAY")
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 
     if not selected_events:
-        printer.print_text("No historical records")
-        printer.print_text("found for today.")
+        printer.print_body("No historical records")
+        printer.print_body("found for today.")
     else:
-        # Reverse events list for reverse print order (invert mode)
-        # When buffer is reversed, events will print in correct chronological order
-        reversed_events = list(reversed(selected_events))
-        for i, event in enumerate(reversed_events):
-            # The event strings often start with year: "1945 - Some event"
-            # Wrap long event text for proper reverse buffer handling
-            event_text = f"* {event}"
-            wrapped_lines = wrap_text(event_text, width=printer.width, indent=0)
-            for line in wrapped_lines:
-                printer.print_text(line)
+        for i, event in enumerate(selected_events):
+            # Parse year from event string (format: "YEAR - Event description")
+            if " - " in event:
+                year, description = event.split(" - ", 1)
+                printer.print_bold(year)
+                wrapped_lines = wrap_text(description, width=printer.width, indent=0)
+                for line in wrapped_lines:
+                    printer.print_body(line)
+            else:
+                wrapped_lines = wrap_text(event, width=printer.width, indent=0)
+                for line in wrapped_lines:
+                    printer.print_body(line)
 
-            if i < len(reversed_events) - 1:
-                printer.feed(1)
+            if i < len(selected_events) - 1:
+                printer.print_line()
 
     printer.print_line()
-    printer.feed(1)

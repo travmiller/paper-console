@@ -157,12 +157,16 @@ def format_weather_receipt(
     weather = get_weather(config)
 
     # Header
-    printer.print_header((module_name or "WEATHER").upper())
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_header(module_name or "WEATHER")
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 
-    # Weather Section
-    printer.print_text(f"WEATHER IN {weather['city'].upper()}")
-    printer.print_text(f"NOW:  {weather['current']}F  {weather['condition']}")
-    printer.print_text(f"H/L:  {weather['high']}F / {weather['low']}F")
+    # Location
+    printer.print_subheader(weather['city'].upper())
+    
+    # Current temperature - big and bold
+    printer.print_bold(f"{weather['current']}°F  {weather['condition']}")
+    
+    # High/Low
+    printer.print_body(f"High {weather['high']}°F  ·  Low {weather['low']}°F")
     printer.print_line()

@@ -1,32 +1,22 @@
 from app.config import TextConfig
 from app.drivers.printer_mock import PrinterDriver
+from app.utils import wrap_text
 
 def format_text_receipt(printer: PrinterDriver, config: TextConfig, module_name: str = None):
     """Prints a static text note."""
     from datetime import datetime
     
-    # Use module_name if provided, otherwise use config.label, otherwise default
-    header_label = (module_name or config.label or "NOTE").upper()
+    header_label = module_name or config.label or "NOTE"
     printer.print_header(header_label)
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
     
     content = config.content or "No content."
     
-    # Simple wrapping logic (could be shared utility)
-    words = content.split()
-    line = ""
-    for word in words:
-        # Handle newlines in the text if user entered them (simple replacement for now)
-        # A better way is to split by newline first, then wrap.
-        # For this V1, we just wrap words.
-        
-        if len(line) + len(word) + 1 <= printer.width:
-            line += word + " "
-        else:
-            printer.print_text(line)
-            line = word + " "
-            
-    if line:
-        printer.print_text(line)
+    # Wrap and print body text
+    wrapped_lines = wrap_text(content, width=printer.width, indent=0)
+    for line in wrapped_lines:
+        printer.print_body(line)
+    
+    printer.print_line()
 

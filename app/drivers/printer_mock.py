@@ -18,27 +18,66 @@ class PrinterDriver:
         """Mock font loading - returns None."""
         return None
 
-    def print_text(self, text: str):
-        """Simulates printing a line of text."""
-        print(f"[PRINT] {text}")
-        # Count actual lines (newlines + 1 for the line itself)
+    def print_text(self, text: str, style: str = "regular"):
+        """Simulates printing styled text.
+        
+        Available styles: regular, bold, bold_lg, medium, semibold, light, regular_sm
+        """
+        style_markers = {
+            "regular": "",
+            "bold": "**",
+            "bold_lg": "▓▓",
+            "medium": "░░",
+            "semibold": "▒▒",
+            "light": "··",
+            "regular_sm": "  ",
+        }
+        marker = style_markers.get(style, "")
+        prefix = f"{marker} " if marker else ""
+        print(f"[PRINT] {prefix}{text}")
         self.lines_printed += text.count("\n") + 1
 
+    def print_header(self, text: str):
+        """Prints large bold header text."""
+        print(f"[PRINT] ╔{'═' * (self.width - 2)}╗")
+        print(f"[PRINT] ║{text.upper():^{self.width - 2}}║")
+        print(f"[PRINT] ╚{'═' * (self.width - 2)}╝")
+        self.lines_printed += 3
+    
+    def print_subheader(self, text: str):
+        """Prints medium-weight subheader."""
+        print(f"[PRINT] ▸ {text}")
+        self.lines_printed += 1
+    
+    def print_body(self, text: str):
+        """Prints regular body text."""
+        print(f"[PRINT] {text}")
+        self.lines_printed += text.count("\n") + 1
+    
+    def print_caption(self, text: str):
+        """Prints small, light caption text."""
+        print(f"[PRINT] ⋅ {text}")
+        self.lines_printed += 1
+    
+    def print_bold(self, text: str):
+        """Prints bold text at normal size."""
+        print(f"[PRINT] ▪ {text}")
+        self.lines_printed += 1
+
     def print_line(self):
-        """Prints a separator line."""
-        print(f"[PRINT] {'-' * self.width}")
+        """Prints a decorative separator line."""
+        print(f"[PRINT] {'· ' * (self.width // 2)}")
+        self.lines_printed += 1
+    
+    def print_thick_line(self):
+        """Prints a bold separator line."""
+        print(f"[PRINT] {'━' * self.width}")
         self.lines_printed += 1
 
     def feed(self, lines: int = 3):
         """Simulates paper feed."""
         for _ in range(lines):
             print("[PRINT] ")
-
-    def print_header(self, text: str):
-        """Prints centered header text."""
-        padding = max(0, (self.width - len(text)) // 2)
-        print(f"[PRINT] {' ' * padding}{text.upper()}")
-        self.print_line()
 
     def print_qr(self, data: str, size: int = 4, error_correction: str = "M", fixed_size: bool = False):
         """Simulates printing a QR code."""

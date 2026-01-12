@@ -124,42 +124,34 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
     articles = get_rss_articles(config)
 
     # Header
-    printer.print_header((module_name or "RSS FEEDS").upper())
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_header(module_name or "RSS FEEDS")
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 
-    # ARTICLES SECTION
-    printer.print_text("TOP STORIES:")
-
     if not articles:
-        printer.print_text("No articles found.")
-        printer.print_text("Check your RSS feed URLs.")
+        printer.print_body("No articles found.")
+        printer.print_caption("Check your RSS feed URLs.")
     else:
         for i, article in enumerate(articles):
-            # Truncate source if too long
-            source = article["source"].upper()[:20]
-            printer.print_text(f"[{source}]")
+            # Source as subheader
+            source = article["source"].upper()[:24]
+            printer.print_subheader(source)
 
-            # Wrap the headline
-            wrapped_lines = wrap_text(
-                article["title"], width=42, indent=2  # PRINTER_WIDTH (Font B)
-            )
+            # Headline in bold
+            wrapped_lines = wrap_text(article["title"], width=42, indent=0)
             for line in wrapped_lines:
-                printer.print_text(f"  {line}")
+                printer.print_bold(line)
 
-            # Wrap the summary
-            wrapped_summary = wrap_text(
-                article["summary"], width=42, indent=0  # PRINTER_WIDTH (Font B)
-            )
-            # Limit summary lines to save paper
+            # Summary in regular body text
+            wrapped_summary = wrap_text(article["summary"], width=42, indent=0)
             for line in wrapped_summary[:4]:
-                printer.print_text(line)
+                printer.print_body(line)
 
             if len(wrapped_summary) > 4:
-                printer.print_text("...")
+                printer.print_caption("...")
 
-            # Print small fixed-size QR code linking to the full article
+            # QR code linking to full article
             if article.get("url"):
                 printer.print_qr(article["url"], size=2, error_correction="L", fixed_size=True)
 
-            printer.print_line()  # Separator between articles
+            printer.print_line()

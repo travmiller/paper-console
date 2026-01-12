@@ -9,47 +9,34 @@ def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = No
     config = config or {}
     items = config.get("items", [])
     
-    printer.print_header((module_name or "CHECKLIST").upper())
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
+    printer.print_header(module_name or "CHECKLIST")
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
     
     if not items:
-        printer.print_text("No items in checklist.")
-        printer.feed(1)
+        printer.print_body("No items in checklist.")
         return
     
     # Print each item with a checkbox
     for item in items:
-        # Format: [ ] Item text
-        # Use a simple checkbox character that works on thermal printers
-        checkbox = "[ ]"
+        checkbox = "□"  # Unicode empty checkbox
         item_text = item.get("text", "").strip() if isinstance(item, dict) else str(item).strip()
         
         if not item_text:
             continue
-            
-        # Format: [ ] Item text
-        line = f"{checkbox} {item_text}"
         
-        # Handle long items by wrapping
-        if len(line) > printer.width:
-            # Print checkbox on first line
-            printer.print_text(checkbox)
-            # Print the rest wrapped
-            words = item_text.split()
-            wrapped_line = "  "  # Indent continuation lines
-            for word in words:
-                if len(wrapped_line) + len(word) + 1 <= printer.width:
-                    wrapped_line += word + " "
-                else:
-                    if wrapped_line.strip():
-                        printer.print_text(wrapped_line)
-                    wrapped_line = "  " + word + " "
-            if wrapped_line.strip():
-                printer.print_text(wrapped_line)
+        # Format: □ Item text
+        if len(item_text) + 2 > printer.width:
+            # Long item - wrap it
+            printer.print_body(f"{checkbox} {item_text[:printer.width - 2]}")
+            # Continuation with indent
+            remaining = item_text[printer.width - 2:]
+            while remaining:
+                chunk = remaining[:printer.width - 2]
+                printer.print_body(f"  {chunk}")
+                remaining = remaining[printer.width - 2:]
         else:
-            printer.print_text(line)
+            printer.print_body(f"{checkbox} {item_text}")
     
     printer.print_line()
-    printer.feed(1)
 

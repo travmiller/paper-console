@@ -54,20 +54,25 @@ def get_almanac_data():
 
 def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name: str = None):
     """Prints the Almanac to the provided printer driver."""
-    # Config can be used to toggle specific sections if we want later
     
     data = get_almanac_data()
     
-    printer.print_header((module_name or "ASTRONOMY").upper())
-    printer.print_text(datetime.now().strftime("%A, %b %d"))
-    printer.print_line()
-    printer.print_text(f"{app.config.settings.city_name}")
-    
-    printer.print_text(f"SUNRISE: {data['sunrise']}")
-    printer.print_text(f"SUNSET:  {data['sunset']}")
-    printer.print_text(f"LENGTH:  {data['day_length']}")
+    printer.print_header(module_name or "ASTRONOMY")
+    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
     
-    printer.print_text(f"MOON:    {data['moon_phase']}")
-    printer.print_text(f"PHASE:   {data['moon_phase_val']:.1f} / 28")
+    # Location
+    printer.print_subheader(app.config.settings.city_name.upper())
+    
+    # Sun data
+    printer.print_bold("☀ SUN")
+    printer.print_body(f"  Rise  {data['sunrise']}")
+    printer.print_body(f"  Set   {data['sunset']}")
+    printer.print_caption(f"  Day length: {data['day_length']}")
+    printer.print_line()
+    
+    # Moon data
+    printer.print_bold("☽ MOON")
+    printer.print_body(f"  {data['moon_phase']}")
+    printer.print_caption(f"  Phase: {data['moon_phase_val']:.1f} / 28")
 

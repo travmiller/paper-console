@@ -73,8 +73,8 @@ class PrinterDriver:
         self.line_spacing = max(0, min(8, line_spacing))  # Clamp to valid range
         self.line_height = self.font_size + self.line_spacing
 
-        # Load monospace font for bitmap rendering
-        self._font = self._load_font()
+        # Load font family for styled text
+        self._fonts = self._load_font_family()
 
         # Auto-detect serial port if not specified
         if port is None:
@@ -126,41 +126,80 @@ class PrinterDriver:
         except serial.SerialException:
             self.ser = None
 
-    def _load_font(self) -> ImageFont.FreeTypeFont:
-        """Load a monospace font for bitmap text rendering."""
+    def _load_font_family(self) -> dict:
+        """Load IBM Plex Mono font family with multiple weights."""
         import os
 
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         project_root = os.path.dirname(app_dir)
 
-        # Try to load IBM Plex Mono from web/public/fonts (relative to project root)
-        font_paths = [
-            os.path.join(
-                project_root, "web/public/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf"
-            ),
-            os.path.join(
-                project_root, "web/dist/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf"
-            ),
-            # System fonts as fallback
-            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-            "C:/Windows/Fonts/consola.ttf",  # Windows Consolas
-            "C:/Windows/Fonts/cour.ttf",  # Windows Courier New
+        fonts = {}
+        
+        # Font variants we want to load
+        font_variants = {
+            "regular": "IBMPlexMono-Regular.ttf",
+            "bold": "IBMPlexMono-Bold.ttf",
+            "medium": "IBMPlexMono-Medium.ttf",
+            "light": "IBMPlexMono-Light.ttf",
+            "semibold": "IBMPlexMono-SemiBold.ttf",
+        }
+        
+        # Base paths to search
+        base_paths = [
+            os.path.join(project_root, "web/public/fonts/IBM_Plex_Mono"),
+            os.path.join(project_root, "web/dist/fonts/IBM_Plex_Mono"),
         ]
+        
+        # Load each variant at different sizes
+        for variant_name, filename in font_variants.items():
+            for base_path in base_paths:
+                font_path = os.path.join(base_path, filename)
+                if os.path.exists(font_path):
+                    try:
+                        # Load at regular size
+                        fonts[variant_name] = ImageFont.truetype(font_path, self.font_size)
+                        # Load at header size (larger)
+                        fonts[f"{variant_name}_lg"] = ImageFont.truetype(font_path, self.font_size + 4)
+                        # Load at small size
+                        fonts[f"{variant_name}_sm"] = ImageFont.truetype(font_path, max(8, self.font_size - 2))
+                        break
+                    except Exception:
+                        continue
 
-        for path in font_paths:
-            if os.path.exists(path):
-                try:
-                    return ImageFont.truetype(path, self.font_size)
-                except Exception:
-                    continue
+        # Fallback to system fonts if IBM Plex not found
+        if "regular" not in fonts:
+            fallback_paths = [
+                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+                "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+                "C:/Windows/Fonts/consola.ttf",
+                "C:/Windows/Fonts/cour.ttf",
+            ]
+            for path in fallback_paths:
+                if os.path.exists(path):
+                    try:
+                        fonts["regular"] = ImageFont.truetype(path, self.font_size)
+                        fonts["bold"] = fonts["regular"]  # No bold variant
+                        fonts["regular_lg"] = ImageFont.truetype(path, self.font_size + 4)
+                        fonts["regular_sm"] = ImageFont.truetype(path, max(8, self.font_size - 2))
+                        break
+                    except Exception:
+                        continue
 
-        # Fallback to default font
-        try:
-            return ImageFont.load_default()
-        except Exception:
-            return None
+        # Ultimate fallback
+        if "regular" not in fonts:
+            try:
+                default_font = ImageFont.load_default()
+                fonts["regular"] = default_font
+                fonts["bold"] = default_font
+            except Exception:
+                pass
+
+        return fonts
+    
+    def _get_font(self, style: str = "regular") -> ImageFont.FreeTypeFont:
+        """Get a font by style name."""
+        return self._fonts.get(style, self._fonts.get("regular"))
 
     def _render_text_bitmap(self, lines: list) -> Image.Image:
         """Render text lines to a bitmap image, rotated 180° for upside-down printing."""
@@ -190,12 +229,26 @@ class PrinterDriver:
 
         return img
 
+    def _get_line_height_for_style(self, style: str) -> int:
+        """Get the line height for a given font style."""
+        font = self._get_font(style)
+        if font and hasattr(font, 'size'):
+            return font.size + self.line_spacing
+        # Estimate based on style name
+        if "_lg" in style:
+            return self.font_size + 4 + self.line_spacing
+        elif "_sm" in style:
+            return max(8, self.font_size - 2) + self.line_spacing
+        return self.line_height
+
     def _render_unified_bitmap(self, ops: list) -> Image.Image:
         """Render ALL buffer operations into one unified bitmap.
         
         This is faster than multiple small bitmaps because:
         - Single GS v 0 command overhead
         - Continuous data stream to printer
+        
+        Supports styled text with different fonts and sizes.
         """
         import qrcode as qr_lib
         
@@ -207,7 +260,13 @@ class PrinterDriver:
         qr_images = []  # Store pre-rendered QR codes with their positions
         
         for op_type, op_data in ops:
-            if op_type == "text":
+            if op_type == "styled":
+                clean_text = self._sanitize_text(op_data["text"])
+                line_count = len(clean_text.split("\n"))
+                style = op_data.get("style", "regular")
+                total_height += line_count * self._get_line_height_for_style(style)
+            elif op_type == "text":
+                # Legacy support for plain text
                 clean_text = self._sanitize_text(op_data)
                 line_count = len(clean_text.split("\n"))
                 total_height += line_count * self.line_height
@@ -235,11 +294,25 @@ class PrinterDriver:
         qr_idx = 0
         
         for op_type, op_data in ops:
-            if op_type == "text":
-                clean_text = self._sanitize_text(op_data)
+            if op_type == "styled":
+                clean_text = self._sanitize_text(op_data["text"])
+                style = op_data.get("style", "regular")
+                font = self._get_font(style)
+                line_height = self._get_line_height_for_style(style)
+                
                 for line in clean_text.split("\n"):
-                    if self._font:
-                        draw.text((2, y), line, font=self._font, fill=0)
+                    if font:
+                        draw.text((2, y), line, font=font, fill=0)
+                    else:
+                        draw.text((2, y), line, fill=0)
+                    y += line_height
+            elif op_type == "text":
+                # Legacy support
+                clean_text = self._sanitize_text(op_data)
+                font = self._get_font("regular")
+                for line in clean_text.split("\n"):
+                    if font:
+                        draw.text((2, y), line, font=font, fill=0)
                     else:
                         draw.text((2, y), line, fill=0)
                     y += self.line_height
@@ -550,19 +623,53 @@ class PrinterDriver:
         """Check if the last print was truncated due to max lines."""
         return self._max_lines_hit
 
-    def print_text(self, text: str):
-        """Print a line of text. Buffers for reverse-order printing."""
+    def print_text(self, text: str, style: str = "regular"):
+        """Print text with specified style. Buffers for unified bitmap rendering.
+        
+        Available styles:
+            - "regular": Normal body text
+            - "bold": Bold text  
+            - "bold_lg": Large bold text (for headers)
+            - "medium": Medium weight
+            - "semibold": Semi-bold
+            - "light": Light weight
+            - "regular_sm": Small regular text
+        """
         # Safety: prevent unbounded buffer growth
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
-        self.print_buffer.append(("text", text))
-        # Note: lines_printed is incremented in _write_text_line() when actually printed
-        # to avoid double-counting
+        self.print_buffer.append(("styled", {"text": text, "style": style}))
+
+    def print_header(self, text: str):
+        """Print large bold header text."""
+        self.print_text(text.upper(), "bold_lg")
+    
+    def print_subheader(self, text: str):
+        """Print medium-weight subheader."""
+        self.print_text(text, "semibold")
+    
+    def print_body(self, text: str):
+        """Print regular body text."""
+        self.print_text(text, "regular")
+    
+    def print_caption(self, text: str):
+        """Print small, light caption text."""
+        self.print_text(text, "light")
+    
+    def print_bold(self, text: str):
+        """Print bold text at normal size."""
+        self.print_text(text, "bold")
 
     def print_line(self):
-        """Print a separator line."""
-        line = "-" * self.width
-        self.print_text(line)
+        """Print a decorative separator line."""
+        # Use a stylish dot pattern instead of plain dashes
+        line = "· " * (self.width // 2)
+        self.print_text(line.strip(), "light")
+    
+    def print_thick_line(self):
+        """Print a bold separator line."""
+        line = "━" * self.width
+        self.print_text(line, "bold")
 
     def _write_feed(self, count: int):
         """Internal method to feed paper."""
