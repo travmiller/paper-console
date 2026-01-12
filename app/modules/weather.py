@@ -259,58 +259,105 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             }
         else:
             # Fetch daily forecast (default)
+            # According to Open-Meteo docs:
+            # - daily data requires timezone parameter
+            # - data starts at 00:00 local time when timezone is set
+            # - forecast_days defaults to 7, can be up to 16
+            # - daily aggregations are 24-hour aggregations from hourly values
             params = {
                 "latitude": latitude,
                 "longitude": longitude,
                 "current_weather": "true",
                 "daily": "weathercode,temperature_2m_max,temperature_2m_min",
-                "timezone": timezone,
+                "timezone": timezone,  # Required for daily data
                 "temperature_unit": "fahrenheit",
-                "forecast_days": 8,  # Request 8 days so we get 7 after skipping today
+                "forecast_days": 8,  # Request 8 days so we get 7 after skipping today (index 0)
             }
 
             resp = requests.get(url, params=params, timeout=10)
+            resp.raise_for_status()  # Raise exception for bad status codes
             data = resp.json()
 
-            current = data["current_weather"]
-            daily = data["daily"]
+            current = data.get("current_weather", {})
+            daily = data.get("daily", {})
+
+            # Validate we have the required data
+            if not daily.get("time") or not daily.get("temperature_2m_max") or not daily.get("temperature_2m_min"):
+                raise ValueError("Missing required daily forecast data")
 
             # Build 7-day forecast (skip today, start from tomorrow)
+            # According to docs: daily data starts from today (index 0) at 00:00 local time
             forecast = []
+            daily_times = daily.get("time", [])
+            daily_max = daily.get("temperature_2m_max", [])
+            daily_min = daily.get("temperature_2m_min", [])
+            daily_weathercode = daily.get("weathercode", [])
+            
             # Start from index 1 to skip today (index 0 is today, which we show separately)
-            for i in range(1, min(len(daily.get("time", [])), 8)):  # Get next 7 days (indices 1-7)
-                date_str = daily["time"][i]
-                dt = datetime.strptime(date_str, "%Y-%m-%d")
-                weather_code = daily["weathercode"][i] if "weathercode" in daily else 0
-                condition = get_weather_condition(weather_code)
-                
-                forecast.append({
-                    "day": dt.strftime("%a"),
-                    "date": dt.strftime("%d"),
-                    "high": int(daily["temperature_2m_max"][i]),
-                    "low": int(daily["temperature_2m_min"][i]),
-                    "condition": condition,
-                })
+            # Get next 7 days (indices 1-7)
+            for i in range(1, min(len(daily_times), 8)):
+                try:
+                    # Parse ISO8601 date (format: "2022-07-01")
+                    date_str = daily_times[i]
+                    dt = datetime.strptime(date_str, "%Y-%m-%d")
+                    
+                    # Get weather code (WMO code) - defaults to 0 (Clear sky) if missing
+                    weather_code = daily_weathercode[i] if i < len(daily_weathercode) else 0
+                    condition = get_weather_condition(weather_code)
+                    
+                    # Get temperatures (convert to int, handle missing data)
+                    high = int(daily_max[i]) if i < len(daily_max) else None
+                    low = int(daily_min[i]) if i < len(daily_min) else None
+                    
+                    forecast.append({
+                        "day": dt.strftime("%a"),  # Day abbreviation (Mon, Tue, etc.)
+                        "date": dt.strftime("%d"),  # Day of month
+                        "high": high,
+                        "low": low,
+                        "condition": condition,
+                    })
+                except (ValueError, IndexError, TypeError) as e:
+                    # Skip invalid entries but continue processing
+                    continue
+
+            # Get today's high/low from index 0
+            today_high = int(daily_max[0]) if daily_max else None
+            today_low = int(daily_min[0]) if daily_min else None
 
             return {
-                "current": int(current["temperature"]),
-                "condition": get_weather_condition(current["weathercode"]),
-                "high": int(daily["temperature_2m_max"][0]),
-                "low": int(daily["temperature_2m_min"][0]),
+                "current": int(current.get("temperature", 0)),
+                "condition": get_weather_condition(current.get("weathercode", 0)),
+                "high": today_high,
+                "low": today_low,
                 "city": city_name,
                 "forecast_type": "daily",
                 "forecast": forecast,
             }
 
-    except Exception:
-        return {
+    except Exception as e:
+        # Log error for debugging
+        import logging
+        try:
+            logging.error(f"Weather API error: {e}")
+        except:
+            pass  # Ignore logging errors
+        
+        # Return error response with appropriate forecast type
+        error_response = {
             "current": "--",
             "condition": "Unavailable",
             "high": "--",
             "low": "--",
             "city": city_name,
-            "forecast": empty_forecast,
+            "forecast_type": forecast_type,
         }
+        
+        if forecast_type == "hourly":
+            error_response["hourly_forecast"] = []
+        else:
+            error_response["forecast"] = empty_forecast
+        
+        return error_response
 
 
 def _get_icon_type(condition: str) -> str:
