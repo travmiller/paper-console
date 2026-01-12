@@ -876,6 +876,291 @@ class PrinterDriver:
             draw.ellipse([center_x - radius, center_y - radius, 
                          center_x + radius, center_y + radius], 
                         fill=0, outline=0, width=2)
+        
+        elif icon_type.lower() == "email" or icon_type.lower() == "mail":
+            # Envelope icon
+            envelope_w = radius * 1.5
+            envelope_h = radius * 1.2
+            # Envelope body
+            draw.rectangle([center_x - envelope_w//2, center_y - envelope_h//2,
+                          center_x + envelope_w//2, center_y + envelope_h//2], 
+                         outline=0, width=2)
+            # Envelope flap (triangle)
+            flap_points = [
+                (center_x - envelope_w//2, center_y - envelope_h//2),
+                (center_x + envelope_w//2, center_y - envelope_h//2),
+                (center_x, center_y - envelope_h//2 + envelope_h//3)
+            ]
+            draw.polygon(flap_points, outline=0, fill=0)
+        
+        elif icon_type.lower() == "calendar":
+            # Calendar icon: rectangle with lines
+            cal_w = radius * 1.4
+            cal_h = radius * 1.2
+            # Calendar body
+            draw.rectangle([center_x - cal_w//2, center_y - cal_h//2,
+                          center_x + cal_w//2, center_y + cal_h//2], 
+                         outline=0, width=2)
+            # Calendar rings at top
+            ring_y = center_y - cal_h//2 + 4
+            draw.ellipse([center_x - cal_w//2 + 4, ring_y - 2,
+                         center_x - cal_w//2 + 8, ring_y + 2], fill=0)
+            draw.ellipse([center_x + cal_w//2 - 8, ring_y - 2,
+                         center_x + cal_w//2 - 4, ring_y + 2], fill=0)
+            # Calendar lines
+            for line_y in range(center_y - cal_h//4, center_y + cal_h//2, 4):
+                draw.line([(center_x - cal_w//2 + 2, line_y),
+                          (center_x + cal_w//2 - 2, line_y)], fill=0, width=1)
+        
+        elif icon_type.lower() == "clock" or icon_type.lower() == "time":
+            # Clock icon: circle with hands
+            draw.ellipse([center_x - radius, center_y - radius,
+                         center_x + radius, center_y + radius], 
+                        outline=0, width=2)
+            # Hour markers (12, 3, 6, 9)
+            marker_len = 3
+            # Top (12)
+            draw.line([(center_x, center_y - radius), 
+                      (center_x, center_y - radius + marker_len)], fill=0, width=2)
+            # Right (3)
+            draw.line([(center_x + radius, center_y),
+                      (center_x + radius - marker_len, center_y)], fill=0, width=2)
+            # Bottom (6)
+            draw.line([(center_x, center_y + radius),
+                      (center_x, center_y + radius - marker_len)], fill=0, width=2)
+            # Left (9)
+            draw.line([(center_x - radius, center_y),
+                      (center_x - radius + marker_len, center_y)], fill=0, width=2)
+            # Clock hands
+            # Hour hand (shorter, pointing up-right)
+            hour_len = radius * 0.5
+            draw.line([(center_x, center_y),
+                      (center_x + hour_len * 0.3, center_y - hour_len * 0.7)], fill=0, width=2)
+            # Minute hand (longer, pointing up)
+            minute_len = radius * 0.7
+            draw.line([(center_x, center_y),
+                      (center_x, center_y - minute_len)], fill=0, width=2)
+        
+        elif icon_type.lower() == "wifi":
+            # WiFi icon: curved arcs
+            arc_spacing = 3
+            for i in range(3):
+                arc_radius = radius - (i * arc_spacing)
+                if arc_radius > 0:
+                    # Draw arc (top half of circle)
+                    draw.arc([center_x - arc_radius, center_y - arc_radius,
+                             center_x + arc_radius, center_y + arc_radius],
+                            start=180, end=0, fill=0, width=2)
+            # Dot in center
+            draw.ellipse([center_x - 2, center_y + radius - 4,
+                         center_x + 2, center_y + radius], fill=0)
+        
+        elif icon_type.lower() == "battery":
+            # Battery icon: rectangle with terminal
+            batt_w = radius * 1.5
+            batt_h = radius * 0.8
+            # Battery body
+            draw.rectangle([center_x - batt_w//2, center_y - batt_h//2,
+                          center_x + batt_w//2 - 3, center_y + batt_h//2],
+                         outline=0, width=2)
+            # Battery terminal (right side)
+            draw.rectangle([center_x + batt_w//2 - 3, center_y - batt_h//3,
+                          center_x + batt_w//2 + 2, center_y + batt_h//3],
+                         fill=0)
+            # Battery level indicator (optional - could be parameterized)
+            level_w = int(batt_w * 0.6)
+            draw.rectangle([center_x - batt_w//2 + 2, center_y - batt_h//2 + 2,
+                          center_x - batt_w//2 + level_w, center_y + batt_h//2 - 2],
+                         fill=0)
+        
+        elif icon_type.lower() == "check" or icon_type.lower() == "checkmark":
+            # Checkmark icon
+            check_size = radius
+            # Draw checkmark
+            draw.line([(center_x - check_size//2, center_y),
+                      (center_x - check_size//4, center_y + check_size//2),
+                      (center_x + check_size//2, center_y - check_size//2)], 
+                     fill=0, width=3)
+        
+        elif icon_type.lower() == "x" or icon_type.lower() == "close":
+            # X/close icon
+            x_size = radius
+            # Draw X
+            draw.line([(center_x - x_size//2, center_y - x_size//2),
+                      (center_x + x_size//2, center_y + x_size//2)], 
+                     fill=0, width=3)
+            draw.line([(center_x + x_size//2, center_y - x_size//2),
+                      (center_x - x_size//2, center_y + x_size//2)], 
+                     fill=0, width=3)
+        
+        elif icon_type.lower() == "star":
+            # Star icon (5-pointed)
+            import math
+            star_radius = radius
+            # Draw 5-pointed star
+            points = []
+            for i in range(10):  # 10 points (5 outer, 5 inner)
+                angle = math.radians(i * 36 - 90)  # Start at top
+                if i % 2 == 0:
+                    # Outer point
+                    r = star_radius
+                else:
+                    # Inner point
+                    r = star_radius * 0.4
+                px = center_x + r * math.cos(angle)
+                py = center_y + r * math.sin(angle)
+                points.append((px, py))
+            draw.polygon(points, outline=0, fill=0)
+        
+        elif icon_type.lower() == "heart":
+            # Heart icon
+            heart_size = radius
+            # Draw heart using two circles and triangle
+            # Left circle
+            draw.ellipse([center_x - heart_size//3, center_y - heart_size//3,
+                         center_x, center_y + heart_size//6], fill=0)
+            # Right circle
+            draw.ellipse([center_x, center_y - heart_size//3,
+                         center_x + heart_size//3, center_y + heart_size//6], fill=0)
+            # Triangle point
+            heart_points = [
+                (center_x - heart_size//2, center_y),
+                (center_x, center_y + heart_size//2),
+                (center_x + heart_size//2, center_y)
+            ]
+            draw.polygon(heart_points, fill=0)
+        
+        elif icon_type.lower() == "settings" or icon_type.lower() == "gear":
+            # Gear/settings icon
+            gear_radius = radius
+            # Draw gear (simplified - octagon with teeth)
+            import math
+            teeth = 8
+            outer_radius = gear_radius
+            inner_radius = gear_radius * 0.6
+            points = []
+            for i in range(teeth * 2):
+                angle = math.radians(i * 360 / (teeth * 2))
+                if i % 2 == 0:
+                    r = outer_radius
+                else:
+                    r = inner_radius
+                px = center_x + r * math.cos(angle)
+                py = center_y + r * math.sin(angle)
+                points.append((px, py))
+            draw.polygon(points, outline=0, fill=0)
+            # Center circle
+            draw.ellipse([center_x - gear_radius//3, center_y - gear_radius//3,
+                         center_x + gear_radius//3, center_y + gear_radius//3],
+                        fill=1, outline=0, width=1)
+        
+        elif icon_type.lower() == "home":
+            # Home icon: house shape
+            house_w = radius * 1.2
+            house_h = radius * 1.0
+            # Roof (triangle)
+            roof_points = [
+                (center_x, center_y - house_h//2),
+                (center_x - house_w//2, center_y),
+                (center_x + house_w//2, center_y)
+            ]
+            draw.polygon(roof_points, fill=0)
+            # House body
+            draw.rectangle([center_x - house_w//3, center_y,
+                          center_x + house_w//3, center_y + house_h//2],
+                         outline=0, width=2)
+            # Door
+            door_w = house_w // 4
+            draw.rectangle([center_x - door_w//2, center_y + house_h//4,
+                          center_x + door_w//2, center_y + house_h//2],
+                         fill=0)
+        
+        elif icon_type.lower() == "location" or icon_type.lower() == "pin":
+            # Location pin icon
+            pin_w = radius * 0.8
+            pin_h = radius * 1.2
+            # Pin body (rounded top, pointy bottom)
+            # Top circle
+            draw.ellipse([center_x - pin_w//2, center_y - pin_h//2,
+                         center_x + pin_w//2, center_y - pin_h//2 + pin_w],
+                        fill=0)
+            # Bottom triangle
+            pin_points = [
+                (center_x, center_y + pin_h//2),
+                (center_x - pin_w//2, center_y - pin_h//2 + pin_w),
+                (center_x + pin_w//2, center_y - pin_h//2 + pin_w)
+            ]
+            draw.polygon(pin_points, fill=0)
+            # Center dot
+            draw.ellipse([center_x - 2, center_y - pin_h//2 + pin_w//2 - 2,
+                         center_x + 2, center_y - pin_h//2 + pin_w//2 + 2],
+                        fill=1)
+        
+        elif icon_type.lower() == "arrow_right":
+            # Right arrow
+            arrow_w = radius * 1.2
+            arrow_h = radius * 0.6
+            # Arrow shaft
+            draw.rectangle([center_x - arrow_w//2, center_y - arrow_h//2,
+                          center_x + arrow_w//4, center_y + arrow_h//2], fill=0)
+            # Arrow head
+            arrow_points = [
+                (center_x + arrow_w//2, center_y),
+                (center_x + arrow_w//4, center_y - arrow_h//2),
+                (center_x + arrow_w//4, center_y + arrow_h//2)
+            ]
+            draw.polygon(arrow_points, fill=0)
+        
+        elif icon_type.lower() == "arrow_left":
+            # Left arrow
+            arrow_w = radius * 1.2
+            arrow_h = radius * 0.6
+            # Arrow shaft
+            draw.rectangle([center_x - arrow_w//4, center_y - arrow_h//2,
+                          center_x + arrow_w//2, center_y + arrow_h//2], fill=0)
+            # Arrow head
+            arrow_points = [
+                (center_x - arrow_w//2, center_y),
+                (center_x - arrow_w//4, center_y - arrow_h//2),
+                (center_x - arrow_w//4, center_y + arrow_h//2)
+            ]
+            draw.polygon(arrow_points, fill=0)
+        
+        elif icon_type.lower() == "arrow_up":
+            # Up arrow
+            arrow_w = radius * 0.6
+            arrow_h = radius * 1.2
+            # Arrow shaft
+            draw.rectangle([center_x - arrow_w//2, center_y - arrow_h//4,
+                          center_x + arrow_w//2, center_y + arrow_h//2], fill=0)
+            # Arrow head
+            arrow_points = [
+                (center_x, center_y - arrow_h//2),
+                (center_x - arrow_w//2, center_y - arrow_h//4),
+                (center_x + arrow_w//2, center_y - arrow_h//4)
+            ]
+            draw.polygon(arrow_points, fill=0)
+        
+        elif icon_type.lower() == "arrow_down":
+            # Down arrow
+            arrow_w = radius * 0.6
+            arrow_h = radius * 1.2
+            # Arrow shaft
+            draw.rectangle([center_x - arrow_w//2, center_y - arrow_h//2,
+                          center_x + arrow_w//2, center_y + arrow_h//4], fill=0)
+            # Arrow head
+            arrow_points = [
+                (center_x, center_y + arrow_h//2),
+                (center_x - arrow_w//2, center_y + arrow_h//4),
+                (center_x + arrow_w//2, center_y + arrow_h//4)
+            ]
+            draw.polygon(arrow_points, fill=0)
+        
+        else:
+            # Default: draw a simple circle
+            draw.ellipse([center_x - radius, center_y - radius,
+                         center_x + radius, center_y + radius],
+                        outline=0, width=2)
 
     def _draw_progress_bar(self, draw: ImageDraw.Draw, x: int, y: int, width: int, height: int,
                           value: float, max_value: float, label: str, font):

@@ -146,14 +146,15 @@ class PrinterDriver:
         self.lines_printed += 11
 
     def print_icon(self, icon_type: str, size: int = 32):
-        """Simulates printing a weather icon."""
+        """Simulates printing an icon."""
         icons = {
-            "sun": "☀",
-            "cloud": "☁",
-            "rain": "🌧",
-            "snow": "❄",
-            "storm": "⛈",
-            "clear": "○"
+            "sun": "☀", "cloud": "☁", "rain": "🌧", "snow": "❄", 
+            "storm": "⛈", "clear": "○", "email": "✉", "mail": "✉",
+            "calendar": "📅", "clock": "🕐", "time": "🕐", "wifi": "📶",
+            "battery": "🔋", "check": "✓", "checkmark": "✓", "x": "✗",
+            "close": "✗", "star": "★", "heart": "♥", "settings": "⚙",
+            "gear": "⚙", "home": "⌂", "location": "📍", "pin": "📍",
+            "arrow_right": "→", "arrow_left": "←", "arrow_up": "↑", "arrow_down": "↓"
         }
         icon = icons.get(icon_type.lower(), "?")
         print(f"[PRINT]     [{icon}]")

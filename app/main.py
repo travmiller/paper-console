@@ -255,11 +255,22 @@ async def check_first_boot():
     # If marker exists, just print ready message
     if os.path.exists(marker_path):
         printer.feed(1)
-        printer.print_text("=" * 32)
-        printer.print_text("       SYSTEM READY")
-        printer.print_text("=" * 32)
-        printer.feed(1)
-
+        
+        # Visual header with icon
+        printer.print_header("SYSTEM READY")
+        printer.print_icon("check", size=48)
+        
+        from datetime import datetime
+        printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
+        printer.print_caption(datetime.now().strftime("%I:%M %p"))
+        
+        printer.print_line()
+        printer.print_body("PC-1 is ready to print!")
+        printer.print_body("Rotate the dial to select")
+        printer.print_body("a channel and press the")
+        printer.print_body("button to print.")
+        printer.print_line()
+        
         # Flush buffer
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
@@ -283,69 +294,73 @@ async def check_first_boot():
     ssid = f"PC-1-Setup-{ssid_suffix}"
 
     printer.feed(1)
-    printer.print_text("================================")
-    printer.print_text("")
-    printer.print_text("    Welcome to PC-1!")
-    printer.print_text("    Your Paper Console")
-    printer.print_text("")
-    printer.print_text("================================")
+    
+    # Welcome header with icon
+    printer.print_header("WELCOME")
+    printer.print_icon("home", size=56)
+    
+    printer.print_bold("PC-1 Paper Console")
+    printer.print_body("Your personal printer for")
+    printer.print_body("weather, news, puzzles,")
+    printer.print_body("and more.")
+    printer.print_line()
+    
+    # Setup instructions
+    printer.print_subheader("SETUP INSTRUCTIONS")
+    printer.print_line()
+    
+    # Step 1
+    printer.print_bold("STEP 1: CONNECT TO WIFI")
+    printer.print_icon("wifi", size=32)
+    printer.print_body("On your phone or computer,")
+    printer.print_body("connect to WiFi network:")
+    printer.print_line()
+    printer.print_bold(f"  {ssid}")
+    printer.print_caption("  Password: setup1234")
+    printer.print_line()
+    
+    # Step 2
+    printer.print_bold("STEP 2: OPEN SETUP PAGE")
+    printer.print_icon("arrow_right", size=32)
+    printer.print_body("Visit in your browser:")
+    printer.print_line()
+    printer.print_bold("  http://10.42.0.1")
+    printer.print_caption("  (or http://pc-1.local)")
+    printer.print_line()
+    
+    # Step 3
+    printer.print_bold("STEP 3: CONFIGURE WIFI")
+    printer.print_icon("settings", size=32)
+    printer.print_body("Select your home WiFi and")
+    printer.print_body("enter the password.")
+    printer.print_caption("PC-1 will remember it.")
+    printer.print_line()
+    
+    # After setup section
+    printer.print_subheader("AFTER SETUP")
+    printer.print_line()
+    printer.print_body("Turn the dial to select a")
+    printer.print_body("channel, then press the")
+    printer.print_body("button to print!")
+    printer.print_line()
+    
+    printer.print_bold("Example Channels:")
+    printer.print_body("  • Weather forecast")
+    printer.print_body("  • News headlines")
+    printer.print_body("  • Moon & sunrise")
+    printer.print_body("  • Sudoku puzzle")
+    printer.print_body("  • Calendar events")
+    printer.print_line()
+    
+    printer.print_caption("Customize channels at:")
+    printer.print_bold("  http://pc-1.local")
+    printer.print_line()
+    
+    printer.print_subheader("QUICK HELP")
+    printer.print_body("Button 5s = WiFi setup")
+    printer.print_body("Button 15s = Reset all")
+    printer.print_line()
     printer.feed(1)
-    printer.print_text("PC-1 prints weather, news,")
-    printer.print_text("puzzles, and more on paper.")
-    printer.print_text("")
-    printer.print_text("First, let's connect it to")
-    printer.print_text("your home WiFi so it can")
-    printer.print_text("fetch content from the internet.")
-    printer.feed(1)
-    printer.print_text("--------------------------------")
-    printer.print_text("STEP 1: CONNECT TO PC-1")
-    printer.print_text("--------------------------------")
-    printer.print_text("")
-    printer.print_text("On your phone or computer,")
-    printer.print_text("look for this WiFi network:")
-    printer.print_text("")
-    printer.print_text(f"  {ssid}")
-    printer.print_text("  Password: setup1234")
-    printer.feed(1)
-    printer.print_text("--------------------------------")
-    printer.print_text("STEP 2: OPEN SETUP PAGE")
-    printer.print_text("--------------------------------")
-    printer.print_text("")
-    printer.print_text("Your phone may open it")
-    printer.print_text("automatically. If not, visit:")
-    printer.print_text("")
-    printer.print_text("  http://10.42.0.1")
-    printer.feed(1)
-    printer.print_text("--------------------------------")
-    printer.print_text("STEP 3: CHOOSE YOUR WIFI")
-    printer.print_text("--------------------------------")
-    printer.print_text("")
-    printer.print_text("Select your home WiFi and")
-    printer.print_text("enter its password. PC-1 will")
-    printer.print_text("remember it and connect")
-    printer.print_text("automatically from now on.")
-    printer.feed(1)
-    printer.print_text("================================")
-    printer.print_text("AFTER SETUP")
-    printer.print_text("================================")
-    printer.print_text("")
-    printer.print_text("Turn the dial to choose:")
-    printer.print_text("  1 = Weather forecast")
-    printer.print_text("  2 = Moon & sunrise times")
-    printer.print_text("  3 = Sudoku puzzle")
-    printer.print_text("")
-    printer.print_text("Press the button to print!")
-    printer.print_text("")
-    printer.print_text("Customize channels anytime at:")
-    printer.print_text("  http://pc-1.local")
-    printer.feed(1)
-    printer.print_text("--------------------------------")
-    printer.print_text("NEED HELP LATER?")
-    printer.print_text("--------------------------------")
-    printer.print_text("Button 5s = WiFi setup")
-    printer.print_text("Button 15s = Reset all")
-    printer.print_text("================================")
-    printer.feed(2)
 
     # Flush buffer to print (prints are reversed for tear-off orientation)
     if hasattr(printer, "flush_buffer"):
