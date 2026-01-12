@@ -76,6 +76,7 @@ class WeatherConfig(BaseModel):
     latitude: Optional[float] = None
     longitude: Optional[float] = None
     timezone: Optional[str] = None
+    forecast_type: str = "daily"  # "daily" or "hourly"
 
 
 class CalendarSource(BaseModel):

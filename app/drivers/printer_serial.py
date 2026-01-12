@@ -325,6 +325,13 @@ class PrinterDriver:
                 total_height += (
                     24 + 12 + 12 + 12 + 8
                 )  # icon + day + high + low + spacing
+            elif op_type == "hourly_forecast":
+                # 24-hour hourly forecast
+                # Group into rows of 6 hours each
+                hourly_forecast = op_data.get("hourly_forecast", [])
+                num_rows = (len(hourly_forecast) + 5) // 6  # 6 hours per row
+                # Each row: icon (20px) + time + temp
+                total_height += num_rows * (20 + 12 + 8)  # icon + text + spacing
             elif op_type == "progress_bar":
                 # Progress bar graphic
                 height = op_data.get("height", 12)
@@ -536,6 +543,13 @@ class PrinterDriver:
                 forecast = op_data.get("forecast", [])
                 self._draw_weather_forecast(draw, 0, y, width, forecast)
                 y += 24 + 12 + 12 + 12 + 8  # icon + day + high + low + spacing
+            elif op_type == "hourly_forecast":
+                # Draw 24-hour hourly forecast
+                hourly_forecast = op_data.get("hourly_forecast", [])
+                self._draw_hourly_forecast(draw, 0, y, width, hourly_forecast)
+                # Calculate height based on number of rows (6 hours per row)
+                num_rows = (len(hourly_forecast) + 5) // 6
+                y += num_rows * (20 + 12 + 8)  # icon + text + spacing
             elif op_type == "progress_bar":
                 # Draw progress bar
                 value = op_data.get("value", 0)  # 0-100
@@ -2657,6 +2671,86 @@ class PrinterDriver:
                 # Just draw normally for now
                 draw.text((text_x, low_y), low_str, font=font, fill=0)
 
+    def _draw_hourly_forecast(
+        self, draw: ImageDraw.Draw, x: int, y: int, total_width: int, hourly_forecast: list
+    ):
+        """Draw a 24-hour hourly weather forecast in rows.
+
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            total_width: Total width available
+            hourly_forecast: List of dicts with keys: time, temperature, condition
+        """
+        if not hourly_forecast:
+            return
+
+        # Map conditions to icon types (matches weather module logic)
+        def get_icon_type(condition: str) -> str:
+            condition_lower = condition.lower() if condition else ""
+            if condition_lower == "clear":
+                return "sun"  # Maps to sun.png
+            elif "mainly clear" in condition_lower or "partly cloudy" in condition_lower:
+                return "cloud-sun"  # Maps to cloud-sun.png
+            elif "rain" in condition_lower:
+                return "rain"  # Maps to cloud-rain.png
+            elif "snow" in condition_lower:
+                return "snow"  # Maps to cloud-snow.png
+            elif "storm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+                return "storm"  # Maps to cloud-lightning.png
+            elif "fog" in condition_lower or "mist" in condition_lower:
+                return "cloud-fog"  # Maps to cloud-fog.png
+            elif "cloud" in condition_lower or "overcast" in condition_lower:
+                return "cloud"  # Maps to cloud.png
+            else:
+                return "cloud"  # Default
+
+        # Group into rows of 6 hours each
+        hours_per_row = 6
+        num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
+        col_width = total_width // hours_per_row
+        icon_size = 20
+        row_height = icon_size + 12 + 8  # icon + text + spacing
+
+        # Get small font for text
+        font = self._get_font("regular_sm")
+
+        for row in range(num_rows):
+            row_y = y + row * row_height
+            start_idx = row * hours_per_row
+            end_idx = min(start_idx + hours_per_row, len(hourly_forecast))
+
+            for col in range(start_idx, end_idx):
+                hour_data = hourly_forecast[col]
+                col_idx = col - start_idx
+                col_x = x + col_idx * col_width
+                col_center = col_x + col_width // 2
+
+                # Icon
+                icon_y = row_y
+                icon_x = int(col_center - icon_size // 2)
+                icon_type = get_icon_type(hour_data.get("condition", ""))
+                self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
+
+                # Time (e.g., "2PM")
+                time_str = hour_data.get("time", "--")
+                time_y = icon_y + icon_size + 2
+                if font:
+                    bbox = font.getbbox(time_str)
+                    text_w = bbox[2] - bbox[0] if bbox else 0
+                    text_x = int(col_center - text_w // 2)
+                    draw.text((text_x, time_y), time_str, font=font, fill=0)
+
+                # Temperature
+                temp = hour_data.get("temperature", "--")
+                temp_str = f"{temp}°" if temp != "--" else "--"
+                temp_y = time_y + 10
+                if font:
+                    bbox = font.getbbox(temp_str)
+                    text_w = bbox[2] - bbox[0] if bbox else 0
+                    text_x = int(col_center - text_w // 2)
+                    draw.text((text_x, temp_y), temp_str, font=font, fill=0)
+
     def _draw_progress_bar(
         self,
         draw: ImageDraw.Draw,
@@ -3388,6 +3482,23 @@ class PrinterDriver:
                 "weather_forecast",
                 {
                     "forecast": forecast,
+                },
+            )
+        )
+
+    def print_hourly_forecast(self, hourly_forecast: list):
+        """Print a 24-hour hourly weather forecast with icons.
+
+        Args:
+            hourly_forecast: List of dicts with keys: time, temperature, condition
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(
+            (
+                "hourly_forecast",
+                {
+                    "hourly_forecast": hourly_forecast,
                 },
             )
         )

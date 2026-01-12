@@ -204,6 +204,37 @@ class PrinterDriver:
         
         self.lines_printed += 4
 
+    def print_hourly_forecast(self, hourly_forecast: list):
+        """Simulates printing a 24-hour hourly weather forecast."""
+        icons = {"sun": "☀", "cloud": "☁", "rain": "🌧", "snow": "❄", "storm": "⛈"}
+        
+        def get_icon(condition):
+            condition = (condition or "").lower()
+            if "clear" in condition: return "☀"
+            if "rain" in condition: return "🌧"
+            if "snow" in condition: return "❄"
+            if "storm" in condition: return "⛈"
+            return "☁"
+        
+        # Group into rows of 6 hours each
+        hours_per_row = 6
+        for i in range(0, len(hourly_forecast), hours_per_row):
+            row = hourly_forecast[i:i + hours_per_row]
+            
+            # Time row
+            times = [h.get("time", "--") for h in row]
+            print(f"[PRINT] {' '.join(f'{t:^6}' for t in times)}")
+            
+            # Icon row
+            icons_row = [get_icon(h.get("condition")) for h in row]
+            print(f"[PRINT] {' '.join(f'{i:^6}' for i in icons_row)}")
+            
+            # Temp row
+            temps = [f"{h.get('temperature', '--')}°" for h in row]
+            print(f"[PRINT] {' '.join(f'{t:^6}' for t in temps)}")
+            
+            self.lines_printed += 3
+
     def print_progress_bar(self, value: float, max_value: float = 100, 
                          width: int = None, height: int = 12, label: str = ""):
         """Simulates printing a progress bar."""
