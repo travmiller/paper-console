@@ -190,6 +190,107 @@ class PrinterDriver:
 
         return img
 
+    def _render_unified_bitmap(self, ops: list) -> Image.Image:
+        """Render ALL buffer operations into one unified bitmap.
+        
+        This is faster than multiple small bitmaps because:
+        - Single GS v 0 command overhead
+        - Continuous data stream to printer
+        """
+        import qrcode as qr_lib
+        
+        if not ops:
+            return None
+
+        # First pass: calculate total height needed
+        total_height = 4  # Padding
+        qr_images = []  # Store pre-rendered QR codes with their positions
+        
+        for op_type, op_data in ops:
+            if op_type == "text":
+                clean_text = self._sanitize_text(op_data)
+                line_count = len(clean_text.split("\n"))
+                total_height += line_count * self.line_height
+            elif op_type == "feed":
+                total_height += op_data * self.line_height
+            elif op_type == "qr":
+                # Pre-render QR code to get its height
+                qr_img = self._generate_qr_image(
+                    op_data["data"],
+                    op_data["size"],
+                    op_data["ec"],
+                    op_data.get("fixed", False),
+                )
+                if qr_img:
+                    qr_images.append((len(qr_images), qr_img))
+                    total_height += qr_img.height + 4  # +4 for spacing
+
+        # Create the unified image
+        width = self.PRINTER_WIDTH_DOTS
+        img = Image.new("1", (width, total_height), 1)  # White background
+        draw = ImageDraw.Draw(img)
+
+        # Second pass: draw everything
+        y = 2
+        qr_idx = 0
+        
+        for op_type, op_data in ops:
+            if op_type == "text":
+                clean_text = self._sanitize_text(op_data)
+                for line in clean_text.split("\n"):
+                    if self._font:
+                        draw.text((2, y), line, font=self._font, fill=0)
+                    else:
+                        draw.text((2, y), line, fill=0)
+                    y += self.line_height
+                    self.lines_printed += 1
+            elif op_type == "feed":
+                y += op_data * self.line_height
+            elif op_type == "qr":
+                if qr_idx < len(qr_images):
+                    _, qr_img = qr_images[qr_idx]
+                    # Center QR code horizontally
+                    x_offset = (width - qr_img.width) // 2
+                    img.paste(qr_img, (x_offset, y + 2))
+                    y += qr_img.height + 4
+                    qr_idx += 1
+
+        # Rotate 180° for upside-down printing
+        img = img.rotate(180)
+
+        return img
+
+    def _generate_qr_image(
+        self, data: str, size: int, error_correction: str, fixed_size: bool
+    ) -> Image.Image:
+        """Generate a QR code as a PIL Image."""
+        try:
+            import qrcode
+            
+            ec_map = {
+                "L": qrcode.constants.ERROR_CORRECT_L,
+                "M": qrcode.constants.ERROR_CORRECT_M,
+                "Q": qrcode.constants.ERROR_CORRECT_Q,
+                "H": qrcode.constants.ERROR_CORRECT_H,
+            }
+            ec_level = ec_map.get(
+                error_correction.upper(), qrcode.constants.ERROR_CORRECT_L
+            )
+
+            qr = qrcode.QRCode(
+                version=4 if fixed_size else 1,
+                error_correction=ec_level,
+                box_size=max(1, min(16, size)),
+                border=1,
+            )
+            qr.add_data(data)
+            qr.make(fit=not fixed_size)
+
+            qr_img = qr.make_image(fill_color="black", back_color="white")
+            return qr_img.convert("1")
+        except Exception:
+            return None
+
     def _send_bitmap(self, img: Image.Image):
         """Send a bitmap image to the printer using GS v 0 raster command."""
         if img is None:
@@ -476,23 +577,21 @@ class PrinterDriver:
         self.print_buffer.append(("feed", lines))
 
     def flush_buffer(self):
-        """Flush the print buffer using bitmap rendering for proper 180° rotation.
+        """Flush the print buffer as ONE unified bitmap for speed.
 
-        Text is rendered to a bitmap image, rotated 180°, and sent as raster graphics.
-        This ensures correct orientation regardless of printer font/rotation quirks.
+        All text, feeds, and QR codes are rendered into a single tall image,
+        rotated 180°, and sent as one raster graphics command.
         """
         if len(self.print_buffer) == 0:
             return
 
-        # If max_lines is set, trim content from END of buffer (preserves header at start)
+        # If max_lines is set, trim content from END of buffer
         total_lines_in_buffer = 0
         if self.max_lines > 0:
-            # First, count total lines in buffer
             for op_type, op_data in self.print_buffer:
                 if op_type == "text":
                     total_lines_in_buffer += op_data.count("\n") + 1
 
-            # Then find trim point
             lines_counted = 0
             trim_index = len(self.print_buffer)
 
@@ -508,54 +607,19 @@ class PrinterDriver:
             if self._max_lines_hit:
                 self.print_buffer = self.print_buffer[:trim_index]
 
-        # Process buffer in order - bitmap rotation handles upside-down orientation
-        # (Header prints first = exits at tear-off edge)
+        # Add truncation message if needed
+        if self._max_lines_hit:
+            self.print_buffer.append(
+                ("text", f"-- TRUNCATED ({self.max_lines}/{total_lines_in_buffer}) --")
+            )
+
+        # Render everything as one unified bitmap
         ops = list(self.print_buffer)
         self.print_buffer.clear()
 
-        # Collect consecutive text lines into batches for bitmap rendering
-        text_batch = []
-
-        for op_type, op_data in ops:
-            if op_type == "text":
-                # Sanitize and collect text
-                clean_text = self._sanitize_text(op_data)
-                # Add lines in order - bitmap rotation handles orientation
-                lines = clean_text.split("\n")
-                for line in lines:
-                    text_batch.append(line)
-                    self.lines_printed += 1
-            elif op_type == "feed":
-                # Flush any pending text batch before feed
-                if text_batch:
-                    img = self._render_text_bitmap(text_batch)
-                    self._send_bitmap(img)
-                    text_batch = []
-                self._write_feed(op_data)
-            elif op_type == "qr":
-                # Flush any pending text batch before QR
-                if text_batch:
-                    img = self._render_text_bitmap(text_batch)
-                    self._send_bitmap(img)
-                    text_batch = []
-                # QR codes handle their own rotation
-                self._write_qr(
-                    op_data["data"],
-                    op_data["size"],
-                    op_data["ec"],
-                    op_data.get("fixed", False),
-                )
-
-        # Flush any remaining text batch
-        if text_batch:
-            img = self._render_text_bitmap(text_batch)
+        img = self._render_unified_bitmap(ops)
+        if img:
             self._send_bitmap(img)
-
-        # Print truncation message at the end (will appear at bottom of paper)
-        if self._max_lines_hit:
-            msg = f"-- TRUNCATED ({self.max_lines}/{total_lines_in_buffer} lines) --"
-            trunc_img = self._render_text_bitmap([msg])
-            self._send_bitmap(trunc_img)
 
     def reset_buffer(self, max_lines: int = 0):
         """Reset/clear the print buffer (call at start of new print job).
