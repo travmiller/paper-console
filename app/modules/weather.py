@@ -198,31 +198,53 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             current = data["current_weather"]
             hourly = data["hourly"]
             
-            # Build hourly forecast (next 24 hours, skip current hour)
+            # Build hourly forecast (next 24 hours)
+            # According to Open-Meteo docs, forecast_hours=24 returns 24 hours from current hour
             hourly_forecast = []
+            
+            # Get current time for filtering (API returns data starting from current hour with forecast_hours=24)
             current_time = datetime.now()
             current_hour = current_time.replace(minute=0, second=0, microsecond=0)
             
             for i in range(len(hourly.get("time", []))):
                 time_str = hourly["time"][i]
-                dt = datetime.strptime(time_str, "%Y-%m-%dT%H:%M")
+                # Parse ISO8601 time (format: "2022-07-01T00:00" or "2022-07-01T00:00:00")
+                # Remove timezone suffix if present (e.g., "+00:00" or "Z")
+                time_str_clean = time_str.split("+")[0].split("Z")[0]
                 
-                # Skip past hours and current hour
-                if dt <= current_hour:
+                try:
+                    if len(time_str_clean) == 16:  # "2022-07-01T00:00"
+                        dt = datetime.strptime(time_str_clean, "%Y-%m-%dT%H:%M")
+                    elif len(time_str_clean) >= 19:  # "2022-07-01T00:00:00"
+                        dt = datetime.strptime(time_str_clean[:19], "%Y-%m-%dT%H:%M:%S")
+                    else:
+                        continue
+                except Exception:
+                    continue
+                
+                # Skip past hours (keep current hour and future hours)
+                # Note: API with forecast_hours=24 should already filter this, but we double-check
+                if dt < current_hour:
                     continue
                 
                 weather_code = hourly["weathercode"][i] if "weathercode" in hourly else 0
                 condition = get_weather_condition(weather_code)
                 temp = int(hourly["temperature_2m"][i]) if "temperature_2m" in hourly else 0
                 
+                # Format time for display (12-hour format with AM/PM)
+                # Remove leading zero from hour (e.g., "01:00 PM" -> "1:00 PM")
+                time_display = dt.strftime("%I:%M %p")
+                if time_display.startswith("0"):
+                    time_display = time_display[1:]  # Remove leading zero from hour
+                
                 hourly_forecast.append({
-                    "time": dt.strftime("%I:%M %p"),
+                    "time": time_display,
                     "hour": dt.strftime("%H"),
                     "temperature": temp,
                     "condition": condition,
                 })
                 
-                # Limit to 24 hours
+                # Limit to 24 hours (API should already provide exactly 24, but be safe)
                 if len(hourly_forecast) >= 24:
                     break
             
