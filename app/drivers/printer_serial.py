@@ -434,11 +434,15 @@ class PrinterDriver:
             pass
 
     def blip(self):
-        """Short paper feed for tactile feedback (~1/4 line)."""
+        """Short paper feed for tactile feedback (double-tap pattern)."""
+        import time
+
         try:
             # ESC J n - Feed paper n dots (n/203 inches, ~24 dots = 1 line)
-            # Using 6 dots for approximately 1/4 line
-            self._write(b"\x1b\x4a\x06")
+            # Two short feeds with a brief delay for distinctive feedback
+            self._write(b"\x1b\x4a\x02")
+            time.sleep(0.05)  # 50ms delay
+            self._write(b"\x1b\x4a\x02")
         except Exception:
             pass
 
