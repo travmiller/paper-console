@@ -546,6 +546,11 @@ async def lifespan(app: FastAPI):
     # Clear printer hardware buffer first to prevent startup garbage
     if hasattr(printer, "clear_hardware_buffer"):
         printer.clear_hardware_buffer()
+    
+    # Set cutter feed space from settings (added to bitmap for reliable paper feed)
+    if hasattr(printer, "set_cutter_feed"):
+        cutter_lines = getattr(settings, "cutter_feed_lines", 7)
+        printer.set_cutter_feed(cutter_lines)
 
     # Check for first boot and print welcome message
     asyncio.create_task(check_first_boot())
@@ -723,6 +728,11 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
     settings = new_settings
     # Update module-level reference so modules that access app.config.settings will see the update
     config_module.settings = settings
+    
+    # Update printer cutter feed if setting changed
+    if hasattr(printer, "set_cutter_feed"):
+        cutter_lines = getattr(settings, "cutter_feed_lines", 7)
+        printer.set_cutter_feed(cutter_lines)
 
     # Save to disk
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
@@ -737,6 +747,11 @@ async def reset_settings(background_tasks: BackgroundTasks):
 
     # Create fresh settings instance (uses defaults from config.py)
     settings = Settings()
+    
+    # Update printer cutter feed to default
+    if hasattr(printer, "set_cutter_feed"):
+        cutter_lines = getattr(settings, "cutter_feed_lines", 7)
+        printer.set_cutter_feed(cutter_lines)
 
     # Save to disk (overwriting existing config.json)
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))

@@ -398,6 +398,10 @@ class PrinterDriver:
         """Feed paper directly, bypassing the buffer."""
         self.feed(lines)
 
+    def set_cutter_feed(self, lines: int):
+        """Set the cutter feed space (mock - just stores the value)."""
+        self.cutter_feed_dots = lines * 24
+
     def close(self):
         """Close the connection."""
         pass

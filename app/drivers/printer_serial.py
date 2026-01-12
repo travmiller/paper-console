@@ -73,6 +73,10 @@ class PrinterDriver:
         self.lines_printed = 0
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
         self._max_lines_hit = False  # Flag set when max lines exceeded during flush
+        
+        # Cutter feed space (pixels to add at end of print for cutter clearance)
+        # Can be updated via set_cutter_feed() method
+        self.cutter_feed_dots = 7 * 24  # Default: 7 lines * 24 dots/line = 168 dots
 
         # Font settings (fixed values)
         self.font_size = self.FONT_SIZE
@@ -336,7 +340,9 @@ class PrinterDriver:
         #   - Top of bitmap (y=0) = printed LAST (end of print)
         #   - Bottom of bitmap = printed FIRST (start of print)
         # We want: no padding at START (bottom), no padding at END (top - feed_direct handles this)
-        total_height = 0  # No end padding - feed_direct adds cutter spacing after bitmap
+        # Start with cutter feed space at TOP of bitmap
+        # After 180° rotation, this becomes space at the END of print (for cutter clearance)
+        total_height = self.cutter_feed_dots
         last_spacing = 0  # Track spacing added by last operation to remove it (start padding)
 
         for op_type, op_data in ops:
@@ -475,9 +481,9 @@ class PrinterDriver:
         draw = ImageDraw.Draw(img)
 
         # Second pass: draw everything
-        # Start at y=0 - no top padding (which becomes end padding after rotation)
-        # feed_direct() handles cutter spacing after the bitmap is sent
-        y = 0
+        # Start at y=cutter_feed_dots to leave white space at TOP of bitmap
+        # After 180° rotation, this space becomes the END of the print (for cutter clearance)
+        y = self.cutter_feed_dots
 
         for op_type, op_data in ops:
             if op_type == "styled":
@@ -2440,31 +2446,47 @@ class PrinterDriver:
         # Re-assert ASCII mode and rotation at start of each print job
         self._ensure_ascii_mode()
 
+    def set_cutter_feed(self, lines: int):
+        """Set the cutter feed space (lines of white space at end of print).
+        
+        This space is added to the bitmap itself, ensuring reliable paper feed
+        after bitmap printing regardless of post-print commands.
+        """
+        self.cutter_feed_dots = lines * 24  # 24 dots per line at 203 DPI
+
     def feed_direct(self, lines: int = 3):
         """Feed paper directly, bypassing the buffer (for use after flushing in invert mode).
         
-        Uses ESC J command to feed by dots - this is a pure motion command
-        that works reliably after bitmap printing (unlike ESC d which requires
-        printable data, or newlines which may be ignored after GS v 0).
+        Uses multiple methods to ensure paper feeds after bitmap printing.
         """
         if lines <= 0:
             return
         
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"feed_direct called with lines={lines}")
+        
         try:
-            # ESC J n - Feed paper n dots (0x1B 0x4A n)
-            # At 203 DPI: 24 dots ≈ 1 line (~3mm)
-            # Max 255 dots per command, so loop for larger feeds
+            # Wait for bitmap to finish
+            time.sleep(0.1)
+            
+            # ESC J - Feed paper by dots (should work after bitmap)
             dots = lines * 24
             while dots > 0:
                 chunk = min(dots, 255)
                 self._write(b"\x1b\x4a" + bytes([chunk]))
                 dots -= chunk
             
-            # Flush to ensure all data is sent before returning
+            # Also try newlines
+            self._write(b"\n" * lines)
+            
+            # Flush
             if self.ser and self.ser.is_open:
                 self.ser.flush()
-        except Exception:
-            pass
+                
+            logger.info(f"feed_direct completed")
+        except Exception as e:
+            logger.error(f"feed_direct error: {e}")
 
     def blip(self):
         """Short paper feed for tactile feedback."""
