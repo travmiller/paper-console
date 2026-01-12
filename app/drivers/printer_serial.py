@@ -659,9 +659,8 @@ class PrinterDriver:
                 # Get the pre-rendered QR image from op_data
                 qr_img = op_data.get("_qr_img")
                 if qr_img:
-                    # Center QR code horizontally
-                    x_offset = (width - qr_img.width) // 2
-                    img.paste(qr_img, (x_offset, y + 2))
+                    # Left-align QR code with small margin
+                    img.paste(qr_img, (4, y + 2))
                     y += qr_img.height + 4
 
         # Rotate 180° for upside-down printing
@@ -1591,7 +1590,14 @@ class PrinterDriver:
     def _generate_qr_image(
         self, data: str, size: int, error_correction: str, fixed_size: bool
     ) -> Image.Image:
-        """Generate a QR code as a PIL Image."""
+        """Generate a QR code as a PIL Image.
+        
+        Args:
+            data: Data to encode
+            size: Target size in pixels (used when fixed_size=True)
+            error_correction: L/M/Q/H
+            fixed_size: If True, resize output to consistent dimensions
+        """
         if not data:
             return None
             
@@ -1608,32 +1614,26 @@ class PrinterDriver:
                 error_correction.upper(), qrcode.constants.ERROR_CORRECT_L
             )
 
-            # Calculate minimum version needed based on data length
-            # QR version capacity (bytes with L error correction):
-            # v1=17, v4=78, v10=271, v20=858, v30=1531, v40=2953
-            data_len = len(data.encode('utf-8'))
-            if data_len <= 78:
-                min_version = 4
-            elif data_len <= 271:
-                min_version = 10
-            elif data_len <= 858:
-                min_version = 20
-            elif data_len <= 1531:
-                min_version = 30
-            else:
-                min_version = 40
-
+            # Use version 1 and let it auto-fit, then resize for consistency
             qr = qrcode.QRCode(
-                version=min_version if fixed_size else 1,
+                version=1,
                 error_correction=ec_level,
-                box_size=max(1, min(16, size)),
+                box_size=10,  # Generate at higher resolution for quality
                 border=1,
             )
             qr.add_data(data)
-            qr.make(fit=True)  # Always fit to ensure it works
+            qr.make(fit=True)
 
             qr_img = qr.make_image(fill_color="black", back_color="white")
-            return qr_img.convert("1")
+            qr_img = qr_img.convert("1")
+            
+            # If fixed_size, resize all QR codes to the same dimensions
+            if fixed_size:
+                # Target size: 80x80 pixels for consistent appearance
+                target_size = 80
+                qr_img = qr_img.resize((target_size, target_size), Image.NEAREST)
+            
+            return qr_img
         except Exception as e:
             import logging
             logging.warning(f"Failed to generate QR code for data: {data[:50]}... Error: {e}")
