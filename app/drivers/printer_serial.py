@@ -535,6 +535,11 @@ class PrinterDriver:
                 # SPACING_SMALL accounts for moon_y = y + SPACING_SMALL in drawing
                 total_height += self.SPACING_SMALL + size + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
+            elif op_type == "sun_path":
+                height = op_data.get("height", 120)
+                # SPACING_SMALL accounts for sun_path_y = y + SPACING_SMALL in drawing
+                total_height += self.SPACING_SMALL + height + self.SPACING_MEDIUM
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "maze":
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 4)
@@ -762,6 +767,38 @@ class PrinterDriver:
                 moon_y = y + self.SPACING_SMALL
                 self._draw_moon_phase(draw, moon_x, moon_y, size, phase)
                 y += self.SPACING_SMALL + size + self.SPACING_MEDIUM
+            elif op_type == "sun_path":
+                sun_path = op_data.get("sun_path", [])
+                sunrise = op_data.get("sunrise")
+                sunset = op_data.get("sunset")
+                current_time = op_data.get("current_time")
+                current_altitude = op_data.get("current_altitude", 0)
+                sunrise_time = op_data.get("sunrise_time", "")
+                sunset_time = op_data.get("sunset_time", "")
+                day_length = op_data.get("day_length", "")
+                path_height = op_data.get("height", 120)
+                path_x = self.SPACING_SMALL
+                path_y = y + self.SPACING_SMALL
+                path_width = width - (2 * self.SPACING_SMALL)
+                self._draw_sun_path(
+                    draw,
+                    path_x,
+                    path_y,
+                    path_width,
+                    path_height,
+                    sun_path,
+                    sunrise,
+                    sunset,
+                    current_time,
+                    current_altitude,
+                    sunrise_time,
+                    sunset_time,
+                    day_length,
+                    self._get_font("bold"),
+                    self._get_font("regular_sm"),
+                    self._get_font("light"),
+                )
+                y += self.SPACING_SMALL + path_height + self.SPACING_MEDIUM
             elif op_type == "maze":
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 4)
@@ -1867,6 +1904,212 @@ class PrinterDriver:
                 value_str = f"{value:.0f}"
                 draw.text((bar_x + bar_width + 4, bar_y), value_str, font=font, fill=0)
 
+    def _draw_sun_path(
+        self,
+        draw: ImageDraw.Draw,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        sun_path: list,
+        sunrise: datetime,
+        sunset: datetime,
+        current_time: datetime,
+        current_altitude: float,
+        sunrise_time: str,
+        sunset_time: str,
+        day_length: str,
+        font,
+        font_sm,
+        font_caption,
+    ):
+        """Draw a sun path curve visualization.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            width: Drawing width
+            height: Drawing height (curve area)
+            sun_path: List of (datetime, altitude) tuples
+            sunrise: Sunrise datetime
+            sunset: Sunset datetime
+            current_time: Current datetime
+            current_altitude: Current sun altitude in degrees
+            sunrise_time: Formatted sunrise time string
+            sunset_time: Formatted sunset time string
+            day_length: Day length string (HH:MM:SS)
+            font: Font for labels
+            font_sm: Small font for captions
+            font_caption: Caption font
+        """
+        # Calculate drawing area
+        curve_height = height - 60  # Leave space for labels and times
+        curve_y = y + 20  # Start below title
+        horizon_y = curve_y + curve_height - 20  # Horizon line position
+        
+        # Find min/max altitude for scaling
+        altitudes = [alt for _, alt in sun_path]
+        min_alt = min(altitudes) if altitudes else -90
+        max_alt = max(altitudes) if altitudes else 90
+        
+        # Normalize altitude range (ensure we show from -10 to max for better visualization)
+        alt_range = max(max_alt - min_alt, 10)  # At least 10 degrees range
+        alt_min = min(-10, min_alt)  # Show at least 10 degrees below horizon
+        alt_max = max_alt
+        
+        # Draw title
+        if font:
+            draw.text((x, y), "SUN", font=font, fill=0)
+        
+        # Draw horizon line
+        horizon_x_start = x + 10
+        horizon_x_end = x + width - 10
+        draw.line(
+            [(horizon_x_start, horizon_y), (horizon_x_end, horizon_y)],
+            fill=0,
+            width=1
+        )
+        
+        # Draw sun path curve
+        curve_width = horizon_x_end - horizon_x_start
+        points = []
+        current_point_idx = -1
+        
+        # Find time range for normalization
+        if sun_path:
+            first_time = sun_path[0][0]
+            last_time = sun_path[-1][0]
+            time_range_seconds = (last_time - first_time).total_seconds()
+        else:
+            time_range_seconds = 24 * 3600  # Fallback to 24 hours
+        
+        # Find current time index
+        for i, (dt, alt) in enumerate(sun_path):
+            # Normalize time to 0-1 based on actual time range
+            if time_range_seconds > 0:
+                time_offset = (dt - first_time).total_seconds()
+                time_of_day = time_offset / time_range_seconds
+            else:
+                # Fallback: use hour/minute if range is invalid
+                time_of_day = (dt.hour * 60 + dt.minute) / (24 * 60)
+            curve_x = horizon_x_start + int(time_of_day * curve_width)
+            
+            # Normalize altitude to curve height
+            # Altitude: -90 (below) to 90 (zenith)
+            # Y position: horizon_y (bottom) to curve_y (top)
+            if alt_max > alt_min:
+                normalized_alt = (alt - alt_min) / (alt_max - alt_min)
+            else:
+                normalized_alt = 0.5
+            curve_y_pos = horizon_y - int(normalized_alt * (horizon_y - curve_y))
+            points.append((curve_x, curve_y_pos))
+            
+            # Check if this is the current time (within 15 minutes)
+            if abs((dt - current_time).total_seconds()) < 15 * 60:
+                current_point_idx = i
+        
+        # Draw the curve path
+        if len(points) > 1:
+            # Draw past path (red/darker) - from sunrise to current
+            if current_point_idx > 0:
+                past_points = points[:current_point_idx + 1]
+                for i in range(len(past_points) - 1):
+                    draw.line(
+                        [past_points[i], past_points[i + 1]],
+                        fill=0,
+                        width=2
+                    )
+            
+            # Draw future path (lighter/dashed) - from current to sunset
+            if current_point_idx < len(points) - 1:
+                future_start = max(0, current_point_idx)
+                future_points = points[future_start:]
+                # Draw as dashed line
+                for i in range(len(future_points) - 1):
+                    if i % 2 == 0:  # Draw every other segment for dashed effect
+                        draw.line(
+                            [future_points[i], future_points[i + 1]],
+                            fill=0,
+                            width=1
+                        )
+        
+        # Draw sunrise marker at actual sunrise time
+        if sun_path and time_range_seconds > 0:
+            sunrise_offset = (sunrise - first_time).total_seconds()
+            sunrise_normalized = sunrise_offset / time_range_seconds
+            sunrise_x = horizon_x_start + int(sunrise_normalized * curve_width)
+        else:
+            sunrise_x = horizon_x_start
+        sunrise_marker_y = horizon_y
+        draw.ellipse(
+            [sunrise_x - 3, sunrise_marker_y - 3, sunrise_x + 3, sunrise_marker_y + 3],
+            outline=0,
+            width=1,
+            fill=1
+        )
+        
+        # Draw sunset marker at actual sunset time
+        if sun_path and time_range_seconds > 0:
+            sunset_offset = (sunset - first_time).total_seconds()
+            sunset_normalized = sunset_offset / time_range_seconds
+            sunset_x = horizon_x_start + int(sunset_normalized * curve_width)
+        else:
+            sunset_x = horizon_x_end
+        sunset_marker_y = horizon_y
+        draw.ellipse(
+            [sunset_x - 3, sunset_marker_y - 3, sunset_x + 3, sunset_marker_y + 3],
+            outline=0,
+            width=1,
+            fill=1
+        )
+        
+        # Draw current sun position marker
+        if current_point_idx >= 0 and current_point_idx < len(points):
+            current_x, current_y = points[current_point_idx]
+            # Draw larger marker with sun icon
+            marker_size = 8
+            draw.ellipse(
+                [current_x - marker_size, current_y - marker_size,
+                 current_x + marker_size, current_y + marker_size],
+                outline=0,
+                width=2,
+                fill=1
+            )
+            # Draw simple sun rays (4 lines)
+            ray_length = 4
+            for angle in [0, 45, 90, 135]:
+                rad = math.radians(angle)
+                end_x = current_x + int(ray_length * math.cos(rad))
+                end_y = current_y + int(ray_length * math.sin(rad))
+                draw.line([(current_x, current_y), (end_x, end_y)], fill=0, width=1)
+        
+        # Draw daylight duration (centered below curve)
+        if font_sm and day_length:
+            duration_text = day_length
+            if font_sm:
+                text_bbox = draw.textbbox((0, 0), duration_text, font=font_sm)
+                text_width = text_bbox[2] - text_bbox[0]
+                duration_x = x + (width - text_width) // 2
+                draw.text((duration_x, horizon_y + 5), duration_text, font=font_sm, fill=0)
+        
+        # Draw sunrise time (bottom left)
+        if font and sunrise_time:
+            draw.text((x, horizon_y + 25), sunrise_time, font=font, fill=0)
+            if font_caption:
+                draw.text((x, horizon_y + 45), "Sunrise", font=font_caption, fill=0)
+        
+        # Draw sunset time (bottom right)
+        if font and sunset_time:
+            if font:
+                text_bbox = draw.textbbox((0, 0), sunset_time, font=font)
+                text_width = text_bbox[2] - text_bbox[0]
+            sunset_text_x = x + width - text_width
+            draw.text((sunset_text_x, horizon_y + 25), sunset_time, font=font, fill=0)
+            if font_caption:
+                caption_bbox = draw.textbbox((0, 0), "Sunset", font=font_caption)
+                caption_width = caption_bbox[2] - caption_bbox[0]
+                draw.text((x + width - caption_width, horizon_y + 45), "Sunset", font=font_caption, fill=0)
+
     def _generate_qr_image(
         self, data: str, size: int, error_correction: str, fixed_size: bool
     ) -> Image.Image:
@@ -2316,6 +2559,50 @@ class PrinterDriver:
                 {
                     "phase": phase,
                     "size": size,
+                },
+            )
+        )
+
+    def print_sun_path(
+        self,
+        sun_path: list,
+        sunrise: datetime,
+        sunset: datetime,
+        current_time: datetime,
+        current_altitude: float,
+        sunrise_time: str,
+        sunset_time: str,
+        day_length: str,
+        height: int = 120,
+    ):
+        """Print a sun path curve visualization.
+
+        Args:
+            sun_path: List of (datetime, altitude) tuples
+            sunrise: Sunrise datetime
+            sunset: Sunset datetime
+            current_time: Current datetime
+            current_altitude: Current sun altitude in degrees
+            sunrise_time: Formatted sunrise time string
+            sunset_time: Formatted sunset time string
+            day_length: Day length string (HH:MM:SS)
+            height: Height of the visualization in pixels (default 120)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(
+            (
+                "sun_path",
+                {
+                    "sun_path": sun_path,
+                    "sunrise": sunrise,
+                    "sunset": sunset,
+                    "current_time": current_time,
+                    "current_altitude": current_altitude,
+                    "sunrise_time": sunrise_time,
+                    "sunset_time": sunset_time,
+                    "day_length": day_length,
+                    "height": height,
                 },
             )
         )

@@ -1,3 +1,5 @@
+from datetime import datetime
+
 class PrinterDriver:
     # Fixed spacing constants (match serial driver)
     FONT_SIZE = 18  # Increased for better readability
@@ -174,6 +176,95 @@ class PrinterDriver:
         print(f"[PRINT]     │  {name:^9} │")
         print(f"[PRINT]     ╰───────────╯")
         self.lines_printed += 4
+
+    def print_sun_path(
+        self,
+        sun_path: list,
+        sunrise: datetime,
+        sunset: datetime,
+        current_time: datetime,
+        current_altitude: float,
+        sunrise_time: str,
+        sunset_time: str,
+        day_length: str,
+        height: int = 120,
+    ):
+        """Simulates printing a sun path curve visualization."""
+        print("[PRINT] SUN")
+        print("[PRINT] ┌─────────────────────────────────────┐")
+        
+        # Create ASCII representation of sun path curve
+        # Find min/max altitude for scaling
+        altitudes = [alt for _, alt in sun_path] if sun_path else []
+        if altitudes:
+            min_alt = min(altitudes)
+            max_alt = max(altitudes)
+            alt_range = max(max_alt - min_alt, 10)
+            alt_min = min(-10, min_alt)
+            alt_max = max_alt
+            
+            # Create a simple ASCII curve
+            width = 35
+            height_chars = 8
+            curve = [[" "] * width for _ in range(height_chars)]
+            
+            # Draw horizon line (middle row)
+            horizon_row = height_chars - 1
+            for x in range(width):
+                curve[horizon_row][x] = "─"
+            
+            # Draw curve points
+            for dt, alt in sun_path:
+                # Normalize time to 0-1
+                time_of_day = (dt.hour * 60 + dt.minute) / (24 * 60)
+                x = int(time_of_day * (width - 1))
+                
+                # Normalize altitude
+                if alt_max > alt_min:
+                    normalized_alt = (alt - alt_min) / (alt_max - alt_min)
+                else:
+                    normalized_alt = 0.5
+                y = horizon_row - int(normalized_alt * horizon_row)
+                y = max(0, min(height_chars - 1, y))
+                
+                if 0 <= x < width:
+                    if alt > 0:
+                        curve[y][x] = "·"
+                    else:
+                        curve[y][x] = " "
+            
+            # Mark sunrise (left)
+            curve[horizon_row][0] = "●"
+            # Mark sunset (right)
+            curve[horizon_row][width - 1] = "●"
+            
+            # Mark current position
+            for i, (dt, alt) in enumerate(sun_path):
+                if abs((dt - current_time).total_seconds()) < 15 * 60:
+                    time_of_day = (dt.hour * 60 + dt.minute) / (24 * 60)
+                    x = int(time_of_day * (width - 1))
+                    if alt_max > alt_min:
+                        normalized_alt = (alt - alt_min) / (alt_max - alt_min)
+                    else:
+                        normalized_alt = 0.5
+                    y = horizon_row - int(normalized_alt * horizon_row)
+                    y = max(0, min(height_chars - 1, y))
+                    if 0 <= x < width:
+                        curve[y][x] = "☀"
+                    break
+            
+            # Print the curve
+            for row in curve:
+                print(f"[PRINT] │{''.join(row)}│")
+        else:
+            # Fallback if no path data
+            print("[PRINT] │  (No sun path data)              │")
+        
+        print("[PRINT] └─────────────────────────────────────┘")
+        print(f"[PRINT]        {day_length}")
+        print(f"[PRINT] {sunrise_time:<18} {sunset_time:>18}")
+        print(f"[PRINT] Sunrise{'Sunset':>30}")
+        self.lines_printed += 10
 
     def print_maze(self, grid: list, cell_size: int = 8):
         """Simulates printing a maze bitmap."""
