@@ -13,10 +13,6 @@ class PrinterDriver:
     """
     Real hardware driver for thermal receipt printer (QR204/CSN-A2).
     Uses serial communication via GPIO pins or USB-to-serial adapters.
-    
-    All rendering is done in binary 1-bit mode (black/white only) to match
-    thermal printer capabilities. Text is rendered via grayscale intermediate
-    then thresholded to ensure crisp binary output without anti-aliasing artifacts.
     """
 
     # Maximum buffer size to prevent memory issues (roughly 1000 lines)
@@ -138,11 +134,11 @@ class PrinterDriver:
             self.ser = None
 
     def _load_font_family(self) -> dict:
-        """Load IBM Plex Mono font family with multiple weights.
+        """Load Orbitron font family with multiple weights.
 
-        IBM Plex Mono is a monospace font designed for code and data display.
-        Place font files in: web/public/fonts/IBM_Plex_Mono/
-        Required files: IBMPlexMono-Regular.ttf, IBMPlexMono-Medium.ttf, IBMPlexMono-Bold.ttf
+        Orbitron is a geometric sans-serif font designed for display purposes.
+        Place font files in: fonts/Orbitron/static/
+        Required files: Orbitron-Regular.ttf, Orbitron-Medium.ttf, Orbitron-Bold.ttf
         """
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -151,21 +147,24 @@ class PrinterDriver:
         fonts = {}
 
         # Font variants we want to load
-        # IBM Plex Mono has: Thin, ExtraLight, Light, Regular, Medium, SemiBold, Bold
+        # Orbitron typically has: Regular, Medium, SemiBold, Bold, ExtraBold, Black
         # We'll map our styles to available weights
         font_variants = {
-            "regular": "IBMPlexMono-Regular.ttf",
-            "bold": "IBMPlexMono-Bold.ttf",
-            "medium": "IBMPlexMono-Medium.ttf",
-            "light": "IBMPlexMono-Light.ttf",
-            "semibold": "IBMPlexMono-SemiBold.ttf",
+            "regular": "Orbitron-Regular.ttf",
+            "bold": "Orbitron-Bold.ttf",
+            "medium": "Orbitron-Medium.ttf",
+            "light": "Orbitron-Regular.ttf",  # Use Regular if Light not available
+            "semibold": "Orbitron-SemiBold.ttf",  # Use SemiBold if available, fallback to Bold
         }
 
-        # Base paths to search
+        # Base paths to search (check both root and static subdirectory)
         base_paths = [
-            os.path.join(project_root, "web/public/fonts/IBM_Plex_Mono"),
-            os.path.join(project_root, "web/dist/fonts/IBM_Plex_Mono"),
-            os.path.join(project_root, "fonts/IBM_Plex_Mono"),  # Alternative location
+            os.path.join(project_root, "web/public/fonts/Orbitron"),
+            os.path.join(project_root, "web/public/fonts/Orbitron/static"),
+            os.path.join(project_root, "web/dist/fonts/Orbitron"),
+            os.path.join(project_root, "web/dist/fonts/Orbitron/static"),
+            os.path.join(project_root, "fonts/Orbitron"),  # Alternative location
+            os.path.join(project_root, "fonts/Orbitron/static"),  # Static subdirectory
         ]
 
         # Load each variant at different sizes
@@ -201,20 +200,20 @@ class PrinterDriver:
                     fonts["semibold_lg"] = fonts.get("bold_lg", fonts["bold"])
                     fonts["semibold_sm"] = fonts.get("bold_sm", fonts["bold"])
 
-        # Fallback to system fonts if IBM Plex Mono not found
+        # Fallback to system fonts if Orbitron not found
         if "regular" not in fonts:
-            # Try common system font locations for IBM Plex Mono
+            # Try common system font locations for Orbitron
             system_font_paths = [
                 # Linux
-                "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-Regular.ttf",
-                "/usr/share/fonts/TTF/IBMPlexMono-Regular.ttf",
-                "~/.fonts/IBMPlexMono-Regular.ttf",
+                "/usr/share/fonts/truetype/orbitron/Orbitron-Regular.ttf",
+                "/usr/share/fonts/TTF/Orbitron-Regular.ttf",
+                "~/.fonts/Orbitron-Regular.ttf",
                 # Windows
-                "C:/Windows/Fonts/IBMPlexMono-Regular.ttf",
-                "C:/Windows/Fonts/ibmplexmono.ttf",
+                "C:/Windows/Fonts/Orbitron-Regular.ttf",
+                "C:/Windows/Fonts/orbitron.ttf",
                 # macOS
-                "~/Library/Fonts/IBMPlexMono-Regular.ttf",
-                "/Library/Fonts/IBMPlexMono-Regular.ttf",
+                "~/Library/Fonts/Orbitron-Regular.ttf",
+                "/Library/Fonts/Orbitron-Regular.ttf",
             ]
             for path in system_font_paths:
                 expanded_path = os.path.expanduser(path)
@@ -278,64 +277,6 @@ class PrinterDriver:
         """Get a font by style name."""
         return self._fonts.get(style, self._fonts.get("regular"))
 
-    def _draw_text_binary(self, img: Image.Image, xy: tuple, text: str, font: Optional[ImageFont.FreeTypeFont] = None):
-        """Draw text in binary black/white mode, ensuring crisp rendering without anti-aliasing artifacts.
-        
-        Renders text to a temporary grayscale image first, then converts to 1-bit with threshold
-        to ensure pure black/white output matching thermal printer capabilities.
-        
-        Args:
-            img: The target 1-bit PIL Image to draw on
-            xy: Tuple (x, y) position to draw text
-            text: Text string to render
-            font: Optional PIL ImageFont to use
-        """
-        if not text:
-            return
-        
-        # Get text bounding box to determine size needed
-        if font:
-            try:
-                bbox = font.getbbox(text)
-                if bbox and len(bbox) >= 4:
-                    text_width = bbox[2] - bbox[0]
-                    text_height = bbox[3] - bbox[1]
-                else:
-                    # Fallback if bbox is invalid
-                    text_width = len(text) * (font.size // 2)
-                    text_height = font.size
-            except Exception:
-                # Fallback on any error
-                text_width = len(text) * (font.size // 2) if hasattr(font, 'size') else len(text) * 10
-                text_height = font.size if hasattr(font, 'size') else 14
-        else:
-            text_width = len(text) * 10
-            text_height = 14  # Default font size
-        
-        # Add padding to avoid edge clipping
-        padding = 4
-        temp_width = text_width + (padding * 2)
-        temp_height = text_height + (padding * 2)
-        
-        # Render to temporary grayscale image (allows proper anti-aliasing)
-        temp_img = Image.new("L", (temp_width, temp_height), 255)  # White background
-        temp_draw = ImageDraw.Draw(temp_img)
-        
-        # Draw text in black (0 = black in L mode)
-        if font:
-            temp_draw.text((padding, padding), text, font=font, fill=0)
-        else:
-            temp_draw.text((padding, padding), text, fill=0)
-        
-        # Convert to 1-bit with threshold (no dithering) for crisp binary output
-        # convert("1") uses threshold at 128: pixels < 128 become black (0), >= 128 become white (1)
-        # Default behavior is no dithering, which gives us crisp binary output
-        temp_img = temp_img.convert("1")
-        
-        # Paste the binary text onto the main image at the specified position
-        x, y = xy
-        img.paste(temp_img, (x - padding, y - padding))
-
     def _render_text_bitmap(self, lines: list) -> Image.Image:
         """Render text lines to a bitmap image, rotated 180° for upside-down printing."""
         if not lines:
@@ -353,8 +294,10 @@ class PrinterDriver:
         # (Content appears at tear-off edge, headers appear after when viewing upside-down)
         y = 2  # Start with small padding
         for line in lines:
-            if line:  # Only draw non-empty lines
-                self._draw_text_binary(img, (2, y), line, self._font)
+            if self._font:
+                draw.text((2, y), line, font=self._font, fill=0)  # Black text
+            else:
+                draw.text((2, y), line, fill=0)
             y += self.line_height
 
         # Rotate 180° for upside-down printing
@@ -557,16 +500,20 @@ class PrinterDriver:
                 line_height = self._get_line_height_for_style(style)
 
                 for line in clean_text.split("\n"):
-                    if line:  # Only draw non-empty lines
-                        self._draw_text_binary(img, (2, y), line, font)
+                    if font:
+                        draw.text((2, y), line, font=font, fill=0)
+                    else:
+                        draw.text((2, y), line, fill=0)
                     y += line_height
             elif op_type == "text":
                 # Legacy support
                 clean_text = self._sanitize_text(op_data)
                 font = self._get_font("regular")
                 for line in clean_text.split("\n"):
-                    if line:  # Only draw non-empty lines
-                        self._draw_text_binary(img, (2, y), line, font)
+                    if font:
+                        draw.text((2, y), line, font=font, fill=0)
+                    else:
+                        draw.text((2, y), line, fill=0)
                     y += self.line_height
                     self.lines_printed += 1
             elif op_type == "box":
@@ -626,8 +573,10 @@ class PrinterDriver:
                     else content_start_x
                 )
                 text_y = content_y
-                if text:  # Only draw non-empty text
-                    self._draw_text_binary(img, (text_x, text_y), text, font)
+                if font:
+                    draw.text((text_x, text_y), text, font=font, fill=0)
+                else:
+                    draw.text((text_x, text_y), text, fill=0)
 
                 # +2 matches the box_y = y + 2 offset
                 y += 2 + box_height + self.SPACING_MEDIUM
