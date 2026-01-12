@@ -138,32 +138,44 @@ class PrinterDriver:
         print(f"[PRINT] {'━' * self.width}")
         self.lines_printed += 1
 
-    def print_moon_phase(self, moon_states: list, size: int = 60):
-        """Simulates printing a moon phase graph with multiple moons."""
-        num_moons = len(moon_states)
-        cols = 4
-        rows = (num_moons + cols - 1) // cols  # Ceiling division
+    def print_moon_phase(self, phase: float, size: int = 60):
+        """Simulates printing a moon phase graphic."""
+        # ASCII art moon phases
+        phase_normalized = (phase % 28) / 28.0
         
-        # Create the moon graph
-        moon_chars = []
-        for i in range(num_moons):
-            is_full = moon_states[i] if i < len(moon_states) else False
-            moon_chars.append("●" if is_full else "○")
+        if phase_normalized < 0.0625:
+            moon = "🌑"  # New Moon
+            name = "New Moon"
+        elif phase_normalized < 0.1875:
+            moon = "🌒"  # Waxing Crescent
+            name = "Waxing Crescent"
+        elif phase_normalized < 0.3125:
+            moon = "🌓"  # First Quarter
+            name = "First Quarter"
+        elif phase_normalized < 0.4375:
+            moon = "🌔"  # Waxing Gibbous
+            name = "Waxing Gibbous"
+        elif phase_normalized < 0.5625:
+            moon = "🌕"  # Full Moon
+            name = "Full Moon"
+        elif phase_normalized < 0.6875:
+            moon = "🌖"  # Waning Gibbous
+            name = "Waning Gibbous"
+        elif phase_normalized < 0.8125:
+            moon = "🌗"  # Last Quarter
+            name = "Last Quarter"
+        elif phase_normalized < 0.9375:
+            moon = "🌘"  # Waning Crescent
+            name = "Waning Crescent"
+        else:
+            moon = "🌑"  # New Moon
+            name = "New Moon"
         
-        # Split into rows
-        moon_rows = []
-        for row in range(rows):
-            start_idx = row * cols
-            end_idx = min(start_idx + cols, num_moons)
-            moon_rows.append(moon_chars[start_idx:end_idx])
-        
-        # Print the graph
-        print(f"[PRINT]     ╭───────────────╮")
-        for row in moon_rows:
-            row_str = ' '.join(row)
-            print(f"[PRINT]     │ {row_str:^15} │")
-        print(f"[PRINT]     ╰───────────────╯")
-        self.lines_printed += 2 + len(moon_rows)
+        print(f"[PRINT]     ╭───────────╮")
+        print(f"[PRINT]     │     {moon}     │")
+        print(f"[PRINT]     │  {name:^9} │")
+        print(f"[PRINT]     ╰───────────╯")
+        self.lines_printed += 4
 
     def print_sun_path(
         self,
