@@ -70,7 +70,7 @@ def print_setup_instructions_sync():
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
         from app.config import settings
-        feed_lines = getattr(settings, "cutter_feed_lines", 5)
+        feed_lines = getattr(settings, "cutter_feed_lines", 7)
         if feed_lines > 0 and hasattr(printer, "feed_direct"):
             printer.feed_direct(feed_lines)
 

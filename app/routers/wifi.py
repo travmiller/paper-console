@@ -34,7 +34,7 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
 
     # Connect to the new network
     success = wifi_manager.connect_to_wifi(ssid, password)
-    feed_lines = getattr(settings, "cutter_feed_lines", 5)
+    feed_lines = getattr(settings, "cutter_feed_lines", 7)
 
     if success:
         # Wait for IP address

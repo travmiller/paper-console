@@ -135,7 +135,7 @@ async def email_polling_loop():
                             printer.flush_buffer()
 
                         # Feed paper
-                        feed_lines = getattr(settings, "cutter_feed_lines", 5)
+                        feed_lines = getattr(settings, "cutter_feed_lines", 7)
                         if feed_lines > 0 and hasattr(printer, "feed_direct"):
                             printer.feed_direct(feed_lines)
 
@@ -299,7 +299,7 @@ async def check_first_boot():
                 logger.error(f"System Ready flush_buffer error: {e}", exc_info=True)
         
         # Feed for cutter using setting
-        feed_lines = getattr(settings, "cutter_feed_lines", 5)
+        feed_lines = getattr(settings, "cutter_feed_lines", 7)
         if feed_lines > 0 and hasattr(printer, "feed_direct"):
             printer.feed_direct(feed_lines)
         return
@@ -392,7 +392,7 @@ async def check_first_boot():
     # Flush buffer to print (prints are reversed for tear-off orientation)
     if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
-    feed_lines = getattr(settings, "cutter_feed_lines", 5)
+    feed_lines = getattr(settings, "cutter_feed_lines", 7)
     if feed_lines > 0 and hasattr(printer, "feed_direct"):
         printer.feed_direct(feed_lines)
 
@@ -487,7 +487,7 @@ async def factory_reset_trigger():
     # Flush buffer to print
     if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
-    feed_lines = getattr(settings, "cutter_feed_lines", 5)
+    feed_lines = getattr(settings, "cutter_feed_lines", 7)
     if feed_lines > 0 and hasattr(printer, "feed_direct"):
         printer.feed_direct(feed_lines)
 
@@ -2174,7 +2174,7 @@ async def trigger_channel(position: int):
             if hasattr(printer, "flush_buffer"):
                 printer.flush_buffer()
 
-            feed_lines = getattr(settings, "cutter_feed_lines", 5)
+            feed_lines = getattr(settings, "cutter_feed_lines", 7)
             if feed_lines > 0:
                 printer.feed_direct(feed_lines)
             return
@@ -2204,7 +2204,7 @@ async def trigger_channel(position: int):
                     # Flush again for the message, then feed for cutter
                     if hasattr(printer, "flush_buffer"):
                         printer.flush_buffer()
-                    feed_lines = getattr(settings, "cutter_feed_lines", 5)
+                    feed_lines = getattr(settings, "cutter_feed_lines", 7)
                     if feed_lines > 0:
                         printer.feed_direct(feed_lines)
                     return
@@ -2218,7 +2218,7 @@ async def trigger_channel(position: int):
             printer.flush_buffer()
 
         # Add cutter feed lines at the end of the print job
-        feed_lines = getattr(settings, "cutter_feed_lines", 5)
+        feed_lines = getattr(settings, "cutter_feed_lines", 7)
         if feed_lines > 0:
             printer.feed_direct(feed_lines)
 
