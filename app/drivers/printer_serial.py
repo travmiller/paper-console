@@ -278,11 +278,17 @@ class PrinterDriver:
         """Get a font by style name."""
         return self._fonts.get(style, self._fonts.get("regular"))
 
-    def _draw_text_binary(self, draw: ImageDraw.Draw, xy: tuple, text: str, font: Optional[ImageFont.FreeTypeFont] = None):
+    def _draw_text_binary(self, img: Image.Image, xy: tuple, text: str, font: Optional[ImageFont.FreeTypeFont] = None):
         """Draw text in binary black/white mode, ensuring crisp rendering without anti-aliasing artifacts.
         
         Renders text to a temporary grayscale image first, then converts to 1-bit with threshold
         to ensure pure black/white output matching thermal printer capabilities.
+        
+        Args:
+            img: The target 1-bit PIL Image to draw on
+            xy: Tuple (x, y) position to draw text
+            text: Text string to render
+            font: Optional PIL ImageFont to use
         """
         if not text:
             return
@@ -328,9 +334,7 @@ class PrinterDriver:
         
         # Paste the binary text onto the main image at the specified position
         x, y = xy
-        # Access the underlying image from ImageDraw (im is the standard attribute)
-        main_img = draw.im
-        main_img.paste(temp_img, (x - padding, y - padding))
+        img.paste(temp_img, (x - padding, y - padding))
 
     def _render_text_bitmap(self, lines: list) -> Image.Image:
         """Render text lines to a bitmap image, rotated 180° for upside-down printing."""
@@ -350,7 +354,7 @@ class PrinterDriver:
         y = 2  # Start with small padding
         for line in lines:
             if line:  # Only draw non-empty lines
-                self._draw_text_binary(draw, (2, y), line, self._font)
+                self._draw_text_binary(img, (2, y), line, self._font)
             y += self.line_height
 
         # Rotate 180° for upside-down printing
@@ -554,7 +558,7 @@ class PrinterDriver:
 
                 for line in clean_text.split("\n"):
                     if line:  # Only draw non-empty lines
-                        self._draw_text_binary(draw, (2, y), line, font)
+                        self._draw_text_binary(img, (2, y), line, font)
                     y += line_height
             elif op_type == "text":
                 # Legacy support
@@ -562,7 +566,7 @@ class PrinterDriver:
                 font = self._get_font("regular")
                 for line in clean_text.split("\n"):
                     if line:  # Only draw non-empty lines
-                        self._draw_text_binary(draw, (2, y), line, font)
+                        self._draw_text_binary(img, (2, y), line, font)
                     y += self.line_height
                     self.lines_printed += 1
             elif op_type == "box":
@@ -623,7 +627,7 @@ class PrinterDriver:
                 )
                 text_y = content_y
                 if text:  # Only draw non-empty text
-                    self._draw_text_binary(draw, (text_x, text_y), text, font)
+                    self._draw_text_binary(img, (text_x, text_y), text, font)
 
                 # +2 matches the box_y = y + 2 offset
                 y += 2 + box_height + self.SPACING_MEDIUM
