@@ -332,8 +332,12 @@ class PrinterDriver:
             return None
 
         # First pass: calculate total height needed
-        # No top padding - content starts immediately
-        total_height = 0
+        # Note: bitmap is rotated 180° before printing, so:
+        #   - Top of bitmap (y=0) = printed LAST (end of print)
+        #   - Bottom of bitmap = printed FIRST (start of print)
+        # We want: no padding at START (bottom), small padding at END (top)
+        total_height = self.SPACING_SMALL  # Small end padding (printed last after rotation)
+        last_spacing = 0  # Track spacing added by last operation to remove it (start padding)
 
         for op_type, op_data in ops:
             if op_type == "styled":
@@ -341,13 +345,13 @@ class PrinterDriver:
                 line_count = len(clean_text.split("\n"))
                 style = op_data.get("style", "regular")
                 total_height += line_count * self._get_line_height_for_style(style)
+                last_spacing = 0  # Text has no trailing spacing
             elif op_type == "text":
-                # Legacy support for plain text
                 clean_text = self._sanitize_text(op_data)
                 line_count = len(clean_text.split("\n"))
                 total_height += line_count * self.line_height
+                last_spacing = 0
             elif op_type == "box":
-                # Box with text inside: border + padding + text + padding + border
                 style = op_data.get("style", "bold_lg")
                 padding = op_data.get("padding", self.SPACING_MEDIUM)
                 border = op_data.get("border", 2)
@@ -358,50 +362,61 @@ class PrinterDriver:
                     border + padding + max(text_height, icon_size) + padding + border
                 )
                 total_height += box_height + self.SPACING_MEDIUM
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "moon":
                 size = op_data.get("size", 60)
                 total_height += size + self.SPACING_MEDIUM
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "maze":
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 4)
                 if grid:
                     maze_height = len(grid) * cell_size
                     total_height += maze_height + self.SPACING_MEDIUM
+                    last_spacing = self.SPACING_MEDIUM
             elif op_type == "sudoku":
                 grid = op_data.get("grid", [])
                 cell_size = op_data.get("cell_size", 8)
                 if grid:
                     sudoku_size = 9 * cell_size + self.SPACING_SMALL
                     total_height += sudoku_size + self.SPACING_MEDIUM
+                    last_spacing = self.SPACING_MEDIUM
             elif op_type == "icon":
                 icon_type = op_data.get("type", "sun")
                 size = op_data.get("size", 32)
                 total_height += size + self.SPACING_SMALL
+                last_spacing = self.SPACING_SMALL
             elif op_type == "weather_forecast":
-                # 7-day forecast: icon (24px) + day + high + low + spacing
                 total_height += 24 + 12 + 12 + 12 + self.SPACING_MEDIUM
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "hourly_forecast":
                 hourly_forecast = op_data.get("hourly_forecast", [])
                 num_rows = (len(hourly_forecast) + 5) // 6
                 total_height += num_rows * (20 + 12 + self.SPACING_MEDIUM)
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "progress_bar":
                 height = op_data.get("height", 12)
                 total_height += height + self.SPACING_SMALL
+                last_spacing = self.SPACING_SMALL
             elif op_type == "calendar_grid":
                 weeks = op_data.get("weeks", 4)
                 cell_size = op_data.get("cell_size", 8)
                 grid_height = weeks * cell_size + self.SPACING_SMALL
                 total_height += grid_height + self.SPACING_MEDIUM
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "timeline":
                 items = op_data.get("items", [])
                 item_height = op_data.get("item_height", 20)
                 total_height += len(items) * item_height + self.SPACING_MEDIUM
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "checkbox":
                 size = op_data.get("size", 12)
                 total_height += size + 2
+                last_spacing = 2
             elif op_type == "separator":
                 height = op_data.get("height", self.SPACING_MEDIUM)
                 total_height += height + self.SPACING_SMALL
+                last_spacing = self.SPACING_SMALL
             elif op_type == "bar_chart":
                 bars = op_data.get("bars", [])
                 bar_height = op_data.get("bar_height", 12)
@@ -409,9 +424,10 @@ class PrinterDriver:
                     len(bars) * (bar_height + self.SPACING_SMALL) + self.SPACING_MEDIUM
                 )
                 total_height += chart_height
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "feed":
-                # feed(n) adds n * SPACING_LARGE pixels (module separator spacing)
                 total_height += op_data * self.SPACING_LARGE
+                last_spacing = op_data * self.SPACING_LARGE
             elif op_type == "article_block":
                 qr_size = op_data.get("qr_size", 64)
                 qr_img = self._generate_qr_image(op_data.get("url", ""), 2, "L", True)
@@ -432,6 +448,7 @@ class PrinterDriver:
                 )
                 block_height = max(qr_size + self.SPACING_SMALL, text_height)
                 total_height += block_height + self.SPACING_MEDIUM
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "qr":
                 qr_img = self._generate_qr_image(
                     op_data["data"],
@@ -442,6 +459,10 @@ class PrinterDriver:
                 op_data["_qr_img"] = qr_img
                 if qr_img:
                     total_height += qr_img.height + self.SPACING_SMALL
+                    last_spacing = self.SPACING_SMALL
+
+        # Remove last operation's trailing spacing (it becomes START padding after 180° rotation)
+        total_height -= last_spacing
 
         # Create the unified image
         width = self.PRINTER_WIDTH_DOTS
@@ -449,8 +470,8 @@ class PrinterDriver:
         draw = ImageDraw.Draw(img)
 
         # Second pass: draw everything
-        # No top padding - content starts at y=0
-        y = 0
+        # Start with small y offset - this becomes END padding after 180° rotation
+        y = self.SPACING_SMALL
 
         for op_type, op_data in ops:
             if op_type == "styled":
