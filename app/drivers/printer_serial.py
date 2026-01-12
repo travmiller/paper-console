@@ -2593,8 +2593,10 @@ class PrinterDriver:
         # Map conditions to icon types (matches weather module logic)
         def get_icon_type(condition: str) -> str:
             condition_lower = condition.lower() if condition else ""
-            if "clear" in condition_lower:
-                return "sun"
+            if condition_lower == "clear":
+                return "sun"  # Maps to sun.png
+            elif "mainly clear" in condition_lower or "partly cloudy" in condition_lower:
+                return "cloud-sun"  # Maps to cloud-sun.png
             elif "rain" in condition_lower:
                 return "rain"  # Maps to cloud-rain.png
             elif "snow" in condition_lower:
@@ -2604,7 +2606,7 @@ class PrinterDriver:
             elif "fog" in condition_lower or "mist" in condition_lower:
                 return "cloud-fog"  # Maps to cloud-fog.png
             elif "cloud" in condition_lower or "overcast" in condition_lower:
-                return "cloud"
+                return "cloud"  # Maps to cloud.png
             else:
                 return "cloud"  # Default
 

@@ -6,17 +6,36 @@ from app.drivers.printer_mock import PrinterDriver
 
 
 def get_weather_condition(code: int) -> str:
-    """Maps WMO Weather Codes to text."""
-    # See https://open-meteo.com/en/docs
+    """Maps WMO Weather Codes to text.
+    
+    WMO Weather Code reference:
+    0: Clear sky
+    1: Mainly clear
+    2: Partly cloudy
+    3: Overcast
+    45, 48: Fog
+    51, 53, 55: Drizzle (light, moderate, dense)
+    61, 63, 65: Rain (slight, moderate, heavy)
+    66, 67: Freezing rain (light, heavy)
+    71, 73, 75: Snow fall (slight, moderate, heavy)
+    77: Snow grains
+    80, 81, 82: Rain showers (slight, moderate, violent)
+    85, 86: Snow showers (slight, heavy)
+    95, 96, 99: Thunderstorm (slight, moderate, heavy)
+    """
     if code == 0:
         return "Clear"
-    if code in [1, 2, 3]:
-        return "Cloudy"
+    if code == 1:
+        return "Mainly Clear"  # Mostly sunny
+    if code == 2:
+        return "Partly Cloudy"  # Partly cloudy
+    if code == 3:
+        return "Overcast"  # Cloudy
     if code in [45, 48]:
         return "Fog"
-    if code in [51, 53, 55, 61, 63, 65]:
+    if code in [51, 53, 55, 61, 63, 65, 66, 67, 80, 81, 82]:
         return "Rain"
-    if code in [71, 73, 75, 85, 86]:
+    if code in [71, 73, 75, 77, 85, 86]:
         return "Snow"
     if code in [95, 96, 99]:
         return "Storm"
@@ -206,8 +225,10 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
 def _get_icon_type(condition: str) -> str:
     """Map weather condition to icon type (maps to Phosphor PNG icons)."""
     condition_lower = condition.lower()
-    if "clear" in condition_lower:
-        return "sun"
+    if condition_lower == "clear":
+        return "sun"  # Maps to sun.png
+    elif "mainly clear" in condition_lower or "partly cloudy" in condition_lower:
+        return "cloud-sun"  # Maps to cloud-sun.png
     elif "rain" in condition_lower:
         return "rain"  # Maps to cloud-rain.png
     elif "snow" in condition_lower:
@@ -217,7 +238,7 @@ def _get_icon_type(condition: str) -> str:
     elif "fog" in condition_lower or "mist" in condition_lower:
         return "cloud-fog"  # Maps to cloud-fog.png
     elif "cloud" in condition_lower or "overcast" in condition_lower:
-        return "cloud"
+        return "cloud"  # Maps to cloud.png
     else:
         return "cloud"  # Default
 
