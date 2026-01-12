@@ -10,6 +10,7 @@ PRINTER_WIDTH = 42  # Characters per line with Font B (small font)
 
 
 class WebhookConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     url: str = ""
     method: str = "GET"
     headers: Dict[str, str] = {}
@@ -19,14 +20,17 @@ class WebhookConfig(BaseModel):
 
 
 class NewsConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     news_api_key: Optional[str] = None
 
 
 class RSSConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     rss_feeds: List[str] = []
 
 
 class EmailConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     email_host: str = "imap.gmail.com"
     email_user: Optional[str] = None
     email_password: Optional[str] = None
@@ -35,21 +39,25 @@ class EmailConfig(BaseModel):
 
 
 class TextConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     label: str = "Note"
     content: str = ""
 
 
 class ChecklistItem(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     text: str = ""
 
 
 class ChecklistConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     title: str = "Checklist"
     items: List[ChecklistItem] = []
 
 
 class QRCodeConfig(BaseModel):
     """Configuration for QR code generation."""
+    model_config = ConfigDict(extra="ignore")
     qr_type: str = "text"  # text, url, wifi, contact, phone, sms, email
     content: str = ""  # Main content (URL, text, phone number, etc.)
     label: str = "QR Code"  # Header label for the printout
@@ -71,6 +79,7 @@ class QRCodeConfig(BaseModel):
 
 
 class WeatherConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     openweather_api_key: Optional[str] = None
     city_name: Optional[str] = None
     latitude: Optional[float] = None
@@ -80,22 +89,27 @@ class WeatherConfig(BaseModel):
 
 
 class CalendarSource(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     label: str
     url: str
 
 
 class CalendarConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     ical_sources: List[CalendarSource] = []
     label: str = "My Calendar"
     days_to_show: int = 2  # 1=Today, 2=Today+Tomorrow
 
 
 class EmptyConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
     pass
 
 
 class ModuleInstance(BaseModel):
     """A module instance with its configuration."""
+
+    model_config = ConfigDict(extra="ignore")
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
     type: str  # e.g., "news", "games" (Sudoku), "calendar"
@@ -106,12 +120,16 @@ class ModuleInstance(BaseModel):
 class ChannelModuleAssignment(BaseModel):
     """A module assignment within a channel with ordering."""
 
+    model_config = ConfigDict(extra="ignore")
+
     module_id: str
     order: int = 0  # Order within the channel (0 = first)
 
 
 class ChannelConfig(BaseModel):
     """Channel configuration - can have multiple modules assigned."""
+
+    model_config = ConfigDict(extra="ignore")
 
     # New format: list of module assignments
     modules: List[ChannelModuleAssignment] = []
