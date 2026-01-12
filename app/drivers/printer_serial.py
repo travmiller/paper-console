@@ -138,8 +138,8 @@ class PrinterDriver:
 
         IBM Plex Mono is a monospace font designed for technical and display purposes.
         Place font files in: web/public/fonts/IBM_Plex_Mono/
-        Required files: IBMPlexMono-SemiBold.ttf (used as base), IBMPlexMono-Medium.ttf, IBMPlexMono-Bold.ttf
-        Uses SemiBold as the lightest weight to prevent broken lines on thermal printers.
+        Required files: IBMPlexMono-Medium.ttf (used as base), IBMPlexMono-SemiBold.ttf, IBMPlexMono-Bold.ttf
+        Uses Medium as base weight, SemiBold and Bold for headings.
         """
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -149,13 +149,13 @@ class PrinterDriver:
 
         # Font variants we want to load
         # IBM Plex Mono has: Regular, Medium, SemiBold, Bold
-        # Using SemiBold as lightest weight to prevent broken lines on thermal printer
+        # Using Medium as base weight, SemiBold and Bold for headings
         font_variants = {
-            "regular": "IBMPlexMono-SemiBold.ttf",  # Use SemiBold as base for better line continuity
-            "bold": "IBMPlexMono-Bold.ttf",
+            "regular": "IBMPlexMono-Medium.ttf",  # Medium as base weight
+            "bold": "IBMPlexMono-Bold.ttf",  # Bold for headings
             "medium": "IBMPlexMono-Medium.ttf",
-            "light": "IBMPlexMono-SemiBold.ttf",  # Map light to SemiBold (heavier for thermal printing)
-            "semibold": "IBMPlexMono-SemiBold.ttf",
+            "light": "IBMPlexMono-Medium.ttf",  # Map light to Medium (base weight)
+            "semibold": "IBMPlexMono-SemiBold.ttf",  # SemiBold for headings
         }
 
         # Base paths to search
@@ -192,32 +192,36 @@ class PrinterDriver:
 
             # Fallback for semibold if SemiBold not found
             if variant_name == "semibold" and not font_loaded:
-                # Try using Bold as fallback
+                # Try using Bold as fallback (heavier than Medium)
                 if "bold" in fonts:
                     fonts["semibold"] = fonts["bold"]
                     fonts["semibold_lg"] = fonts.get("bold_lg", fonts["bold"])
                     fonts["semibold_sm"] = fonts.get("bold_sm", fonts["bold"])
+                elif "medium" in fonts:
+                    fonts["semibold"] = fonts["medium"]
+                    fonts["semibold_lg"] = fonts.get("medium_lg", fonts["medium"])
+                    fonts["semibold_sm"] = fonts.get("medium_sm", fonts["medium"])
 
         # Fallback to system fonts if IBM Plex Mono not found
         if "regular" not in fonts:
             # Try common system font locations for IBM Plex Mono
-            # Prefer SemiBold as base weight for better thermal printing
+            # Prefer Medium as base weight
             system_font_paths = [
-                # Linux - try SemiBold first
-                "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-SemiBold.ttf",
-                "/usr/share/fonts/TTF/IBMPlexMono-SemiBold.ttf",
-                "~/.fonts/IBMPlexMono-SemiBold.ttf",
-                # Windows - try SemiBold first
-                "C:/Windows/Fonts/IBMPlexMono-SemiBold.ttf",
-                # Fallback to Regular if SemiBold not found
+                # Linux - try Medium first
+                "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-Medium.ttf",
+                "/usr/share/fonts/TTF/IBMPlexMono-Medium.ttf",
+                "~/.fonts/IBMPlexMono-Medium.ttf",
+                # Windows - try Medium first
+                "C:/Windows/Fonts/IBMPlexMono-Medium.ttf",
+                # Fallback to Regular if Medium not found
                 "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-Regular.ttf",
                 "/usr/share/fonts/TTF/IBMPlexMono-Regular.ttf",
                 "~/.fonts/IBMPlexMono-Regular.ttf",
                 "C:/Windows/Fonts/IBMPlexMono-Regular.ttf",
                 "C:/Windows/Fonts/ibmplexmono.ttf",
                 # macOS
-                "~/Library/Fonts/IBMPlexMono-SemiBold.ttf",
-                "/Library/Fonts/IBMPlexMono-SemiBold.ttf",
+                "~/Library/Fonts/IBMPlexMono-Medium.ttf",
+                "/Library/Fonts/IBMPlexMono-Medium.ttf",
                 "~/Library/Fonts/IBMPlexMono-Regular.ttf",
                 "/Library/Fonts/IBMPlexMono-Regular.ttf",
             ]
@@ -228,11 +232,17 @@ class PrinterDriver:
                         fonts["regular"] = ImageFont.truetype(
                             expanded_path, self.font_size
                         )
-                        # Try to find Bold variant
-                        bold_path = expanded_path.replace("Regular", "Bold").replace("SemiBold", "Bold")
+                        # Try to find Bold and SemiBold variants for headings
+                        bold_path = expanded_path.replace("Regular", "Bold").replace("Medium", "Bold")
+                        semibold_path = expanded_path.replace("Regular", "SemiBold").replace("Medium", "SemiBold")
                         fonts["bold"] = (
                             ImageFont.truetype(bold_path, self.font_size)
                             if os.path.exists(bold_path)
+                            else fonts["regular"]
+                        )
+                        fonts["semibold"] = (
+                            ImageFont.truetype(semibold_path, self.font_size)
+                            if os.path.exists(semibold_path)
                             else fonts["regular"]
                         )
                         fonts["regular_lg"] = ImageFont.truetype(
