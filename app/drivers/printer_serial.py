@@ -134,11 +134,11 @@ class PrinterDriver:
             self.ser = None
 
     def _load_font_family(self) -> dict:
-        """Load Orbitron font family with multiple weights.
+        """Load IBM Plex Mono font family with multiple weights.
 
-        Orbitron is a geometric sans-serif font designed for display purposes.
-        Place font files in: fonts/Orbitron/static/
-        Required files: Orbitron-Regular.ttf, Orbitron-Medium.ttf, Orbitron-Bold.ttf
+        IBM Plex Mono is a monospace font designed for code and data display.
+        Place font files in: web/public/fonts/IBM_Plex_Mono/
+        Required files: IBMPlexMono-Regular.ttf, IBMPlexMono-Medium.ttf, IBMPlexMono-Bold.ttf
         """
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -147,24 +147,21 @@ class PrinterDriver:
         fonts = {}
 
         # Font variants we want to load
-        # Orbitron typically has: Regular, Medium, SemiBold, Bold, ExtraBold, Black
+        # IBM Plex Mono has: Thin, ExtraLight, Light, Regular, Medium, SemiBold, Bold
         # We'll map our styles to available weights
         font_variants = {
-            "regular": "Orbitron-Regular.ttf",
-            "bold": "Orbitron-Bold.ttf",
-            "medium": "Orbitron-Medium.ttf",
-            "light": "Orbitron-Regular.ttf",  # Use Regular if Light not available
-            "semibold": "Orbitron-SemiBold.ttf",  # Use SemiBold if available, fallback to Bold
+            "regular": "IBMPlexMono-Regular.ttf",
+            "bold": "IBMPlexMono-Bold.ttf",
+            "medium": "IBMPlexMono-Medium.ttf",
+            "light": "IBMPlexMono-Light.ttf",
+            "semibold": "IBMPlexMono-SemiBold.ttf",
         }
 
-        # Base paths to search (check both root and static subdirectory)
+        # Base paths to search
         base_paths = [
-            os.path.join(project_root, "web/public/fonts/Orbitron"),
-            os.path.join(project_root, "web/public/fonts/Orbitron/static"),
-            os.path.join(project_root, "web/dist/fonts/Orbitron"),
-            os.path.join(project_root, "web/dist/fonts/Orbitron/static"),
-            os.path.join(project_root, "fonts/Orbitron"),  # Alternative location
-            os.path.join(project_root, "fonts/Orbitron/static"),  # Static subdirectory
+            os.path.join(project_root, "web/public/fonts/IBM_Plex_Mono"),
+            os.path.join(project_root, "web/dist/fonts/IBM_Plex_Mono"),
+            os.path.join(project_root, "fonts/IBM_Plex_Mono"),  # Alternative location
         ]
 
         # Load each variant at different sizes
@@ -200,20 +197,20 @@ class PrinterDriver:
                     fonts["semibold_lg"] = fonts.get("bold_lg", fonts["bold"])
                     fonts["semibold_sm"] = fonts.get("bold_sm", fonts["bold"])
 
-        # Fallback to system fonts if Orbitron not found
+        # Fallback to system fonts if IBM Plex Mono not found
         if "regular" not in fonts:
-            # Try common system font locations for Orbitron
+            # Try common system font locations for IBM Plex Mono
             system_font_paths = [
                 # Linux
-                "/usr/share/fonts/truetype/orbitron/Orbitron-Regular.ttf",
-                "/usr/share/fonts/TTF/Orbitron-Regular.ttf",
-                "~/.fonts/Orbitron-Regular.ttf",
+                "/usr/share/fonts/truetype/ibm-plex/IBMPlexMono-Regular.ttf",
+                "/usr/share/fonts/TTF/IBMPlexMono-Regular.ttf",
+                "~/.fonts/IBMPlexMono-Regular.ttf",
                 # Windows
-                "C:/Windows/Fonts/Orbitron-Regular.ttf",
-                "C:/Windows/Fonts/orbitron.ttf",
+                "C:/Windows/Fonts/IBMPlexMono-Regular.ttf",
+                "C:/Windows/Fonts/ibmplexmono.ttf",
                 # macOS
-                "~/Library/Fonts/Orbitron-Regular.ttf",
-                "/Library/Fonts/Orbitron-Regular.ttf",
+                "~/Library/Fonts/IBMPlexMono-Regular.ttf",
+                "/Library/Fonts/IBMPlexMono-Regular.ttf",
             ]
             for path in system_font_paths:
                 expanded_path = os.path.expanduser(path)
