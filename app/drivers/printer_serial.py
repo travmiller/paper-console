@@ -127,7 +127,13 @@ class PrinterDriver:
             self.ser = None
 
     def _load_font_family(self) -> dict:
-        """Load IBM Plex Mono font family with multiple weights."""
+        """Load Orbitron font family with multiple weights.
+        
+        Orbitron is a geometric sans-serif font designed for display purposes.
+        Download from: https://fonts.google.com/specimen/Orbitron
+        Place font files in: web/public/fonts/Orbitron/
+        Required files: Orbitron-Regular.ttf, Orbitron-Medium.ttf, Orbitron-Bold.ttf
+        """
         import os
 
         # Get the project root directory (parent of app/)
@@ -137,18 +143,21 @@ class PrinterDriver:
         fonts = {}
 
         # Font variants we want to load
+        # Orbitron typically has: Regular, Medium, Bold, Black
+        # We'll map our styles to available weights
         font_variants = {
-            "regular": "IBMPlexMono-Regular.ttf",
-            "bold": "IBMPlexMono-Bold.ttf",
-            "medium": "IBMPlexMono-Medium.ttf",
-            "light": "IBMPlexMono-Light.ttf",
-            "semibold": "IBMPlexMono-SemiBold.ttf",
+            "regular": "Orbitron-Regular.ttf",
+            "bold": "Orbitron-Bold.ttf",
+            "medium": "Orbitron-Medium.ttf",
+            "light": "Orbitron-Regular.ttf",  # Use Regular if Light not available
+            "semibold": "Orbitron-Bold.ttf",  # Use Bold if SemiBold not available
         }
 
         # Base paths to search
         base_paths = [
-            os.path.join(project_root, "web/public/fonts/IBM_Plex_Mono"),
-            os.path.join(project_root, "web/dist/fonts/IBM_Plex_Mono"),
+            os.path.join(project_root, "web/public/fonts/Orbitron"),
+            os.path.join(project_root, "web/dist/fonts/Orbitron"),
+            os.path.join(project_root, "fonts/Orbitron"),  # Alternative location
         ]
 
         # Load each variant at different sizes
@@ -174,14 +183,45 @@ class PrinterDriver:
                     except Exception:
                         continue
 
-        # Fallback to system fonts if IBM Plex not found
+        # Fallback to system fonts if Orbitron not found
         if "regular" not in fonts:
-            fallback_paths = [
-                "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
-                "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
-                "C:/Windows/Fonts/consola.ttf",
-                "C:/Windows/Fonts/cour.ttf",
+            # Try common system font locations for Orbitron
+            system_font_paths = [
+                # Linux
+                "/usr/share/fonts/truetype/orbitron/Orbitron-Regular.ttf",
+                "/usr/share/fonts/TTF/Orbitron-Regular.ttf",
+                "~/.fonts/Orbitron-Regular.ttf",
+                # Windows
+                "C:/Windows/Fonts/Orbitron-Regular.ttf",
+                "C:/Windows/Fonts/orbitron.ttf",
+                # macOS
+                "~/Library/Fonts/Orbitron-Regular.ttf",
+                "/Library/Fonts/Orbitron-Regular.ttf",
             ]
+            for path in system_font_paths:
+                expanded_path = os.path.expanduser(path)
+                if os.path.exists(expanded_path):
+                    try:
+                        fonts["regular"] = ImageFont.truetype(expanded_path, self.font_size)
+                        fonts["bold"] = ImageFont.truetype(
+                            expanded_path.replace("Regular", "Bold"), self.font_size
+                        ) if os.path.exists(expanded_path.replace("Regular", "Bold")) else fonts["regular"]
+                        fonts["regular_lg"] = ImageFont.truetype(expanded_path, self.font_size + 6)
+                        fonts["regular_sm"] = ImageFont.truetype(
+                            expanded_path, max(10, self.font_size - 4)
+                        )
+                        break
+                    except Exception:
+                        continue
+            
+            # If still not found, try generic monospace fonts
+            if "regular" not in fonts:
+                fallback_paths = [
+                    "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+                    "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+                    "C:/Windows/Fonts/consola.ttf",
+                    "C:/Windows/Fonts/cour.ttf",
+                ]
             for path in fallback_paths:
                 if os.path.exists(path):
                     try:
