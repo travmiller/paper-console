@@ -3720,23 +3720,6 @@ class PrinterDriver:
             # Fallback to native if bitmap fails
             self._write_qr_native(data, pixel_size, error_correction)
 
-    def print_header(self, text: str):
-        """Print large bold header text in a drawn box."""
-        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
-            self.flush_buffer()
-        self.print_buffer.append(
-            (
-                "box",
-                {
-                    "text": text.upper(),
-                    "style": "bold_lg",
-                    "padding": 8,
-                    "border": 2,
-                },
-            )
-        )
-        self.print_line()
-
     def close(self):
         """Close the serial connection."""
         if self.ser and self.ser.is_open:
