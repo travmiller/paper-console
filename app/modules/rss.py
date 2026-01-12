@@ -142,14 +142,14 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
 
             # Wrap the headline
             wrapped_lines = wrap_text(
-                article["title"], width=32, indent=2  # PRINTER_WIDTH
+                article["title"], width=42, indent=2  # PRINTER_WIDTH (Font B)
             )
             for line in wrapped_lines:
                 printer.print_text(f"  {line}")
 
             # Wrap the summary
             wrapped_summary = wrap_text(
-                article["summary"], width=32, indent=0  # PRINTER_WIDTH
+                article["summary"], width=42, indent=0  # PRINTER_WIDTH (Font B)
             )
             # Limit summary lines to save paper
             for line in wrapped_summary[:4]:
@@ -160,6 +160,6 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
 
             # Print small fixed-size QR code linking to the full article
             if article.get("url"):
-                printer.print_qr(article["url"], size=1, error_correction="L", fixed_size=True)
+                printer.print_qr(article["url"], size=2, error_correction="L", fixed_size=True)
 
             printer.print_line()  # Separator between articles

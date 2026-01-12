@@ -49,7 +49,7 @@ def strip_html(html_content):
         logger.error(f"Error stripping HTML: {e}")
         return html_content
 
-def wrap_text(text: str, width: int = 32) -> List[str]:
+def wrap_text(text: str, width: int = 42) -> List[str]:
     """Wraps text into lines of specified width."""
     words = text.split()
     lines = []

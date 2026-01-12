@@ -1,7 +1,7 @@
 class PrinterDriver:
     def __init__(
         self,
-        width: int = 32,
+        width: int = 42,  # Characters per line with Font B (small font)
         port: str = None,
         baudrate: int = 9600,
     ):

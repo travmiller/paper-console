@@ -4,7 +4,7 @@ from app.hardware import printer, _is_raspberry_pi
 from app.config import PRINTER_WIDTH
 
 
-def wrap_text(text: str, width: int = 32, indent: int = 0) -> list[str]:
+def wrap_text(text: str, width: int = 42, indent: int = 0) -> list[str]:
     """Wraps text to fit the printer width with optional indentation."""
     words = text.split()
     lines = []

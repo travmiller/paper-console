@@ -46,7 +46,7 @@ class PrinterDriver:
 
     def __init__(
         self,
-        width: int = 32,
+        width: int = 42,  # Characters per line with Font B (small font)
         port: Optional[str] = None,
         baudrate: int = 9600,
     ):
@@ -242,8 +242,11 @@ class PrinterDriver:
             # Select code page PC437 (confirmed in QR204 manual)
             self._write(b"\x1b\x74\x00")  # ESC t 0 (1B 74 00) - Code page PC437 (US)
 
-            # Set default line spacing (confirmed in QR204 manual)
-            self._write(b"\x1b\x32")  # ESC 2 (1B 32) - Default line spacing
+            # Select Font B (smaller font: 9x17 vs Font A's 12x24)
+            self._write(b"\x1b\x4d\x01")  # ESC M 1 - Select Font B (small)
+            
+            # Set tighter line spacing for small font (16 dots instead of default 30)
+            self._write(b"\x1b\x33\x10")  # ESC 3 16 - Set line spacing to 16 dots
 
             # Enable 180° rotation (standard ESC/POS, required for this unit despite missing from manual)
             self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
@@ -273,6 +276,8 @@ class PrinterDriver:
         try:
             # Cancel Chinese mode (confirmed in QR204 manual)
             self._write(b"\x1c\x2e")  # FS . (1C 2E)
+            # Re-apply small font
+            self._write(b"\x1b\x4d\x01")  # ESC M 1 - Font B
             # Re-apply rotation (required for correct orientation)
             self._write(b"\x1b\x7b\x01")  # ESC { 1
         except Exception:

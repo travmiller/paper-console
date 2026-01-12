@@ -6,7 +6,7 @@ import os
 import uuid
 
 # Constants
-PRINTER_WIDTH = 32  # Hardcoded printer width
+PRINTER_WIDTH = 42  # Characters per line with Font B (small font)
 
 
 class WebhookConfig(BaseModel):
