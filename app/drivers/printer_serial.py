@@ -2604,25 +2604,41 @@ class PrinterDriver:
         if not forecast:
             return
 
-        # Map conditions to icon types (matches weather module logic)
+        # Map conditions to icon types based on WMO weather codes (matches weather module logic)
         def get_icon_type(condition: str) -> str:
             condition_lower = condition.lower() if condition else ""
+            
+            # Clear sky (code 0)
             if condition_lower == "clear":
                 return "sun"  # Maps to sun.png
-            elif "mainly clear" in condition_lower or "partly cloudy" in condition_lower:
+            
+            # Mainly clear (code 1) or Partly cloudy (code 2)
+            elif condition_lower == "mainly clear" or condition_lower == "partly cloudy":
                 return "cloud-sun"  # Maps to cloud-sun.png
-            elif "rain" in condition_lower:
-                return "rain"  # Maps to cloud-rain.png
+            
+            # Overcast (code 3)
+            elif condition_lower == "overcast":
+                return "cloud"  # Maps to cloud.png
+            
+            # Fog (codes 45, 48)
+            elif condition_lower == "fog" or "mist" in condition_lower:
+                return "cloud-fog"  # Maps to cloud-fog.png
+            
+            # Thunderstorm (codes 95, 96, 99) - check before rain to avoid false matches
+            elif "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+                return "storm"  # Maps to cloud-lightning.png
+            
+            # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
             elif "snow" in condition_lower:
                 return "snow"  # Maps to cloud-snow.png
-            elif "storm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
-                return "storm"  # Maps to cloud-lightning.png
-            elif "fog" in condition_lower or "mist" in condition_lower:
-                return "cloud-fog"  # Maps to cloud-fog.png
-            elif "cloud" in condition_lower or "overcast" in condition_lower:
-                return "cloud"  # Maps to cloud.png
+            
+            # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
+            elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
+                return "rain"  # Maps to cloud-rain.png
+            
+            # Default fallback
             else:
-                return "cloud"  # Default
+                return "cloud"  # Maps to cloud.png
 
         num_days = min(len(forecast), 7)
         col_width = total_width // num_days
@@ -2685,25 +2701,41 @@ class PrinterDriver:
         if not hourly_forecast:
             return
 
-        # Map conditions to icon types (matches weather module logic)
+        # Map conditions to icon types based on WMO weather codes (matches weather module logic)
         def get_icon_type(condition: str) -> str:
             condition_lower = condition.lower() if condition else ""
+            
+            # Clear sky (code 0)
             if condition_lower == "clear":
                 return "sun"  # Maps to sun.png
-            elif "mainly clear" in condition_lower or "partly cloudy" in condition_lower:
+            
+            # Mainly clear (code 1) or Partly cloudy (code 2)
+            elif condition_lower == "mainly clear" or condition_lower == "partly cloudy":
                 return "cloud-sun"  # Maps to cloud-sun.png
-            elif "rain" in condition_lower:
-                return "rain"  # Maps to cloud-rain.png
+            
+            # Overcast (code 3)
+            elif condition_lower == "overcast":
+                return "cloud"  # Maps to cloud.png
+            
+            # Fog (codes 45, 48)
+            elif condition_lower == "fog" or "mist" in condition_lower:
+                return "cloud-fog"  # Maps to cloud-fog.png
+            
+            # Thunderstorm (codes 95, 96, 99) - check before rain to avoid false matches
+            elif "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+                return "storm"  # Maps to cloud-lightning.png
+            
+            # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
             elif "snow" in condition_lower:
                 return "snow"  # Maps to cloud-snow.png
-            elif "storm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
-                return "storm"  # Maps to cloud-lightning.png
-            elif "fog" in condition_lower or "mist" in condition_lower:
-                return "cloud-fog"  # Maps to cloud-fog.png
-            elif "cloud" in condition_lower or "overcast" in condition_lower:
-                return "cloud"  # Maps to cloud.png
+            
+            # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
+            elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
+                return "rain"  # Maps to cloud-rain.png
+            
+            # Default fallback
             else:
-                return "cloud"  # Default
+                return "cloud"  # Maps to cloud.png
 
         # Group into rows of 6 hours each
         hours_per_row = 6

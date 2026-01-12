@@ -6,39 +6,53 @@ from app.drivers.printer_mock import PrinterDriver
 
 
 def get_weather_condition(code: int) -> str:
-    """Maps WMO Weather Codes to text.
+    """Maps WMO Weather Codes to text per official WMO interpretation codes.
     
     WMO Weather Code reference:
     0: Clear sky
-    1: Mainly clear
-    2: Partly cloudy
-    3: Overcast
-    45, 48: Fog
-    51, 53, 55: Drizzle (light, moderate, dense)
-    61, 63, 65: Rain (slight, moderate, heavy)
-    66, 67: Freezing rain (light, heavy)
-    71, 73, 75: Snow fall (slight, moderate, heavy)
+    1, 2, 3: Mainly clear, partly cloudy, and overcast
+    45, 48: Fog and depositing rime fog
+    51, 53, 55: Drizzle: Light, moderate, and dense intensity
+    56, 57: Freezing Drizzle: Light and dense intensity
+    61, 63, 65: Rain: Slight, moderate and heavy intensity
+    66, 67: Freezing Rain: Light and heavy intensity
+    71, 73, 75: Snow fall: Slight, moderate, and heavy intensity
     77: Snow grains
-    80, 81, 82: Rain showers (slight, moderate, violent)
-    85, 86: Snow showers (slight, heavy)
-    95, 96, 99: Thunderstorm (slight, moderate, heavy)
+    80, 81, 82: Rain showers: Slight, moderate, and violent
+    85, 86: Snow showers slight and heavy
+    95: Thunderstorm: Slight or moderate
+    96, 99: Thunderstorm with slight and heavy hail
     """
     if code == 0:
         return "Clear"
     if code == 1:
-        return "Mainly Clear"  # Mostly sunny
+        return "Mainly Clear"
     if code == 2:
-        return "Partly Cloudy"  # Partly cloudy
+        return "Partly Cloudy"
     if code == 3:
-        return "Overcast"  # Cloudy
+        return "Overcast"
     if code in [45, 48]:
         return "Fog"
-    if code in [51, 53, 55, 61, 63, 65, 66, 67, 80, 81, 82]:
+    if code in [51, 53, 55]:  # Drizzle
+        return "Drizzle"
+    if code in [56, 57]:  # Freezing Drizzle
+        return "Freezing Drizzle"
+    if code in [61, 63, 65]:  # Rain
         return "Rain"
-    if code in [71, 73, 75, 77, 85, 86]:
+    if code in [66, 67]:  # Freezing Rain
+        return "Freezing Rain"
+    if code in [71, 73, 75]:  # Snow fall
         return "Snow"
-    if code in [95, 96, 99]:
-        return "Storm"
+    if code == 77:  # Snow grains
+        return "Snow Grains"
+    if code in [80, 81, 82]:  # Rain showers
+        return "Rain Showers"
+    if code in [85, 86]:  # Snow showers
+        return "Snow Showers"
+    if code == 95:  # Thunderstorm
+        return "Thunderstorm"
+    if code in [96, 99]:  # Thunderstorm with hail
+        return "Thunderstorm Hail"
     return "Unknown"
 
 
@@ -361,24 +375,51 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
 
 
 def _get_icon_type(condition: str) -> str:
-    """Map weather condition to icon type (maps to Phosphor PNG icons)."""
+    """Map weather condition to icon type based on WMO weather codes.
+    
+    Maps to Phosphor PNG icons:
+    - Clear (0) → sun
+    - Mainly Clear (1) → cloud-sun
+    - Partly Cloudy (2) → cloud-sun
+    - Overcast (3) → cloud
+    - Fog (45, 48) → cloud-fog
+    - Drizzle/Freezing Drizzle/Rain/Freezing Rain/Rain Showers (51-82) → cloud-rain
+    - Snow/Snow Grains/Snow Showers (71-86) → cloud-snow
+    - Thunderstorm/Thunderstorm Hail (95-99) → cloud-lightning
+    """
     condition_lower = condition.lower()
+    
+    # Clear sky (code 0)
     if condition_lower == "clear":
         return "sun"  # Maps to sun.png
-    elif "mainly clear" in condition_lower or "partly cloudy" in condition_lower:
+    
+    # Mainly clear (code 1) or Partly cloudy (code 2)
+    elif condition_lower == "mainly clear" or condition_lower == "partly cloudy":
         return "cloud-sun"  # Maps to cloud-sun.png
-    elif "rain" in condition_lower:
-        return "rain"  # Maps to cloud-rain.png
+    
+    # Overcast (code 3)
+    elif condition_lower == "overcast":
+        return "cloud"  # Maps to cloud.png
+    
+    # Fog (codes 45, 48)
+    elif condition_lower == "fog" or "mist" in condition_lower:
+        return "cloud-fog"  # Maps to cloud-fog.png
+    
+    # Thunderstorm (codes 95, 96, 99) - check before rain to avoid false matches
+    elif "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+        return "storm"  # Maps to cloud-lightning.png
+    
+    # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
     elif "snow" in condition_lower:
         return "snow"  # Maps to cloud-snow.png
-    elif "storm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
-        return "storm"  # Maps to cloud-lightning.png
-    elif "fog" in condition_lower or "mist" in condition_lower:
-        return "cloud-fog"  # Maps to cloud-fog.png
-    elif "cloud" in condition_lower or "overcast" in condition_lower:
-        return "cloud"  # Maps to cloud.png
+    
+    # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
+    elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
+        return "rain"  # Maps to cloud-rain.png
+    
+    # Default fallback
     else:
-        return "cloud"  # Default
+        return "cloud"  # Maps to cloud.png
 
 
 def format_weather_receipt(
