@@ -204,19 +204,19 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
 
 
 def _get_icon_type(condition: str) -> str:
-    """Map weather condition to icon type."""
+    """Map weather condition to icon type (maps to Phosphor PNG icons)."""
     condition_lower = condition.lower()
     if "clear" in condition_lower:
         return "sun"
-    elif "cloud" in condition_lower or "overcast" in condition_lower:
-        return "cloud"
     elif "rain" in condition_lower:
-        return "rain"
+        return "rain"  # Maps to cloud-rain.png
     elif "snow" in condition_lower:
-        return "snow"
-    elif "storm" in condition_lower or "thunder" in condition_lower:
-        return "storm"
-    elif "fog" in condition_lower:
+        return "snow"  # Maps to cloud-snow.png
+    elif "storm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+        return "storm"  # Maps to cloud-lightning.png
+    elif "fog" in condition_lower or "mist" in condition_lower:
+        return "cloud-fog"  # Maps to cloud-fog.png
+    elif "cloud" in condition_lower or "overcast" in condition_lower:
         return "cloud"
     else:
         return "cloud"  # Default

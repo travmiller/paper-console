@@ -1023,6 +1023,9 @@ class PrinterDriver:
             "storm": "cloud-lightning",
             "thunder": "cloud-lightning",
             "lightning": "cloud-lightning",
+            "cloud-fog": "cloud-fog",
+            "fog": "cloud-fog",
+            "mist": "cloud-fog",
         }
 
         # Use mapped name or original
@@ -2587,21 +2590,23 @@ class PrinterDriver:
         if not forecast:
             return
 
-        # Map conditions to icon types
+        # Map conditions to icon types (matches weather module logic)
         def get_icon_type(condition: str) -> str:
             condition_lower = condition.lower() if condition else ""
             if "clear" in condition_lower:
                 return "sun"
+            elif "rain" in condition_lower:
+                return "rain"  # Maps to cloud-rain.png
+            elif "snow" in condition_lower:
+                return "snow"  # Maps to cloud-snow.png
+            elif "storm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
+                return "storm"  # Maps to cloud-lightning.png
+            elif "fog" in condition_lower or "mist" in condition_lower:
+                return "cloud-fog"  # Maps to cloud-fog.png
             elif "cloud" in condition_lower or "overcast" in condition_lower:
                 return "cloud"
-            elif "rain" in condition_lower:
-                return "rain"
-            elif "snow" in condition_lower:
-                return "snow"
-            elif "storm" in condition_lower:
-                return "storm"
             else:
-                return "cloud"
+                return "cloud"  # Default
 
         num_days = min(len(forecast), 7)
         col_width = total_width // num_days
