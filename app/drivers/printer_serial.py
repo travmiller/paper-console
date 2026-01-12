@@ -75,6 +75,14 @@ class PrinterDriver:
 
         # Load font family for styled text
         self._fonts = self._load_font_family()
+        
+        # Debug: Log which fonts were loaded
+        import logging
+        if self._fonts.get("regular"):
+            font_name = getattr(self._fonts["regular"], "path", "unknown")
+            logging.info(f"Loaded Orbitron fonts from: {font_name}")
+        else:
+            logging.warning("Orbitron fonts not found, using fallback fonts")
 
         # Auto-detect serial port if not specified
         if port is None:
@@ -143,26 +151,30 @@ class PrinterDriver:
         fonts = {}
 
         # Font variants we want to load
-        # Orbitron typically has: Regular, Medium, Bold, Black
+        # Orbitron typically has: Regular, Medium, SemiBold, Bold, ExtraBold, Black
         # We'll map our styles to available weights
         font_variants = {
             "regular": "Orbitron-Regular.ttf",
             "bold": "Orbitron-Bold.ttf",
             "medium": "Orbitron-Medium.ttf",
             "light": "Orbitron-Regular.ttf",  # Use Regular if Light not available
-            "semibold": "Orbitron-Bold.ttf",  # Use Bold if SemiBold not available
+            "semibold": "Orbitron-SemiBold.ttf",  # Use SemiBold if available, fallback to Bold
         }
 
-        # Base paths to search
+        # Base paths to search (check both root and static subdirectory)
         base_paths = [
             os.path.join(project_root, "web/public/fonts/Orbitron"),
+            os.path.join(project_root, "web/public/fonts/Orbitron/static"),
             os.path.join(project_root, "web/dist/fonts/Orbitron"),
+            os.path.join(project_root, "web/dist/fonts/Orbitron/static"),
             os.path.join(project_root, "fonts/Orbitron"),  # Alternative location
+            os.path.join(project_root, "fonts/Orbitron/static"),  # Static subdirectory
         ]
 
         # Load each variant at different sizes
         # Size jumps: +6 for headers, -4 for captions (visible hierarchy)
         for variant_name, filename in font_variants.items():
+            font_loaded = False
             for base_path in base_paths:
                 font_path = os.path.join(base_path, filename)
                 if os.path.exists(font_path):
@@ -179,9 +191,20 @@ class PrinterDriver:
                         fonts[f"{variant_name}_sm"] = ImageFont.truetype(
                             font_path, max(10, self.font_size - 4)
                         )
+                        font_loaded = True
                         break
-                    except Exception:
+                    except Exception as e:
+                        import logging
+                        logging.warning(f"Failed to load font {font_path}: {e}")
                         continue
+            
+            # Fallback for semibold if SemiBold not found
+            if variant_name == "semibold" and not font_loaded:
+                # Try using Bold as fallback
+                if "bold" in fonts:
+                    fonts["semibold"] = fonts["bold"]
+                    fonts["semibold_lg"] = fonts.get("bold_lg", fonts["bold"])
+                    fonts["semibold_sm"] = fonts.get("bold_sm", fonts["bold"])
 
         # Fallback to system fonts if Orbitron not found
         if "regular" not in fonts:
