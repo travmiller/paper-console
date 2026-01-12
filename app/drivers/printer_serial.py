@@ -3,7 +3,7 @@ import os
 import platform
 import time
 import unicodedata
-from datetime import datetime
+from datetime import datetime, date
 from typing import List, Optional
 
 import serial
@@ -533,8 +533,18 @@ class PrinterDriver:
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "moon":
                 size = op_data.get("size", 60)
+                # Calculate info panel and progression bar height
+                info_height = 0
+                if op_data.get("illumination") is not None:
+                    info_height += self._get_line_height_for_style("regular_sm")
+                if op_data.get("moonrise") or op_data.get("moonset"):
+                    info_height += self._get_line_height_for_style("light")
+                if op_data.get("days_to_full") is not None or op_data.get("days_to_new") is not None:
+                    info_height += self._get_line_height_for_style("light")
+                progression_bar_height = 8 + 12 + self.SPACING_SMALL  # bar + labels + spacing
+                total_moon_height = size + info_height + progression_bar_height
                 # SPACING_SMALL accounts for moon_y = y + SPACING_SMALL in drawing
-                total_height += self.SPACING_SMALL + size + self.SPACING_MEDIUM
+                total_height += self.SPACING_SMALL + total_moon_height + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "sun_path":
                 height = op_data.get("height", 120)
@@ -764,10 +774,44 @@ class PrinterDriver:
             elif op_type == "moon":
                 phase = op_data.get("phase", 0)
                 size = op_data.get("size", 60)
+                illumination = op_data.get("illumination")
+                moonrise = op_data.get("moonrise")
+                moonset = op_data.get("moonset")
+                next_full_moon = op_data.get("next_full_moon")
+                next_new_moon = op_data.get("next_new_moon")
+                days_to_full = op_data.get("days_to_full")
+                days_to_new = op_data.get("days_to_new")
                 moon_x = (width - size) // 2
                 moon_y = y + self.SPACING_SMALL
-                self._draw_moon_phase(draw, moon_x, moon_y, size, phase)
-                y += self.SPACING_SMALL + size + self.SPACING_MEDIUM
+                self._draw_moon_phase(
+                    draw,
+                    moon_x,
+                    moon_y,
+                    size,
+                    phase,
+                    illumination=illumination,
+                    moonrise=moonrise,
+                    moonset=moonset,
+                    next_full_moon=next_full_moon,
+                    next_new_moon=next_new_moon,
+                    days_to_full=days_to_full,
+                    days_to_new=days_to_new,
+                    font=self._get_font("bold"),
+                    font_sm=self._get_font("regular_sm"),
+                    font_caption=self._get_font("light"),
+                    width=width,
+                )
+                # Calculate total height: moon + info panel + progression bar
+                info_height = 0
+                if illumination is not None:
+                    info_height += self._get_line_height_for_style("regular_sm")
+                if moonrise or moonset:
+                    info_height += self._get_line_height_for_style("light")
+                if days_to_full is not None or days_to_new is not None:
+                    info_height += self._get_line_height_for_style("light")
+                progression_bar_height = 8 + 12 + self.SPACING_SMALL  # bar + labels + spacing
+                total_height = size + info_height + progression_bar_height
+                y += self.SPACING_SMALL + total_height + self.SPACING_MEDIUM
             elif op_type == "sun_path":
                 sun_path = op_data.get("sun_path", [])
                 sunrise = op_data.get("sunrise")
@@ -977,103 +1021,234 @@ class PrinterDriver:
         return img
 
     def _draw_moon_phase(
-        self, draw: ImageDraw.Draw, x: int, y: int, size: int, phase: float
+        self,
+        draw: ImageDraw.Draw,
+        x: int,
+        y: int,
+        size: int,
+        phase: float,
+        illumination: float = None,
+        moonrise: str = None,
+        moonset: str = None,
+        next_full_moon: date = None,
+        next_new_moon: date = None,
+        days_to_full: int = None,
+        days_to_new: int = None,
+        font: ImageFont = None,
+        font_sm: ImageFont = None,
+        font_caption: ImageFont = None,
+        width: int = 384,
     ):
-        """Draw a moon phase graphic.
+        """Draw an enhanced moon phase graphic with realistic terminator, texture, info panel, and progression bar.
 
         Args:
             draw: ImageDraw object
             x, y: Top-left corner of bounding box
             size: Diameter of moon in pixels
             phase: Moon phase value (0-28 day cycle)
-                   0/28 = New Moon (dark)
-                   7 = First Quarter (right half lit)
-                   14 = Full Moon (fully lit)
-                   21 = Last Quarter (left half lit)
+            illumination: Illumination percentage (0-100)
+            moonrise: Formatted moonrise time string
+            moonset: Formatted moonset time string
+            next_full_moon: Date of next full moon
+            next_new_moon: Date of next new moon
+            days_to_full: Days until next full moon
+            days_to_new: Days until next new moon
+            font: Font for labels
+            font_sm: Small font for captions
+            font_caption: Caption font
+            width: Total drawing width for layout
         """
         # Normalize phase to 0-1 (0 = new, 0.5 = full, 1 = new)
         phase_normalized = (phase % 28) / 28.0
 
-        # Calculate illumination (0 = new moon, 1 = full moon)
-        # illumination follows a cosine curve
-        illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2
+        # Calculate illumination if not provided
+        if illumination is None:
+            illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2 * 100.0
+        illumination_ratio = illumination / 100.0
 
         center_x = x + size // 2
         center_y = y + size // 2
-        radius = size // 2
+        radius = size // 2 - 2  # Account for border
 
         # Draw the moon outline (black circle)
         draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
 
-        if phase_normalized < 0.5:
-            # Waxing: right side illuminated, left side dark
-            # Draw white (lit) right half
-            # Then overlay dark portion from left
+        # Determine if waxing (right side lit) or waning (left side lit)
+        is_waxing = phase_normalized < 0.5
 
-            # Fill the whole moon white first
-            draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
+        # Calculate terminator position (where light meets shadow)
+        # The terminator is a vertical line that moves left/right based on phase
+        # For realistic curve, we use an ellipse intersection
+        terminator_offset = (illumination_ratio - 0.5) * 2 * radius  # -radius to +radius
+        
+        # Fill the moon white (lit portion)
+        draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
 
-            # Calculate the terminator (shadow edge) position
-            # At new moon (phase=0), shadow covers everything
-            # At first quarter (phase=0.25), shadow covers left half
-            # At full moon (phase=0.5), no shadow
-            shadow_width = (
-                int((1 - illumination * 2) * radius) if illumination < 0.5 else 0
-            )
+        # Draw realistic curved terminator using ellipse intersection
+        # For better performance, use a column-by-column approach
+        if abs(terminator_offset) < radius * 1.5:  # Only draw if terminator is visible
+            # Draw shadow column by column for better performance
+            for px in range(x + 2, x + size - 2):
+                dx = px - center_x
+                
+                # Calculate column height at this x position
+                col_height = int(math.sqrt(max(0, radius * radius - dx * dx)))
+                if col_height == 0:
+                    continue
+                
+                # Determine if this column is in shadow
+                if is_waxing:
+                    # Waxing: shadow on left (dx < 0), light on right (dx > 0)
+                    # Terminator moves from left (-radius) to center (0)
+                    in_shadow = dx < terminator_offset
+                else:
+                    # Waning: light on left (dx < 0), shadow on right (dx > 0)
+                    # Terminator moves from center (0) to right (+radius)
+                    in_shadow = dx > terminator_offset
+                
+                if in_shadow:
+                    # Draw shadow for this column
+                    py_start = center_y - col_height
+                    py_end = center_y + col_height
+                    
+                    # Add smooth transition near terminator
+                    terminator_dist = abs(dx - terminator_offset)
+                    if terminator_dist < 3:
+                        # Gradual transition - draw with varying intensity
+                        transition = terminator_dist / 3.0
+                        # Draw every other pixel for lighter shadow near edge
+                        for py in range(py_start, py_end):
+                            if (py - py_start) % max(1, int(transition * 2 + 1)) == 0:
+                                draw.point((px, py), fill=0)
+                    else:
+                        # Full shadow - draw solid line
+                        draw.line([(px, py_start), (px, py_end)], fill=0, width=1)
 
-            if shadow_width > 0:
-                # Draw shadow on the left side
-                # Use an ellipse that gets narrower as moon waxes
-                for px in range(x + 2, center_x):
-                    # Calculate how much of this column is in shadow
-                    dist_from_center = center_x - px
-                    shadow_depth = (
-                        shadow_width * (dist_from_center / radius) if radius > 0 else 0
-                    )
-
-                    if dist_from_center > shadow_width:
-                        # Full shadow for this column
-                        col_height = int(
-                            math.sqrt(max(0, radius**2 - (px - center_x) ** 2))
-                        )
-                        if col_height > 0:
-                            draw.line(
-                                [
-                                    (px, center_y - col_height),
-                                    (px, center_y + col_height),
-                                ],
-                                fill=0,
-                            )
-        else:
-            # Waning: left side illuminated, right side dark
-            # Fill the whole moon white first
-            draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
-
-            # Calculate shadow width for waning phase
-            wane_progress = (phase_normalized - 0.5) * 2  # 0 at full, 1 at new
-            shadow_width = int(wane_progress * radius)
-
-            if shadow_width > 0:
-                # Draw shadow on the right side
-                for px in range(center_x, x + size - 2):
-                    dist_from_center = px - center_x
-
-                    if dist_from_center > (radius - shadow_width):
-                        # Shadow for this column
-                        col_height = int(
-                            math.sqrt(max(0, radius**2 - (px - center_x) ** 2))
-                        )
-                        if col_height > 0:
-                            draw.line(
-                                [
-                                    (px, center_y - col_height),
-                                    (px, center_y + col_height),
-                                ],
-                                fill=0,
-                            )
+        # Add moon surface texture (crater patterns) on lit side
+        # Only add texture where moon is illuminated
+        import random
+        random.seed(42)  # Fixed seed for consistent pattern
+        num_craters = 8
+        for _ in range(num_craters):
+            # Random position on moon surface
+            angle = random.uniform(0, 2 * math.pi)
+            dist_from_center = random.uniform(0, radius * 0.7)
+            crater_x = int(center_x + dist_from_center * math.cos(angle))
+            crater_y = int(center_y + dist_from_center * math.sin(angle))
+            
+            # Only draw crater if it's on the lit side
+            if is_waxing:
+                on_lit_side = crater_x > (center_x + terminator_offset)
+            else:
+                on_lit_side = crater_x < (center_x + terminator_offset)
+            
+            if on_lit_side and (x + 2 <= crater_x < x + size - 2) and (y + 2 <= crater_y < y + size - 2):
+                # Draw small crater (circle)
+                crater_size = random.randint(1, 3)
+                draw.ellipse(
+                    [
+                        crater_x - crater_size,
+                        crater_y - crater_size,
+                        crater_x + crater_size,
+                        crater_y + crater_size,
+                    ],
+                    outline=0,
+                    width=1,
+                )
 
         # Redraw outline to ensure clean edges
         draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
+
+        # Draw info panel below moon
+        info_y = y + size + self.SPACING_SMALL
+        info_x = x
+        
+        # Illumination percentage
+        if font_sm:
+            illum_text = f"{illumination:.0f}% illuminated"
+            draw.text((info_x, info_y), illum_text, font=font_sm, fill=0)
+            info_y += self._get_line_height_for_style("regular_sm")
+
+        # Moonrise/Moonset times
+        if moonrise or moonset:
+            times_text = ""
+            if moonrise:
+                times_text += f"Rise {moonrise}"
+            if moonrise and moonset:
+                times_text += "  "
+            if moonset:
+                times_text += f"Set {moonset}"
+            if font_caption and times_text:
+                draw.text((info_x, info_y), times_text, font=font_caption, fill=0)
+                info_y += self._get_line_height_for_style("light")
+
+        # Next full/new moon info
+        if next_full_moon or next_new_moon:
+            next_text = ""
+            if days_to_full is not None and days_to_full >= 0:
+                next_text += f"Full in {days_to_full}d"
+            if days_to_full is not None and days_to_new is not None:
+                next_text += "  "
+            if days_to_new is not None and days_to_new >= 0:
+                next_text += f"New in {days_to_new}d"
+            if font_caption and next_text:
+                draw.text((info_x, info_y), next_text, font=font_caption, fill=0)
+                info_y += self._get_line_height_for_style("light")
+
+        # Draw phase progression bar (28-day cycle)
+        bar_y = info_y + self.SPACING_SMALL
+        bar_width = width - (info_x * 2)
+        bar_height = 8
+        bar_x = info_x
+        
+        # Draw background bar
+        draw.rectangle(
+            [bar_x, bar_y, bar_x + bar_width, bar_y + bar_height],
+            outline=0,
+            width=1,
+        )
+        
+        # Mark key phases
+        phase_positions = {
+            0: "N",  # New
+            7: "Q1",  # First Quarter
+            14: "F",  # Full
+            21: "Q3",  # Last Quarter
+        }
+        
+        for phase_val, label in phase_positions.items():
+            phase_pos = int((phase_val / 28.0) * bar_width)
+            marker_x = bar_x + phase_pos
+            # Draw vertical marker
+            draw.line(
+                [(marker_x, bar_y), (marker_x, bar_y + bar_height)],
+                fill=0,
+                width=1,
+            )
+            # Draw label above
+            if font_caption:
+                label_bbox = draw.textbbox((0, 0), label, font=font_caption)
+                label_width = label_bbox[2] - label_bbox[0]
+                draw.text(
+                    (marker_x - label_width // 2, bar_y - 12),
+                    label,
+                    font=font_caption,
+                    fill=0,
+                )
+        
+        # Draw current phase indicator
+        current_pos = int((phase / 28.0) * bar_width)
+        indicator_x = bar_x + current_pos
+        # Draw triangle indicator pointing down
+        triangle_size = 4
+        draw.polygon(
+            [
+                (indicator_x, bar_y + bar_height),
+                (indicator_x - triangle_size, bar_y + bar_height + triangle_size),
+                (indicator_x + triangle_size, bar_y + bar_height + triangle_size),
+            ],
+            fill=0,
+        )
 
     def _draw_maze(
         self,
@@ -2545,21 +2720,52 @@ class PrinterDriver:
         line = "━" * self.width
         self.print_text(line, "bold")
 
-    def print_moon_phase(self, phase: float, size: int = 60):
-        """Print a moon phase graphic.
+    def print_moon_phase(
+        self,
+        phase: float,
+        size: int = 60,
+        illumination: float = None,
+        moonrise: str = None,
+        moonset: str = None,
+        next_full_moon: date = None,
+        next_new_moon: date = None,
+        days_to_full: int = None,
+        days_to_new: int = None,
+    ):
+        """Print an enhanced moon phase graphic with info panel and progression bar.
 
         Args:
             phase: Moon phase value (0-28 day cycle)
             size: Diameter of moon in pixels (default 60)
+            illumination: Illumination percentage (0-100)
+            moonrise: Formatted moonrise time string
+            moonset: Formatted moonset time string
+            next_full_moon: Date of next full moon
+            next_new_moon: Date of next new moon
+            days_to_full: Days until next full moon
+            days_to_new: Days until next new moon
         """
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
+        
+        # Calculate illumination if not provided
+        if illumination is None:
+            phase_normalized = (phase % 28) / 28.0
+            illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2 * 100.0
+        
         self.print_buffer.append(
             (
                 "moon",
                 {
                     "phase": phase,
                     "size": size,
+                    "illumination": illumination,
+                    "moonrise": moonrise,
+                    "moonset": moonset,
+                    "next_full_moon": next_full_moon,
+                    "next_new_moon": next_new_moon,
+                    "days_to_full": days_to_full,
+                    "days_to_new": days_to_new,
                 },
             )
         )

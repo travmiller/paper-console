@@ -138,8 +138,22 @@ class PrinterDriver:
         print(f"[PRINT] {'━' * self.width}")
         self.lines_printed += 1
 
-    def print_moon_phase(self, phase: float, size: int = 60):
-        """Simulates printing a moon phase graphic."""
+    def print_moon_phase(
+        self,
+        phase: float,
+        size: int = 60,
+        illumination: float = None,
+        moonrise: str = None,
+        moonset: str = None,
+        next_full_moon: date = None,
+        next_new_moon: date = None,
+        days_to_full: int = None,
+        days_to_new: int = None,
+    ):
+        """Simulates printing an enhanced moon phase graphic."""
+        from datetime import date
+        import math
+        
         # ASCII art moon phases
         phase_normalized = (phase % 28) / 28.0
         
@@ -171,10 +185,66 @@ class PrinterDriver:
             moon = "🌑"  # New Moon
             name = "New Moon"
         
+        # Calculate illumination if not provided
+        if illumination is None:
+            illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2 * 100.0
+        
         print(f"[PRINT]     ╭───────────╮")
         print(f"[PRINT]     │     {moon}     │")
         print(f"[PRINT]     │  {name:^9} │")
         print(f"[PRINT]     ╰───────────╯")
+        self.lines_printed += 4
+        
+        # Info panel
+        if illumination is not None:
+            print(f"[PRINT] {illumination:.0f}% illuminated")
+            self.lines_printed += 1
+        
+        if moonrise or moonset:
+            times = []
+            if moonrise:
+                times.append(f"Rise {moonrise}")
+            if moonset:
+                times.append(f"Set {moonset}")
+            print(f"[PRINT] {'  '.join(times)}")
+            self.lines_printed += 1
+        
+        if days_to_full is not None or days_to_new is not None:
+            next_info = []
+            if days_to_full is not None:
+                next_info.append(f"Full in {days_to_full}d")
+            if days_to_new is not None:
+                next_info.append(f"New in {days_to_new}d")
+            print(f"[PRINT] {'  '.join(next_info)}")
+            self.lines_printed += 1
+        
+        # Phase progression bar
+        print(f"[PRINT] ┌─────────────────────────────────────┐")
+        bar_width = 35
+        # Mark key phases
+        markers = {0: "N", 7: "Q1", 14: "F", 21: "Q3"}
+        bar_chars = [" "] * bar_width
+        for phase_val, label in markers.items():
+            pos = int((phase_val / 28.0) * bar_width)
+            if 0 <= pos < bar_width:
+                bar_chars[pos] = "│"
+        
+        # Current position
+        current_pos = int((phase / 28.0) * bar_width)
+        if 0 <= current_pos < bar_width:
+            bar_chars[current_pos] = "●"
+        
+        print(f"[PRINT] │{''.join(bar_chars)}│")
+        # Labels
+        label_line = [" "] * bar_width
+        for phase_val, label in markers.items():
+            pos = int((phase_val / 28.0) * bar_width)
+            if 0 <= pos < bar_width and pos + len(label) <= bar_width:
+                for i, char in enumerate(label):
+                    if pos + i < bar_width:
+                        label_line[pos + i] = char
+        print(f"[PRINT] │{''.join(label_line)}│")
+        print(f"[PRINT] └─────────────────────────────────────┘")
         self.lines_printed += 4
 
     def print_sun_path(

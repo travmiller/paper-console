@@ -1,9 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
+import math
 import pytz
 from astral import LocationInfo
 from astral.sun import sun, zenith_and_azimuth
-from astral.moon import phase
-from typing import Dict, Any, List, Tuple
+from astral.moon import phase, moonrise, moonset
+from typing import Dict, Any, List, Tuple, Optional
 import app.config
 from app.config import format_time
 
@@ -28,6 +29,64 @@ def get_moon_phase_text(moon_phase: float) -> str:
     elif moon_phase < 20: return "Wan Gibbous"
     elif moon_phase < 23: return "Last Qtr"
     else: return "Wan Crescent"
+
+def get_moon_illumination(moon_phase: float) -> float:
+    """Calculate moon illumination percentage (0-100).
+    
+    Args:
+        moon_phase: Moon phase value (0-28 day cycle)
+    
+    Returns:
+        Illumination percentage (0.0 = new moon, 100.0 = full moon)
+    """
+    phase_normalized = (moon_phase % 28) / 28.0
+    # Illumination follows a cosine curve
+    illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2
+    return illumination * 100.0
+
+def find_next_full_moon(current_date: date) -> date:
+    """Find the next full moon date after current_date.
+    
+    Full moon occurs at phase = 14 (approximately).
+    """
+    # Start searching from current date
+    search_date = current_date
+    max_days = 30  # Full moon cycle is ~29.5 days
+    
+    for _ in range(max_days):
+        try:
+            phase_val = phase(search_date)
+            # Full moon is around phase 14 (0-28 cycle)
+            if 13.5 <= phase_val <= 14.5:
+                return search_date
+        except:
+            pass
+        search_date += timedelta(days=1)
+    
+    # Fallback: approximate next full moon (29.5 days)
+    return current_date + timedelta(days=29)
+
+def find_next_new_moon(current_date: date) -> date:
+    """Find the next new moon date after current_date.
+    
+    New moon occurs at phase = 0 or 28 (approximately).
+    """
+    # Start searching from current date
+    search_date = current_date
+    max_days = 30  # New moon cycle is ~29.5 days
+    
+    for _ in range(max_days):
+        try:
+            phase_val = phase(search_date)
+            # New moon is around phase 0 or 28 (0-28 cycle)
+            if phase_val < 1.0 or phase_val > 27.0:
+                return search_date
+        except:
+            pass
+        search_date += timedelta(days=1)
+    
+    # Fallback: approximate next new moon (29.5 days)
+    return current_date + timedelta(days=29)
 
 def get_sun_path_data(now: datetime, city: LocationInfo, tz: pytz.BaseTzInfo) -> List[Tuple[datetime, float]]:
     """Calculate sun altitude throughout the day.
@@ -77,6 +136,28 @@ def get_almanac_data():
     # Moon Calculations
     # Astral's phase() returns 0..28 roughly
     current_phase = phase(now)
+    moon_illumination = get_moon_illumination(current_phase)
+    
+    # Calculate moonrise and moonset
+    moonrise_time = None
+    moonset_time = None
+    try:
+        moonrise_time = moonrise(city.observer, date=now.date(), tzinfo=tz)
+    except (ValueError, Exception):
+        pass  # Moon doesn't rise today
+    
+    try:
+        moonset_time = moonset(city.observer, date=now.date(), tzinfo=tz)
+    except (ValueError, Exception):
+        pass  # Moon doesn't set today
+    
+    # Find next full and new moon
+    next_full_moon = find_next_full_moon(now.date())
+    next_new_moon = find_next_new_moon(now.date())
+    
+    # Calculate days until next phases
+    days_to_full = (next_full_moon - now.date()).days
+    days_to_new = (next_new_moon - now.date()).days
     
     # Calculate current sun position
     try:
@@ -96,6 +177,15 @@ def get_almanac_data():
         "sun_path": sun_path,
         "moon_phase_val": current_phase,
         "moon_phase": get_moon_phase_text(current_phase),
+        "moon_illumination": moon_illumination,
+        "moonrise": format_time(moonrise_time) if moonrise_time else None,
+        "moonset": format_time(moonset_time) if moonset_time else None,
+        "moonrise_dt": moonrise_time,
+        "moonset_dt": moonset_time,
+        "next_full_moon": next_full_moon,
+        "next_new_moon": next_new_moon,
+        "days_to_full": days_to_full,
+        "days_to_new": days_to_new,
         "day_length": str(s["sunset"] - s["sunrise"]).split('.')[0] # HH:MM:SS
     }
 
@@ -124,10 +214,16 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     )
     printer.print_line()
     
-    # Moon phase graphic
-    printer.print_moon_phase(data['moon_phase_val'], size=64)
-    
-    # Moon data text
-    printer.print_bold(data['moon_phase'].upper())
-    printer.print_caption(f"Day {data['moon_phase_val']:.0f} of 28")
+    # Enhanced moon phase graphic with info
+    printer.print_moon_phase(
+        phase=data['moon_phase_val'],
+        size=64,
+        illumination=data['moon_illumination'],
+        moonrise=data['moonrise'],
+        moonset=data['moonset'],
+        next_full_moon=data['next_full_moon'],
+        next_new_moon=data['next_new_moon'],
+        days_to_full=data['days_to_full'],
+        days_to_new=data['days_to_new']
+    )
 
