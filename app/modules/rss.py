@@ -160,7 +160,6 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
 
             # Print small QR code linking to the full article
             if article.get("url"):
-                printer.print_text("")  # Small gap
-                printer.print_qr(article["url"], size=3, error_correction="M")
+                printer.print_qr(article["url"], size=2, error_correction="L")
 
             printer.print_line()  # Separator between articles

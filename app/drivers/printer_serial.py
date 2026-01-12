@@ -410,6 +410,9 @@ class PrinterDriver:
                     self._write_text_line(line)
             elif op_type == "feed":
                 self._write_feed(op_data)
+            elif op_type == "qr":
+                # Write QR code (already atomic, no reversal needed)
+                self._write_qr(op_data["data"], op_data["size"], op_data["ec"])
 
     def reset_buffer(self, max_lines: int = 0):
         """Reset/clear the print buffer (call at start of new print job).
@@ -442,13 +445,21 @@ class PrinterDriver:
             pass
 
     def print_qr(self, data: str, size: int = 4, error_correction: str = "M"):
-        """Print a QR code using native ESC/POS commands.
+        """Print a QR code using native ESC/POS commands. Buffers for correct print order.
         
         Args:
             data: The text/URL to encode in the QR code
             size: Module size 1-16 (each module = n dots, default 4)
             error_correction: Error correction level - L(7%), M(15%), Q(25%), H(30%)
         """
+        # Safety: prevent unbounded buffer growth
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        # Buffer QR code for proper ordering with text
+        self.print_buffer.append(("qr", {"data": data, "size": size, "ec": error_correction}))
+
+    def _write_qr(self, data: str, size: int, error_correction: str):
+        """Internal method to write QR code directly to printer."""
         try:
             # Clamp size to valid range
             size = max(1, min(16, size))
