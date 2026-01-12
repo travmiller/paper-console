@@ -14,7 +14,7 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
     from datetime import datetime
 
     header_label = module_name or action.label or "WEBHOOK"
-    printer.print_header(header_label)
+    printer.print_header(header_label, icon="plugs")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 

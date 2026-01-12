@@ -104,7 +104,7 @@ def format_quotes_receipt(
     author = quote.get("quoteAuthor", "Unknown")
 
     # Header
-    printer.print_header(module_name or "QUOTE")
+    printer.print_header(module_name or "QUOTE", icon="quotes")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 

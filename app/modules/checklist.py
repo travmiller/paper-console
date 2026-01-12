@@ -9,7 +9,7 @@ def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = No
     config = config or {}
     items = config.get("items", [])
     
-    printer.print_header(module_name or "CHECKLIST")
+    printer.print_header(module_name or "CHECKLIST", icon="check-square")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
     

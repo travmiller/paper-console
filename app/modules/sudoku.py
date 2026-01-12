@@ -113,7 +113,7 @@ def format_sudoku_receipt(
 
     grid = generate_puzzle(difficulty)
 
-    printer.print_header(module_name or "SUDOKU")
+    printer.print_header(module_name or "SUDOKU", icon="grid-nine")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
     printer.print_subheader(f"Difficulty: {difficulty.title()}")

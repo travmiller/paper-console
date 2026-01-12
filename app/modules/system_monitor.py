@@ -13,7 +13,7 @@ def format_system_monitor_receipt(
     """Prints system status information."""
 
     # Header
-    printer.print_header(module_name or "SYSTEM")
+    printer.print_header(module_name or "SYSTEM", icon="desktop")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 

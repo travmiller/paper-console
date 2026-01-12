@@ -165,11 +165,44 @@ class PrinterDriver:
             "battery": "🔋", "check": "✓", "checkmark": "✓", "x": "✗",
             "close": "✗", "star": "★", "heart": "♥", "settings": "⚙",
             "gear": "⚙", "home": "⌂", "location": "📍", "pin": "📍",
-            "arrow_right": "→", "arrow_left": "←", "arrow_up": "↑", "arrow_down": "↓"
+            "arrow_right": "→", "arrow_left": "←", "arrow_up": "↑", "arrow_down": "↓",
+            "user": "👤", "trash": "🗑", "search": "🔍", "menu": "☰",
+            "printer": "🖨", "cpu": "💻", "floppy": "💾", "save": "💾",
+            "play": "▶", "pause": "⏸", "volume": "🔊", "speaker": "🔊"
         }
         icon = icons.get(icon_type.lower(), "?")
         print(f"[PRINT]     [{icon}]")
         self.lines_printed += 1
+
+    def print_weather_forecast(self, forecast: list):
+        """Simulates printing a 7-day weather forecast."""
+        icons = {"sun": "☀", "cloud": "☁", "rain": "🌧", "snow": "❄", "storm": "⛈"}
+        
+        def get_icon(condition):
+            condition = (condition or "").lower()
+            if "clear" in condition: return "☀"
+            if "rain" in condition: return "🌧"
+            if "snow" in condition: return "❄"
+            if "storm" in condition: return "⛈"
+            return "☁"
+        
+        # Header row
+        days = [d.get("day", "--")[:3] for d in forecast[:7]]
+        print(f"[PRINT] {' '.join(f'{d:^5}' for d in days)}")
+        
+        # Icon row
+        icons_row = [get_icon(d.get("condition")) for d in forecast[:7]]
+        print(f"[PRINT] {' '.join(f'{i:^5}' for i in icons_row)}")
+        
+        # High temps
+        highs = [f"{d.get('high', '--')}°" for d in forecast[:7]]
+        print(f"[PRINT] {' '.join(f'{h:^5}' for h in highs)}")
+        
+        # Low temps
+        lows = [f"{d.get('low', '--')}°" for d in forecast[:7]]
+        print(f"[PRINT] {' '.join(f'{l:^5}' for l in lows)}")
+        
+        self.lines_printed += 4
 
     def print_progress_bar(self, value: float, max_value: float = 100, 
                          width: int = None, height: int = 12, label: str = ""):

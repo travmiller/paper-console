@@ -63,7 +63,7 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     maze.generate()
     
     # Header
-    printer.print_header(module_name or "MAZE")
+    printer.print_header(module_name or "MAZE", icon="path")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
     printer.print_subheader("START ↑  ·  END ↓")

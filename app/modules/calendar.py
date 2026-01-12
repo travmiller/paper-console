@@ -175,7 +175,7 @@ def format_calendar_receipt(
     """Fetches and prints the calendar agenda."""
 
     header_label = module_name or config.label or "CALENDAR"
-    printer.print_header(header_label)
+    printer.print_header(header_label, icon="calendar-blank")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 

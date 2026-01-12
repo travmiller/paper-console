@@ -55,7 +55,7 @@ def format_news_receipt(
     news_data = get_newsapi_articles(config)
 
     # Header with date
-    printer.print_header(module_name or "NEWS")
+    printer.print_header(module_name or "NEWS", icon="newspaper")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 

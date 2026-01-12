@@ -57,7 +57,7 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     
     data = get_almanac_data()
     
-    printer.print_header(module_name or "ASTRONOMY")
+    printer.print_header(module_name or "ASTRONOMY", icon="moon-stars")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
     
@@ -65,6 +65,7 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     printer.print_subheader(app.config.settings.city_name.upper())
     
     # Sun data
+    printer.print_icon("sun", size=32)
     printer.print_bold("SUN")
     printer.print_body(f"  Rise  {data['sunrise']}")
     printer.print_body(f"  Set   {data['sunset']}")

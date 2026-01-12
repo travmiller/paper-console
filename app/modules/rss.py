@@ -124,7 +124,7 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
     articles = get_rss_articles(config)
 
     # Header
-    printer.print_header(module_name or "RSS FEEDS")
+    printer.print_header(module_name or "RSS FEEDS", icon="rss")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 

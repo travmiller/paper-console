@@ -7,7 +7,7 @@ def format_text_receipt(printer: PrinterDriver, config: TextConfig, module_name:
     from datetime import datetime
     
     header_label = module_name or config.label or "NOTE"
-    printer.print_header(header_label)
+    printer.print_header(header_label, icon="note")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
     

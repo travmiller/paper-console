@@ -241,13 +241,13 @@ def format_email_receipt(
     header_name = module_name or "EMAIL"
 
     if not messages:
-        printer.print_header(header_name)
+        printer.print_header(header_name, icon="envelope")
         printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
         printer.print_line()
         printer.print_body("No new messages.")
         return
 
-    printer.print_header(f"{header_name} ({len(messages)})")
+    printer.print_header(f"{header_name} ({len(messages)})", icon="envelope-open")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
 
