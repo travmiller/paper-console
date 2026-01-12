@@ -54,7 +54,7 @@ class PrinterDriver:
         self,
         width: int = 42,  # Characters per line
         port: Optional[str] = None,
-        baudrate: int = 115200,  # Try high speed first (fallback: 9600)
+        baudrate: int = 19200,  # 2x faster than 9600
         font_size: int = 12,  # Font size in pixels (8-24)
         line_spacing: int = 2,  # Extra pixels between lines
     ):
