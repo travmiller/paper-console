@@ -65,14 +65,16 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     printer.print_subheader(app.config.settings.city_name.upper())
     
     # Sun data
-    printer.print_bold("☀ SUN")
+    printer.print_bold("SUN")
     printer.print_body(f"  Rise  {data['sunrise']}")
     printer.print_body(f"  Set   {data['sunset']}")
     printer.print_caption(f"  Day length: {data['day_length']}")
     printer.print_line()
     
-    # Moon data
-    printer.print_bold("☽ MOON")
-    printer.print_body(f"  {data['moon_phase']}")
-    printer.print_caption(f"  Phase: {data['moon_phase_val']:.1f} / 28")
+    # Moon phase graphic
+    printer.print_moon_phase(data['moon_phase_val'], size=64)
+    
+    # Moon data text
+    printer.print_bold(data['moon_phase'].upper())
+    printer.print_caption(f"Day {data['moon_phase_val']:.0f} of 28")
 

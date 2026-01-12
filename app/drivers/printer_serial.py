@@ -279,6 +279,10 @@ class PrinterDriver:
                 text_height = self._get_line_height_for_style(style)
                 box_height = border + padding + text_height + padding + border
                 total_height += box_height + 4  # +4 for spacing around box
+            elif op_type == "moon":
+                # Moon phase graphic: circle with shadow
+                size = op_data.get("size", 60)  # Diameter in pixels
+                total_height += size + 8  # Moon + spacing
             elif op_type == "feed":
                 total_height += op_data * self.line_height
             elif op_type == "qr":
@@ -369,6 +373,19 @@ class PrinterDriver:
                     draw.text((text_x, text_y), text, fill=0)
                 
                 y += box_height + 4  # Move past box + spacing
+            elif op_type == "moon":
+                # Draw moon phase graphic
+                phase = op_data.get("phase", 0)  # 0-28 day cycle
+                size = op_data.get("size", 60)
+                
+                # Center moon horizontally
+                moon_x = (width - size) // 2
+                moon_y = y + 4
+                
+                # Draw moon using ellipses to create the phase effect
+                self._draw_moon_phase(draw, moon_x, moon_y, size, phase)
+                
+                y += size + 8
             elif op_type == "feed":
                 y += op_data * self.line_height
             elif op_type == "qr":
@@ -384,6 +401,85 @@ class PrinterDriver:
         img = img.rotate(180)
 
         return img
+
+    def _draw_moon_phase(self, draw: ImageDraw.Draw, x: int, y: int, size: int, phase: float):
+        """Draw a moon phase graphic.
+        
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner of bounding box
+            size: Diameter of moon in pixels
+            phase: Moon phase value (0-28 day cycle)
+                   0/28 = New Moon (dark)
+                   7 = First Quarter (right half lit)
+                   14 = Full Moon (fully lit)
+                   21 = Last Quarter (left half lit)
+        """
+        import math
+        
+        # Normalize phase to 0-1 (0 = new, 0.5 = full, 1 = new)
+        phase_normalized = (phase % 28) / 28.0
+        
+        # Calculate illumination (0 = new moon, 1 = full moon)
+        # illumination follows a cosine curve
+        illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2
+        
+        center_x = x + size // 2
+        center_y = y + size // 2
+        radius = size // 2
+        
+        # Draw the moon outline (black circle)
+        draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
+        
+        if phase_normalized < 0.5:
+            # Waxing: right side illuminated, left side dark
+            # Draw white (lit) right half
+            # Then overlay dark portion from left
+            
+            # Fill the whole moon white first
+            draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
+            
+            # Calculate the terminator (shadow edge) position
+            # At new moon (phase=0), shadow covers everything
+            # At first quarter (phase=0.25), shadow covers left half
+            # At full moon (phase=0.5), no shadow
+            shadow_width = int((1 - illumination * 2) * radius) if illumination < 0.5 else 0
+            
+            if shadow_width > 0:
+                # Draw shadow on the left side
+                # Use an ellipse that gets narrower as moon waxes
+                for px in range(x + 2, center_x):
+                    # Calculate how much of this column is in shadow
+                    dist_from_center = center_x - px
+                    shadow_depth = shadow_width * (dist_from_center / radius) if radius > 0 else 0
+                    
+                    if dist_from_center > shadow_width:
+                        # Full shadow for this column
+                        col_height = int(math.sqrt(max(0, radius**2 - (px - center_x)**2)))
+                        if col_height > 0:
+                            draw.line([(px, center_y - col_height), (px, center_y + col_height)], fill=0)
+        else:
+            # Waning: left side illuminated, right side dark
+            # Fill the whole moon white first
+            draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
+            
+            # Calculate shadow width for waning phase
+            wane_progress = (phase_normalized - 0.5) * 2  # 0 at full, 1 at new
+            shadow_width = int(wane_progress * radius)
+            
+            if shadow_width > 0:
+                # Draw shadow on the right side
+                for px in range(center_x, x + size - 2):
+                    dist_from_center = px - center_x
+                    
+                    if dist_from_center > (radius - shadow_width):
+                        # Shadow for this column
+                        col_height = int(math.sqrt(max(0, radius**2 - (px - center_x)**2)))
+                        if col_height > 0:
+                            draw.line([(px, center_y - col_height), (px, center_y + col_height)], fill=0)
+        
+        # Redraw outline to ensure clean edges
+        draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
 
     def _generate_qr_image(
         self, data: str, size: int, error_correction: str, fixed_size: bool
@@ -730,6 +826,20 @@ class PrinterDriver:
         """Print a bold separator line."""
         line = "━" * self.width
         self.print_text(line, "bold")
+
+    def print_moon_phase(self, phase: float, size: int = 60):
+        """Print a moon phase graphic.
+        
+        Args:
+            phase: Moon phase value (0-28 day cycle)
+            size: Diameter of moon in pixels (default 60)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(("moon", {
+            "phase": phase,
+            "size": size,
+        }))
 
     def _write_feed(self, count: int):
         """Internal method to feed paper."""

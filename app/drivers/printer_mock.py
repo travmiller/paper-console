@@ -78,6 +78,45 @@ class PrinterDriver:
         print(f"[PRINT] {'━' * self.width}")
         self.lines_printed += 1
 
+    def print_moon_phase(self, phase: float, size: int = 60):
+        """Simulates printing a moon phase graphic."""
+        # ASCII art moon phases
+        phase_normalized = (phase % 28) / 28.0
+        
+        if phase_normalized < 0.0625:
+            moon = "🌑"  # New Moon
+            name = "New Moon"
+        elif phase_normalized < 0.1875:
+            moon = "🌒"  # Waxing Crescent
+            name = "Waxing Crescent"
+        elif phase_normalized < 0.3125:
+            moon = "🌓"  # First Quarter
+            name = "First Quarter"
+        elif phase_normalized < 0.4375:
+            moon = "🌔"  # Waxing Gibbous
+            name = "Waxing Gibbous"
+        elif phase_normalized < 0.5625:
+            moon = "🌕"  # Full Moon
+            name = "Full Moon"
+        elif phase_normalized < 0.6875:
+            moon = "🌖"  # Waning Gibbous
+            name = "Waning Gibbous"
+        elif phase_normalized < 0.8125:
+            moon = "🌗"  # Last Quarter
+            name = "Last Quarter"
+        elif phase_normalized < 0.9375:
+            moon = "🌘"  # Waning Crescent
+            name = "Waning Crescent"
+        else:
+            moon = "🌑"  # New Moon
+            name = "New Moon"
+        
+        print(f"[PRINT]     ╭───────────╮")
+        print(f"[PRINT]     │     {moon}     │")
+        print(f"[PRINT]     │  {name:^9} │")
+        print(f"[PRINT]     ╰───────────╯")
+        self.lines_printed += 4
+
     def feed(self, lines: int = 3):
         """Simulates paper feed."""
         for _ in range(lines):
