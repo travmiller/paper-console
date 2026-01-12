@@ -1778,7 +1778,11 @@ class PrinterDriver:
             return None
 
     def _send_bitmap(self, img: Image.Image):
-        """Send a bitmap image to the printer using GS v 0 raster command."""
+        """Send a bitmap image to the printer using GS v 0 raster command.
+        
+        Optimized for speed: builds the entire command as one buffer
+        and sends it in a single write operation.
+        """
         if img is None:
             return
 
@@ -1796,41 +1800,47 @@ class PrinterDriver:
             # Convert to 1-bit if not already
             img = img.convert("1")
 
-            # Get pixel data
-            pixels = list(img.getdata())
+            # Get raw pixel bytes directly (more efficient than iterating)
+            pixels = img.tobytes()
             bytes_per_row = width // 8
 
-            # Build raster data (1 = white, 0 = black in PIL, but printer wants 1 = black)
-            raster_data = bytearray()
-            for y in range(height):
-                row_start = y * width
-                for x_byte in range(bytes_per_row):
-                    byte_val = 0
-                    for bit in range(8):
-                        pixel_idx = row_start + (x_byte * 8) + bit
-                        if pixels[pixel_idx] == 0:  # Black pixel in PIL
-                            byte_val |= 0x80 >> bit
-                    raster_data.append(byte_val)
-
+            # Build complete command in one buffer
             # GS v 0 - Print raster bit image
             xL = bytes_per_row & 0xFF
             xH = (bytes_per_row >> 8) & 0xFF
             yL = height & 0xFF
             yH = (height >> 8) & 0xFF
 
-            self._write(
-                b"\x1d\x76\x30\x00" + bytes([xL, xH, yL, yH]) + bytes(raster_data)
-            )
+            # Pre-allocate the complete command buffer
+            # Header (8 bytes) + raster data
+            command = bytearray(8 + len(pixels))
+            command[0:4] = b"\x1d\x76\x30\x00"  # GS v 0 command
+            command[4:8] = bytes([xL, xH, yL, yH])
+            
+            # PIL 1-bit mode: 0 = black, 255 = white (packed into bytes)
+            # Printer expects: 1 = black dot, 0 = white
+            # PIL packs 8 pixels per byte, MSB first, but inverted from what printer expects
+            # So we need to invert the bytes
+            for i, byte in enumerate(pixels):
+                command[8 + i] = byte ^ 0xFF  # Invert bits
+            
+            # Send entire image in one write
+            self._write(bytes(command))
 
         except Exception:
             pass
 
     def _write(self, data: bytes):
-        """Internal helper to write bytes to serial interface."""
+        """Internal helper to write bytes to serial interface.
+        
+        Sends data without waiting for transmission to complete.
+        This allows the printer to buffer data while we continue processing.
+        """
         try:
             if self.ser and self.ser.is_open:
+                # Write all data at once - don't flush() as that blocks
+                # until all bytes transmit (slow at 9600 baud)
                 self.ser.write(data)
-                self.ser.flush()
         except Exception:
             pass
 
@@ -2464,6 +2474,9 @@ class PrinterDriver:
             img = self._render_unified_bitmap(ops)
             if img:
                 self._send_bitmap(img)
+                # Ensure all data is transmitted before returning
+                if self.ser and self.ser.is_open:
+                    self.ser.flush()
             else:
                 logger.error("flush_buffer: _render_unified_bitmap returned None")
         except Exception as e:
@@ -2488,8 +2501,8 @@ class PrinterDriver:
     def feed_direct(self, lines: int = 3):
         """Feed paper directly, bypassing the buffer (for use after flushing in invert mode)."""
         try:
-            for _ in range(lines):
-                self._write(b"\n")
+            # Send all newlines at once (more efficient)
+            self._write(b"\n" * lines)
         except Exception:
             pass
 
