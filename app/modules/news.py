@@ -92,6 +92,6 @@ def format_news_receipt(
 
             # Print small fixed-size QR code linking to the full article
             if article.get("url"):
-                printer.print_qr(article["url"], size=2, error_correction="L", fixed_size=True)
+                printer.print_qr(article["url"], size=1, error_correction="L", fixed_size=True)
 
             printer.print_line()  # Separator between articles
