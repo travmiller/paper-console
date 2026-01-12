@@ -38,14 +38,14 @@ class PrinterDriver:
         self.lines_printed += text.count("\n") + 1
 
     def print_header(self, text: str):
-        """Prints large bold header text in a drawn box (simulated)."""
+        """Prints large bold header text in a full-width drawn box (simulated)."""
         text = text.upper()
-        box_width = len(text) + 6  # text + padding
+        inner_width = self.width - 4  # Full width minus borders
         
         # Simulate the bitmap box with ASCII
-        print(f"[PRINT] ┏{'━' * box_width}┓")
-        print(f"[PRINT] ┃  {text}  ┃")
-        print(f"[PRINT] ┗{'━' * box_width}┛")
+        print(f"[PRINT] ┏{'━' * inner_width}┓")
+        print(f"[PRINT] ┃{text:^{inner_width}}┃")
+        print(f"[PRINT] ┗{'━' * inner_width}┛")
         self.lines_printed += 3
     
     def print_subheader(self, text: str):

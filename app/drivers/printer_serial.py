@@ -327,7 +327,7 @@ class PrinterDriver:
                     y += self.line_height
                     self.lines_printed += 1
             elif op_type == "box":
-                # Draw a box with text centered inside
+                # Draw a full-width box with text centered inside
                 text = self._sanitize_text(op_data.get("text", ""))
                 style = op_data.get("style", "bold_lg")
                 padding = op_data.get("padding", 8)
@@ -335,36 +335,33 @@ class PrinterDriver:
                 font = self._get_font(style)
                 text_height = self._get_line_height_for_style(style)
                 
-                # Calculate text width to size the box
-                if font:
-                    bbox = font.getbbox(text)
-                    text_width = bbox[2] - bbox[0] if bbox else len(text) * 10
-                else:
-                    text_width = len(text) * 10
-                
-                # Box dimensions
-                box_width = text_width + (padding * 2) + (border * 2)
+                # Full width box
+                box_width = width - 4  # Leave 2px margin on each side
                 box_height = text_height + (padding * 2) + (border * 2)
                 
-                # Center the box horizontally
-                box_x = (width - box_width) // 2
+                box_x = 2  # Small left margin
                 box_y = y + 2  # Small top margin
                 
-                # Draw the rectangle (filled black border, white interior)
-                # Outer rectangle (black)
+                # Draw outer rectangle (black border)
                 draw.rectangle(
                     [box_x, box_y, box_x + box_width, box_y + box_height],
                     fill=0  # Black
                 )
-                # Inner rectangle (white) - creates the border effect
+                # Draw inner rectangle (white) - creates the border effect
                 draw.rectangle(
                     [box_x + border, box_y + border, 
                      box_x + box_width - border, box_y + box_height - border],
                     fill=1  # White
                 )
                 
-                # Draw the text centered in the box
-                text_x = box_x + border + padding
+                # Center text horizontally within the box
+                if font:
+                    bbox = font.getbbox(text)
+                    text_width = bbox[2] - bbox[0] if bbox else len(text) * 10
+                else:
+                    text_width = len(text) * 10
+                
+                text_x = box_x + (box_width - text_width) // 2
                 text_y = box_y + border + padding
                 if font:
                     draw.text((text_x, text_y), text, font=font, fill=0)
