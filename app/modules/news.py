@@ -33,6 +33,7 @@ def get_newsapi_articles(config: Dict[str, Any] = None):
                         "source": item["source"]["name"],
                         "title": item["title"],
                         "summary": item.get("description") or "",
+                        "url": item.get("url") or "",
                     }
                 )
     except Exception:
@@ -88,5 +89,10 @@ def format_news_receipt(
 
                 if len(wrapped_summary) > 4:
                     printer.print_text("...")
+
+            # Print small QR code linking to the full article
+            if article.get("url"):
+                printer.print_text("")  # Small gap
+                printer.print_qr(article["url"], size=3, error_correction="M")
 
             printer.print_line()  # Separator between articles

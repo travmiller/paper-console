@@ -65,9 +65,9 @@ class QRCodeConfig(BaseModel):
     contact_phone: str = ""
     contact_email: str = ""
     
-    # QR code display settings
-    size: int = 5  # Module size 1-16 (dots per module)
-    error_correction: str = "M"  # L, M, Q, H
+    # QR code display settings (fixed for optimal scannability)
+    size: int = 6  # Module size - larger = easier to scan
+    error_correction: str = "H"  # High error correction for durability
 
 
 class WeatherConfig(BaseModel):

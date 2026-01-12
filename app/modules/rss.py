@@ -110,7 +110,8 @@ def get_rss_articles(config: Dict[str, Any] = None):
                 )
                 source = clean_text(feed.feed.get("title", "RSS"))
 
-                articles.append({"source": source, "title": title, "summary": summary})
+                link = entry.get("link", "")
+                articles.append({"source": source, "title": title, "summary": summary, "url": link})
         except Exception:
             # Silently skip failed feeds
             continue
@@ -156,5 +157,10 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
 
             if len(wrapped_summary) > 4:
                 printer.print_text("...")
+
+            # Print small QR code linking to the full article
+            if article.get("url"):
+                printer.print_text("")  # Small gap
+                printer.print_qr(article["url"], size=3, error_correction="M")
 
             printer.print_line()  # Separator between articles

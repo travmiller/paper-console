@@ -869,40 +869,6 @@ const ModuleConfig = ({ module, updateConfig }) => {
           </>
         )}
         
-        {/* Advanced settings */}
-        <div className={`pt-4 border-t-2 border-gray-200`}>
-          <p className={`${commonClasses.textSubtle} text-xs mb-3`}>Advanced Settings</p>
-          <div className='flex gap-4'>
-            <div className='flex-1'>
-              <label className={labelClass}>Size</label>
-              <select
-                value={config.size || 5}
-                onChange={(e) => updateConfig('size', parseInt(e.target.value))}
-                className={inputClass}>
-                <option value={3}>Small (3)</option>
-                <option value={4}>Medium (4)</option>
-                <option value={5}>Default (5)</option>
-                <option value={6}>Large (6)</option>
-                <option value={8}>Extra Large (8)</option>
-              </select>
-            </div>
-            <div className='flex-1'>
-              <label className={labelClass}>Error Correction</label>
-              <select
-                value={config.error_correction || 'M'}
-                onChange={(e) => updateConfig('error_correction', e.target.value)}
-                className={inputClass}>
-                <option value='L'>Low (7%)</option>
-                <option value='M'>Medium (15%)</option>
-                <option value='Q'>Quartile (25%)</option>
-                <option value='H'>High (30%)</option>
-              </select>
-            </div>
-          </div>
-          <p className={`${commonClasses.textSubtle} mt-2`}>
-            Higher error correction allows the QR code to remain scannable even if partially damaged.
-          </p>
-        </div>
       </div>
     );
   }
