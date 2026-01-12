@@ -236,6 +236,10 @@ class Settings(BaseModel):
         3  # Number of empty lines to add at end of print job to clear cutter
     )
     max_print_lines: int = 200  # Maximum lines per print job (0 = no limit)
+    
+    # Font/text settings for bitmap rendering
+    font_size: int = 12  # Font size in pixels (8-24)
+    line_spacing: int = 2  # Extra pixels between lines (0-8)
 
     # Module Instances: Dictionary of module_id -> ModuleInstance
     # These are reusable module configurations that can be assigned to channels

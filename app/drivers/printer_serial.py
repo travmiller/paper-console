@@ -49,16 +49,14 @@ class PrinterDriver:
     # Printer physical specs
     PRINTER_DPI = 203  # dots per inch
     PRINTER_WIDTH_DOTS = 384  # 58mm paper at 203 DPI
-    
-    # Font settings for bitmap rendering
-    FONT_SIZE = 12  # Small font size in pixels
-    LINE_HEIGHT = 14  # Pixels per line (font size + 2px spacing)
 
     def __init__(
         self,
-        width: int = 42,  # Characters per line with Font B (small font)
+        width: int = 42,  # Characters per line
         port: Optional[str] = None,
         baudrate: int = 9600,
+        font_size: int = 12,  # Font size in pixels (8-24)
+        line_spacing: int = 2,  # Extra pixels between lines
     ):
         self.width = width
         self.ser = None
@@ -69,7 +67,12 @@ class PrinterDriver:
         self.lines_printed = 0
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
         self._max_lines_hit = False  # Flag set when max lines exceeded during flush
-        
+
+        # Font settings for bitmap rendering (configurable)
+        self.font_size = max(8, min(24, font_size))  # Clamp to valid range
+        self.line_spacing = max(0, min(8, line_spacing))  # Clamp to valid range
+        self.line_height = self.font_size + self.line_spacing
+
         # Load monospace font for bitmap rendering
         self._font = self._load_font()
 
@@ -126,29 +129,33 @@ class PrinterDriver:
     def _load_font(self) -> ImageFont.FreeTypeFont:
         """Load a monospace font for bitmap text rendering."""
         import os
-        
+
         # Get the project root directory (parent of app/)
         app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         project_root = os.path.dirname(app_dir)
-        
+
         # Try to load IBM Plex Mono from web/public/fonts (relative to project root)
         font_paths = [
-            os.path.join(project_root, "web/public/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf"),
-            os.path.join(project_root, "web/dist/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf"),
+            os.path.join(
+                project_root, "web/public/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf"
+            ),
+            os.path.join(
+                project_root, "web/dist/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf"
+            ),
             # System fonts as fallback
             "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
             "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
             "C:/Windows/Fonts/consola.ttf",  # Windows Consolas
             "C:/Windows/Fonts/cour.ttf",  # Windows Courier New
         ]
-        
+
         for path in font_paths:
             if os.path.exists(path):
                 try:
-                    return ImageFont.truetype(path, self.FONT_SIZE)
+                    return ImageFont.truetype(path, self.font_size)
                 except Exception:
                     continue
-        
+
         # Fallback to default font
         try:
             return ImageFont.load_default()
@@ -159,15 +166,15 @@ class PrinterDriver:
         """Render text lines to a bitmap image, rotated 180° for upside-down printing."""
         if not lines:
             return None
-        
+
         # Calculate image dimensions
-        height = len(lines) * self.LINE_HEIGHT + 4  # +4 for padding
+        height = len(lines) * self.line_height + 4  # +4 for padding
         width = self.PRINTER_WIDTH_DOTS
-        
+
         # Create white background image
         img = Image.new("1", (width, height), 1)  # 1-bit, white background
         draw = ImageDraw.Draw(img)
-        
+
         # Draw each line of text
         y = 2  # Start with small padding
         for line in lines:
@@ -175,21 +182,21 @@ class PrinterDriver:
                 draw.text((2, y), line, font=self._font, fill=0)  # Black text
             else:
                 draw.text((2, y), line, fill=0)
-            y += self.LINE_HEIGHT
-        
+            y += self.line_height
+
         # Rotate 180° for upside-down printing
         img = img.rotate(180)
-        
+
         return img
 
     def _send_bitmap(self, img: Image.Image):
         """Send a bitmap image to the printer using GS v 0 raster command."""
         if img is None:
             return
-        
+
         try:
             width, height = img.size
-            
+
             # Ensure width is multiple of 8 for byte alignment
             if width % 8 != 0:
                 new_width = ((width // 8) + 1) * 8
@@ -197,14 +204,14 @@ class PrinterDriver:
                 new_img.paste(img, (0, 0))
                 img = new_img
                 width = new_width
-            
+
             # Convert to 1-bit if not already
             img = img.convert("1")
-            
+
             # Get pixel data
             pixels = list(img.getdata())
             bytes_per_row = width // 8
-            
+
             # Build raster data (1 = white, 0 = black in PIL, but printer wants 1 = black)
             raster_data = bytearray()
             for y in range(height):
@@ -214,17 +221,19 @@ class PrinterDriver:
                     for bit in range(8):
                         pixel_idx = row_start + (x_byte * 8) + bit
                         if pixels[pixel_idx] == 0:  # Black pixel in PIL
-                            byte_val |= (0x80 >> bit)
+                            byte_val |= 0x80 >> bit
                     raster_data.append(byte_val)
-            
+
             # GS v 0 - Print raster bit image
             xL = bytes_per_row & 0xFF
             xH = (bytes_per_row >> 8) & 0xFF
             yL = height & 0xFF
             yH = (height >> 8) & 0xFF
-            
-            self._write(b"\x1d\x76\x30\x00" + bytes([xL, xH, yL, yH]) + bytes(raster_data))
-            
+
+            self._write(
+                b"\x1d\x76\x30\x00" + bytes([xL, xH, yL, yH]) + bytes(raster_data)
+            )
+
         except Exception:
             pass
 
@@ -359,7 +368,7 @@ class PrinterDriver:
 
             # Select code page PC437 (confirmed in QR204 manual)
             self._write(b"\x1b\x74\x00")  # ESC t 0 (1B 74 00) - Code page PC437 (US)
-            
+
             # Note: No ESC { rotation needed - we rotate bitmaps in software
         except Exception:
             pass
@@ -467,7 +476,7 @@ class PrinterDriver:
 
     def flush_buffer(self):
         """Flush the print buffer using bitmap rendering for proper 180° rotation.
-        
+
         Text is rendered to a bitmap image, rotated 180°, and sent as raster graphics.
         This ensures correct orientation regardless of printer font/rotation quirks.
         """
@@ -498,20 +507,21 @@ class PrinterDriver:
             if self._max_lines_hit:
                 self.print_buffer = self.print_buffer[:trim_index]
 
-        # Reverse the buffer for upside-down printing (tear-off edge first)
-        reversed_ops = list(reversed(self.print_buffer))
+        # Process buffer in order - bitmap rotation handles upside-down orientation
+        # (Header prints first = exits at tear-off edge)
+        ops = list(self.print_buffer)
         self.print_buffer.clear()
 
         # Collect consecutive text lines into batches for bitmap rendering
         text_batch = []
-        
-        for op_type, op_data in reversed_ops:
+
+        for op_type, op_data in ops:
             if op_type == "text":
                 # Sanitize and collect text
                 clean_text = self._sanitize_text(op_data)
-                # Handle multi-line text by reversing lines within the item
+                # Add lines in order - bitmap rotation handles orientation
                 lines = clean_text.split("\n")
-                for line in reversed(lines):
+                for line in lines:
                     text_batch.append(line)
                     self.lines_printed += 1
             elif op_type == "feed":
@@ -528,16 +538,21 @@ class PrinterDriver:
                     self._send_bitmap(img)
                     text_batch = []
                 # QR codes handle their own rotation
-                self._write_qr(op_data["data"], op_data["size"], op_data["ec"], op_data.get("fixed", False))
-        
+                self._write_qr(
+                    op_data["data"],
+                    op_data["size"],
+                    op_data["ec"],
+                    op_data.get("fixed", False),
+                )
+
         # Flush any remaining text batch
         if text_batch:
             img = self._render_text_bitmap(text_batch)
             self._send_bitmap(img)
-        
-        # Print truncation message at the end (will appear at tear-off edge)
+
+        # Print truncation message at the end (will appear at bottom of paper)
         if self._max_lines_hit:
-            msg = f"-- MAX LENGTH ({self.max_lines}/{total_lines_in_buffer}) --"
+            msg = f"-- TRUNCATED ({self.max_lines}/{total_lines_in_buffer} lines) --"
             trunc_img = self._render_text_bitmap([msg])
             self._send_bitmap(trunc_img)
 
@@ -571,9 +586,15 @@ class PrinterDriver:
         except Exception:
             pass
 
-    def print_qr(self, data: str, size: int = 4, error_correction: str = "M", fixed_size: bool = False):
+    def print_qr(
+        self,
+        data: str,
+        size: int = 4,
+        error_correction: str = "M",
+        fixed_size: bool = False,
+    ):
         """Print a QR code using native ESC/POS commands. Buffers for correct print order.
-        
+
         Args:
             data: The text/URL to encode in the QR code
             size: Module size 1-16 (each module = n dots, default 4)
@@ -584,9 +605,21 @@ class PrinterDriver:
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
         # Buffer QR code for proper ordering with text
-        self.print_buffer.append(("qr", {"data": data, "size": size, "ec": error_correction, "fixed": fixed_size}))
+        self.print_buffer.append(
+            (
+                "qr",
+                {
+                    "data": data,
+                    "size": size,
+                    "ec": error_correction,
+                    "fixed": fixed_size,
+                },
+            )
+        )
 
-    def _write_qr(self, data: str, size: int, error_correction: str, fixed_size: bool = False):
+    def _write_qr(
+        self, data: str, size: int, error_correction: str, fixed_size: bool = False
+    ):
         """Internal method to write QR code directly to printer."""
         if fixed_size:
             self._write_qr_bitmap(data, size, error_correction)
@@ -598,35 +631,37 @@ class PrinterDriver:
         try:
             # Clamp size to valid range
             size = max(1, min(16, size))
-            
+
             # Map error correction level to command value
             ec_map = {"L": 48, "M": 49, "Q": 50, "H": 51}
             ec_value = ec_map.get(error_correction.upper(), 49)  # Default to M
-            
+
             # Encode data as bytes
             data_bytes = data.encode("ascii", errors="replace")
             data_len = len(data_bytes) + 3  # +3 for m (48) byte
             pL = data_len & 0xFF
             pH = (data_len >> 8) & 0xFF
-            
+
             # Step 1: Set QR code model (Model 2)
             self._write(b"\x1d\x28\x6b\x04\x00\x31\x41\x32\x00")
-            
+
             # Step 2: Set module size
             self._write(b"\x1d\x28\x6b\x03\x00\x31\x43" + bytes([size]))
-            
+
             # Step 3: Set error correction level
             self._write(b"\x1d\x28\x6b\x03\x00\x31\x45" + bytes([ec_value]))
-            
+
             # Step 4: Store QR code data
-            self._write(b"\x1d\x28\x6b" + bytes([pL, pH]) + b"\x31\x50\x30" + data_bytes)
-            
+            self._write(
+                b"\x1d\x28\x6b" + bytes([pL, pH]) + b"\x31\x50\x30" + data_bytes
+            )
+
             # Step 5: Print the QR code
             self._write(b"\x1d\x28\x6b\x03\x00\x31\x51\x30")
-            
+
             # Add a newline after QR code
             self._write(b"\n")
-            
+
         except Exception:
             pass
 
@@ -635,7 +670,7 @@ class PrinterDriver:
         try:
             import qrcode
             from PIL import Image
-            
+
             # Map error correction
             ec_map = {
                 "L": qrcode.constants.ERROR_CORRECT_L,
@@ -643,8 +678,10 @@ class PrinterDriver:
                 "Q": qrcode.constants.ERROR_CORRECT_Q,
                 "H": qrcode.constants.ERROR_CORRECT_H,
             }
-            ec_level = ec_map.get(error_correction.upper(), qrcode.constants.ERROR_CORRECT_L)
-            
+            ec_level = ec_map.get(
+                error_correction.upper(), qrcode.constants.ERROR_CORRECT_L
+            )
+
             # Generate QR with fixed version 4 (33x33 modules) - fits most URLs
             # Version 4 can hold ~78 alphanumeric chars with L correction
             qr = qrcode.QRCode(
@@ -655,14 +692,14 @@ class PrinterDriver:
             )
             qr.add_data(data)
             qr.make(fit=False)  # Don't auto-fit, use fixed version
-            
+
             # Create image
             img = qr.make_image(fill_color="black", back_color="white")
             img = img.convert("1")  # Convert to 1-bit black/white
-            
+
             # Get image dimensions
             width, height = img.size
-            
+
             # Ensure width is multiple of 8 for byte alignment
             if width % 8 != 0:
                 new_width = ((width // 8) + 1) * 8
@@ -670,11 +707,11 @@ class PrinterDriver:
                 new_img.paste(img, (0, 0))
                 img = new_img
                 width = new_width
-            
+
             # Convert to bytes (1 bit per pixel, MSB first)
             pixels = list(img.getdata())
             bytes_per_row = width // 8
-            
+
             # Build raster data
             raster_data = bytearray()
             for y in range(height):
@@ -684,9 +721,9 @@ class PrinterDriver:
                     for bit in range(8):
                         pixel_idx = row_start + (x_byte * 8) + bit
                         if pixels[pixel_idx] == 0:  # Black pixel
-                            byte_val |= (0x80 >> bit)
+                            byte_val |= 0x80 >> bit
                     raster_data.append(byte_val)
-            
+
             # GS v 0 - Print raster bit image
             # Format: GS v 0 m xL xH yL yH d1...dk
             # m = 0 (normal), xL xH = bytes per row, yL yH = rows
@@ -694,10 +731,12 @@ class PrinterDriver:
             xH = (bytes_per_row >> 8) & 0xFF
             yL = height & 0xFF
             yH = (height >> 8) & 0xFF
-            
-            self._write(b"\x1d\x76\x30\x00" + bytes([xL, xH, yL, yH]) + bytes(raster_data))
+
+            self._write(
+                b"\x1d\x76\x30\x00" + bytes([xL, xH, yL, yH]) + bytes(raster_data)
+            )
             self._write(b"\n")
-            
+
         except Exception:
             # Fallback to native if bitmap fails
             self._write_qr_native(data, pixel_size, error_correction)

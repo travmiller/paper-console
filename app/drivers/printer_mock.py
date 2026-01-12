@@ -1,13 +1,22 @@
 class PrinterDriver:
     def __init__(
         self,
-        width: int = 42,  # Characters per line with Font B (small font)
+        width: int = 42,  # Characters per line
         port: str = None,
         baudrate: int = 9600,
+        font_size: int = 12,  # Font size in pixels (8-24)
+        line_spacing: int = 2,  # Extra pixels between lines
     ):
         self.width = width
         self.lines_printed = 0
         self.max_lines = 0
+        self.font_size = font_size
+        self.line_spacing = line_spacing
+        self.line_height = font_size + line_spacing
+    
+    def _load_font(self):
+        """Mock font loading - returns None."""
+        return None
 
     def print_text(self, text: str):
         """Simulates printing a line of text."""

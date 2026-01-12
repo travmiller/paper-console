@@ -621,6 +621,42 @@ const GeneralSettings = ({
               Maximum lines per print job to prevent endless prints. Set to 0 for no limit (default: 200)
             </p>
           </div>
+
+          <div className='mb-4'>
+            <label className={labelClass}>Font Size</label>
+            <div className='flex items-center gap-3'>
+              <input
+                type='range'
+                min='8'
+                max='24'
+                value={settings.font_size ?? 12}
+                onChange={(e) => saveGlobalSettings({ font_size: parseInt(e.target.value) })}
+                className='flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-black'
+              />
+              <span className='w-12 text-center font-mono font-bold text-black'>{settings.font_size ?? 12}px</span>
+            </div>
+            <p className='text-xs text-gray-600 mt-1 '>
+              Text size for printed output (default: 12px). Smaller = more text per line
+            </p>
+          </div>
+
+          <div className='mb-4'>
+            <label className={labelClass}>Line Spacing</label>
+            <div className='flex items-center gap-3'>
+              <input
+                type='range'
+                min='0'
+                max='8'
+                value={settings.line_spacing ?? 2}
+                onChange={(e) => saveGlobalSettings({ line_spacing: parseInt(e.target.value) })}
+                className='flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-black'
+              />
+              <span className='w-12 text-center font-mono font-bold text-black'>{settings.line_spacing ?? 2}px</span>
+            </div>
+            <p className='text-xs text-gray-600 mt-1 '>
+              Extra space between lines (default: 2px). 0 = tightest, 8 = loosest
+            </p>
+          </div>
         </div>
       </div>
 

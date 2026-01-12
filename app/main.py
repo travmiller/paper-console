@@ -674,11 +674,15 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
     """Updates the configuration and saves it to disk."""
     global settings
     import app.config as config_module
+    from app.hardware import update_printer_settings
 
     # Update in-memory - create new settings object
     settings = new_settings
     # Update module-level reference so modules that access app.config.settings will see the update
     config_module.settings = settings
+    
+    # Update printer font settings if changed
+    update_printer_settings()
 
     # Save to disk
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
@@ -690,9 +694,13 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
 async def reset_settings(background_tasks: BackgroundTasks):
     """Resets all settings to their default values."""
     global settings
+    from app.hardware import update_printer_settings
 
     # Create fresh settings instance (uses defaults from config.py)
     settings = Settings()
+    
+    # Update printer font settings to defaults
+    update_printer_settings()
 
     # Save to disk (overwriting existing config.json)
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
