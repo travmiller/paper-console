@@ -2443,15 +2443,26 @@ class PrinterDriver:
     def feed_direct(self, lines: int = 3):
         """Feed paper directly, bypassing the buffer (for use after flushing in invert mode).
         
-        Uses ESC d command to feed by lines, which works reliably after bitmap printing.
+        Uses ESC J command to feed by dots - this is a pure motion command
+        that works reliably after bitmap printing (unlike ESC d which requires
+        printable data, or newlines which may be ignored after GS v 0).
         """
+        if lines <= 0:
+            return
+        
         try:
-            # ESC d n - Print and feed n lines (0x1B 0x64 n)
-            # This command works better than newlines after bitmap mode
-            if lines > 0:
-                # ESC d only supports 0-255 lines
-                feed_amount = min(lines, 255)
-                self._write(b"\x1b\x64" + bytes([feed_amount]))
+            # ESC J n - Feed paper n dots (0x1B 0x4A n)
+            # At 203 DPI: 24 dots ≈ 1 line (~3mm)
+            # Max 255 dots per command, so loop for larger feeds
+            dots = lines * 24
+            while dots > 0:
+                chunk = min(dots, 255)
+                self._write(b"\x1b\x4a" + bytes([chunk]))
+                dots -= chunk
+            
+            # Flush to ensure all data is sent before returning
+            if self.ser and self.ser.is_open:
+                self.ser.flush()
         except Exception:
             pass
 
