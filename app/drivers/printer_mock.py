@@ -31,6 +31,34 @@ class PrinterDriver:
         print(f"[PRINT] {' ' * padding}{text.upper()}")
         self.print_line()
 
+    def print_qr(self, data: str, size: int = 4, error_correction: str = "M"):
+        """Simulates printing a QR code."""
+        # Generate ASCII art representation for visual feedback
+        try:
+            import qrcode
+            qr = qrcode.QRCode(
+                version=1,
+                error_correction=qrcode.constants.ERROR_CORRECT_M,
+                box_size=1,
+                border=1,
+            )
+            qr.add_data(data)
+            qr.make(fit=True)
+            
+            # Print as ASCII art using block characters
+            print(f"[PRINT] ┌{'─' * (self.width - 2)}┐")
+            print(f"[PRINT] │{'QR CODE':^{self.width - 2}}│")
+            for row in qr.modules:
+                line = "".join("██" if cell else "  " for cell in row)
+                # Center the QR code
+                print(f"[PRINT] {line[:self.width]}")
+            print(f"[PRINT] └{'─' * (self.width - 2)}┘")
+            print(f"[PRINT] Data: {data[:30]}{'...' if len(data) > 30 else ''}")
+        except ImportError:
+            # Fallback if qrcode not installed
+            print(f"[PRINT] [QR CODE: {data}]")
+        self.lines_printed += 5
+
     def flush_buffer(self):
         """Flush the print buffer (for invert mode compatibility)."""
         pass

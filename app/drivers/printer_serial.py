@@ -441,6 +441,54 @@ class PrinterDriver:
         except Exception:
             pass
 
+    def print_qr(self, data: str, size: int = 4, error_correction: str = "M"):
+        """Print a QR code using native ESC/POS commands.
+        
+        Args:
+            data: The text/URL to encode in the QR code
+            size: Module size 1-16 (each module = n dots, default 4)
+            error_correction: Error correction level - L(7%), M(15%), Q(25%), H(30%)
+        """
+        try:
+            # Clamp size to valid range
+            size = max(1, min(16, size))
+            
+            # Map error correction level to command value
+            ec_map = {"L": 48, "M": 49, "Q": 50, "H": 51}
+            ec_value = ec_map.get(error_correction.upper(), 49)  # Default to M
+            
+            # Encode data as bytes
+            data_bytes = data.encode("ascii", errors="replace")
+            data_len = len(data_bytes) + 3  # +3 for m (48) byte
+            pL = data_len & 0xFF
+            pH = (data_len >> 8) & 0xFF
+            
+            # Step 1: Set QR code model (Model 2)
+            # GS ( k pL pH cn fn n1 n2
+            self._write(b"\x1d\x28\x6b\x04\x00\x31\x41\x32\x00")
+            
+            # Step 2: Set module size
+            # GS ( k pL pH cn fn n
+            self._write(b"\x1d\x28\x6b\x03\x00\x31\x43" + bytes([size]))
+            
+            # Step 3: Set error correction level
+            # GS ( k pL pH cn fn n
+            self._write(b"\x1d\x28\x6b\x03\x00\x31\x45" + bytes([ec_value]))
+            
+            # Step 4: Store QR code data
+            # GS ( k pL pH cn fn m d1...dk
+            self._write(b"\x1d\x28\x6b" + bytes([pL, pH]) + b"\x31\x50\x30" + data_bytes)
+            
+            # Step 5: Print the QR code
+            # GS ( k pL pH cn fn m
+            self._write(b"\x1d\x28\x6b\x03\x00\x31\x51\x30")
+            
+            # Add a newline after QR code
+            self._write(b"\n")
+            
+        except Exception:
+            pass
+
     def print_header(self, text: str):
         """Print centered header text."""
         # Simple centering logic

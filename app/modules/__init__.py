@@ -3,6 +3,7 @@ from . import (
     calendar,
     email_client,
     news,
+    qrcode_print,
     rss,
     sudoku,
     text,

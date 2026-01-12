@@ -48,6 +48,28 @@ class ChecklistConfig(BaseModel):
     items: List[ChecklistItem] = []
 
 
+class QRCodeConfig(BaseModel):
+    """Configuration for QR code generation."""
+    qr_type: str = "text"  # text, url, wifi, contact, phone, sms, email
+    content: str = ""  # Main content (URL, text, phone number, etc.)
+    label: str = "QR Code"  # Header label for the printout
+    
+    # WiFi-specific fields
+    wifi_ssid: str = ""
+    wifi_password: str = ""
+    wifi_security: str = "WPA"  # WPA, WEP, or nopass
+    wifi_hidden: bool = False
+    
+    # Contact (vCard) fields
+    contact_name: str = ""
+    contact_phone: str = ""
+    contact_email: str = ""
+    
+    # QR code display settings
+    size: int = 5  # Module size 1-16 (dots per module)
+    error_correction: str = "M"  # L, M, Q, H
+
+
 class WeatherConfig(BaseModel):
     openweather_api_key: Optional[str] = None
     city_name: Optional[str] = None

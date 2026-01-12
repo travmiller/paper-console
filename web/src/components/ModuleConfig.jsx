@@ -720,6 +720,193 @@ const ModuleConfig = ({ module, updateConfig }) => {
     );
   }
 
+  if (module.type === 'qrcode') {
+    const qrType = config.qr_type || 'text';
+    
+    return (
+      <div className='space-y-4'>
+        <div>
+          <label className={labelClass}>Label</label>
+          <input
+            type='text'
+            value={config.label || ''}
+            onChange={(e) => updateConfig('label', e.target.value)}
+            className={inputClass}
+            placeholder='e.g. WiFi, My Contact'
+          />
+        </div>
+        
+        <div>
+          <label className={labelClass}>QR Code Type</label>
+          <select
+            value={qrType}
+            onChange={(e) => updateConfig('qr_type', e.target.value)}
+            className={inputClass}>
+            <option value='text'>Plain Text</option>
+            <option value='url'>URL / Website</option>
+            <option value='wifi'>WiFi Network</option>
+            <option value='contact'>Contact Card (vCard)</option>
+            <option value='phone'>Phone Number</option>
+            <option value='sms'>SMS Message</option>
+            <option value='email'>Email Address</option>
+          </select>
+        </div>
+        
+        {/* Text / URL / Phone / SMS / Email content */}
+        {['text', 'url', 'phone', 'sms', 'email'].includes(qrType) && (
+          <div>
+            <label className={labelClass}>
+              {qrType === 'text' && 'Text Content'}
+              {qrType === 'url' && 'Website URL'}
+              {qrType === 'phone' && 'Phone Number'}
+              {qrType === 'sms' && 'Phone Number for SMS'}
+              {qrType === 'email' && 'Email Address'}
+            </label>
+            {qrType === 'text' ? (
+              <textarea
+                value={config.content || ''}
+                onChange={(e) => updateConfig('content', e.target.value)}
+                className={`${inputClass} text-sm min-h-[80px]`}
+                placeholder='Enter text to encode...'
+              />
+            ) : (
+              <input
+                type={qrType === 'email' ? 'email' : 'text'}
+                value={config.content || ''}
+                onChange={(e) => updateConfig('content', e.target.value)}
+                className={inputClass}
+                placeholder={
+                  qrType === 'url' ? 'https://example.com' :
+                  qrType === 'phone' ? '+1-555-123-4567' :
+                  qrType === 'sms' ? '+1-555-123-4567' :
+                  'email@example.com'
+                }
+              />
+            )}
+          </div>
+        )}
+        
+        {/* WiFi fields */}
+        {qrType === 'wifi' && (
+          <>
+            <div>
+              <label className={labelClass}>Network Name (SSID)</label>
+              <input
+                type='text'
+                value={config.wifi_ssid || ''}
+                onChange={(e) => updateConfig('wifi_ssid', e.target.value)}
+                className={inputClass}
+                placeholder='MyWiFiNetwork'
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Password</label>
+              <input
+                type='text'
+                value={config.wifi_password || ''}
+                onChange={(e) => updateConfig('wifi_password', e.target.value)}
+                className={inputClass}
+                placeholder='WiFi password'
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Security Type</label>
+              <select
+                value={config.wifi_security || 'WPA'}
+                onChange={(e) => updateConfig('wifi_security', e.target.value)}
+                className={inputClass}>
+                <option value='WPA'>WPA/WPA2/WPA3</option>
+                <option value='WEP'>WEP</option>
+                <option value='nopass'>Open (No Password)</option>
+              </select>
+            </div>
+            <div className='flex items-center gap-2'>
+              <input
+                type='checkbox'
+                checked={config.wifi_hidden || false}
+                onChange={(e) => updateConfig('wifi_hidden', e.target.checked)}
+                className='w-5 h-5 bg-white border-2 border-gray-300 rounded'
+                style={{ accentColor: 'var(--color-brass)' }}
+              />
+              <span className={`text-gray-600 text-sm`}>Hidden Network</span>
+            </div>
+          </>
+        )}
+        
+        {/* Contact (vCard) fields */}
+        {qrType === 'contact' && (
+          <>
+            <div>
+              <label className={labelClass}>Full Name</label>
+              <input
+                type='text'
+                value={config.contact_name || ''}
+                onChange={(e) => updateConfig('contact_name', e.target.value)}
+                className={inputClass}
+                placeholder='John Doe'
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Phone Number (Optional)</label>
+              <input
+                type='text'
+                value={config.contact_phone || ''}
+                onChange={(e) => updateConfig('contact_phone', e.target.value)}
+                className={inputClass}
+                placeholder='+1-555-123-4567'
+              />
+            </div>
+            <div>
+              <label className={labelClass}>Email (Optional)</label>
+              <input
+                type='email'
+                value={config.contact_email || ''}
+                onChange={(e) => updateConfig('contact_email', e.target.value)}
+                className={inputClass}
+                placeholder='john@example.com'
+              />
+            </div>
+          </>
+        )}
+        
+        {/* Advanced settings */}
+        <div className={`pt-4 border-t-2 border-gray-200`}>
+          <p className={`${commonClasses.textSubtle} text-xs mb-3`}>Advanced Settings</p>
+          <div className='flex gap-4'>
+            <div className='flex-1'>
+              <label className={labelClass}>Size</label>
+              <select
+                value={config.size || 5}
+                onChange={(e) => updateConfig('size', parseInt(e.target.value))}
+                className={inputClass}>
+                <option value={3}>Small (3)</option>
+                <option value={4}>Medium (4)</option>
+                <option value={5}>Default (5)</option>
+                <option value={6}>Large (6)</option>
+                <option value={8}>Extra Large (8)</option>
+              </select>
+            </div>
+            <div className='flex-1'>
+              <label className={labelClass}>Error Correction</label>
+              <select
+                value={config.error_correction || 'M'}
+                onChange={(e) => updateConfig('error_correction', e.target.value)}
+                className={inputClass}>
+                <option value='L'>Low (7%)</option>
+                <option value='M'>Medium (15%)</option>
+                <option value='Q'>Quartile (25%)</option>
+                <option value='H'>High (30%)</option>
+              </select>
+            </div>
+          </div>
+          <p className={`${commonClasses.textSubtle} mt-2`}>
+            Higher error correction allows the QR code to remain scannable even if partially damaged.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return <div className={commonClasses.textMuted}>No configuration needed for this module type.</div>;
 };
 

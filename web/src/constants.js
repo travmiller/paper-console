@@ -12,6 +12,7 @@ export const AVAILABLE_MODULE_TYPES = [
   { id: 'webhook', label: 'Webhook', offline: false },
   { id: 'text', label: 'Text / Note', offline: true },
   { id: 'checklist', label: 'Checklist', offline: true },
+  { id: 'qrcode', label: 'QR Code', offline: true },
   { id: 'system_monitor', label: 'System Monitor', offline: true },
 ];
 
