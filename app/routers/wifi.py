@@ -21,6 +21,7 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
     """Background task to connect to WiFi."""
     import time
     from app.hardware import printer
+    from app.config import settings
 
     # Stop AP mode first
     if wifi_manager.is_ap_mode_active():
@@ -33,6 +34,7 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
 
     # Connect to the new network
     success = wifi_manager.connect_to_wifi(ssid, password)
+    feed_lines = getattr(settings, "cutter_feed_lines", 5)
 
     if success:
         # Wait for IP address
@@ -56,8 +58,8 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
 
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
-        if hasattr(printer, "feed_direct"):
-            printer.feed_direct(3)
+        if feed_lines > 0 and hasattr(printer, "feed_direct"):
+            printer.feed_direct(feed_lines)
 
     else:
         # If connection failed, restart AP mode so user can try again
@@ -74,8 +76,8 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
 
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
-        if hasattr(printer, "feed_direct"):
-            printer.feed_direct(3)
+        if feed_lines > 0 and hasattr(printer, "feed_direct"):
+            printer.feed_direct(feed_lines)
 
         time.sleep(2)
         wifi_manager.start_ap_mode()

@@ -69,8 +69,10 @@ def print_setup_instructions_sync():
         # Flush buffer to print
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
-        if hasattr(printer, "feed_direct"):
-            printer.feed_direct(3)
+        from app.config import settings
+        feed_lines = getattr(settings, "cutter_feed_lines", 5)
+        if feed_lines > 0 and hasattr(printer, "feed_direct"):
+            printer.feed_direct(feed_lines)
 
     except Exception:
         pass
