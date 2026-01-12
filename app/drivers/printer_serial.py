@@ -642,8 +642,23 @@ class PrinterDriver:
         self.print_buffer.append(("styled", {"text": text, "style": style}))
 
     def print_header(self, text: str):
-        """Print large bold header text."""
-        self.print_text(text.upper(), "bold_lg")
+        """Print large bold header text in a box."""
+        text = text.upper()
+        # Calculate box width (text + padding)
+        inner_width = len(text) + 4  # 2 spaces padding on each side
+        box_width = min(inner_width, self.width)
+        
+        # Box drawing characters
+        top_border = "╔" + "═" * (box_width - 2) + "╗"
+        bottom_border = "╚" + "═" * (box_width - 2) + "╝"
+        
+        # Center text within box
+        text_padded = text.center(box_width - 2)
+        middle = "║" + text_padded + "║"
+        
+        self.print_text(top_border, "bold")
+        self.print_text(middle, "bold_lg")
+        self.print_text(bottom_border, "bold")
     
     def print_subheader(self, text: str):
         """Print medium-weight subheader."""
@@ -915,11 +930,19 @@ class PrinterDriver:
             self._write_qr_native(data, pixel_size, error_correction)
 
     def print_header(self, text: str):
-        """Print centered header text."""
-        # Simple centering logic
-        padding = max(0, (self.width - len(text)) // 2)
-        header_text = " " * padding + text.upper()
-        self.print_text(header_text)
+        """Print large bold header text in a box."""
+        text = text.upper()
+        inner_width = len(text) + 4
+        box_width = min(inner_width, self.width)
+        
+        top_border = "╔" + "═" * (box_width - 2) + "╗"
+        bottom_border = "╚" + "═" * (box_width - 2) + "╝"
+        text_padded = text.center(box_width - 2)
+        middle = "║" + text_padded + "║"
+        
+        self.print_text(top_border, "bold")
+        self.print_text(middle, "bold_lg")
+        self.print_text(bottom_border, "bold")
         self.print_line()
 
     def close(self):
