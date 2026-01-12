@@ -4,6 +4,8 @@ import os
 import unicodedata
 import time
 from typing import Optional
+from PIL import Image, ImageDraw, ImageFont
+from io import BytesIO
 
 
 class PrinterDriver:
@@ -44,6 +46,14 @@ class PrinterDriver:
         }
     )
 
+    # Printer physical specs
+    PRINTER_DPI = 203  # dots per inch
+    PRINTER_WIDTH_DOTS = 384  # 58mm paper at 203 DPI
+    
+    # Font settings for bitmap rendering
+    FONT_SIZE = 12  # Small font size in pixels
+    LINE_HEIGHT = 14  # Pixels per line (font size + 2px spacing)
+
     def __init__(
         self,
         width: int = 42,  # Characters per line with Font B (small font)
@@ -53,12 +63,15 @@ class PrinterDriver:
         self.width = width
         self.ser = None
         # Buffer for print operations (prints are always inverted/reversed)
-        # Each item is a tuple: ('text', line) or ('feed', count)
+        # Each item is a tuple: ('text', line) or ('feed', count) or ('qr', data)
         self.print_buffer = []
         # Line tracking for max print length
         self.lines_printed = 0
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
         self._max_lines_hit = False  # Flag set when max lines exceeded during flush
+        
+        # Load monospace font for bitmap rendering
+        self._font = self._load_font()
 
         # Auto-detect serial port if not specified
         if port is None:
@@ -109,6 +122,111 @@ class PrinterDriver:
 
         except serial.SerialException:
             self.ser = None
+
+    def _load_font(self) -> ImageFont.FreeTypeFont:
+        """Load a monospace font for bitmap text rendering."""
+        import os
+        
+        # Get the project root directory (parent of app/)
+        app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        project_root = os.path.dirname(app_dir)
+        
+        # Try to load IBM Plex Mono from web/public/fonts (relative to project root)
+        font_paths = [
+            os.path.join(project_root, "web/public/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf"),
+            os.path.join(project_root, "web/dist/fonts/IBM_Plex_Mono/IBMPlexMono-Regular.ttf"),
+            # System fonts as fallback
+            "/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationMono-Regular.ttf",
+            "C:/Windows/Fonts/consola.ttf",  # Windows Consolas
+            "C:/Windows/Fonts/cour.ttf",  # Windows Courier New
+        ]
+        
+        for path in font_paths:
+            if os.path.exists(path):
+                try:
+                    return ImageFont.truetype(path, self.FONT_SIZE)
+                except Exception:
+                    continue
+        
+        # Fallback to default font
+        try:
+            return ImageFont.load_default()
+        except Exception:
+            return None
+
+    def _render_text_bitmap(self, lines: list) -> Image.Image:
+        """Render text lines to a bitmap image, rotated 180° for upside-down printing."""
+        if not lines:
+            return None
+        
+        # Calculate image dimensions
+        height = len(lines) * self.LINE_HEIGHT + 4  # +4 for padding
+        width = self.PRINTER_WIDTH_DOTS
+        
+        # Create white background image
+        img = Image.new("1", (width, height), 1)  # 1-bit, white background
+        draw = ImageDraw.Draw(img)
+        
+        # Draw each line of text
+        y = 2  # Start with small padding
+        for line in lines:
+            if self._font:
+                draw.text((2, y), line, font=self._font, fill=0)  # Black text
+            else:
+                draw.text((2, y), line, fill=0)
+            y += self.LINE_HEIGHT
+        
+        # Rotate 180° for upside-down printing
+        img = img.rotate(180)
+        
+        return img
+
+    def _send_bitmap(self, img: Image.Image):
+        """Send a bitmap image to the printer using GS v 0 raster command."""
+        if img is None:
+            return
+        
+        try:
+            width, height = img.size
+            
+            # Ensure width is multiple of 8 for byte alignment
+            if width % 8 != 0:
+                new_width = ((width // 8) + 1) * 8
+                new_img = Image.new("1", (new_width, height), 1)
+                new_img.paste(img, (0, 0))
+                img = new_img
+                width = new_width
+            
+            # Convert to 1-bit if not already
+            img = img.convert("1")
+            
+            # Get pixel data
+            pixels = list(img.getdata())
+            bytes_per_row = width // 8
+            
+            # Build raster data (1 = white, 0 = black in PIL, but printer wants 1 = black)
+            raster_data = bytearray()
+            for y in range(height):
+                row_start = y * width
+                for x_byte in range(bytes_per_row):
+                    byte_val = 0
+                    for bit in range(8):
+                        pixel_idx = row_start + (x_byte * 8) + bit
+                        if pixels[pixel_idx] == 0:  # Black pixel in PIL
+                            byte_val |= (0x80 >> bit)
+                    raster_data.append(byte_val)
+            
+            # GS v 0 - Print raster bit image
+            xL = bytes_per_row & 0xFF
+            xH = (bytes_per_row >> 8) & 0xFF
+            yL = height & 0xFF
+            yH = (height >> 8) & 0xFF
+            
+            self._write(b"\x1d\x76\x30\x00" + bytes([xL, xH, yL, yH]) + bytes(raster_data))
+            
+        except Exception:
+            pass
 
     def _write(self, data: bytes):
         """Internal helper to write bytes to serial interface."""
@@ -231,11 +349,8 @@ class PrinterDriver:
             pass
 
     def _apply_ascii_settings(self):
-        """Apply ASCII-only mode settings (QR204 confirmed commands only)."""
+        """Apply ASCII-only mode settings for bitmap rendering."""
         try:
-            # Enable 180° rotation FIRST (before font selection)
-            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
-            
             # Cancel Chinese character mode (confirmed in QR204 manual)
             self._write(b"\x1c\x2e")  # FS . (1C 2E) - Cancel Chinese mode
 
@@ -244,12 +359,8 @@ class PrinterDriver:
 
             # Select code page PC437 (confirmed in QR204 manual)
             self._write(b"\x1b\x74\x00")  # ESC t 0 (1B 74 00) - Code page PC437 (US)
-
-            # Select Font B (smaller font: 9x17 vs Font A's 12x24)
-            self._write(b"\x1b\x4d\x01")  # ESC M 1 - Select Font B (small)
             
-            # Set tighter line spacing for small font (16 dots instead of default 30)
-            self._write(b"\x1b\x33\x10")  # ESC 3 16 - Set line spacing to 16 dots
+            # Note: No ESC { rotation needed - we rotate bitmaps in software
         except Exception:
             pass
 
@@ -276,8 +387,7 @@ class PrinterDriver:
         try:
             # Cancel Chinese mode (confirmed in QR204 manual)
             self._write(b"\x1c\x2e")  # FS . (1C 2E)
-            # Re-apply rotation only (Font B set at init, rotation can be lost)
-            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
+            # Note: No rotation command needed - bitmaps are pre-rotated
         except Exception:
             pass
 
@@ -356,16 +466,13 @@ class PrinterDriver:
         self.print_buffer.append(("feed", lines))
 
     def flush_buffer(self):
-        """Flush the print buffer in reverse order for inverted printing.
-
-        Hardware handles character rotation (ESC { 1),
-        software reverses line order (print last line first).
+        """Flush the print buffer using bitmap rendering for proper 180° rotation.
+        
+        Text is rendered to a bitmap image, rotated 180°, and sent as raster graphics.
+        This ensures correct orientation regardless of printer font/rotation quirks.
         """
         if len(self.print_buffer) == 0:
             return
-
-        # Ensure we're in the right mode before printing
-        self._ensure_ascii_mode()
 
         # If max_lines is set, trim content from END of buffer (preserves header at start)
         total_lines_in_buffer = 0
@@ -383,39 +490,56 @@ class PrinterDriver:
                 if op_type == "text":
                     lines_in_item = op_data.count("\n") + 1
                     if lines_counted + lines_in_item > self.max_lines:
-                        # This item would exceed limit - trim here
                         trim_index = i
                         self._max_lines_hit = True
                         break
                     lines_counted += lines_in_item
 
-            # Trim buffer if needed
             if self._max_lines_hit:
                 self.print_buffer = self.print_buffer[:trim_index]
 
-        # If truncated, print message FIRST (tear-off edge)
-        if self._max_lines_hit:
-            self._write(b"\n")
-            msg = f"-- MAX LENGTH ({self.max_lines}/{total_lines_in_buffer}) --\n"
-            self._write(msg.encode("ascii", errors="replace"))
-            self._write(b"\n")
-
-        # Reverse the entire sequence of operations
+        # Reverse the buffer for upside-down printing (tear-off edge first)
         reversed_ops = list(reversed(self.print_buffer))
         self.print_buffer.clear()
 
+        # Collect consecutive text lines into batches for bitmap rendering
+        text_batch = []
+        
         for op_type, op_data in reversed_ops:
             if op_type == "text":
-                # Handle multi-line text by splitting and reversing lines
-                lines = op_data.split("\n")
-                reversed_lines = list(reversed(lines))
-                for line in reversed_lines:
-                    self._write_text_line(line)
+                # Sanitize and collect text
+                clean_text = self._sanitize_text(op_data)
+                # Handle multi-line text by reversing lines within the item
+                lines = clean_text.split("\n")
+                for line in reversed(lines):
+                    text_batch.append(line)
+                    self.lines_printed += 1
             elif op_type == "feed":
+                # Flush any pending text batch before feed
+                if text_batch:
+                    img = self._render_text_bitmap(text_batch)
+                    self._send_bitmap(img)
+                    text_batch = []
                 self._write_feed(op_data)
             elif op_type == "qr":
-                # Write QR code (already atomic, no reversal needed)
+                # Flush any pending text batch before QR
+                if text_batch:
+                    img = self._render_text_bitmap(text_batch)
+                    self._send_bitmap(img)
+                    text_batch = []
+                # QR codes handle their own rotation
                 self._write_qr(op_data["data"], op_data["size"], op_data["ec"], op_data.get("fixed", False))
+        
+        # Flush any remaining text batch
+        if text_batch:
+            img = self._render_text_bitmap(text_batch)
+            self._send_bitmap(img)
+        
+        # Print truncation message at the end (will appear at tear-off edge)
+        if self._max_lines_hit:
+            msg = f"-- MAX LENGTH ({self.max_lines}/{total_lines_in_buffer}) --"
+            trunc_img = self._render_text_bitmap([msg])
+            self._send_bitmap(trunc_img)
 
     def reset_buffer(self, max_lines: int = 0):
         """Reset/clear the print buffer (call at start of new print job).
