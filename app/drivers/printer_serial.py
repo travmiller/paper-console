@@ -233,6 +233,9 @@ class PrinterDriver:
     def _apply_ascii_settings(self):
         """Apply ASCII-only mode settings (QR204 confirmed commands only)."""
         try:
+            # Enable 180° rotation FIRST (before font selection)
+            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
+            
             # Cancel Chinese character mode (confirmed in QR204 manual)
             self._write(b"\x1c\x2e")  # FS . (1C 2E) - Cancel Chinese mode
 
@@ -247,9 +250,6 @@ class PrinterDriver:
             
             # Set tighter line spacing for small font (16 dots instead of default 30)
             self._write(b"\x1b\x33\x10")  # ESC 3 16 - Set line spacing to 16 dots
-
-            # Enable 180° rotation (standard ESC/POS, required for this unit despite missing from manual)
-            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
         except Exception:
             pass
 
@@ -276,10 +276,8 @@ class PrinterDriver:
         try:
             # Cancel Chinese mode (confirmed in QR204 manual)
             self._write(b"\x1c\x2e")  # FS . (1C 2E)
-            # Re-apply small font
-            self._write(b"\x1b\x4d\x01")  # ESC M 1 - Font B
-            # Re-apply rotation (required for correct orientation)
-            self._write(b"\x1b\x7b\x01")  # ESC { 1
+            # Re-apply rotation only (Font B set at init, rotation can be lost)
+            self._write(b"\x1b\x7b\x01")  # ESC { 1 - 180° rotation
         except Exception:
             pass
 
