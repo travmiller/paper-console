@@ -533,9 +533,20 @@ class PrinterDriver:
                 total_height += 2 + box_height + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "moon":
+                moon_states = op_data.get("moon_states", [False] * 8)
                 size = op_data.get("size", 60)
+                num_moons = len(moon_states)
+                cols = 4
+                rows = (num_moons + cols - 1) // cols  # Ceiling division
+                # Calculate height for rows of moons
+                moon_size = min(20, (size - 3 * 4) // 4)  # 4 moons per row, 3 spacings
+                moon_graph_height = (
+                    rows * moon_size + (rows - 1) * 4
+                )  # rows + spacing between rows
                 # SPACING_SMALL accounts for moon_y = y + SPACING_SMALL in drawing
-                total_height += self.SPACING_SMALL + size + self.SPACING_MEDIUM
+                total_height += (
+                    self.SPACING_SMALL + moon_graph_height + self.SPACING_MEDIUM
+                )
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "sun_path":
                 height = op_data.get("height", 120)
@@ -763,12 +774,23 @@ class PrinterDriver:
                 # +2 matches the box_y = y + 2 offset
                 y += 2 + box_height + self.SPACING_MEDIUM
             elif op_type == "moon":
-                phase = op_data.get("phase", 0)
+                moon_states = op_data.get("moon_states", [False] * 8)
                 size = op_data.get("size", 60)
-                moon_x = (width - size) // 2
+                num_moons = len(moon_states)
+                cols = 4
+                rows = (num_moons + cols - 1) // cols  # Ceiling division
+                # Calculate moon size and graph dimensions
+                moon_size = min(20, (size - 3 * 4) // 4)  # 4 moons per row, 3 spacings
+                graph_width = cols * moon_size + (cols - 1) * 4  # moons + spacings
+                graph_height = (
+                    rows * moon_size + (rows - 1) * 4
+                )  # rows + spacing between rows
+                moon_x = (width - graph_width) // 2  # Center the graph
                 moon_y = y + self.SPACING_SMALL
-                self._draw_moon_phase(draw, moon_x, moon_y, size, phase)
-                y += self.SPACING_SMALL + size + self.SPACING_MEDIUM
+                self._draw_moon_phase(
+                    draw, moon_x, moon_y, moon_size, moon_states, cols
+                )
+                y += self.SPACING_SMALL + graph_height + self.SPACING_MEDIUM
             elif op_type == "sun_path":
                 sun_path = op_data.get("sun_path", [])
                 sunrise = op_data.get("sunrise")
@@ -978,131 +1000,57 @@ class PrinterDriver:
         return img
 
     def _draw_moon_phase(
-        self, draw: ImageDraw.Draw, x: int, y: int, size: int, phase: float
+        self,
+        draw: ImageDraw.Draw,
+        x: int,
+        y: int,
+        moon_size: int,
+        moon_states: List[bool],
+        cols: int,
     ):
-        """Draw an improved moon phase graphic with smooth terminator and surface detail.
+        """Draw a moon phase graph with multiple moons.
 
         Args:
             draw: ImageDraw object
             x, y: Top-left corner of bounding box
-            size: Diameter of moon in pixels
-            phase: Moon phase value (0-28 day cycle)
-                   0/28 = New Moon (dark)
-                   7 = First Quarter (right half lit)
-                   14 = Full Moon (fully lit)
-                   21 = Last Quarter (left half lit)
+            moon_size: Size of each individual moon in pixels
+            moon_states: List of booleans indicating which moons should be full (True) or empty (False)
+            cols: Number of columns in the grid
         """
-        # Normalize phase to 0-1 (0 = new, 0.5 = full, 1 = new)
-        phase_normalized = (phase % 28) / 28.0
+        spacing = 4
+        num_moons = len(moon_states)
+        rows = (num_moons + cols - 1) // cols  # Ceiling division
 
-        # Calculate illumination (0 = new moon, 1 = full moon)
-        # illumination follows a cosine curve
-        illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2
+        # Draw moons in grid
+        for i in range(num_moons):
+            row = i // cols
+            col = i % cols
 
-        center_x = x + size // 2
-        center_y = y + size // 2
-        radius = size // 2
-        inner_radius = radius - 2  # Account for outline
+            # Calculate position for this moon
+            moon_x = x + col * (moon_size + spacing)
+            moon_y = y + row * (moon_size + spacing)
 
-        # Draw the moon outline (black circle)
-        draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
+            # Determine if this moon should be full or empty
+            is_full = moon_states[i] if i < len(moon_states) else False
 
-        # Handle new moon (completely dark)
-        if illumination < 0.01:
-            # Just draw the outline, leave interior dark
-            return
+            # Draw moon outline
+            draw.ellipse(
+                [moon_x, moon_y, moon_x + moon_size, moon_y + moon_size],
+                outline=0,
+                width=1,
+            )
 
-        # Fill the whole moon white first (lit portion)
-        draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
-
-        # Calculate terminator position using proper geometry
-        # The terminator is a vertical line that moves across the moon
-        # At new moon: terminator at right edge (illumination = 0)
-        # At full moon: terminator at left edge (illumination = 1)
-        
-        # Terminator X position: moves from right edge to left edge as illumination increases
-        # At illumination=0 (new): terminator_x = right edge
-        # At illumination=1 (full): terminator_x = left edge
-        terminator_x = center_x - (illumination * 2 - 1) * inner_radius
-        
-        # Draw shadow efficiently using pixel-by-pixel for smooth terminator
-        if phase_normalized < 0.5:
-            # Waxing: right side illuminated, left side dark
-            # Shadow is on the left side (px < terminator_x)
-            for py in range(y + 2, y + size - 2):
-                for px in range(x + 2, min(int(terminator_x) + 1, x + size - 2)):
-                    dx = px - center_x
-                    dy = py - center_y
-                    dist_sq = dx * dx + dy * dy
-                    
-                    # Check if point is within moon circle and in shadow
-                    if dist_sq <= inner_radius * inner_radius and px < terminator_x:
-                        draw.point((px, py), fill=0)
-        else:
-            # Waning: left side illuminated, right side dark
-            # Shadow is on the right side (px > terminator_x)
-            for py in range(y + 2, y + size - 2):
-                for px in range(max(int(terminator_x), x + 2), x + size - 2):
-                    dx = px - center_x
-                    dy = py - center_y
-                    dist_sq = dx * dx + dy * dy
-                    
-                    # Check if point is within moon circle and in shadow
-                    if dist_sq <= inner_radius * inner_radius and px > terminator_x:
-                        draw.point((px, py), fill=0)
-
-        # Add subtle surface texture (craters) for realism
-        # Only add texture to the lit portion
-        random.seed(int(phase * 100))  # Deterministic based on phase
-        
-        num_craters = max(3, size // 20)  # Scale with moon size
-        for _ in range(num_craters):
-            # Random position within moon circle
-            angle = random.uniform(0, 2 * math.pi)
-            dist = random.uniform(0, inner_radius * 0.7)  # Keep craters away from edge
-            crater_x = int(center_x + dist * math.cos(angle))
-            crater_y = int(center_y + dist * math.sin(angle))
-            
-            # Check if crater is within moon bounds
-            dx = crater_x - center_x
-            dy = crater_y - center_y
-            if dx * dx + dy * dy > inner_radius * inner_radius:
-                continue
-            
-            # Only draw crater if it's in the lit portion
-            if phase_normalized < 0.5:
-                # Waxing: right side lit (crater_x > terminator_x)
-                if crater_x > terminator_x:
-                    crater_size = random.randint(1, max(1, size // 30))
-                    draw.ellipse(
-                        [
-                            crater_x - crater_size,
-                            crater_y - crater_size,
-                            crater_x + crater_size,
-                            crater_y + crater_size,
-                        ],
-                        fill=0,
-                        outline=1,
-                        width=1,
-                    )
-            else:
-                # Waning: left side lit (crater_x < terminator_x)
-                if crater_x < terminator_x:
-                    crater_size = random.randint(1, max(1, size // 30))
-                    draw.ellipse(
-                        [
-                            crater_x - crater_size,
-                            crater_y - crater_size,
-                            crater_x + crater_size,
-                            crater_y + crater_size,
-                        ],
-                        fill=0,
-                        outline=1,
-                        width=1,
-                    )
-
-        # Redraw outline to ensure clean edges
-        draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
+            # Fill moon if it should be full
+            if is_full:
+                draw.ellipse(
+                    [
+                        moon_x + 1,
+                        moon_y + 1,
+                        moon_x + moon_size - 1,
+                        moon_y + moon_size - 1,
+                    ],
+                    fill=1,
+                )
 
     def _draw_maze(
         self,
@@ -1954,7 +1902,7 @@ class PrinterDriver:
         font_caption,
     ):
         """Draw a sun path curve visualization.
-        
+
         Args:
             draw: ImageDraw object
             x, y: Top-left corner
@@ -1976,35 +1924,33 @@ class PrinterDriver:
         curve_height = height - 60  # Leave space for labels and times
         curve_y = y + 20  # Start below title
         horizon_y = curve_y + curve_height - 20  # Horizon line position
-        
+
         # Find min/max altitude for scaling
         altitudes = [alt for _, alt in sun_path]
         min_alt = min(altitudes) if altitudes else -90
         max_alt = max(altitudes) if altitudes else 90
-        
+
         # Normalize altitude range (ensure we show from -10 to max for better visualization)
         alt_range = max(max_alt - min_alt, 10)  # At least 10 degrees range
         alt_min = min(-10, min_alt)  # Show at least 10 degrees below horizon
         alt_max = max_alt
-        
+
         # Draw title
         if font:
             draw.text((x, y), "SUN", font=font, fill=0)
-        
+
         # Draw horizon line
         horizon_x_start = x + 10
         horizon_x_end = x + width - 10
         draw.line(
-            [(horizon_x_start, horizon_y), (horizon_x_end, horizon_y)],
-            fill=0,
-            width=1
+            [(horizon_x_start, horizon_y), (horizon_x_end, horizon_y)], fill=0, width=1
         )
-        
+
         # Draw sun path curve
         curve_width = horizon_x_end - horizon_x_start
         points = []
         current_point_idx = -1
-        
+
         # Find time range for normalization
         if sun_path:
             first_time = sun_path[0][0]
@@ -2012,7 +1958,7 @@ class PrinterDriver:
             time_range_seconds = (last_time - first_time).total_seconds()
         else:
             time_range_seconds = 24 * 3600  # Fallback to 24 hours
-        
+
         # Find current time index
         for i, (dt, alt) in enumerate(sun_path):
             # Normalize time to 0-1 based on actual time range
@@ -2023,7 +1969,7 @@ class PrinterDriver:
                 # Fallback: use hour/minute if range is invalid
                 time_of_day = (dt.hour * 60 + dt.minute) / (24 * 60)
             curve_x = horizon_x_start + int(time_of_day * curve_width)
-            
+
             # Normalize altitude to curve height
             # Altitude: -90 (below) to 90 (zenith)
             # Y position: horizon_y (bottom) to curve_y (top)
@@ -2033,23 +1979,19 @@ class PrinterDriver:
                 normalized_alt = 0.5
             curve_y_pos = horizon_y - int(normalized_alt * (horizon_y - curve_y))
             points.append((curve_x, curve_y_pos))
-            
+
             # Check if this is the current time (within 15 minutes)
             if abs((dt - current_time).total_seconds()) < 15 * 60:
                 current_point_idx = i
-        
+
         # Draw the curve path
         if len(points) > 1:
             # Draw past path (red/darker) - from sunrise to current
             if current_point_idx > 0:
-                past_points = points[:current_point_idx + 1]
+                past_points = points[: current_point_idx + 1]
                 for i in range(len(past_points) - 1):
-                    draw.line(
-                        [past_points[i], past_points[i + 1]],
-                        fill=0,
-                        width=2
-                    )
-            
+                    draw.line([past_points[i], past_points[i + 1]], fill=0, width=2)
+
             # Draw future path (lighter/dashed) - from current to sunset
             if current_point_idx < len(points) - 1:
                 future_start = max(0, current_point_idx)
@@ -2058,11 +2000,9 @@ class PrinterDriver:
                 for i in range(len(future_points) - 1):
                     if i % 2 == 0:  # Draw every other segment for dashed effect
                         draw.line(
-                            [future_points[i], future_points[i + 1]],
-                            fill=0,
-                            width=1
+                            [future_points[i], future_points[i + 1]], fill=0, width=1
                         )
-        
+
         # Draw sunrise marker at actual sunrise time
         if sun_path and time_range_seconds > 0:
             sunrise_offset = (sunrise - first_time).total_seconds()
@@ -2075,9 +2015,9 @@ class PrinterDriver:
             [sunrise_x - 3, sunrise_marker_y - 3, sunrise_x + 3, sunrise_marker_y + 3],
             outline=0,
             width=1,
-            fill=1
+            fill=1,
         )
-        
+
         # Draw sunset marker at actual sunset time
         if sun_path and time_range_seconds > 0:
             sunset_offset = (sunset - first_time).total_seconds()
@@ -2090,20 +2030,24 @@ class PrinterDriver:
             [sunset_x - 3, sunset_marker_y - 3, sunset_x + 3, sunset_marker_y + 3],
             outline=0,
             width=1,
-            fill=1
+            fill=1,
         )
-        
+
         # Draw current sun position marker
         if current_point_idx >= 0 and current_point_idx < len(points):
             current_x, current_y = points[current_point_idx]
             # Draw larger marker with sun icon
             marker_size = 8
             draw.ellipse(
-                [current_x - marker_size, current_y - marker_size,
-                 current_x + marker_size, current_y + marker_size],
+                [
+                    current_x - marker_size,
+                    current_y - marker_size,
+                    current_x + marker_size,
+                    current_y + marker_size,
+                ],
                 outline=0,
                 width=2,
-                fill=1
+                fill=1,
             )
             # Draw simple sun rays (4 lines)
             ray_length = 4
@@ -2112,7 +2056,7 @@ class PrinterDriver:
                 end_x = current_x + int(ray_length * math.cos(rad))
                 end_y = current_y + int(ray_length * math.sin(rad))
                 draw.line([(current_x, current_y), (end_x, end_y)], fill=0, width=1)
-        
+
         # Draw daylight duration (centered below curve)
         if font_sm and day_length:
             duration_text = day_length
@@ -2120,14 +2064,16 @@ class PrinterDriver:
                 text_bbox = draw.textbbox((0, 0), duration_text, font=font_sm)
                 text_width = text_bbox[2] - text_bbox[0]
                 duration_x = x + (width - text_width) // 2
-                draw.text((duration_x, horizon_y + 5), duration_text, font=font_sm, fill=0)
-        
+                draw.text(
+                    (duration_x, horizon_y + 5), duration_text, font=font_sm, fill=0
+                )
+
         # Draw sunrise time (bottom left)
         if font and sunrise_time:
             draw.text((x, horizon_y + 25), sunrise_time, font=font, fill=0)
             if font_caption:
                 draw.text((x, horizon_y + 45), "Sunrise", font=font_caption, fill=0)
-        
+
         # Draw sunset time (bottom right)
         if font and sunset_time:
             if font:
@@ -2138,7 +2084,12 @@ class PrinterDriver:
             if font_caption:
                 caption_bbox = draw.textbbox((0, 0), "Sunset", font=font_caption)
                 caption_width = caption_bbox[2] - caption_bbox[0]
-                draw.text((x + width - caption_width, horizon_y + 45), "Sunset", font=font_caption, fill=0)
+                draw.text(
+                    (x + width - caption_width, horizon_y + 45),
+                    "Sunset",
+                    font=font_caption,
+                    fill=0,
+                )
 
     def _generate_qr_image(
         self, data: str, size: int, error_correction: str, fixed_size: bool
@@ -2574,12 +2525,12 @@ class PrinterDriver:
         line = "━" * self.width
         self.print_text(line, "bold")
 
-    def print_moon_phase(self, phase: float, size: int = 60):
-        """Print a moon phase graphic.
+    def print_moon_phase(self, moon_states: List[bool], size: int = 60):
+        """Print a moon phase graph with multiple moons.
 
         Args:
-            phase: Moon phase value (0-28 day cycle)
-            size: Diameter of moon in pixels (default 60)
+            moon_states: List of booleans indicating which moons should be full (True) or empty (False)
+            size: Total width available for the graph in pixels (default 60)
         """
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
@@ -2587,7 +2538,7 @@ class PrinterDriver:
             (
                 "moon",
                 {
-                    "phase": phase,
+                    "moon_states": moon_states,
                     "size": size,
                 },
             )

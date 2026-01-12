@@ -129,8 +129,16 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     )
     printer.print_line()
     
-    # Moon phase graphic
-    printer.print_moon_phase(data['moon_phase_val'], size=64)
+    # Moon phase graphic - 8 moons showing cycle progression
+    # Each moon represents 3.5 days (28 / 8 = 3.5)
+    phase_normalized = data['moon_phase_val'] % 28
+    num_moons = 8
+    days_per_moon = 28.0 / num_moons
+    current_moon_index = int(phase_normalized / days_per_moon)
+    
+    # Moons fill up progressively as the cycle progresses (progress bar style)
+    moon_states = [i <= current_moon_index for i in range(num_moons)]
+    printer.print_moon_phase(moon_states, size=64)
     
     # Moon data text
     printer.print_bold(data['moon_phase'].upper())
