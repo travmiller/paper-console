@@ -866,12 +866,18 @@ class PrinterDriver:
                 y += bar_height + self.SPACING_MEDIUM
             elif op_type == "calendar_grid":
                 weeks = op_data.get("weeks", 4)
-                cell_size = op_data.get("cell_size", 8)
+                requested_cell_size = op_data.get("cell_size", 8)
                 start_date = op_data.get("start_date")
                 events_by_date = op_data.get("events_by_date", {})
                 highlight_date = op_data.get("highlight_date")
                 month_start = op_data.get("month_start")
                 month_end = op_data.get("month_end")
+
+                # Calculate full width available (minus margins)
+                available_width = width - (2 * self.SPACING_SMALL)
+                # Calculate cell size to fill full width (7 days)
+                cell_size = available_width // 7
+
                 grid_x = self.SPACING_SMALL
                 grid_y = y + self.SPACING_SMALL
                 self._draw_calendar_grid(
@@ -1762,11 +1768,12 @@ class PrinterDriver:
         day_names = ["S", "M", "T", "W", "T", "F", "S"]
         header_y = y + 2
         header_height = 10
+        grid_width = 7 * cell_size
         # Draw header background line
         draw.line(
             [
                 (x, header_y + header_height),
-                (x + 7 * cell_size, header_y + header_height),
+                (x + grid_width, header_y + header_height),
             ],
             fill=0,
             width=1,
