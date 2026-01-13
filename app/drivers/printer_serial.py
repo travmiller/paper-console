@@ -1975,17 +1975,21 @@ class PrinterDriver:
         # Calculate drawing area
         curve_height = height - 60  # Leave space for labels and times
         curve_y = y + 20  # Start below title
-        horizon_y = curve_y + curve_height - 20  # Horizon line position
+        curve_bottom = curve_y + curve_height - 20  # Bottom of curve area
+        horizon_y = (
+            curve_y + (curve_height - 20) // 2
+        )  # Horizon line in middle of curve area
 
         # Find min/max altitude for scaling
         altitudes = [alt for _, alt in sun_path]
         min_alt = min(altitudes) if altitudes else -90
         max_alt = max(altitudes) if altitudes else 90
 
-        # Normalize altitude range (ensure we show from -10 to max for better visualization)
+        # Normalize altitude range to show full sine wave including night
+        # Use the actual min/max from the data to show complete day/night cycle
         alt_range = max(max_alt - min_alt, 10)  # At least 10 degrees range
-        alt_min = min(-10, min_alt)  # Show at least 10 degrees below horizon
-        alt_max = max_alt
+        alt_min = min_alt  # Use actual minimum (can be -90 at night)
+        alt_max = max_alt  # Use actual maximum (can be 90 at zenith)
 
         # Draw title
         if font:
@@ -2024,27 +2028,32 @@ class PrinterDriver:
 
             # Normalize altitude to curve height
             # Altitude: -90 (below) to 90 (zenith)
-            # Y position: horizon_y (bottom) to curve_y (top)
+            # Y position: curve_bottom (min altitude/night) to curve_y (max altitude/day)
+            # Horizon (0 altitude) should be at horizon_y (middle)
             if alt_max > alt_min:
                 normalized_alt = (alt - alt_min) / (alt_max - alt_min)
             else:
                 normalized_alt = 0.5
-            curve_y_pos = horizon_y - int(normalized_alt * (horizon_y - curve_y))
+            # Map normalized altitude to full curve height (from top to bottom)
+            curve_y_pos = curve_y + int(
+                (1.0 - normalized_alt) * (curve_bottom - curve_y)
+            )
             points.append((curve_x, curve_y_pos))
 
             # Check if this is the current time (within 15 minutes)
             if abs((dt - current_time).total_seconds()) < 15 * 60:
                 current_point_idx = i
 
-        # Draw the curve path
+        # Draw the full 24-hour curve path
         if len(points) > 1:
-            # Draw past path (red/darker) - from sunrise to current
+            # Draw the complete curve (full sine wave including night)
+            # Draw past portion (solid) - from start to current time
             if current_point_idx > 0:
                 past_points = points[: current_point_idx + 1]
                 for i in range(len(past_points) - 1):
                     draw.line([past_points[i], past_points[i + 1]], fill=0, width=2)
 
-            # Draw future path (lighter/dashed) - from current to sunset
+            # Draw future portion (dashed) - from current time to end
             if current_point_idx < len(points) - 1:
                 future_start = max(0, current_point_idx)
                 future_points = points[future_start:]
