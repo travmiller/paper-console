@@ -30,25 +30,26 @@ def get_moon_phase_text(moon_phase: float) -> str:
     else: return "Wan Crescent"
 
 def get_sun_path_data(now: datetime, city: LocationInfo, tz: pytz.BaseTzInfo) -> List[Tuple[datetime, float]]:
-    """Calculate sun altitude throughout the day.
+    """Calculate sun altitude throughout a full 24-hour day.
     
     Returns a list of (datetime, altitude) tuples where altitude is in degrees.
     Altitude ranges from -90 (below horizon) to 90 (zenith).
+    Shows a full sine wave including night periods.
     """
     # Get sunrise and sunset for the day
     s = sun(city.observer, date=now, tzinfo=tz)
     sunrise = s["sunrise"]
     sunset = s["sunset"]
     
-    # Calculate points throughout the day (every 15 minutes)
-    # Start 2 hours before sunrise, end 2 hours after sunset for full curve
+    # Calculate points throughout a full 24-hour period (every 15 minutes)
+    # Start at midnight of the current day, end at midnight of the next day
     path_data = []
-    start_time = sunrise - timedelta(hours=2)
-    end_time = sunset + timedelta(hours=2)
+    start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    end_time = start_time + timedelta(days=1)
     current = start_time.replace(minute=(start_time.minute // 15) * 15, second=0, microsecond=0)
     
-    # Sample every 15 minutes from start to end
-    while current <= end_time:
+    # Sample every 15 minutes for full 24-hour cycle
+    while current < end_time:
         try:
             zenith, azimuth = zenith_and_azimuth(city.observer, current, with_refraction=True)
             # Altitude = 90 - zenith (zenith is angle from vertical, altitude is angle from horizon)
