@@ -870,6 +870,8 @@ class PrinterDriver:
                 start_date = op_data.get("start_date")
                 events_by_date = op_data.get("events_by_date", {})
                 highlight_date = op_data.get("highlight_date")
+                month_start = op_data.get("month_start")
+                month_end = op_data.get("month_end")
                 grid_x = self.SPACING_SMALL
                 grid_y = y + self.SPACING_SMALL
                 self._draw_calendar_grid(
@@ -882,6 +884,8 @@ class PrinterDriver:
                     events_by_date,
                     self._get_font("regular_sm"),
                     highlight_date,
+                    month_start,
+                    month_end,
                 )
                 grid_height = weeks * cell_size + self.SPACING_SMALL
                 y += grid_height + self.SPACING_MEDIUM
@@ -1737,6 +1741,8 @@ class PrinterDriver:
         events_by_date: dict,
         font,
         highlight_date=None,
+        month_start=None,
+        month_end=None,
     ):
         """Draw a calendar grid.
 
@@ -1791,9 +1797,10 @@ class PrinterDriver:
                 is_highlighted = highlight_date and cell_date == highlight_date
 
                 # Check if date is in current month (for month view)
-                # If start_date is provided and it's a month start, check if cell_date is in same month
                 is_current_month = True
-                if start_date:
+                if month_start and month_end:
+                    is_current_month = month_start <= cell_date < month_end
+                elif start_date:
                     try:
                         # Check if start_date represents a month start
                         if start_date.day <= 7:  # Likely a month start
@@ -1804,21 +1811,37 @@ class PrinterDriver:
                     except:
                         pass
 
-                # Draw cell border (thicker if highlighted)
-                border_width = 2 if is_highlighted else 1
+                # Check if date has events
+                date_key = cell_date.isoformat()
+                has_events = date_key in events_by_date and events_by_date[date_key] > 0
+
+                # Draw cell border
+                # Thicker if highlighted (today), medium if has events
+                if is_highlighted:
+                    border_width = 2
+                elif has_events:
+                    border_width = 2  # Also thick for events
+                else:
+                    border_width = 1
+
                 draw.rectangle(
                     [cell_x, cell_y, cell_x + cell_size - 1, cell_y + cell_size - 1],
                     outline=0,
                     width=border_width,
                 )
 
-                # Fill cell background if highlighted
+                # Fill cell background if highlighted or has events
                 if is_highlighted:
-                    # Draw filled rectangle with checkerboard pattern
+                    # Draw filled rectangle with checkerboard pattern for today
                     for px in range(cell_x + 1, cell_x + cell_size - 1):
                         for py in range(cell_y + 1, cell_y + cell_size - 1):
                             if ((px - cell_x) + (py - cell_y)) % 3 < 2:
                                 draw.point((px, py), fill=0)
+                elif has_events and is_current_month:
+                    # Draw lighter pattern for dates with events
+                    for px in range(cell_x + 1, cell_x + cell_size - 1, 2):
+                        for py in range(cell_y + 1, cell_y + cell_size - 1, 2):
+                            draw.point((px, py), fill=0)
 
                 # Draw day number
                 day_num = str(cell_date.day)
@@ -1841,15 +1864,19 @@ class PrinterDriver:
                         text_fill = 0  # Normal black
                     draw.text((text_x, text_y), day_num, font=font, fill=text_fill)
 
-                # Draw event indicator (dot)
-                date_key = cell_date.isoformat()
-                if date_key in events_by_date and events_by_date[date_key] > 0:
+                # Draw event indicator (dot) - only if not already highlighted
+                if has_events and not is_highlighted:
                     dot_x = cell_x + cell_size - 4
                     dot_y = cell_y + cell_size - 4
-                    # Use inverted fill for highlighted dates
-                    dot_fill = 1 if is_highlighted else 0
+                    # Draw a small filled circle for events
+                    draw.ellipse([dot_x - 2, dot_y - 2, dot_x + 2, dot_y + 2], fill=0)
+                elif has_events and is_highlighted:
+                    # For highlighted dates with events, draw a larger indicator
+                    dot_x = cell_x + cell_size - 5
+                    dot_y = cell_y + cell_size - 5
+                    # Draw white circle on black background
                     draw.ellipse(
-                        [dot_x - 1, dot_y - 1, dot_x + 1, dot_y + 1], fill=dot_fill
+                        [dot_x - 2, dot_y - 2, dot_x + 2, dot_y + 2], fill=1, outline=0
                     )
 
     def _draw_timeline(
@@ -3047,6 +3074,8 @@ class PrinterDriver:
         start_date=None,
         events_by_date: dict = None,
         highlight_date=None,
+        month_start=None,
+        month_end=None,
     ):
         """Print a visual calendar grid.
 
@@ -3056,6 +3085,8 @@ class PrinterDriver:
             start_date: First date to show (default: today)
             events_by_date: Dict mapping date strings to event counts
             highlight_date: Date to highlight (e.g., today)
+            month_start: Start of month for month view (optional)
+            month_end: End of month for month view (optional)
         """
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
@@ -3068,6 +3099,8 @@ class PrinterDriver:
                     "start_date": start_date,
                     "events_by_date": events_by_date or {},
                     "highlight_date": highlight_date,
+                    "month_start": month_start,
+                    "month_end": month_end,
                 },
             )
         )

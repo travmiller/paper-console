@@ -195,6 +195,7 @@ def _print_calendar_timeline_view(printer, sorted_dates, all_events):
 def _print_calendar_month_view(printer, sorted_dates, all_events):
     """Full month calendar view with events."""
     from datetime import datetime
+    import app.config
     
     # Get current month
     today = date.today()
@@ -210,11 +211,31 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
         next_month = date(today.year, today.month + 1, 1)
     days_in_month = (next_month - month_start).days
     
+    # For month view, we need to fetch events for the entire month
+    # Re-fetch events for the full month range
+    month_all_events = {}
+    sources = []
+    # We need access to config, but we'll parse for the full month
+    # Calculate end date for the month
+    month_end = next_month - timedelta(days=1)
+    
+    # Re-parse events for the entire month
+    # This is a bit of a hack - we'll need to re-fetch, but for now use what we have
+    # and extend it by parsing with a larger days_to_show
+    # Actually, let's just use all_events we have and extend the range
+    
     # Convert all_events to format expected by calendar grid (date string -> event count)
+    # Also collect all events in the month
     events_by_date = {}
+    month_events_by_date = {}  # All events in the current month
+    
     for d, events in all_events.items():
         date_key = d.isoformat() if isinstance(d, date) else str(d)
         events_by_date[date_key] = len(events)
+        
+        # If date is in current month, add to month events
+        if month_start <= d < next_month:
+            month_events_by_date[d] = events
     
     # Print month header
     month_name = today.strftime("%B %Y").upper()
@@ -224,18 +245,51 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
     days_since_sunday = first_weekday + 1  # Monday=0, so +1
     grid_start = month_start - timedelta(days=days_since_sunday % 7)
     
-    # Print full month calendar grid
+    # Print full month calendar grid with event highlighting
     printer.print_calendar_grid(
         weeks=6,  # Enough for any month
         cell_size=14,  # Slightly larger for better readability
         start_date=grid_start,
         events_by_date=events_by_date,
         highlight_date=today,  # Highlight today
+        month_start=month_start,  # Pass month boundaries for highlighting
+        month_end=next_month,
     )
     printer.print_line()
     
-    # Print upcoming events list below calendar
-    if sorted_dates:
+    # Print all events from the month below calendar
+    if month_events_by_date:
+        printer.print_subheader("MONTH EVENTS")
+        # Sort dates
+        sorted_month_dates = sorted([d for d in month_events_by_date.keys() if month_start <= d < next_month])
+        
+        for d in sorted_month_dates:
+            events = month_events_by_date[d]
+            events.sort(key=lambda x: x["sort_key"])
+            
+            # Day header
+            day_name = d.strftime("%A").upper()
+            if d == date.today():
+                day_name = "TODAY"
+            elif d == date.today() + timedelta(days=1):
+                day_name = "TOMORROW"
+            
+            printer.print_bold(f"{day_name} {d.strftime('%m/%d')}")
+            
+            for evt in events:
+                time_str = evt["time"]
+                summary = evt["summary"]
+                
+                # Truncate summary to fit
+                max_len = printer.width - 12
+                if len(summary) > max_len:
+                    summary = summary[: max_len - 1] + ".."
+                
+                printer.print_body(f"  {time_str:<8}{summary}")
+            
+            printer.print_line()
+    elif sorted_dates:
+        # Fallback: show what we have
         printer.print_subheader("UPCOMING EVENTS")
         for d in sorted_dates:
             events = all_events[d]
@@ -367,11 +421,26 @@ def format_calendar_receipt(
 
     all_events = {}
 
+    # For month view, we need to parse events for the entire month
+    days_to_show = config.days_to_show or 2
+    if days_to_show == 2:  # Month view
+        # Parse events for the entire current month
+        today = date.today()
+        month_start = date(today.year, today.month, 1)
+        if today.month == 12:
+            next_month = date(today.year + 1, 1, 1)
+        else:
+            next_month = date(today.year, today.month + 1, 1)
+        days_in_month = (next_month - today).days
+        parse_days = days_in_month + 1  # Include today through end of month
+    else:
+        parse_days = days_to_show
+    
     for url in sources:
         ics_data = fetch_ics(url)
         if ics_data:
             events = parse_events(
-                ics_data, config.days_to_show or 2, app.config.settings.timezone
+                ics_data, parse_days, app.config.settings.timezone
             )
             for d, evts in events.items():
                 if d not in all_events:

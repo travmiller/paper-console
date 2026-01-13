@@ -726,15 +726,15 @@ const ModuleConfig = ({ module, updateConfig }) => {
             onChange={(e) => updateConfig('days_to_show', parseInt(e.target.value))}
             className={inputClass}>
             <option value={1}>Timeline View (Today)</option>
-            <option value={2}>Month View</option>
             <option value={3}>Compact List (3 Days)</option>
             <option value={7}>Week View (7 Days)</option>
+            <option value={2}>Month View</option>
           </select>
           <p className='text-xs text-gray-600 mt-1'>
             {config.days_to_show === 1 && 'Detailed timeline with hour markers and event positioning'}
-            {config.days_to_show === 2 && 'Full month calendar grid with upcoming events list'}
             {config.days_to_show === 3 && 'Compact event list with visual separators'}
             {config.days_to_show === 7 && 'Week calendar grid with compact event list'}
+            {config.days_to_show === 2 && 'Full month calendar grid with upcoming events list'}
           </p>
         </div>
       </div>
