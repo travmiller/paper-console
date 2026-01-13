@@ -2118,17 +2118,6 @@ class PrinterDriver:
                 end_y = current_y + int(ray_length * math.sin(rad))
                 draw.line([(current_x, current_y), (end_x, end_y)], fill=0, width=1)
 
-        # Draw daylight duration (centered below curve)
-        if font_sm and day_length:
-            duration_text = day_length
-            if font_sm:
-                text_bbox = draw.textbbox((0, 0), duration_text, font=font_sm)
-                text_width = text_bbox[2] - text_bbox[0]
-                duration_x = x + (width - text_width) // 2
-                draw.text(
-                    (duration_x, horizon_y + 5), duration_text, font=font_sm, fill=0
-                )
-
         # Draw sunrise time (bottom left)
         if font and sunrise_time:
             draw.text((x, horizon_y + 25), sunrise_time, font=font, fill=0)
@@ -2148,6 +2137,24 @@ class PrinterDriver:
                 draw.text(
                     (x + width - caption_width, horizon_y + 45),
                     "Sunset",
+                    font=font_caption,
+                    fill=0,
+                )
+
+        # Draw day length (centered, inline with sunrise/sunset times)
+        if font and day_length:
+            duration_text = day_length
+            text_bbox = draw.textbbox((0, 0), duration_text, font=font)
+            text_width = text_bbox[2] - text_bbox[0]
+            duration_x = x + (width - text_width) // 2
+            draw.text((duration_x, horizon_y + 25), duration_text, font=font, fill=0)
+            if font_caption:
+                caption_bbox = draw.textbbox((0, 0), "Day Length", font=font_caption)
+                caption_width = caption_bbox[2] - caption_bbox[0]
+                caption_x = x + (width - caption_width) // 2
+                draw.text(
+                    (caption_x, horizon_y + 45),
+                    "Day Length",
                     font=font_caption,
                     fill=0,
                 )
