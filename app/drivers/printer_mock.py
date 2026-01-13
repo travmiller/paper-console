@@ -394,6 +394,21 @@ class PrinterDriver:
         print("[PRINT] └─┴─┴─┴─┴─┴─┴─┘")
         self.lines_printed += weeks + 3
 
+    def print_calendar_day_timeline(self, day, events: list, compact: bool = False, height: int = 120):
+        """Simulates printing a calendar day timeline."""
+        from datetime import date
+        day_str = day.strftime("%A, %B %d") if isinstance(day, date) else str(day)
+        print(f"[PRINT] Timeline: {day_str}")
+        print("[PRINT] ┌─────────────────────────────────────┐")
+        print("[PRINT] │ 00:00    06:00    12:00    18:00     │")
+        print("[PRINT] │ ──────────────────────────────────── │")
+        for evt in events:
+            time_str = evt.get("time", "")
+            summary = evt.get("summary", "")[:30]
+            print(f"[PRINT] │ ● {time_str:<8} {summary:<20} │")
+        print("[PRINT] └─────────────────────────────────────┘")
+        self.lines_printed += len(events) + 4
+
     def print_timeline(self, items: list, item_height: int = 20):
         """Simulates printing a timeline."""
         for item in items:

@@ -159,6 +159,8 @@ def parse_events(
                             "time": time_str,
                             "summary": summary,
                             "sort_key": "00:00" if evt_is_all_day else time_str,
+                            "datetime": evt_dt if not evt_is_all_day else None,
+                            "is_all_day": evt_is_all_day,
                         }
                     )
 
@@ -167,6 +169,166 @@ def parse_events(
         events_by_day[d].sort(key=lambda x: x["sort_key"])
 
     return events_by_day
+
+
+def _print_calendar_timeline_view(printer, sorted_dates, all_events):
+    """Detailed timeline view for 1 day - shows full day with hour markers and event bars."""
+    if not sorted_dates:
+        return
+    
+    d = sorted_dates[0]
+    events = all_events[d]
+    events.sort(key=lambda x: x["sort_key"])
+    
+    # Day header
+    day_name = d.strftime("%A").upper()
+    if d == date.today():
+        day_name = "TODAY"
+    
+    printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
+    
+    # Print timeline visualization
+    printer.print_calendar_day_timeline(d, events)
+    printer.print_line()
+
+
+def _print_calendar_month_view(printer, sorted_dates, all_events):
+    """Full month calendar view with events."""
+    from datetime import datetime
+    
+    # Get current month
+    today = date.today()
+    month_start = date(today.year, today.month, 1)
+    
+    # Calculate first day of week for the month (Monday = 0)
+    first_weekday = month_start.weekday()
+    
+    # Calculate number of days in month
+    if today.month == 12:
+        next_month = date(today.year + 1, 1, 1)
+    else:
+        next_month = date(today.year, today.month + 1, 1)
+    days_in_month = (next_month - month_start).days
+    
+    # Convert all_events to format expected by calendar grid (date string -> event count)
+    events_by_date = {}
+    for d, events in all_events.items():
+        date_key = d.isoformat() if isinstance(d, date) else str(d)
+        events_by_date[date_key] = len(events)
+    
+    # Print month header
+    month_name = today.strftime("%B %Y").upper()
+    printer.print_subheader(month_name)
+    
+    # Calculate grid start (first Sunday before or on month start)
+    days_since_sunday = first_weekday + 1  # Monday=0, so +1
+    grid_start = month_start - timedelta(days=days_since_sunday % 7)
+    
+    # Print full month calendar grid
+    printer.print_calendar_grid(
+        weeks=6,  # Enough for any month
+        cell_size=12,
+        start_date=grid_start,
+        events_by_date=events_by_date,
+        highlight_date=today,  # Highlight today
+    )
+    printer.print_line()
+    
+    # Print upcoming events list below calendar
+    printer.print_subheader("UPCOMING EVENTS")
+    for d in sorted_dates:
+        events = all_events[d]
+        events.sort(key=lambda x: x["sort_key"])
+        
+        # Day header
+        day_name = d.strftime("%A").upper()
+        if d == date.today():
+            day_name = "TODAY"
+        elif d == date.today() + timedelta(days=1):
+            day_name = "TOMORROW"
+        
+        printer.print_body(f"{day_name} {d.strftime('%m/%d')}")
+        
+        for evt in events:
+            time_str = evt["time"]
+            summary = evt["summary"]
+            
+            # Truncate summary to fit
+            max_len = printer.width - 8
+            if len(summary) > max_len:
+                summary = summary[: max_len - 1] + ".."
+            
+            printer.print_body(f"  {time_str:<8}{summary}")
+        
+        printer.print_line()
+
+
+def _print_calendar_compact_view(printer, sorted_dates, all_events):
+    """Compact timeline view for 3 days with visual separators."""
+    for i, d in enumerate(sorted_dates[:3]):
+        events = all_events[d]
+        events.sort(key=lambda x: x["sort_key"])
+        
+        # Day header
+        day_name = d.strftime("%A").upper()
+        if d == date.today():
+            day_name = "TODAY"
+        elif d == date.today() + timedelta(days=1):
+            day_name = "TOMORROW"
+        
+        printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
+        
+        # Print events in compact list format
+        for evt in events:
+            time_str = evt["time"]
+            summary = evt["summary"]
+            
+            # Truncate summary to fit
+            max_len = printer.width - 8
+            if len(summary) > max_len:
+                summary = summary[: max_len - 1] + ".."
+            
+            printer.print_body(f"{time_str:<8}{summary}")
+        
+        if i < len(sorted_dates) - 1:
+            printer.print_separator(style="dashed", height=4)
+
+
+def _print_calendar_week_view(printer, sorted_dates, all_events):
+    """Week view with mini calendar grid and compact event list."""
+    # Print mini calendar grid
+    today = date.today()
+    printer.print_calendar_grid(weeks=1, cell_size=10, start_date=today, events_by_date=all_events)
+    printer.print_line()
+    
+    # Print events for each day
+    for i, d in enumerate(sorted_dates):
+        events = all_events[d]
+        events.sort(key=lambda x: x["sort_key"])
+        
+        # Day header
+        day_name = d.strftime("%A").upper()
+        if d == date.today():
+            day_name = "TODAY"
+        elif d == date.today() + timedelta(days=1):
+            day_name = "TOMORROW"
+        
+        printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
+        
+        # Print events in compact list format
+        for evt in events:
+            time_str = evt["time"]
+            summary = evt["summary"]
+            
+            # Truncate summary to fit
+            max_len = printer.width - 8
+            if len(summary) > max_len:
+                summary = summary[: max_len - 1] + ".."
+            
+            printer.print_body(f"{time_str:<8}{summary}")
+        
+        if i < len(sorted_dates) - 1:
+            printer.print_line()
 
 
 def format_calendar_receipt(
@@ -208,30 +370,18 @@ def format_calendar_receipt(
         return
 
     sorted_dates = sorted(all_events.keys())
-
-    for i, d in enumerate(sorted_dates):
-        all_events[d].sort(key=lambda x: x["sort_key"])
-
-        # Day header
-        day_name = d.strftime("%A").upper()
-        if d == date.today():
-            day_name = "TODAY"
-        elif d == date.today() + timedelta(days=1):
-            day_name = "TOMORROW"
-
-        printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
-
-        for evt in all_events[d]:
-            time_str = evt["time"]
-            summary = evt["summary"]
-
-            # Truncate summary to fit
-            max_len = printer.width - 8
-            if len(summary) > max_len:
-                summary = summary[: max_len - 1] + ".."
-
-            # Time in caption style, event in body
-            printer.print_body(f"{time_str:<8}{summary}")
-
-        if i < len(sorted_dates) - 1:
-            printer.print_line()
+    days_to_show = config.days_to_show or 2
+    
+    # Use different visualizations based on number of days
+    if days_to_show == 1:
+        # Detailed timeline view for single day
+        _print_calendar_timeline_view(printer, sorted_dates, all_events)
+    elif days_to_show == 2:
+        # Full month view
+        _print_calendar_month_view(printer, sorted_dates, all_events)
+    elif days_to_show == 3:
+        # Compact timeline view for 3 days
+        _print_calendar_compact_view(printer, sorted_dates, all_events)
+    else:  # 7 days
+        # Week view with calendar grid
+        _print_calendar_week_view(printer, sorted_dates, all_events)

@@ -9,6 +9,7 @@ from typing import List, Optional
 
 import serial
 from PIL import Image, ImageDraw, ImageFont
+import app.config
 
 
 class PrinterDriver:
@@ -586,6 +587,10 @@ class PrinterDriver:
                 grid_height = weeks * cell_size + self.SPACING_SMALL
                 total_height += grid_height + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
+            elif op_type == "calendar_day_timeline":
+                height = op_data.get("height", 120)
+                total_height += height + self.SPACING_MEDIUM
+                last_spacing = self.SPACING_MEDIUM
             elif op_type == "timeline":
                 items = op_data.get("items", [])
                 item_height = op_data.get("item_height", 20)
@@ -864,6 +869,7 @@ class PrinterDriver:
                 cell_size = op_data.get("cell_size", 8)
                 start_date = op_data.get("start_date")
                 events_by_date = op_data.get("events_by_date", {})
+                highlight_date = op_data.get("highlight_date")
                 grid_x = self.SPACING_SMALL
                 grid_y = y + self.SPACING_SMALL
                 self._draw_calendar_grid(
@@ -875,9 +881,30 @@ class PrinterDriver:
                     start_date,
                     events_by_date,
                     self._get_font("regular_sm"),
+                    highlight_date,
                 )
                 grid_height = weeks * cell_size + self.SPACING_SMALL
                 y += grid_height + self.SPACING_MEDIUM
+            elif op_type == "calendar_day_timeline":
+                day = op_data.get("day")
+                events = op_data.get("events", [])
+                compact = op_data.get("compact", False)
+                timeline_height = op_data.get("height", 120)
+                timeline_x = self.SPACING_SMALL
+                timeline_y = y + self.SPACING_SMALL
+                self._draw_calendar_day_timeline(
+                    draw,
+                    timeline_x,
+                    timeline_y,
+                    width - 2 * self.SPACING_SMALL,
+                    timeline_height,
+                    day,
+                    events,
+                    compact,
+                    self._get_font("regular"),
+                    self._get_font("regular_sm"),
+                )
+                y += timeline_height + self.SPACING_MEDIUM
             elif op_type == "timeline":
                 items = op_data.get("items", [])
                 item_height = op_data.get("item_height", 20)
@@ -1709,6 +1736,7 @@ class PrinterDriver:
         start_date,
         events_by_date: dict,
         font,
+        highlight_date=None,
     ):
         """Draw a calendar grid.
 
@@ -1720,6 +1748,7 @@ class PrinterDriver:
             start_date: First date to show
             events_by_date: Dict mapping dates to event counts
             font: Font for numbers
+            highlight_date: Date to highlight (e.g., today)
         """
         from datetime import datetime, timedelta
 
@@ -1745,15 +1774,27 @@ class PrinterDriver:
                 cell_x = x + day * cell_size
                 cell_y = y + 8 + week * cell_size  # +8 for header
 
-                # Draw cell border
+                # Get date for this cell
+                cell_date = grid_start + timedelta(days=week * 7 + day)
+
+                # Check if this is the highlighted date (e.g., today)
+                is_highlighted = highlight_date and cell_date == highlight_date
+
+                # Draw cell border (thicker if highlighted)
+                border_width = 2 if is_highlighted else 1
                 draw.rectangle(
                     [cell_x, cell_y, cell_x + cell_size - 1, cell_y + cell_size - 1],
                     outline=0,
-                    width=1,
+                    width=border_width,
                 )
 
-                # Get date for this cell
-                cell_date = grid_start + timedelta(days=week * 7 + day)
+                # Fill cell background if highlighted
+                if is_highlighted:
+                    # Draw filled rectangle with checkerboard pattern
+                    for px in range(cell_x + 1, cell_x + cell_size - 1):
+                        for py in range(cell_y + 1, cell_y + cell_size - 1):
+                            if ((px - cell_x) + (py - cell_y)) % 3 < 2:
+                                draw.point((px, py), fill=0)
 
                 # Draw day number
                 day_num = str(cell_date.day)
@@ -1763,14 +1804,20 @@ class PrinterDriver:
                     text_h = bbox[3] - bbox[1] if bbox else cell_size // 2
                     text_x = cell_x + 2
                     text_y = cell_y + 2
-                    draw.text((text_x, text_y), day_num, font=font, fill=0)
+                    # Use inverted fill for highlighted dates
+                    text_fill = 1 if is_highlighted else 0
+                    draw.text((text_x, text_y), day_num, font=font, fill=text_fill)
 
                 # Draw event indicator (dot)
                 date_key = cell_date.isoformat()
                 if date_key in events_by_date and events_by_date[date_key] > 0:
                     dot_x = cell_x + cell_size - 4
                     dot_y = cell_y + cell_size - 4
-                    draw.ellipse([dot_x - 1, dot_y - 1, dot_x + 1, dot_y + 1], fill=0)
+                    # Use inverted fill for highlighted dates
+                    dot_fill = 1 if is_highlighted else 0
+                    draw.ellipse(
+                        [dot_x - 1, dot_y - 1, dot_x + 1, dot_y + 1], fill=dot_fill
+                    )
 
     def _draw_timeline(
         self, draw: ImageDraw.Draw, x: int, y: int, items: list, item_height: int, font
@@ -1820,6 +1867,185 @@ class PrinterDriver:
                 if len(text) > max_width // 6:  # Rough estimate
                     text = text[: max_width // 6 - 3] + "..."
                 draw.text((line_x + 10, item_y - 4), text, font=font, fill=0)
+
+    def _draw_calendar_day_timeline(
+        self,
+        draw: ImageDraw.Draw,
+        x: int,
+        y: int,
+        width: int,
+        height: int,
+        day: date,
+        events: list,
+        compact: bool,
+        font,
+        font_sm,
+    ):
+        """Draw a timeline visualization for a single calendar day.
+
+        Args:
+            draw: ImageDraw object
+            x, y: Top-left corner
+            width: Timeline width
+            height: Timeline height
+            day: Date object for the day
+            events: List of event dicts with 'time', 'summary', 'datetime', 'is_all_day' keys
+            compact: If True, use compact format
+            font: Font for event text
+            font_sm: Small font for time labels
+        """
+        from datetime import datetime, time as dt_time
+        import pytz
+
+        # Timeline area
+        timeline_x = x + 10
+        timeline_y = y + 20
+        timeline_width = width - 20
+        timeline_height = height - 60 if not compact else height - 40
+
+        # Get timezone
+        try:
+            tz = pytz.timezone(app.config.settings.timezone)
+        except:
+            tz = pytz.UTC
+
+        # Current time
+        now = datetime.now(tz)
+        today = now.date()
+        is_today = day == today
+
+        # Draw timeline axis (horizontal line)
+        axis_y = timeline_y + timeline_height // 2
+        draw.line(
+            [(timeline_x, axis_y), (timeline_x + timeline_width, axis_y)],
+            fill=0,
+            width=2,
+        )
+
+        # Draw hour markers
+        if not compact:
+            for hour in [0, 6, 12, 18, 24]:
+                if hour == 24:
+                    hour = 0
+                marker_x = timeline_x + int((hour / 24) * timeline_width)
+                # Draw tick mark
+                draw.line(
+                    [(marker_x, axis_y - 5), (marker_x, axis_y + 5)],
+                    fill=0,
+                    width=1,
+                )
+                # Draw hour label
+                if font_sm:
+                    hour_str = f"{hour:02d}:00"
+                    bbox = font_sm.getbbox(hour_str)
+                    text_w = bbox[2] - bbox[0] if bbox else 20
+                    draw.text(
+                        (marker_x - text_w // 2, axis_y + 8),
+                        hour_str,
+                        font=font_sm,
+                        fill=0,
+                    )
+
+        # Draw current time indicator (if today)
+        if is_today and not compact:
+            current_hour = now.hour
+            current_minute = now.minute
+            current_pos = (current_hour * 60 + current_minute) / (24 * 60)
+            current_x = timeline_x + int(current_pos * timeline_width)
+            # Draw vertical line
+            draw.line(
+                [(current_x, timeline_y), (current_x, timeline_y + timeline_height)],
+                fill=0,
+                width=1,
+            )
+            # Draw triangle indicator
+            triangle_size = 4
+            draw.polygon(
+                [
+                    (current_x, timeline_y),
+                    (current_x - triangle_size, timeline_y + triangle_size),
+                    (current_x + triangle_size, timeline_y + triangle_size),
+                ],
+                fill=0,
+            )
+
+        # Draw events
+        event_y_offset = 0
+        for event in events:
+            time_str = event.get("time", "")
+            summary = event.get("summary", "")
+            event_dt = event.get("datetime")
+            is_all_day = event.get("is_all_day", False)
+
+            if is_all_day:
+                # All-day event: draw full-width bar at top
+                bar_y = timeline_y + event_y_offset
+                bar_height = 12
+                draw.rectangle(
+                    [
+                        (timeline_x, bar_y),
+                        (timeline_x + timeline_width, bar_y + bar_height),
+                    ],
+                    outline=0,
+                    width=1,
+                    fill=0,
+                )
+                # Draw text
+                if font_sm:
+                    draw.text(
+                        (timeline_x + 4, bar_y + 2),
+                        f"All Day: {summary[:30]}",
+                        font=font_sm,
+                        fill=1,  # White text on black background
+                    )
+                event_y_offset += bar_height + 4
+            elif event_dt and not compact:
+                # Timed event: position by time
+                event_hour = event_dt.hour
+                event_minute = event_dt.minute
+                event_pos = (event_hour * 60 + event_minute) / (24 * 60)
+                event_x = timeline_x + int(event_pos * timeline_width)
+
+                # Draw event marker (circle)
+                marker_radius = 4
+                marker_y = axis_y
+                draw.ellipse(
+                    [
+                        event_x - marker_radius,
+                        marker_y - marker_radius,
+                        event_x + marker_radius,
+                        marker_y + marker_radius,
+                    ],
+                    fill=0,
+                )
+
+                # Draw event text above or below timeline
+                text_y = (
+                    marker_y - 20
+                    if marker_y > timeline_y + timeline_height // 2
+                    else marker_y + 12
+                )
+                if font_sm:
+                    # Truncate summary
+                    max_text_width = timeline_width // 3
+                    if len(summary) > max_text_width // 6:
+                        summary = summary[: max_text_width // 6 - 3] + "..."
+                    draw.text((event_x + 6, text_y), summary, font=font_sm, fill=0)
+                    # Draw time below
+                    draw.text(
+                        (event_x + 6, text_y + 12), time_str, font=font_sm, fill=0
+                    )
+            else:
+                # Compact mode: just list events
+                if font:
+                    text = f"{time_str:<8}{summary[:30]}"
+                    draw.text(
+                        (timeline_x, timeline_y + event_y_offset),
+                        text,
+                        font=font,
+                        fill=0,
+                    )
+                    event_y_offset += 18
 
     def _draw_checkbox(
         self, draw: ImageDraw.Draw, x: int, y: int, size: int, checked: bool
@@ -2787,6 +3013,7 @@ class PrinterDriver:
         cell_size: int = 8,
         start_date=None,
         events_by_date: dict = None,
+        highlight_date=None,
     ):
         """Print a visual calendar grid.
 
@@ -2795,6 +3022,7 @@ class PrinterDriver:
             cell_size: Size of each day cell in pixels (default 8)
             start_date: First date to show (default: today)
             events_by_date: Dict mapping date strings to event counts
+            highlight_date: Date to highlight (e.g., today)
         """
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
@@ -2806,6 +3034,32 @@ class PrinterDriver:
                     "cell_size": cell_size,
                     "start_date": start_date,
                     "events_by_date": events_by_date or {},
+                    "highlight_date": highlight_date,
+                },
+            )
+        )
+
+    def print_calendar_day_timeline(
+        self, day: date, events: list, compact: bool = False, height: int = 120
+    ):
+        """Print a timeline visualization for a single calendar day.
+
+        Args:
+            day: Date object for the day
+            events: List of event dicts with 'time', 'summary', 'datetime', 'is_all_day' keys
+            compact: If True, use compact format (default False)
+            height: Height of timeline in pixels (default 120)
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(
+            (
+                "calendar_day_timeline",
+                {
+                    "day": day,
+                    "events": events,
+                    "compact": compact,
+                    "height": height,
                 },
             )
         )
