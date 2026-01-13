@@ -584,7 +584,8 @@ class PrinterDriver:
             elif op_type == "calendar_grid":
                 weeks = op_data.get("weeks", 4)
                 cell_size = op_data.get("cell_size", 8)
-                grid_height = weeks * cell_size + self.SPACING_SMALL
+                # Account for header (12px) + weeks * cell_size + spacing
+                grid_height = 12 + weeks * cell_size + self.SPACING_SMALL
                 total_height += grid_height + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "calendar_day_timeline":
@@ -893,7 +894,7 @@ class PrinterDriver:
                     month_start,
                     month_end,
                 )
-                grid_height = weeks * cell_size + self.SPACING_SMALL
+                grid_height = 12 + weeks * cell_size + self.SPACING_SMALL
                 y += grid_height + self.SPACING_MEDIUM
             elif op_type == "calendar_day_timeline":
                 day = op_data.get("day")
