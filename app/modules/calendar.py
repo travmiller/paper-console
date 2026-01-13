@@ -227,7 +227,7 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
     # Print full month calendar grid
     printer.print_calendar_grid(
         weeks=6,  # Enough for any month
-        cell_size=12,
+        cell_size=14,  # Slightly larger for better readability
         start_date=grid_start,
         events_by_date=events_by_date,
         highlight_date=today,  # Highlight today
@@ -235,32 +235,33 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
     printer.print_line()
     
     # Print upcoming events list below calendar
-    printer.print_subheader("UPCOMING EVENTS")
-    for d in sorted_dates:
-        events = all_events[d]
-        events.sort(key=lambda x: x["sort_key"])
-        
-        # Day header
-        day_name = d.strftime("%A").upper()
-        if d == date.today():
-            day_name = "TODAY"
-        elif d == date.today() + timedelta(days=1):
-            day_name = "TOMORROW"
-        
-        printer.print_body(f"{day_name} {d.strftime('%m/%d')}")
-        
-        for evt in events:
-            time_str = evt["time"]
-            summary = evt["summary"]
+    if sorted_dates:
+        printer.print_subheader("UPCOMING EVENTS")
+        for d in sorted_dates:
+            events = all_events[d]
+            events.sort(key=lambda x: x["sort_key"])
             
-            # Truncate summary to fit
-            max_len = printer.width - 8
-            if len(summary) > max_len:
-                summary = summary[: max_len - 1] + ".."
+            # Day header
+            day_name = d.strftime("%A").upper()
+            if d == date.today():
+                day_name = "TODAY"
+            elif d == date.today() + timedelta(days=1):
+                day_name = "TOMORROW"
             
-            printer.print_body(f"  {time_str:<8}{summary}")
-        
-        printer.print_line()
+            printer.print_bold(f"{day_name} {d.strftime('%m/%d')}")
+            
+            for evt in events:
+                time_str = evt["time"]
+                summary = evt["summary"]
+                
+                # Truncate summary to fit
+                max_len = printer.width - 12
+                if len(summary) > max_len:
+                    summary = summary[: max_len - 1] + ".."
+                
+                printer.print_body(f"  {time_str:<8}{summary}")
+            
+            printer.print_line()
 
 
 def _print_calendar_compact_view(printer, sorted_dates, all_events):
@@ -296,9 +297,21 @@ def _print_calendar_compact_view(printer, sorted_dates, all_events):
 
 def _print_calendar_week_view(printer, sorted_dates, all_events):
     """Week view with mini calendar grid and compact event list."""
+    # Convert all_events to format expected by calendar grid (date string -> event count)
+    events_by_date = {}
+    for d, events in all_events.items():
+        date_key = d.isoformat() if isinstance(d, date) else str(d)
+        events_by_date[date_key] = len(events)
+    
     # Print mini calendar grid
     today = date.today()
-    printer.print_calendar_grid(weeks=1, cell_size=10, start_date=today, events_by_date=all_events)
+    printer.print_calendar_grid(
+        weeks=1, 
+        cell_size=10, 
+        start_date=today, 
+        events_by_date=events_by_date,
+        highlight_date=today,
+    )
     printer.print_line()
     
     # Print events for each day

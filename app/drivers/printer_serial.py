@@ -1754,7 +1754,17 @@ class PrinterDriver:
 
         # Day headers (S M T W T F S)
         day_names = ["S", "M", "T", "W", "T", "F", "S"]
-        header_y = y
+        header_y = y + 2
+        header_height = 10
+        # Draw header background line
+        draw.line(
+            [
+                (x, header_y + header_height),
+                (x + 7 * cell_size, header_y + header_height),
+            ],
+            fill=0,
+            width=1,
+        )
         for i, day_name in enumerate(day_names):
             day_x = x + i * cell_size
             if font:
@@ -1772,13 +1782,27 @@ class PrinterDriver:
         for week in range(weeks):
             for day in range(7):
                 cell_x = x + day * cell_size
-                cell_y = y + 8 + week * cell_size  # +8 for header
+                cell_y = y + 12 + week * cell_size  # +12 for header
 
                 # Get date for this cell
                 cell_date = grid_start + timedelta(days=week * 7 + day)
 
                 # Check if this is the highlighted date (e.g., today)
                 is_highlighted = highlight_date and cell_date == highlight_date
+
+                # Check if date is in current month (for month view)
+                # If start_date is provided and it's a month start, check if cell_date is in same month
+                is_current_month = True
+                if start_date:
+                    try:
+                        # Check if start_date represents a month start
+                        if start_date.day <= 7:  # Likely a month start
+                            is_current_month = (
+                                cell_date.month == start_date.month
+                                and cell_date.year == start_date.year
+                            )
+                    except:
+                        pass
 
                 # Draw cell border (thicker if highlighted)
                 border_width = 2 if is_highlighted else 1
@@ -1804,8 +1828,17 @@ class PrinterDriver:
                     text_h = bbox[3] - bbox[1] if bbox else cell_size // 2
                     text_x = cell_x + 2
                     text_y = cell_y + 2
-                    # Use inverted fill for highlighted dates
-                    text_fill = 1 if is_highlighted else 0
+                    # Use inverted fill for highlighted dates, lighter for other months
+                    if is_highlighted:
+                        text_fill = 1  # White on black
+                    elif not is_current_month:
+                        text_fill = 0  # Black, but we'll make it lighter with pattern
+                        # Draw lighter pattern for other months
+                        for px in range(cell_x + 1, cell_x + cell_size - 1, 2):
+                            for py in range(cell_y + 1, cell_y + cell_size - 1, 2):
+                                draw.point((px, py), fill=0)
+                    else:
+                        text_fill = 0  # Normal black
                     draw.text((text_x, text_y), day_num, font=font, fill=text_fill)
 
                 # Draw event indicator (dot)

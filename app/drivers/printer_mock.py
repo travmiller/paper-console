@@ -385,12 +385,47 @@ class PrinterDriver:
         self.lines_printed += 1
 
     def print_calendar_grid(self, weeks: int = 4, cell_size: int = 8, 
-                           start_date=None, events_by_date: dict = None):
+                           start_date=None, events_by_date: dict = None, highlight_date=None):
         """Simulates printing a calendar grid."""
+        from datetime import date, timedelta
+        
         print("[PRINT] S M T W T F S")
         print("[PRINT] ┌─┬─┬─┬─┬─┬─┬─┐")
-        for _ in range(weeks):
-            print("[PRINT] │ │ │ │ │ │ │ │")
+        
+        # Calculate grid start
+        if start_date:
+            current_date = start_date if isinstance(start_date, date) else date.today()
+            days_since_sunday = current_date.weekday() + 1
+            grid_start = current_date - timedelta(days=days_since_sunday % 7)
+        else:
+            grid_start = date.today()
+            days_since_sunday = grid_start.weekday() + 1
+            grid_start = grid_start - timedelta(days=days_since_sunday % 7)
+        
+        # Print calendar rows
+        for week in range(weeks):
+            row = "│"
+            for day in range(7):
+                cell_date = grid_start + timedelta(days=week * 7 + day)
+                day_num = str(cell_date.day)
+                
+                # Check if highlighted
+                is_highlighted = highlight_date and cell_date == highlight_date
+                # Check if has events
+                date_key = cell_date.isoformat()
+                has_events = events_by_date and date_key in events_by_date and events_by_date[date_key] > 0
+                
+                # Format day number
+                if is_highlighted:
+                    day_display = f"[{day_num:>2}]"
+                elif has_events:
+                    day_display = f"{day_num:>2}·"
+                else:
+                    day_display = f"{day_num:>2} "
+                row += day_display
+            row += "│"
+            print(f"[PRINT] {row}")
+        
         print("[PRINT] └─┴─┴─┴─┴─┴─┴─┘")
         self.lines_printed += weeks + 3
 
