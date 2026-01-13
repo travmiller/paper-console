@@ -652,6 +652,11 @@ class PrinterDriver:
         # Remove last operation's trailing spacing (it becomes START padding after 180° rotation)
         total_height -= last_spacing
 
+        # Add safety buffer to account for any calculation discrepancies
+        # This prevents content from being cut off due to rounding or wrapping differences
+        # Use a larger buffer to ensure all content fits
+        total_height += self.SPACING_LARGE * 2  # 32px safety buffer
+
         # Add 7 lines (168 dots) of padding at the TOP of original bitmap (y=0)
         # After 180° rotation: top of original → bottom of rotated → printed LAST (end spacing)
         # This provides consistent spacing at the end of every print job
