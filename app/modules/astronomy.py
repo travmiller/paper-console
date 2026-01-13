@@ -34,31 +34,46 @@ def get_sun_path_data(now: datetime, city: LocationInfo, tz: pytz.BaseTzInfo) ->
     
     Returns a list of (datetime, altitude) tuples where altitude is in degrees.
     Altitude ranges from -90 (below horizon) to 90 (zenith).
-    Shows a full sine wave including night periods.
+    Shows a full sine wave with day on the left and night on the right.
     """
     # Get sunrise and sunset for the day
     s = sun(city.observer, date=now, tzinfo=tz)
     sunrise = s["sunrise"]
     sunset = s["sunset"]
     
-    # Calculate points throughout a full 24-hour period (every 15 minutes)
-    # Start at midnight of the current day, end at midnight of the next day
-    path_data = []
-    start_time = now.replace(hour=0, minute=0, second=0, microsecond=0)
-    end_time = start_time + timedelta(days=1)
-    current = start_time.replace(minute=(start_time.minute // 15) * 15, second=0, microsecond=0)
+    # Get sunrise for next day to complete the night period
+    next_day = now + timedelta(days=1)
+    s_next = sun(city.observer, date=next_day, tzinfo=tz)
+    next_sunrise = s_next["sunrise"]
     
-    # Sample every 15 minutes for full 24-hour cycle
-    while current < end_time:
+    path_data = []
+    
+    # First, collect day period (sunrise to sunset) - will be on the left
+    day_data = []
+    current = sunrise.replace(minute=(sunrise.minute // 15) * 15, second=0, microsecond=0)
+    while current <= sunset:
         try:
             zenith, azimuth = zenith_and_azimuth(city.observer, current, with_refraction=True)
-            # Altitude = 90 - zenith (zenith is angle from vertical, altitude is angle from horizon)
             altitude = 90.0 - zenith
-            path_data.append((current, altitude))
+            day_data.append((current, altitude))
         except:
-            # If calculation fails (e.g., polar regions), use -90 (below horizon)
-            path_data.append((current, -90.0))
+            day_data.append((current, -90.0))
         current += timedelta(minutes=15)
+    
+    # Then, collect night period (sunset to next sunrise) - will be on the right
+    night_data = []
+    current = sunset.replace(minute=(sunset.minute // 15) * 15, second=0, microsecond=0)
+    while current < next_sunrise:
+        try:
+            zenith, azimuth = zenith_and_azimuth(city.observer, current, with_refraction=True)
+            altitude = 90.0 - zenith
+            night_data.append((current, altitude))
+        except:
+            night_data.append((current, -90.0))
+        current += timedelta(minutes=15)
+    
+    # Combine: day first (left), then night (right)
+    path_data = day_data + night_data
     
     return path_data
 
