@@ -181,19 +181,6 @@ function App() {
 
   const triggerChannelPrint = async (position) => {
     try {
-      // Flush any pending debounced module updates before printing
-      const pendingModuleIds = Object.keys(moduleUpdateTimers.current);
-      for (const moduleId of pendingModuleIds) {
-        if (moduleUpdateTimers.current[moduleId]) {
-          clearTimeout(moduleUpdateTimers.current[moduleId]);
-          delete moduleUpdateTimers.current[moduleId];
-          // Force immediate save of current state
-          if (modules[moduleId]) {
-            await updateModule(moduleId, modules[moduleId], true);
-          }
-        }
-      }
-
       const response = await fetch(`/action/print-channel/${position}`, { method: 'POST' });
 
       if (!response.ok) throw new Error('Failed to trigger print');
