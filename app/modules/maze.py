@@ -55,8 +55,8 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     """Prints a Maze puzzle."""
     from datetime import datetime
     
-    # Fixed size for best readability (15x15)
-    width, height = 15, 15
+    # Fixed size for thermal printer (25x25 for more challenge)
+    width, height = 25, 25
     
     # Generate Maze
     maze = MazeGenerator(width, height)
