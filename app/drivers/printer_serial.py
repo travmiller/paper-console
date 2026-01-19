@@ -575,9 +575,9 @@ class PrinterDriver:
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "hourly_forecast":
                 hourly_forecast = op_data.get("hourly_forecast", [])
-                # Calculate actual height: 4 hours per row, 70px entry height, 10px row spacing
+                # Calculate actual height: 4 hours per row, 80px entry height, 10px row spacing
                 hours_per_row = 4
-                entry_height = 70
+                entry_height = 80
                 row_spacing = 10
                 num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
                 # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
@@ -859,9 +859,9 @@ class PrinterDriver:
             elif op_type == "hourly_forecast":
                 hourly_forecast = op_data.get("hourly_forecast", [])
                 self._draw_hourly_forecast(draw, 0, y, width, hourly_forecast)
-                # Calculate actual height: 4 hours per row, 70px entry height, 10px row spacing
+                # Calculate actual height: 4 hours per row, 80px entry height, 10px row spacing
                 hours_per_row = 4
-                entry_height = 70
+                entry_height = 80
                 row_spacing = 10
                 num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
                 # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
@@ -1762,7 +1762,7 @@ class PrinterDriver:
         col_width = (total_width - 16 - (hours_per_row - 1) * 5) // hours_per_row  # Account for spacing between columns
         hour_spacing = 5  # Horizontal spacing between hours
         icon_size = 18
-        entry_height = 70  # Height for each hourly entry: temp + icon + precip + time
+        entry_height = 80  # Increased height for each hourly entry: time + icon + temp + precip
         row_spacing = 10  # Vertical spacing between rows
         
         # Get fonts
@@ -1837,10 +1837,16 @@ class PrinterDriver:
                 else:
                     time_height = 10
 
-                # Temperature (below time, prominent)
+                # Icon (below time)
+                icon_y = time_y + time_height + 8
+                icon_x = int(col_center - icon_size // 2)
+                icon_type = get_icon_type(hour_data.get("condition", ""))
+                self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
+
+                # Temperature (below icon, prominent)
                 temp = hour_data.get("temperature", "--")
                 temp_str = f"{temp}°" if temp != "--" else "--"
-                temp_y = time_y + time_height + 6
+                temp_y = icon_y + icon_size + 8
                 if font_md:
                     bbox = font_md.getbbox(temp_str)
                     text_w = bbox[2] - bbox[0] if bbox else 0
@@ -1850,17 +1856,11 @@ class PrinterDriver:
                 else:
                     temp_height = 12
 
-                # Icon (middle) - more spacing from temp
-                icon_y = temp_y + temp_height + 8
-                icon_x = int(col_center - icon_size // 2)
-                icon_type = get_icon_type(hour_data.get("condition", ""))
-                self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
-
-                # Precipitation probability (below icon, always show)
+                # Precipitation probability (below temp, always show)
                 precip = hour_data.get("precipitation")
                 precip_value = precip if precip is not None else 0
                 precip_str = f"{precip_value}%"
-                precip_y = icon_y + icon_size + 6
+                precip_y = temp_y + temp_height + 8
                 if font_sm:
                     bbox = font_sm.getbbox(precip_str)
                     text_w = bbox[2] - bbox[0] if bbox else 0
