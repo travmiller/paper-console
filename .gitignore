@@ -83,3 +83,7 @@ docs/raspberry-pi-config-full.md
 # Cursor IDE files
 .cursorrules
 
+# Deployment scripts (local use only)
+deploy.bat
+deploy.sh
+
