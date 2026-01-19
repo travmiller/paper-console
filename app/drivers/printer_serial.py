@@ -1537,9 +1537,9 @@ class PrinterDriver:
 
         num_days = min(len(forecast), 7)
         col_width = total_width // num_days
-        icon_size = 24
-        pill_height = 70  # Height for each pill container
-        pill_padding = 4  # Padding inside pill
+        icon_size = 22  # Slightly smaller icon to fit better
+        pill_height = 85  # Increased height for each pill container
+        pill_padding = 6  # Increased padding inside pill
         pill_radius = 8  # Border radius for rounded corners
 
         # Get fonts
@@ -1576,9 +1576,9 @@ class PrinterDriver:
                 text_w = bbox[2] - bbox[0] if bbox else 0
                 text_x = col_center - text_w // 2
                 draw.text((text_x, content_y), high_str, font=font_lg, fill=0)
-                high_y = content_y + (bbox[3] - bbox[1] if bbox else 16)
+                high_y = content_y + (bbox[3] - bbox[1] if bbox else 16) + 2
             else:
-                high_y = content_y + 16
+                high_y = content_y + 18
 
             # Low temp (smaller, below high)
             low = day_data.get("low", "--")
@@ -1589,9 +1589,9 @@ class PrinterDriver:
                 text_w = bbox[2] - bbox[0] if bbox else 0
                 text_x = col_center - text_w // 2
                 draw.text((text_x, low_y), low_str, font=font_sm, fill=0)
-                icon_y = low_y + (bbox[3] - bbox[1] if bbox else 10) + 2
+                icon_y = low_y + (bbox[3] - bbox[1] if bbox else 10) + 4
             else:
-                icon_y = low_y + 12
+                icon_y = low_y + 14
 
             # Icon
             icon_x = col_center - icon_size // 2
@@ -1602,30 +1602,65 @@ class PrinterDriver:
             precip = day_data.get("precipitation")
             if precip is not None and precip > 0:
                 precip_str = f"{precip}%"
-                precip_y = icon_y + icon_size + 2
+                precip_y = icon_y + icon_size + 4
                 if font_sm:
                     bbox = font_sm.getbbox(precip_str)
                     text_w = bbox[2] - bbox[0] if bbox else 0
                     text_x = col_center - text_w // 2
                     draw.text((text_x, precip_y), precip_str, font=font_sm, fill=0)
-                    date_y = precip_y + (bbox[3] - bbox[1] if bbox else 10) + 2
+                    precip_height = bbox[3] - bbox[1] if bbox else 10
+                    date_y = precip_y + precip_height + 4
                 else:
-                    date_y = precip_y + 12
+                    date_y = icon_y + icon_size + 14
             else:
-                date_y = icon_y + icon_size + 6
+                date_y = icon_y + icon_size + 8
 
             # Day/Date (bottom, e.g., "Today 1/19" or "Tue 1/20")
+            # Use compact format to prevent truncation
             day_label = day_data.get("day", "--")
             date_label = day_data.get("date", "")
+            
+            # Build day/date string - keep it compact
             if date_label:
-                day_date_str = f"{day_label} {date_label}"
+                # For "Today", just show date. For others, show "Mon 1/20"
+                if day_label == "Today":
+                    day_date_str = f"{day_label}\n{date_label}"  # Two lines for "Today"
+                else:
+                    day_date_str = f"{day_label}\n{date_label}"  # Two lines: "Mon" on top, "1/20" below
             else:
                 day_date_str = day_label
+            
+            # Draw day and date on separate lines for better readability
             if font_sm:
-                bbox = font_sm.getbbox(day_date_str)
-                text_w = bbox[2] - bbox[0] if bbox else 0
-                text_x = col_center - text_w // 2
-                draw.text((text_x, date_y), day_date_str, font=font_sm, fill=0)
+                # First line: day label
+                day_bbox = font_sm.getbbox(day_label)
+                day_text_w = day_bbox[2] - day_bbox[0] if day_bbox else 0
+                day_text_x = col_center - day_text_w // 2
+                # Ensure we don't draw outside the pill
+                available_width = col_width - (pill_padding * 2) - 4
+                if day_text_x < pill_left + 2:
+                    day_text_x = pill_left + 2
+                if day_text_x + day_text_w > pill_right - 2:
+                    day_text_x = pill_right - 2 - day_text_w
+                
+                draw.text((day_text_x, date_y), day_label, font=font_sm, fill=0)
+                
+                # Second line: date (if available)
+                if date_label:
+                    date_bbox = font_sm.getbbox(date_label)
+                    date_text_w = date_bbox[2] - date_bbox[0] if date_bbox else 0
+                    date_text_x = col_center - date_text_w // 2
+                    date_text_y = date_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10) + 2
+                    
+                    # Ensure we don't draw outside the pill
+                    if date_text_x < pill_left + 2:
+                        date_text_x = pill_left + 2
+                    if date_text_x + date_text_w > pill_right - 2:
+                        date_text_x = pill_right - 2 - date_text_w
+                    
+                    # Make sure date doesn't go below pill bottom
+                    if date_text_y + (date_bbox[3] - date_bbox[1] if date_bbox else 10) <= pill_bottom - 2:
+                        draw.text((date_text_x, date_text_y), date_label, font=font_sm, fill=0)
 
     def _draw_hourly_forecast(
         self,
@@ -1694,12 +1729,12 @@ class PrinterDriver:
             else:
                 return "cloud"  # Maps to cloud.png
 
-        # Horizontal layout - show up to 8-9 hours per row for better visibility
-        hours_per_row = min(9, len(hourly_forecast))
+        # Horizontal layout - show 6 hours per row for better readability
+        hours_per_row = 6
         num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
         col_width = total_width // hours_per_row
         icon_size = 20
-        entry_height = 60  # Height for each hourly entry: temp + icon + precip + time
+        entry_height = 75  # Increased height for each hourly entry: temp + icon + precip + time
         
         # Get fonts
         font_sm = self._get_font("regular_sm")
@@ -1719,15 +1754,18 @@ class PrinterDriver:
                 # Temperature (top, prominent)
                 temp = hour_data.get("temperature", "--")
                 temp_str = f"{temp}°" if temp != "--" else "--"
-                temp_y = row_y + 2
+                temp_y = row_y + 4
                 if font_md:
                     bbox = font_md.getbbox(temp_str)
                     text_w = bbox[2] - bbox[0] if bbox else 0
                     text_x = int(col_center - text_w // 2)
                     draw.text((text_x, temp_y), temp_str, font=font_md, fill=0)
+                    temp_height = bbox[3] - bbox[1] if bbox else 12
+                else:
+                    temp_height = 12
 
-                # Icon (middle)
-                icon_y = temp_y + 18
+                # Icon (middle) - more spacing from temp
+                icon_y = temp_y + temp_height + 6
                 icon_x = int(col_center - icon_size // 2)
                 icon_type = get_icon_type(hour_data.get("condition", ""))
                 self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
@@ -1736,17 +1774,18 @@ class PrinterDriver:
                 precip = hour_data.get("precipitation")
                 if precip is not None and precip > 0:
                     precip_str = f"{precip}%"
-                    precip_y = icon_y + icon_size + 2
+                    precip_y = icon_y + icon_size + 4
                     if font_sm:
                         bbox = font_sm.getbbox(precip_str)
                         text_w = bbox[2] - bbox[0] if bbox else 0
                         text_x = int(col_center - text_w // 2)
                         draw.text((text_x, precip_y), precip_str, font=font_sm, fill=0)
-                        time_y = precip_y + 10
+                        precip_height = bbox[3] - bbox[1] if bbox else 10
+                        time_y = precip_y + precip_height + 4
                     else:
-                        time_y = icon_y + icon_size + 10
+                        time_y = icon_y + icon_size + 14
                 else:
-                    time_y = icon_y + icon_size + 8
+                    time_y = icon_y + icon_size + 10
 
                 # Time (bottom)
                 time_str = hour_data.get("time", "--")

@@ -247,12 +247,19 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                 precip_prob = int(daily_precip_prob[i]) if i < len(daily_precip_prob) and daily_precip_prob[i] is not None else None
                 
                 # Format day label: "Today" for today, otherwise "Mon 1/19" format
+                # Remove leading zeros from dates for cleaner display
                 if date_obj == today:
                     day_label = "Today"
-                    date_label = dt.strftime("%m/%d")
+                    # Format date without leading zeros: "1/19" instead of "01/19"
+                    month = str(dt.month)
+                    day = str(dt.day)
+                    date_label = f"{month}/{day}"
                 else:
                     day_label = dt.strftime("%a")  # Day abbreviation (Mon, Tue, etc.)
-                    date_label = dt.strftime("%m/%d")
+                    # Format date without leading zeros: "1/20" instead of "01/20"
+                    month = str(dt.month)
+                    day = str(dt.day)
+                    date_label = f"{month}/{day}"
                 
                 forecast.append({
                     "day": day_label,
