@@ -107,15 +107,39 @@ def format_history_receipt(
         # Prepare timeline items
         timeline_items = []
         for event in selected_events:
+            year = 0
+            description = event
+            
+            # Try to parse year from various formats:
+            # "1920: Description" or "1920 - Description" or "1920 Description"
             if " - " in event:
+                # Format: "YEAR - Description"
                 year_str, description = event.split(" - ", 1)
                 try:
                     year = int(year_str.strip())
                 except:
                     year = 0
-                timeline_items.append({"year": year, "text": description})
+            elif ": " in event:
+                # Format: "YEAR: Description" (most common in history.json)
+                parts = event.split(": ", 1)
+                if len(parts) == 2:
+                    year_str = parts[0].strip()
+                    description = parts[1].strip()
+                    try:
+                        year = int(year_str)
+                    except:
+                        year = 0
             else:
-                timeline_items.append({"year": 0, "text": event})
+                # Try to extract year from start of string if it starts with digits
+                parts = event.split(None, 1)  # Split on first whitespace
+                if parts and parts[0].isdigit():
+                    try:
+                        year = int(parts[0])
+                        description = parts[1] if len(parts) > 1 else event
+                    except:
+                        description = event
+            
+            timeline_items.append({"year": year, "text": description})
         
         # Print timeline graphic
         printer.print_timeline(timeline_items, item_height=24)
