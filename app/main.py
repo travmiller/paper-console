@@ -2269,14 +2269,69 @@ async def print_channel(position: int, background_tasks: BackgroundTasks):
 
 
 @app.post("/debug/print-module/{module_id}")
-async def print_module(module_id: str):
+async def print_module(module_id: str, background_tasks: BackgroundTasks):
     """Forces a specific module instance to print (for testing)."""
+    global print_in_progress
+    
     module = settings.modules.get(module_id)
     if not module:
         raise HTTPException(status_code=404, detail="Module not found")
 
-    execute_module(module)
-    return {"message": f"Module '{module.name}' printed to console"}
+    with print_lock:
+        if print_in_progress:
+            raise HTTPException(status_code=409, detail="Print already in progress")
+        print_in_progress = True
+
+    # Run print in background and return immediately
+    # print_module_direct handles errors and clears print_in_progress in its finally block
+    background_tasks.add_task(print_module_direct, module_id)
+    return {"message": f"Printing module '{module.name}'"}
+
+
+async def print_module_direct(module_id: str):
+    """Internal function to print a single module with proper buffer setup."""
+    global print_in_progress
+    
+    try:
+        module = settings.modules.get(module_id)
+        if not module:
+            return
+
+        # Instant tactile feedback - tiny paper blip (2 dots, ~0.01")
+        if hasattr(printer, "blip"):
+            printer.blip()
+
+        # Clear hardware buffer (reset) before starting new job to kill any ghosts
+        if hasattr(printer, "clear_hardware_buffer"):
+            printer.clear_hardware_buffer()
+
+        # Reset printer buffer at start of print job (for invert mode)
+        # Also set max lines limit
+        max_lines = getattr(settings, "max_print_lines", 200)
+        if hasattr(printer, "reset_buffer"):
+            printer.reset_buffer(max_lines)
+
+        # Check paper status before printing
+        if hasattr(printer, "check_paper_status"):
+            paper_status = printer.check_paper_status()
+            if paper_status.get("paper_near_end"):
+                printer.print_text("")
+                printer.print_text("*** PAPER LOW ***")
+                printer.print_text("")
+                printer.feed(1)
+
+        # Execute the module
+        execute_module(module)
+
+        # Flush buffer to actually print (in reverse order for tear-off orientation)
+        # Spacing is built into the bitmap (5 lines at end of each print job)
+        if hasattr(printer, "flush_buffer"):
+            printer.flush_buffer()
+
+    finally:
+        # Always mark print as complete (thread-safe)
+        with print_lock:
+            print_in_progress = False
 
 
 @app.post("/debug/test-webhook")
