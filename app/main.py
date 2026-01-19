@@ -253,46 +253,46 @@ async def check_first_boot():
         if os.path.exists(marker_path):
             # Visual header with inline icon (no feed before - content starts immediately)
             printer.print_header("SYSTEM READY", icon="check", icon_size=28)
-            
-            from datetime import datetime
-            printer.print_bold(datetime.now().strftime("%A, %B %d, %Y"))
-            printer.print_bold(datetime.now().strftime("%I:%M %p"))
-            
-            printer.print_line()
-            
-            # Show channel assignments
-            printer.print_subheader("CHANNELS")
-            
-            import app.config as config_module
-            settings = config_module.settings
-            
-            # Show all 8 channels
-            for channel_num in range(1, 9):
-                channel = settings.channels.get(channel_num)
-                if channel and channel.modules:
-                    # Get module names
-                    module_names = []
-                    for mod_assignment in sorted(channel.modules, key=lambda m: m.order):
-                        module_id = mod_assignment.module_id
-                        if module_id in settings.modules:
-                            module = settings.modules[module_id]
-                            module_names.append(module.name)
-                    
-                    if module_names:
-                        modules_str = " + ".join(module_names)
-                        printer.print_body(f"  {channel_num}. {modules_str}")
-                else:
-                    printer.print_caption(f"  {channel_num}. (empty)")
-            
-            printer.print_line()
-            
-            # Flush buffer (spacing is built into bitmap)
-            if hasattr(printer, "flush_buffer"):
-                try:
-                    printer.flush_buffer()
-                except Exception as e:
-                    logger.error(f"System Ready flush_buffer error: {e}", exc_info=True)
-            return
+        
+        from datetime import datetime
+        printer.print_bold(datetime.now().strftime("%A, %B %d, %Y"))
+        printer.print_bold(datetime.now().strftime("%I:%M %p"))
+        
+        printer.print_line()
+        
+        # Show channel assignments
+        printer.print_subheader("CHANNELS")
+        
+        import app.config as config_module
+        settings = config_module.settings
+        
+        # Show all 8 channels
+        for channel_num in range(1, 9):
+            channel = settings.channels.get(channel_num)
+            if channel and channel.modules:
+                # Get module names
+                module_names = []
+                for mod_assignment in sorted(channel.modules, key=lambda m: m.order):
+                    module_id = mod_assignment.module_id
+                    if module_id in settings.modules:
+                        module = settings.modules[module_id]
+                        module_names.append(module.name)
+                
+                if module_names:
+                    modules_str = " + ".join(module_names)
+                    printer.print_body(f"  {channel_num}. {modules_str}")
+            else:
+                printer.print_caption(f"  {channel_num}. (empty)")
+        
+        printer.print_line()
+        
+        # Flush buffer (spacing is built into bitmap)
+        if hasattr(printer, "flush_buffer"):
+            try:
+                printer.flush_buffer()
+            except Exception as e:
+                logger.error(f"System Ready flush_buffer error: {e}", exc_info=True)
+        return
     except Exception as e:
         logger.error(f"System Ready print error: {e}", exc_info=True)
         return

@@ -109,18 +109,33 @@ def format_quotes_receipt(
     printer.print_line()
 
     # Quote body in italics-style (using medium weight for emphasis)
-    # Strip any embedded newlines and normalize whitespace
-    text = " ".join(text.split())
-    wrapped_lines = wrap_text(text, width=printer.width, indent=0)
+    # Clean text: remove all newlines, carriage returns, tabs, and normalize whitespace
+    import re
+    text = re.sub(r'[\n\r\t]+', ' ', text)  # Replace all whitespace chars with single space
+    text = " ".join(text.split())  # Normalize multiple spaces to single space
+    
+    # Wrap text accounting for quotation marks
+    # First line will have opening quote (1 char), so wrap with width - 1
+    # This ensures the first line + quote doesn't exceed printer width
+    wrapped_lines = wrap_text(text, width=printer.width - 1, indent=0)
+    
+    if not wrapped_lines:
+        wrapped_lines = [text] if text else [""]
+    
+    # Print wrapped lines with proper quotation marks
     for i, line in enumerate(wrapped_lines):
-        if i == 0:
-            # First line: opening quote
+        line = line.strip()  # Remove any trailing/leading whitespace
+        if len(wrapped_lines) == 1:
+            # Single line quote: both quotes on same line
+            printer.print_body(f'"{line}"')
+        elif i == 0:
+            # First line: opening quote only
             printer.print_body(f'"{line}')
         elif i == len(wrapped_lines) - 1:
-            # Last line: closing quote
+            # Last line: leading space + closing quote
             printer.print_body(f' {line}"')
         else:
-            # Middle lines: no quotes, just space
+            # Middle lines: leading space for visual indentation
             printer.print_body(f' {line}')
 
     printer.feed(1)
