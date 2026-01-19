@@ -2082,21 +2082,30 @@ class PrinterDriver:
             item_height: Height per timeline item
             font: Font for text
         """
-        line_x = x + 20  # Vertical line position
-        text_x = line_x + 10  # Text starts 10px right of line
         current_y = y  # Track current Y position
-        
-        # Calculate available width for text (from text_x to right margin)
-        max_text_width = self.PRINTER_WIDTH_DOTS - text_x - 10  # 10px right margin
         line_height = self._get_line_height_for_style("regular") if font else self.line_height
 
         for i, item in enumerate(items):
             item_y = current_y
             
-            # Draw year label (left of line)
+            # Draw year label and calculate its width
             year = str(item.get("year", ""))
+            year_width = 0
             if font and year and year != "0":
+                # Measure year text width
+                try:
+                    bbox = font.getbbox(year)
+                    year_width = bbox[2] - bbox[0] if bbox else len(year) * 8
+                except:
+                    year_width = len(year) * 8  # Fallback estimate
                 draw.text((x, item_y - 4), year, font=font, fill=0)
+            
+            # Position vertical line after year with padding
+            line_x = x + year_width + 12  # 12px padding after year
+            text_x = line_x + 10  # Text starts 10px right of line
+            
+            # Calculate available width for text (from text_x to right margin)
+            max_text_width = self.PRINTER_WIDTH_DOTS - text_x - 10  # 10px right margin
 
             # Draw text (right of line) - wrap it properly
             text = item.get("text", "")
