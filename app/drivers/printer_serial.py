@@ -1571,7 +1571,7 @@ class PrinterDriver:
             col_center = col_x + col_width // 2
             col_right = col_x + col_width
             day_top = y
-            day_bottom = y + day_height
+            day_bottom = y + day_height  # Full height of the forecast section
 
             # Get data
             day_label = day_data.get("day", "--")
@@ -1655,18 +1655,25 @@ class PrinterDriver:
                     date_y = current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10) + 2
                     draw.text((date_text_x, date_y), date_label, font=font_sm, fill=0)
             
-            # Draw vertical divider line on the right (except for last day)
-            # Extend lines to full height of column
+            # Draw vertical divider lines - full height for all columns
+            # Right edge (for all columns except last)
             if i < num_days - 1:
                 draw.line(
                     [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, day_bottom)],
                     fill=0,
                     width=divider_width
                 )
-            # Also draw left edge for first column to complete the grid
+            # Left edge for first column
             if i == 0:
                 draw.line(
                     [(col_x, day_top), (col_x, day_bottom)],
+                    fill=0,
+                    width=divider_width
+                )
+            # Right edge for last column (to complete the grid)
+            if i == num_days - 1:
+                draw.line(
+                    [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, day_bottom)],
                     fill=0,
                     width=divider_width
                 )
@@ -1762,16 +1769,19 @@ class PrinterDriver:
         for col in range(hours_per_row):
             col_x = x + col * (col_width + hour_spacing) + 8  # 8px left margin
             actual_col_positions.append(col_x)
-        # Add right edge
+        # Add right edge - calculate properly to avoid cutoff
         if actual_col_positions:
             last_col_x = actual_col_positions[-1] + col_width
             actual_col_positions.append(last_col_x)
+        
+        # Calculate rightmost position for grid
+        rightmost_x = min(x + total_width, actual_col_positions[-1] if actual_col_positions else x + total_width)
         
         # Draw horizontal grid lines (between rows)
         for row in range(num_rows + 1):
             line_y = y + row * (entry_height + row_spacing)
             draw.line(
-                [(x, line_y), (x + total_width, line_y)],
+                [(x, line_y), (rightmost_x, line_y)],
                 fill=0,
                 width=grid_line_width
             )
@@ -1830,16 +1840,16 @@ class PrinterDriver:
                 icon_type = get_icon_type(hour_data.get("condition", ""))
                 self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
 
-                # Precipitation probability (below icon, only if > 0)
+                # Precipitation probability (below icon, always show)
                 precip = hour_data.get("precipitation")
-                if precip is not None and precip > 0:
-                    precip_str = f"{precip}%"
-                    precip_y = icon_y + icon_size + 6
-                    if font_sm:
-                        bbox = font_sm.getbbox(precip_str)
-                        text_w = bbox[2] - bbox[0] if bbox else 0
-                        text_x = int(col_center - text_w // 2)
-                        draw.text((text_x, precip_y), precip_str, font=font_sm, fill=0)
+                precip_value = precip if precip is not None else 0
+                precip_str = f"{precip_value}%"
+                precip_y = icon_y + icon_size + 6
+                if font_sm:
+                    bbox = font_sm.getbbox(precip_str)
+                    text_w = bbox[2] - bbox[0] if bbox else 0
+                    text_x = int(col_center - text_w // 2)
+                    draw.text((text_x, precip_y), precip_str, font=font_sm, fill=0)
 
     def _draw_progress_bar(
         self,
