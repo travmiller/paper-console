@@ -99,7 +99,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
     """
     Fetches weather from OpenWeather API (if API key provided) or Open-Meteo (free, no key).
     Uses module config location if provided, otherwise falls back to global settings.
-    Returns current weather and 7-day forecast.
+    Returns current weather, 7-day forecast, and 24-hour forecast.
     """
     # Get location from config or fall back to global settings
     if config:
@@ -108,14 +108,12 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         timezone = config.get("timezone") or app.config.settings.timezone
         city_name = config.get("city_name") or app.config.settings.city_name
         api_key = config.get("openweather_api_key")
-        forecast_type = config.get("forecast_type", "daily")  # "daily" or "hourly"
     else:
         latitude = app.config.settings.latitude
         longitude = app.config.settings.longitude
         timezone = app.config.settings.timezone
         city_name = app.config.settings.city_name
         api_key = None
-        forecast_type = "daily"
 
     # Default forecast structure
     empty_forecast = [{"day": "--", "high": "--", "low": "--", "condition": "Unknown", "icon": "cloud"} for _ in range(7)]
@@ -178,6 +176,8 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                 except Exception:
                     pass
 
+                # For OpenWeather, we only get daily forecast from the API
+                # We'll need to use Open-Meteo for hourly forecast
                 return {
                     "current": current_temp,
                     "condition": condition,
@@ -185,6 +185,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                     "low": low,
                     "city": city,
                     "forecast": forecast if forecast else empty_forecast,
+                    "hourly_forecast": [],  # OpenWeather doesn't provide hourly in free tier
                 }
         except Exception:
             # Fall through to Open-Meteo if OpenWeather fails
@@ -194,159 +195,147 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
     try:
         url = "https://api.open-meteo.com/v1/forecast"
         
-        if forecast_type == "hourly":
-            # Fetch hourly forecast (next 24 hours)
-            params = {
-                "latitude": latitude,
-                "longitude": longitude,
-                "current_weather": "true",
-                "hourly": "weathercode,temperature_2m",
-                "timezone": timezone,
-                "temperature_unit": "fahrenheit",
-                "forecast_hours": 24,
-            }
-            
-            resp = requests.get(url, params=params, timeout=10)
-            data = resp.json()
-            
-            current = data["current_weather"]
-            hourly = data["hourly"]
-            
-            # Build hourly forecast (next 24 hours)
-            # According to Open-Meteo docs, forecast_hours=24 returns 24 hours from current hour
-            hourly_forecast = []
-            
-            # Get current time for filtering (API returns data starting from current hour with forecast_hours=24)
-            current_time = datetime.now()
-            current_hour = current_time.replace(minute=0, second=0, microsecond=0)
-            
-            for i in range(len(hourly.get("time", []))):
-                time_str = hourly["time"][i]
-                # Parse ISO8601 time (format: "2022-07-01T00:00" or "2022-07-01T00:00:00")
-                # Remove timezone suffix if present (e.g., "+00:00" or "Z")
-                time_str_clean = time_str.split("+")[0].split("Z")[0]
+        # Fetch both daily and hourly forecasts in a single request
+        params = {
+            "latitude": latitude,
+            "longitude": longitude,
+            "current_weather": "true",
+            "daily": "weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "hourly": "weathercode,temperature_2m,precipitation_probability",
+            "timezone": timezone,
+            "temperature_unit": "fahrenheit",
+            "forecast_days": 8,  # Request 8 days so we get 7 after skipping today (index 0)
+            "forecast_hours": 24,  # Request 24 hours for hourly forecast
+        }
+        
+        resp = requests.get(url, params=params, timeout=10)
+        resp.raise_for_status()  # Raise exception for bad status codes
+        data = resp.json()
+        
+        current = data.get("current_weather", {})
+        daily = data.get("daily", {})
+        hourly = data.get("hourly", {})
+        
+        # Build 7-day forecast (include today, then next 6 days)
+        forecast = []
+        daily_times = daily.get("time", [])
+        daily_max = daily.get("temperature_2m_max", [])
+        daily_min = daily.get("temperature_2m_min", [])
+        daily_weathercode = daily.get("weathercode", [])
+        daily_precip_prob = daily.get("precipitation_probability_max", [])
+        
+        # Get today's date for comparison
+        today = datetime.now().date()
+        
+        # Start from index 0 to include today, then next 6 days (indices 0-6)
+        for i in range(min(len(daily_times), 7)):
+            try:
+                # Parse ISO8601 date (format: "2022-07-01")
+                date_str = daily_times[i]
+                dt = datetime.strptime(date_str, "%Y-%m-%d")
+                date_obj = dt.date()
                 
-                try:
-                    if len(time_str_clean) == 16:  # "2022-07-01T00:00"
-                        dt = datetime.strptime(time_str_clean, "%Y-%m-%dT%H:%M")
-                    elif len(time_str_clean) >= 19:  # "2022-07-01T00:00:00"
-                        dt = datetime.strptime(time_str_clean[:19], "%Y-%m-%dT%H:%M:%S")
-                    else:
-                        continue
-                except Exception:
-                    continue
-                
-                # Skip past hours (keep current hour and future hours)
-                # Note: API with forecast_hours=24 should already filter this, but we double-check
-                if dt < current_hour:
-                    continue
-                
-                weather_code = hourly["weathercode"][i] if "weathercode" in hourly else 0
+                # Get weather code (WMO code) - defaults to 0 (Clear sky) if missing
+                weather_code = daily_weathercode[i] if i < len(daily_weathercode) else 0
                 condition = get_weather_condition(weather_code)
-                temp = int(hourly["temperature_2m"][i]) if "temperature_2m" in hourly else 0
                 
-                # Format time for display (12-hour format with AM/PM)
-                # Remove leading zero from hour (e.g., "01:00 PM" -> "1:00 PM")
-                time_display = dt.strftime("%I:%M %p")
+                # Get temperatures (convert to int, handle missing data)
+                high = int(daily_max[i]) if i < len(daily_max) else None
+                low = int(daily_min[i]) if i < len(daily_min) else None
+                
+                # Get precipitation probability
+                precip_prob = int(daily_precip_prob[i]) if i < len(daily_precip_prob) and daily_precip_prob[i] is not None else None
+                
+                # Format day label: "Today" for today, otherwise "Mon 1/19" format
+                if date_obj == today:
+                    day_label = "Today"
+                    date_label = dt.strftime("%m/%d")
+                else:
+                    day_label = dt.strftime("%a")  # Day abbreviation (Mon, Tue, etc.)
+                    date_label = dt.strftime("%m/%d")
+                
+                forecast.append({
+                    "day": day_label,
+                    "date": date_label,
+                    "high": high,
+                    "low": low,
+                    "condition": condition,
+                    "precipitation": precip_prob,
+                })
+            except (ValueError, IndexError, TypeError) as e:
+                # Skip invalid entries but continue processing
+                continue
+        
+        # Get today's high/low from index 0 (if available)
+        today_high = int(daily_max[0]) if daily_max and len(daily_max) > 0 else None
+        today_low = int(daily_min[0]) if daily_min and len(daily_min) > 0 else None
+        
+        # Build hourly forecast (next 24 hours)
+        hourly_forecast = []
+        
+        # Get current time for filtering
+        current_time = datetime.now()
+        current_hour = current_time.replace(minute=0, second=0, microsecond=0)
+        
+        for i in range(len(hourly.get("time", []))):
+            time_str = hourly["time"][i]
+            # Parse ISO8601 time (format: "2022-07-01T00:00" or "2022-07-01T00:00:00")
+            # Remove timezone suffix if present (e.g., "+00:00" or "Z")
+            time_str_clean = time_str.split("+")[0].split("Z")[0]
+            
+            try:
+                if len(time_str_clean) == 16:  # "2022-07-01T00:00"
+                    dt = datetime.strptime(time_str_clean, "%Y-%m-%dT%H:%M")
+                elif len(time_str_clean) >= 19:  # "2022-07-01T00:00:00"
+                    dt = datetime.strptime(time_str_clean[:19], "%Y-%m-%dT%H:%M:%S")
+                else:
+                    continue
+            except Exception:
+                continue
+            
+            # Skip past hours (keep current hour and future hours)
+            if dt < current_hour:
+                continue
+            
+            weather_code = hourly["weathercode"][i] if "weathercode" in hourly else 0
+            condition = get_weather_condition(weather_code)
+            temp = int(hourly["temperature_2m"][i]) if "temperature_2m" in hourly else 0
+            
+            # Get precipitation probability
+            hourly_precip_prob = hourly.get("precipitation_probability", [])
+            precip_prob = int(hourly_precip_prob[i]) if i < len(hourly_precip_prob) and hourly_precip_prob[i] is not None else None
+            
+            # Format time for display
+            # Show "Now" for current hour, otherwise 12-hour format with AM/PM
+            current_hour_dt = datetime.now().replace(minute=0, second=0, microsecond=0)
+            if dt == current_hour_dt:
+                time_display = "Now"
+            else:
+                time_display = dt.strftime("%I %p")  # "11 AM", "2 PM" format
                 if time_display.startswith("0"):
                     time_display = time_display[1:]  # Remove leading zero from hour
-                
-                hourly_forecast.append({
-                    "time": time_display,
-                    "hour": dt.strftime("%H"),
-                    "temperature": temp,
-                    "condition": condition,
-                })
-                
-                # Limit to 24 hours (API should already provide exactly 24, but be safe)
-                if len(hourly_forecast) >= 24:
-                    break
             
-            return {
-                "current": int(current["temperature"]),
-                "condition": get_weather_condition(current["weathercode"]),
-                "high": int(current["temperature"]),  # Use current for hourly
-                "low": int(current["temperature"]),
-                "city": city_name,
-                "forecast_type": "hourly",
-                "hourly_forecast": hourly_forecast,
-            }
-        else:
-            # Fetch daily forecast (default)
-            # According to Open-Meteo docs:
-            # - daily data requires timezone parameter
-            # - data starts at 00:00 local time when timezone is set
-            # - forecast_days defaults to 7, can be up to 16
-            # - daily aggregations are 24-hour aggregations from hourly values
-            params = {
-                "latitude": latitude,
-                "longitude": longitude,
-                "current_weather": "true",
-                "daily": "weathercode,temperature_2m_max,temperature_2m_min",
-                "timezone": timezone,  # Required for daily data
-                "temperature_unit": "fahrenheit",
-                "forecast_days": 8,  # Request 8 days so we get 7 after skipping today (index 0)
-            }
-
-            resp = requests.get(url, params=params, timeout=10)
-            resp.raise_for_status()  # Raise exception for bad status codes
-            data = resp.json()
-
-            current = data.get("current_weather", {})
-            daily = data.get("daily", {})
-
-            # Validate we have the required data
-            if not daily.get("time") or not daily.get("temperature_2m_max") or not daily.get("temperature_2m_min"):
-                raise ValueError("Missing required daily forecast data")
-
-            # Build 7-day forecast (skip today, start from tomorrow)
-            # According to docs: daily data starts from today (index 0) at 00:00 local time
-            forecast = []
-            daily_times = daily.get("time", [])
-            daily_max = daily.get("temperature_2m_max", [])
-            daily_min = daily.get("temperature_2m_min", [])
-            daily_weathercode = daily.get("weathercode", [])
+            hourly_forecast.append({
+                "time": time_display,
+                "hour": dt.strftime("%H"),
+                "temperature": temp,
+                "condition": condition,
+                "precipitation": precip_prob,
+            })
             
-            # Start from index 1 to skip today (index 0 is today, which we show separately)
-            # Get next 7 days (indices 1-7)
-            for i in range(1, min(len(daily_times), 8)):
-                try:
-                    # Parse ISO8601 date (format: "2022-07-01")
-                    date_str = daily_times[i]
-                    dt = datetime.strptime(date_str, "%Y-%m-%d")
-                    
-                    # Get weather code (WMO code) - defaults to 0 (Clear sky) if missing
-                    weather_code = daily_weathercode[i] if i < len(daily_weathercode) else 0
-                    condition = get_weather_condition(weather_code)
-                    
-                    # Get temperatures (convert to int, handle missing data)
-                    high = int(daily_max[i]) if i < len(daily_max) else None
-                    low = int(daily_min[i]) if i < len(daily_min) else None
-                    
-                    forecast.append({
-                        "day": dt.strftime("%a"),  # Day abbreviation (Mon, Tue, etc.)
-                        "date": dt.strftime("%d"),  # Day of month
-                        "high": high,
-                        "low": low,
-                        "condition": condition,
-                    })
-                except (ValueError, IndexError, TypeError) as e:
-                    # Skip invalid entries but continue processing
-                    continue
-
-            # Get today's high/low from index 0
-            today_high = int(daily_max[0]) if daily_max else None
-            today_low = int(daily_min[0]) if daily_min else None
-
-            return {
-                "current": int(current.get("temperature", 0)),
-                "condition": get_weather_condition(current.get("weathercode", 0)),
-                "high": today_high,
-                "low": today_low,
-                "city": city_name,
-                "forecast_type": "daily",
-                "forecast": forecast,
-            }
+            # Limit to 24 hours
+            if len(hourly_forecast) >= 24:
+                break
+        
+        return {
+            "current": int(current.get("temperature", 0)),
+            "condition": get_weather_condition(current.get("weathercode", 0)),
+            "high": today_high,
+            "low": today_low,
+            "city": city_name,
+            "forecast": forecast,
+            "hourly_forecast": hourly_forecast,
+        }
 
     except Exception as e:
         # Log error for debugging
@@ -356,22 +345,16 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         except:
             pass  # Ignore logging errors
         
-        # Return error response with appropriate forecast type
-        error_response = {
+        # Return error response with both forecast types
+        return {
             "current": "--",
             "condition": "Unavailable",
             "high": "--",
             "low": "--",
             "city": city_name,
-            "forecast_type": forecast_type,
+            "forecast": empty_forecast,
+            "hourly_forecast": empty_hourly,
         }
-        
-        if forecast_type == "hourly":
-            error_response["hourly_forecast"] = []
-        else:
-            error_response["forecast"] = empty_forecast
-        
-        return error_response
 
 
 def _get_icon_type(condition: str) -> str:
@@ -425,7 +408,7 @@ def _get_icon_type(condition: str) -> str:
 def format_weather_receipt(
     printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None
 ):
-    """Prints the weather receipt with current conditions and 7-day forecast."""
+    """Prints the weather receipt with current conditions, 24-hour forecast, and 7-day forecast."""
     weather = get_weather(config)
 
     # Header
@@ -448,26 +431,22 @@ def format_weather_receipt(
     printer.print_body(f"High {weather['high']}°F  ·  Low {weather['low']}°F")
     printer.print_line()
     
-    # Check forecast type
-    forecast_type = weather.get('forecast_type', 'daily')
+    # 24-Hour Forecast
+    hourly_forecast = weather.get('hourly_forecast', [])
+    if hourly_forecast:
+        printer.print_subheader("24-HOUR FORECAST")
+        printer.print_line()
+        
+        # Print hourly forecast
+        printer.print_hourly_forecast(hourly_forecast)
+        printer.print_line()
     
-    if forecast_type == "hourly":
-        # Hourly Forecast
-        hourly_forecast = weather.get('hourly_forecast', [])
-        if hourly_forecast:
-            printer.print_subheader("24-HOUR FORECAST")
-            printer.print_line()
-            
-            # Print hourly forecast
-            printer.print_hourly_forecast(hourly_forecast)
-            printer.print_line()
-    else:
-        # Daily Forecast
-        forecast = weather.get('forecast', [])
-        if forecast:
-            printer.print_subheader("7-DAY FORECAST")
-            printer.print_line()
-            
-            # Print forecast as a visual row with icons
-            printer.print_weather_forecast(forecast)
-            printer.print_line()
+    # 7-Day Forecast
+    forecast = weather.get('forecast', [])
+    if forecast:
+        printer.print_subheader("7-DAY FORECAST")
+        printer.print_line()
+        
+        # Print forecast as a visual row with icons
+        printer.print_weather_forecast(forecast)
+        printer.print_line()

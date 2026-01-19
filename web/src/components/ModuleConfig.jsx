@@ -401,21 +401,6 @@ const ModuleConfig = ({ module, updateConfig }) => {
             </p>
           )}
         </div>
-
-        <div className={`pt-4 border-t-2 border-gray-300`}>
-          <label className={labelClass}>Forecast Type</label>
-          <select
-            value={config.forecast_type || 'daily'}
-            onChange={(e) => updateConfig('forecast_type', e.target.value)}
-            className={inputClass}
-          >
-            <option value='daily'>7-Day Forecast</option>
-            <option value='hourly'>24-Hour Forecast</option>
-          </select>
-          <p className={`${commonClasses.textSubtle} mt-1`}>
-            Choose between daily (7-day) or hourly (24-hour) forecast display.
-          </p>
-        </div>
       </div>
     );
   }
