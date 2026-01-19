@@ -97,7 +97,7 @@ def format_history_receipt(
 
     # Header
     printer.print_header(module_name or "ON THIS DAY", icon="hourglass")
-    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
+    printer.print_caption(datetime.now().strftime("%B %d, %Y"))
     printer.print_line()
 
     if not selected_events:

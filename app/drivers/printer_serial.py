@@ -2083,17 +2083,22 @@ class PrinterDriver:
             font: Font for text
         """
         line_x = x + 20  # Vertical line position
+        text_x = line_x + 10  # Text starts 10px right of line
+        current_y = y  # Track current Y position
+        
+        # Calculate available width for text (from text_x to right margin)
+        max_text_width = self.PRINTER_WIDTH_DOTS - text_x - 10  # 10px right margin
+        line_height = self._get_line_height_for_style("regular") if font else self.line_height
 
         for i, item in enumerate(items):
-            item_y = y + i * item_height
+            item_y = current_y
+            
+            # Draw year label (left of line)
+            year = str(item.get("year", ""))
+            if font and year:
+                draw.text((x, item_y - 4), year, font=font, fill=0)
 
-            # Draw vertical timeline line
-            if i < len(items) - 1:
-                draw.line(
-                    [(line_x, item_y), (line_x, item_y + item_height)], fill=0, width=2
-                )
-
-            # Draw circle/node on timeline
+            # Draw circle/node on timeline (at the start position)
             node_radius = 4
             draw.ellipse(
                 [
@@ -2105,19 +2110,37 @@ class PrinterDriver:
                 fill=0,
             )
 
-            # Draw year label (left of line)
-            year = str(item.get("year", ""))
-            if font and year:
-                draw.text((x, item_y - 4), year, font=font, fill=0)
-
-            # Draw text (right of line)
+            # Draw text (right of line) - wrap it properly
             text = item.get("text", "")
             if font and text:
-                # Truncate if too long
-                max_width = self.PRINTER_WIDTH_DOTS - line_x - 30
-                if len(text) > max_width // 6:  # Rough estimate
-                    text = text[: max_width // 6 - 3] + "..."
-                draw.text((line_x + 10, item_y - 4), text, font=font, fill=0)
+                # Wrap text to fit available width
+                wrapped_lines = self._wrap_text_by_width(text, font, max_text_width)
+                
+                # Draw each wrapped line
+                text_y = item_y - 4
+                for line in wrapped_lines:
+                    if line.strip():  # Only draw non-empty lines
+                        draw.text((text_x, text_y), line, font=font, fill=0)
+                        text_y += line_height
+                
+                # Calculate actual height used for this item
+                # Add some padding at the bottom
+                actual_height = max(item_height, (len(wrapped_lines) * line_height) + 8)
+            else:
+                # Fallback if no font
+                if text:
+                    draw.text((text_x, item_y - 4), text, fill=0)
+                actual_height = item_height
+            
+            # Draw vertical timeline line to next item (if not last item)
+            if i < len(items) - 1:
+                line_end_y = item_y + actual_height
+                draw.line(
+                    [(line_x, item_y), (line_x, line_end_y)], fill=0, width=2
+                )
+            
+            # Update position for next item
+            current_y += actual_height
 
     def _draw_calendar_day_timeline(
         self,
