@@ -2246,8 +2246,8 @@ async def set_dial(position: int):
 
 
 @app.post("/action/print-channel/{position}")
-async def print_channel(position: int):
-    """Set dial position and trigger print atomically."""
+async def print_channel(position: int, background_tasks: BackgroundTasks):
+    """Set dial position and trigger print atomically. Returns immediately while print runs in background."""
     global print_in_progress
     logger = logging.getLogger(__name__)
 
@@ -2259,15 +2259,10 @@ async def print_channel(position: int):
             raise HTTPException(status_code=409, detail="Print already in progress")
         print_in_progress = True
 
-    try:
-        await trigger_channel(position)
-        return {"message": f"Printing channel {position}"}
-    except Exception as e:
-        logger.error(f"Error printing channel {position}: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Print failed: {str(e)}")
-    finally:
-        with print_lock:
-            print_in_progress = False
+    # Run print in background and return immediately
+    # trigger_channel handles errors and clears print_in_progress in its finally block
+    background_tasks.add_task(trigger_channel, position)
+    return {"message": f"Printing channel {position}"}
 
 
 # --- DEBUG / VIRTUAL HARDWARE CONTROLS ---
