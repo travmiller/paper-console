@@ -327,28 +327,25 @@ class PrinterDriver:
             return "☁"
         
         # Print all 7 days horizontally with vertical dividers
-        # Day labels row
-        day_labels = []
-        for day_data in forecast[:7]:
-            day_label = day_data.get("day", "--")
-            date_label = day_data.get("date", "")
-            if date_label:
-                day_labels.append(f"{day_label}\n{date_label}")
-            else:
-                day_labels.append(day_label)
-        print(f"[PRINT] {' | '.join(f'{d:^8}' for d in day_labels)}")
+        # Order: High temp (bold) → Low temp (medium) → Icon → Precip % → Day/Date
         
-        # High temps row
+        # High temps row (bold)
         highs = [f"{d.get('high', '--')}°" for d in forecast[:7]]
         print(f"[PRINT] {' | '.join(f'{h:^8}' for h in highs)}")
+        print(f"[PRINT]")  # Extra spacing
+        self.lines_printed += 2
         
-        # Low temps row
+        # Low temps row (medium)
         lows = [f"{d.get('low', '--')}°" for d in forecast[:7]]
         print(f"[PRINT] {' | '.join(f'{l:^8}' for l in lows)}")
+        print(f"[PRINT]")  # Extra spacing
+        self.lines_printed += 2
         
         # Icons row
         icons_row = [get_icon(d.get("condition", "")) for d in forecast[:7]]
         print(f"[PRINT] {' | '.join(f'{i:^8}' for i in icons_row)}")
+        print(f"[PRINT]")  # Extra spacing
+        self.lines_printed += 2
         
         # Precipitation row (only if > 0)
         precip_row = []
@@ -359,8 +356,20 @@ class PrinterDriver:
             else:
                 precip_row.append("")
         print(f"[PRINT] {' | '.join(f'{p:^8}' for p in precip_row)}")
+        print(f"[PRINT]")  # Extra spacing
+        self.lines_printed += 2
         
-        self.lines_printed += 5
+        # Day/Date labels row (bottom)
+        day_labels = []
+        for day_data in forecast[:7]:
+            day_label = day_data.get("day", "--")
+            date_label = day_data.get("date", "")
+            if date_label:
+                day_labels.append(f"{day_label} {date_label}")
+            else:
+                day_labels.append(day_label)
+        print(f"[PRINT] {' | '.join(f'{d:^8}' for d in day_labels)}")
+        self.lines_printed += 1
 
     def print_hourly_forecast(self, hourly_forecast: list):
         """Simulates printing a 24-hour hourly weather forecast in card style (4 hours per row)."""
