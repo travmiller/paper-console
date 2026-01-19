@@ -570,13 +570,22 @@ class PrinterDriver:
                 total_height += self.SPACING_SMALL + size + self.SPACING_SMALL
                 last_spacing = self.SPACING_SMALL
             elif op_type == "weather_forecast":
-                total_height += 24 + 12 + 12 + 12 + self.SPACING_MEDIUM
+                # Day height is 110px (as set in _draw_weather_forecast)
+                total_height += 110 + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "hourly_forecast":
                 hourly_forecast = op_data.get("hourly_forecast", [])
-                num_rows = (len(hourly_forecast) + 5) // 6
-                # Grid layout: icon_size (20) + text spacing (12) + content spacing (12) = 44 per row
-                total_height += num_rows * 44
+                # Calculate actual height: 4 hours per row, 70px entry height, 10px row spacing
+                hours_per_row = 4
+                entry_height = 70
+                row_spacing = 10
+                num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
+                # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
+                if num_rows > 0:
+                    forecast_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
+                else:
+                    forecast_height = 0
+                total_height += forecast_height + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "progress_bar":
                 height = op_data.get("height", 12)
@@ -1734,6 +1743,33 @@ class PrinterDriver:
         font_sm = self._get_font("regular_sm")
         font_md = self._get_font("regular")  # For temperature
 
+        # Draw grid lines first (behind content)
+        grid_line_width = 1
+        
+        # Calculate total forecast height
+        total_forecast_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
+        
+        # Draw horizontal grid lines (between rows)
+        for row in range(num_rows + 1):
+            line_y = y + row * (entry_height + row_spacing)
+            draw.line(
+                [(x, line_y), (x + total_width, line_y)],
+                fill=0,
+                width=grid_line_width
+            )
+        
+        # Draw vertical grid lines (between hours)
+        for col in range(hours_per_row + 1):
+            col_x = x + col * (col_width + hour_spacing) + 8  # 8px left margin
+            # Only draw if within bounds
+            if col_x <= x + total_width:
+                draw.line(
+                    [(col_x, y), (col_x, y + total_forecast_height)],
+                    fill=0,
+                    width=grid_line_width
+                )
+        
+        # Draw content on top of grid
         for row in range(num_rows):
             row_y = y + row * (entry_height + row_spacing)
             start_idx = row * hours_per_row
