@@ -2095,20 +2095,8 @@ class PrinterDriver:
             
             # Draw year label (left of line)
             year = str(item.get("year", ""))
-            if font and year:
+            if font and year and year != "0":
                 draw.text((x, item_y - 4), year, font=font, fill=0)
-
-            # Draw circle/node on timeline (at the start position)
-            node_radius = 4
-            draw.ellipse(
-                [
-                    line_x - node_radius,
-                    item_y - node_radius,
-                    line_x + node_radius,
-                    item_y + node_radius,
-                ],
-                fill=0,
-            )
 
             # Draw text (right of line) - wrap it properly
             text = item.get("text", "")
