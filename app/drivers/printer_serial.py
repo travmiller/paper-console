@@ -1640,6 +1640,7 @@ class PrinterDriver:
             current_y += element_spacing
             
             # 5. Day/Date label (bottom)
+            actual_bottom = day_bottom  # Track actual bottom of content
             if font_sm:
                 # Day name
                 day_bbox = font_sm.getbbox(day_label)
@@ -1654,26 +1655,34 @@ class PrinterDriver:
                     date_text_x = col_center - date_text_w // 2
                     date_y = current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10) + 2
                     draw.text((date_text_x, date_y), date_label, font=font_sm, fill=0)
+                    # Update actual bottom to include date
+                    actual_bottom = max(actual_bottom, date_y + (date_bbox[3] - date_bbox[1] if date_bbox else 10))
+                else:
+                    # Update actual bottom to include day label
+                    actual_bottom = max(actual_bottom, current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10))
             
             # Draw vertical divider lines - full height for all columns
+            # Use actual_bottom to ensure lines extend to the very bottom of content
+            line_bottom = max(day_bottom, actual_bottom)
+            
             # Right edge (for all columns except last)
             if i < num_days - 1:
                 draw.line(
-                    [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, day_bottom)],
+                    [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, line_bottom)],
                     fill=0,
                     width=divider_width
                 )
             # Left edge for first column
             if i == 0:
                 draw.line(
-                    [(col_x, day_top), (col_x, day_bottom)],
+                    [(col_x, day_top), (col_x, line_bottom)],
                     fill=0,
                     width=divider_width
                 )
             # Right edge for last column (to complete the grid)
             if i == num_days - 1:
                 draw.line(
-                    [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, day_bottom)],
+                    [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, line_bottom)],
                     fill=0,
                     width=divider_width
                 )
@@ -1748,7 +1757,9 @@ class PrinterDriver:
         # Horizontal layout - show 4 hours per row for much better readability
         hours_per_row = 4
         num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
-        col_width = (total_width - 15) // hours_per_row  # Leave 15px total margin
+        # Calculate column width with proper margins to avoid cutoff
+        # Leave 8px left margin + 8px right margin = 16px total margin
+        col_width = (total_width - 16 - (hours_per_row - 1) * 5) // hours_per_row  # Account for spacing between columns
         hour_spacing = 5  # Horizontal spacing between hours
         icon_size = 18
         entry_height = 70  # Height for each hourly entry: temp + icon + precip + time
@@ -1766,16 +1777,21 @@ class PrinterDriver:
         
         # Calculate actual column positions for grid
         actual_col_positions = []
+        left_margin = 8
+        right_margin = 8
         for col in range(hours_per_row):
-            col_x = x + col * (col_width + hour_spacing) + 8  # 8px left margin
+            col_x = x + col * (col_width + hour_spacing) + left_margin
             actual_col_positions.append(col_x)
         # Add right edge - calculate properly to avoid cutoff
+        # Use the actual last column position + its width, but ensure it doesn't exceed total_width
         if actual_col_positions:
             last_col_x = actual_col_positions[-1] + col_width
+            # Ensure we don't exceed the available width (account for right margin)
+            last_col_x = min(last_col_x, x + total_width - right_margin)
             actual_col_positions.append(last_col_x)
         
-        # Calculate rightmost position for grid
-        rightmost_x = min(x + total_width, actual_col_positions[-1] if actual_col_positions else x + total_width)
+        # Calculate rightmost position for grid - ensure it's within bounds
+        rightmost_x = min(x + total_width - right_margin, actual_col_positions[-1] if actual_col_positions else x + total_width - right_margin)
         
         # Draw horizontal grid lines (between rows)
         for row in range(num_rows + 1):
@@ -1788,8 +1804,8 @@ class PrinterDriver:
         
         # Draw vertical grid lines (between hours) - use actual column positions
         for col_x in actual_col_positions:
-            # Only draw if within bounds
-            if col_x <= x + total_width:
+            # Only draw if within bounds - ensure we don't exceed total_width
+            if col_x < x + total_width:
                 draw.line(
                     [(col_x, y), (col_x, y + total_forecast_height)],
                     fill=0,
