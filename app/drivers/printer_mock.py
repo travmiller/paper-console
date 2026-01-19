@@ -313,7 +313,7 @@ class PrinterDriver:
         self.lines_printed += 1
 
     def print_weather_forecast(self, forecast: list):
-        """Simulates printing a 7-day weather forecast with pill containers."""
+        """Simulates printing a 7-day weather forecast in 2 rows (4+3 layout)."""
         icons = {"sun": "☀", "cloud": "☁", "rain": "🌧", "snow": "❄", "storm": "⛈", "cloud-sun": "⛅", "cloud-fog": "🌫", "snowflake": "❄"}
         
         def get_icon(condition):
@@ -326,42 +326,59 @@ class PrinterDriver:
             if "fog" in condition or "mist" in condition: return "🌫"
             return "☁"
         
-        # Print each day in a pill container format
-        for day_data in forecast[:7]:
-            day_label = day_data.get("day", "--")
-            date_label = day_data.get("date", "")
-            high = day_data.get("high", "--")
-            low = day_data.get("low", "--")
-            condition = day_data.get("condition", "")
-            precip = day_data.get("precipitation")
+        # Print in 2 rows: 4 days top, 3 days bottom
+        days_per_row = 4
+        for row in range(2):
+            start_idx = row * days_per_row
+            end_idx = min(start_idx + days_per_row, len(forecast))
+            if start_idx >= len(forecast):
+                break
+                
+            # Print row of days
+            row_days = forecast[start_idx:end_idx]
             
-            # Format day/date
-            if date_label:
-                day_date = f"{day_label} {date_label}"
-            else:
-                day_date = day_label
+            # Day labels row
+            day_labels = []
+            for day_data in row_days:
+                day_label = day_data.get("day", "--")
+                date_label = day_data.get("date", "")
+                if date_label:
+                    day_labels.append(f"{day_label} {date_label}")
+                else:
+                    day_labels.append(day_label)
+            print(f"[PRINT] {'  '.join(f'{d:^12}' for d in day_labels)}")
             
-            # Format precipitation
-            precip_str = f"{precip}%" if precip is not None and precip > 0 else ""
+            # High temps row
+            highs = [f"{d.get('high', '--')}°" for d in row_days]
+            print(f"[PRINT] {'  '.join(f'{h:^12}' for h in highs)}")
             
-            # Print pill container
-            print(f"[PRINT] ┌{'─' * 10}┐")
-            print(f"[PRINT] │ {high}°{' ' * (8 - len(str(high)))}│")
-            print(f"[PRINT] │ {low}°{' ' * (8 - len(str(low)))}│")
-            print(f"[PRINT] │ {get_icon(condition)}{' ' * 8}│")
-            if precip_str:
-                print(f"[PRINT] │ {precip_str}{' ' * (10 - len(precip_str))}│")
-            print(f"[PRINT] │ {day_date}{' ' * (10 - len(day_date))}│")
-            print(f"[PRINT] └{'─' * 10}┘")
-            self.lines_printed += 6 if precip_str else 5
-        
-        # Add spacing between days
-        if forecast:
-            print(f"[PRINT]")
-            self.lines_printed += 1
+            # Low temps row
+            lows = [f"{d.get('low', '--')}°" for d in row_days]
+            print(f"[PRINT] {'  '.join(f'{l:^12}' for l in lows)}")
+            
+            # Icons row
+            icons_row = [get_icon(d.get("condition", "")) for d in row_days]
+            print(f"[PRINT] {'  '.join(f'{i:^12}' for i in icons_row)}")
+            
+            # Precipitation row (only if > 0)
+            precip_row = []
+            for d in row_days:
+                precip = d.get("precipitation")
+                if precip is not None and precip > 0:
+                    precip_row.append(f"{precip}%")
+                else:
+                    precip_row.append("")
+            print(f"[PRINT] {'  '.join(f'{p:^12}' for p in precip_row)}")
+            
+            self.lines_printed += 5
+            
+            # Add spacing between rows
+            if row < 1:
+                print(f"[PRINT]")
+                self.lines_printed += 1
 
     def print_hourly_forecast(self, hourly_forecast: list):
-        """Simulates printing a 24-hour hourly weather forecast in card style."""
+        """Simulates printing a 24-hour hourly weather forecast in card style (4 hours per row)."""
         icons = {"sun": "☀", "cloud": "☁", "rain": "🌧", "snow": "❄", "storm": "⛈", "cloud-sun": "⛅", "cloud-fog": "🌫", "snowflake": "❄"}
         
         def get_icon(condition):
@@ -375,18 +392,18 @@ class PrinterDriver:
             return "☁"
         
         # Print in horizontal card style: temp, icon, precip, time
-        # Group into rows of 9 hours each
-        hours_per_row = 9
+        # Group into rows of 4 hours each for better spacing
+        hours_per_row = 4
         for i in range(0, len(hourly_forecast), hours_per_row):
             row = hourly_forecast[i:i + hours_per_row]
             
             # Temperature row (top, prominent)
             temps = [f"{h.get('temperature', '--')}°" for h in row]
-            print(f"[PRINT] {' '.join(f'{t:^6}' for t in temps)}")
+            print(f"[PRINT] {'  '.join(f'{t:^10}' for t in temps)}")
             
             # Icon row
             icons_row = [get_icon(h.get("condition")) for h in row]
-            print(f"[PRINT] {' '.join(f'{i:^6}' for i in icons_row)}")
+            print(f"[PRINT] {'  '.join(f'{i:^10}' for i in icons_row)}")
             
             # Precipitation row (optional, only show if > 0)
             precip_row = []
@@ -396,13 +413,18 @@ class PrinterDriver:
                     precip_row.append(f"{precip}%")
                 else:
                     precip_row.append("")
-            print(f"[PRINT] {' '.join(f'{p:^6}' for p in precip_row)}")
+            print(f"[PRINT] {'  '.join(f'{p:^10}' for p in precip_row)}")
             
             # Time row (bottom)
             times = [h.get("time", "--") for h in row]
-            print(f"[PRINT] {' '.join(f'{t:^6}' for t in times)}")
+            print(f"[PRINT] {'  '.join(f'{t:^10}' for t in times)}")
             
             self.lines_printed += 4
+            
+            # Add spacing between rows
+            if i + hours_per_row < len(hourly_forecast):
+                print(f"[PRINT]")
+                self.lines_printed += 1
 
     def print_progress_bar(self, value: float, max_value: float = 100, 
                          width: int = None, height: int = 12, label: str = ""):
