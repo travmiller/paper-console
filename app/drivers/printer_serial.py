@@ -575,8 +575,8 @@ class PrinterDriver:
             elif op_type == "hourly_forecast":
                 hourly_forecast = op_data.get("hourly_forecast", [])
                 num_rows = (len(hourly_forecast) + 5) // 6
-                # Updated: icon_size (20) + text spacing (12) + content spacing (12) + row spacing (12) = 56
-                total_height += num_rows * 56
+                # Grid layout: icon_size (20) + text spacing (12) + content spacing (12) = 44 per row
+                total_height += num_rows * 44
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "progress_bar":
                 height = op_data.get("height", 12)
@@ -850,8 +850,8 @@ class PrinterDriver:
                 hourly_forecast = op_data.get("hourly_forecast", [])
                 self._draw_hourly_forecast(draw, 0, y, width, hourly_forecast)
                 num_rows = (len(hourly_forecast) + 5) // 6
-                # Updated: icon_size (20) + text spacing (12) + content spacing (12) + row spacing (12) = 56
-                y += num_rows * 56
+                # Grid layout: icon_size (20) + text spacing (12) + content spacing (12) = 44 per row
+                y += num_rows * 44
             elif op_type == "progress_bar":
                 value = op_data.get("value", 0)
                 max_value = op_data.get("max_value", 100)
@@ -1654,9 +1654,8 @@ class PrinterDriver:
         num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
         col_width = total_width // hours_per_row
         icon_size = 20
-        content_height = icon_size + 12 + 12  # icon + text + more spacing
-        row_spacing = 12  # Extra spacing between rows
-        row_height = content_height + row_spacing  # Total height per row including spacing
+        cell_height = icon_size + 12 + 12  # icon + text + spacing
+        row_height = cell_height  # Each row is exactly one cell height
 
         # Get small font for text
         font = self._get_font("regular_sm")
@@ -1671,17 +1670,18 @@ class PrinterDriver:
                 col_idx = col - start_idx
                 col_x = x + col_idx * col_width
                 col_center = col_x + col_width // 2
+                cell_right = col_x + col_width
+                cell_bottom = row_y + cell_height
 
-                # Draw vertical line before each column (except the first)
-                if col_idx > 0:
-                    draw.line(
-                        [col_x, row_y - 2, col_x, row_y + content_height + 2],
-                        fill=0,
-                        width=1,
-                    )
+                # Draw box around each hour cell
+                draw.rectangle(
+                    [col_x, row_y, cell_right - 1, cell_bottom - 1],
+                    outline=0,
+                    width=1,
+                )
 
                 # Icon
-                icon_y = row_y
+                icon_y = row_y + 2  # Small padding from top
                 icon_x = int(col_center - icon_size // 2)
                 icon_type = get_icon_type(hour_data.get("condition", ""))
                 self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
@@ -1704,15 +1704,6 @@ class PrinterDriver:
                     text_w = bbox[2] - bbox[0] if bbox else 0
                     text_x = int(col_center - text_w // 2)
                     draw.text((text_x, temp_y), temp_str, font=font, fill=0)
-
-            # Draw horizontal line after each row (except the last one)
-            if row < num_rows - 1:
-                line_y = row_y + content_height + row_spacing // 2
-                draw.line(
-                    [x, line_y, x + total_width, line_y],
-                    fill=0,
-                    width=2,  # Thicker line for better visibility
-                )
 
     def _draw_progress_bar(
         self,
