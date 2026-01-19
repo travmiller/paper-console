@@ -575,7 +575,8 @@ class PrinterDriver:
             elif op_type == "hourly_forecast":
                 hourly_forecast = op_data.get("hourly_forecast", [])
                 num_rows = (len(hourly_forecast) + 5) // 6
-                total_height += num_rows * (20 + 12 + self.SPACING_MEDIUM)
+                # Updated: icon_size (20) + text spacing (12) + content spacing (8) + row spacing (8) = 48
+                total_height += num_rows * 48
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "progress_bar":
                 height = op_data.get("height", 12)
@@ -849,7 +850,8 @@ class PrinterDriver:
                 hourly_forecast = op_data.get("hourly_forecast", [])
                 self._draw_hourly_forecast(draw, 0, y, width, hourly_forecast)
                 num_rows = (len(hourly_forecast) + 5) // 6
-                y += num_rows * (20 + 12 + self.SPACING_MEDIUM)
+                # Updated: icon_size (20) + text spacing (12) + content spacing (8) + row spacing (8) = 48
+                y += num_rows * 48
             elif op_type == "progress_bar":
                 value = op_data.get("value", 0)
                 max_value = op_data.get("max_value", 100)
@@ -1652,7 +1654,9 @@ class PrinterDriver:
         num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
         col_width = total_width // hours_per_row
         icon_size = 20
-        row_height = icon_size + 12 + 8  # icon + text + spacing
+        content_height = icon_size + 12 + 8  # icon + text + spacing
+        row_spacing = 8  # Extra spacing between rows
+        row_height = content_height + row_spacing  # Total height per row including spacing
 
         # Get small font for text
         font = self._get_font("regular_sm")
@@ -1692,6 +1696,15 @@ class PrinterDriver:
                     text_w = bbox[2] - bbox[0] if bbox else 0
                     text_x = int(col_center - text_w // 2)
                     draw.text((text_x, temp_y), temp_str, font=font, fill=0)
+
+            # Draw horizontal line after each row (except the last one)
+            if row < num_rows - 1:
+                line_y = row_y + content_height + row_spacing // 2
+                draw.line(
+                    [x, line_y, x + total_width, line_y],
+                    fill=0,
+                    width=1,
+                )
 
     def _draw_progress_bar(
         self,
