@@ -109,34 +109,19 @@ def format_quotes_receipt(
     printer.print_line()
 
     # Quote body in italics-style (using medium weight for emphasis)
-    # Clean text: remove all newlines, carriage returns, tabs, and normalize whitespace
+    # Clean text: remove any embedded newlines and normalize whitespace
     import re
     text = re.sub(r'[\n\r\t]+', ' ', text)  # Replace all whitespace chars with single space
     text = " ".join(text.split())  # Normalize multiple spaces to single space
     
-    # Wrap text accounting for quotation marks
-    # First line will have opening quote (1 char), so wrap with width - 1
-    # This ensures the first line + quote doesn't exceed printer width
-    wrapped_lines = wrap_text(text, width=printer.width - 1, indent=0)
-    
-    if not wrapped_lines:
-        wrapped_lines = [text] if text else [""]
-    
-    # Print wrapped lines with proper quotation marks
-    for i, line in enumerate(wrapped_lines):
-        line = line.strip()  # Remove any trailing/leading whitespace
-        if len(wrapped_lines) == 1:
-            # Single line quote: both quotes on same line
-            printer.print_body(f'"{line}"')
-        elif i == 0:
-            # First line: opening quote only
-            printer.print_body(f'"{line}')
-        elif i == len(wrapped_lines) - 1:
-            # Last line: leading space + closing quote
-            printer.print_body(f' {line}"')
-        else:
-            # Middle lines: leading space for visual indentation
-            printer.print_body(f' {line}')
+    # Don't pre-wrap! Let the printer's font-metric-based wrapping handle it.
+    # The printer driver uses _wrap_text_by_width which uses actual font pixel metrics,
+    # not character counts. Pre-wrapping with character-based wrap_text causes
+    # double-wrapping and incorrect line breaks.
+    # 
+    # Simply pass the text with quotes - the printer will wrap it correctly based on
+    # actual rendered width, and the quotes will naturally be at the start and end.
+    printer.print_body(f'"{text}"')
 
     printer.feed(1)
 
