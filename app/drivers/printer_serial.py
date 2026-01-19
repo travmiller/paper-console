@@ -1790,24 +1790,28 @@ class PrinterDriver:
             last_col_x = min(last_col_x, x + total_width - right_margin)
             actual_col_positions.append(last_col_x)
         
-        # Calculate rightmost position for grid - ensure it's within bounds
+        # Calculate leftmost and rightmost positions for grid - ensure they're within bounds
+        leftmost_x = actual_col_positions[0] if actual_col_positions else x + left_margin
         rightmost_x = min(x + total_width - right_margin, actual_col_positions[-1] if actual_col_positions else x + total_width - right_margin)
         
-        # Draw horizontal grid lines (between rows)
+        # Calculate bottom position for vertical lines (should match bottom horizontal line)
+        bottom_y = y + total_forecast_height
+        
+        # Draw horizontal grid lines (between rows) - start at leftmost vertical line
         for row in range(num_rows + 1):
             line_y = y + row * (entry_height + row_spacing)
             draw.line(
-                [(x, line_y), (rightmost_x, line_y)],
+                [(leftmost_x, line_y), (rightmost_x, line_y)],
                 fill=0,
                 width=grid_line_width
             )
         
-        # Draw vertical grid lines (between hours) - use actual column positions
+        # Draw vertical grid lines (between hours) - extend to bottom horizontal line
         for col_x in actual_col_positions:
             # Only draw if within bounds - ensure we don't exceed total_width
             if col_x < x + total_width:
                 draw.line(
-                    [(col_x, y), (col_x, y + total_forecast_height)],
+                    [(col_x, y), (col_x, bottom_y)],
                     fill=0,
                     width=grid_line_width
                 )
