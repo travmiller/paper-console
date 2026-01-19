@@ -109,9 +109,19 @@ def format_quotes_receipt(
     printer.print_line()
 
     # Quote body in italics-style (using medium weight for emphasis)
+    # Strip any embedded newlines and normalize whitespace
+    text = " ".join(text.split())
     wrapped_lines = wrap_text(text, width=printer.width, indent=0)
-    for line in wrapped_lines:
-        printer.print_body(f'"{line}"' if line == wrapped_lines[0] else f' {line}')
+    for i, line in enumerate(wrapped_lines):
+        if i == 0:
+            # First line: opening quote
+            printer.print_body(f'"{line}')
+        elif i == len(wrapped_lines) - 1:
+            # Last line: closing quote
+            printer.print_body(f' {line}"')
+        else:
+            # Middle lines: no quotes, just space
+            printer.print_body(f' {line}')
 
     printer.feed(1)
 
