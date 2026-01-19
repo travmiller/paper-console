@@ -428,7 +428,7 @@ def format_weather_receipt(
     
     # Weather icon - large for current conditions
     icon_type = _get_icon_type(weather['condition'])
-    printer.print_icon(icon_type, size=48)
+    printer.print_icon(icon_type, size=64)
     
     # Current temperature - big and bold
     printer.print_bold(f"{weather['current']}°F")

@@ -1556,7 +1556,7 @@ class PrinterDriver:
         num_days = min(len(forecast), 7)
         # Horizontal layout: all 7 days in one row
         col_width = total_width // num_days
-        icon_size = 20
+        icon_size = 24  # Increased size, matches 24-hour forecast
         day_height = 110  # Increased height for better spacing
         divider_width = 1  # Width of vertical divider lines
 
@@ -1761,7 +1761,7 @@ class PrinterDriver:
         # Leave 8px left margin + 8px right margin = 16px total margin
         col_width = (total_width - 16 - (hours_per_row - 1) * 5) // hours_per_row  # Account for spacing between columns
         hour_spacing = 5  # Horizontal spacing between hours
-        icon_size = 18
+        icon_size = 24  # Increased size, matches 7-day forecast
         entry_height = 80  # Increased height for each hourly entry: time + icon + temp + precip
         row_spacing = 10  # Vertical spacing between rows
         
