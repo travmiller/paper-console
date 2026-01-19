@@ -1536,14 +1536,11 @@ class PrinterDriver:
                 return "cloud"  # Maps to cloud.png
 
         num_days = min(len(forecast), 7)
-        # Use 2 rows: 4 days top, 3 days bottom for better spacing
-        days_per_row = 4
-        num_rows = 2
-        col_width = (total_width - 20) // days_per_row  # Leave 20px total margin
+        # Horizontal layout: all 7 days in one row
+        col_width = total_width // num_days
         icon_size = 20
-        day_height = 65  # Height for each day entry
-        day_spacing = 8  # Horizontal spacing between days
-        row_spacing = 12  # Vertical spacing between rows
+        day_height = 80  # Height for each day entry
+        divider_width = 1  # Width of vertical divider lines
 
         # Get fonts
         font_sm = self._get_font("regular_sm")
@@ -1551,40 +1548,50 @@ class PrinterDriver:
         font_lg = self._get_font("bold")  # For high temp
 
         for i, day_data in enumerate(forecast[:7]):
-            row = i // days_per_row
-            col = i % days_per_row
-            
-            # Calculate position with spacing
-            col_x = x + col * (col_width + day_spacing) + 10  # 10px left margin
+            # Calculate column position
+            col_x = x + i * col_width
             col_center = col_x + col_width // 2
-            day_top = y + row * (day_height + row_spacing)
+            col_right = col_x + col_width
+            day_top = y
+            day_bottom = y + day_height
 
-            # No borders - cleaner look with just content
-            content_y = day_top + 4
-
-            # Day/Date label (top)
+            # Calculate equal vertical spacing for all elements
+            # Elements: Day/Date, High temp, Low temp, Icon, Precip (optional)
             day_label = day_data.get("day", "--")
             date_label = day_data.get("date", "")
+            precip = day_data.get("precipitation")
+            has_precip = precip is not None and precip > 0
+            
+            # Count elements to space
+            num_elements = 5 if has_precip else 4  # Day/Date, High, Low, Icon, (Precip)
+            
+            # Calculate spacing between elements
+            available_height = day_height - 8  # Leave 4px top and bottom padding
+            element_spacing = available_height // (num_elements + 1)  # Equal spacing between elements
+            
+            current_y = day_top + 4 + element_spacing
+            
+            # Day/Date label (top)
             if font_sm:
                 # Day name
                 day_bbox = font_sm.getbbox(day_label)
                 day_text_w = day_bbox[2] - day_bbox[0] if day_bbox else 0
                 day_text_x = col_center - day_text_w // 2
-                draw.text((day_text_x, content_y), day_label, font=font_sm, fill=0)
+                draw.text((day_text_x, current_y), day_label, font=font_sm, fill=0)
                 
-                # Date below day
+                # Date below day (if available)
                 if date_label:
                     date_bbox = font_sm.getbbox(date_label)
                     date_text_w = date_bbox[2] - date_bbox[0] if date_bbox else 0
                     date_text_x = col_center - date_text_w // 2
-                    date_y = content_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10) + 2
+                    date_y = current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10) + 2
                     draw.text((date_text_x, date_y), date_label, font=font_sm, fill=0)
-                    temp_y = date_y + (date_bbox[3] - date_bbox[1] if date_bbox else 10) + 6
+                    current_y = date_y + (date_bbox[3] - date_bbox[1] if date_bbox else 10)
                 else:
-                    temp_y = content_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10) + 6
-            else:
-                temp_y = content_y + 16
-
+                    current_y = current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10)
+            
+            current_y += element_spacing
+            
             # High temp (large)
             high = day_data.get("high", "--")
             high_str = f"{high}°" if high != "--" else "--"
@@ -1592,39 +1599,51 @@ class PrinterDriver:
                 bbox = font_lg.getbbox(high_str)
                 text_w = bbox[2] - bbox[0] if bbox else 0
                 text_x = col_center - text_w // 2
-                draw.text((text_x, temp_y), high_str, font=font_lg, fill=0)
-                high_height = bbox[3] - bbox[1] if bbox else 16
-                low_y = temp_y + high_height + 4
+                draw.text((text_x, current_y), high_str, font=font_lg, fill=0)
+                current_y = current_y + (bbox[3] - bbox[1] if bbox else 16)
             else:
-                low_y = temp_y + 20
-
-            # Low temp (smaller, below high)
+                current_y = current_y + 16
+            
+            current_y += element_spacing
+            
+            # Low temp (smaller)
             low = day_data.get("low", "--")
             low_str = f"{low}°" if low != "--" else "--"
             if font_sm:
                 bbox = font_sm.getbbox(low_str)
                 text_w = bbox[2] - bbox[0] if bbox else 0
                 text_x = col_center - text_w // 2
-                draw.text((text_x, low_y), low_str, font=font_sm, fill=0)
-                icon_y = low_y + (bbox[3] - bbox[1] if bbox else 10) + 6
+                draw.text((text_x, current_y), low_str, font=font_sm, fill=0)
+                current_y = current_y + (bbox[3] - bbox[1] if bbox else 10)
             else:
-                icon_y = low_y + 16
-
+                current_y = current_y + 10
+            
+            current_y += element_spacing
+            
             # Icon
             icon_x = col_center - icon_size // 2
+            icon_y = current_y
             icon_type = get_icon_type(day_data.get("condition", ""))
             self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
-
-            # Precipitation probability (below icon, only if > 0)
-            precip = day_data.get("precipitation")
-            if precip is not None and precip > 0:
+            current_y = icon_y + icon_size
+            
+            # Precipitation probability (only if > 0)
+            if has_precip:
+                current_y += element_spacing
                 precip_str = f"{precip}%"
-                precip_y = icon_y + icon_size + 4
                 if font_sm:
                     bbox = font_sm.getbbox(precip_str)
                     text_w = bbox[2] - bbox[0] if bbox else 0
                     text_x = col_center - text_w // 2
-                    draw.text((text_x, precip_y), precip_str, font=font_sm, fill=0)
+                    draw.text((text_x, current_y), precip_str, font=font_sm, fill=0)
+            
+            # Draw vertical divider line on the right (except for last day)
+            if i < num_days - 1:
+                draw.line(
+                    [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, day_bottom)],
+                    fill=0,
+                    width=divider_width
+                )
 
     def _draw_hourly_forecast(
         self,
