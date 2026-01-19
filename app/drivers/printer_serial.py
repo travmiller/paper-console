@@ -845,13 +845,22 @@ class PrinterDriver:
             elif op_type == "weather_forecast":
                 forecast = op_data.get("forecast", [])
                 self._draw_weather_forecast(draw, 0, y, width, forecast)
-                y += 24 + 12 + 12 + 12 + self.SPACING_MEDIUM
+                # Day height is 110px (as set in _draw_weather_forecast)
+                y += 110 + self.SPACING_MEDIUM
             elif op_type == "hourly_forecast":
                 hourly_forecast = op_data.get("hourly_forecast", [])
                 self._draw_hourly_forecast(draw, 0, y, width, hourly_forecast)
-                num_rows = (len(hourly_forecast) + 5) // 6
-                # Grid layout: icon_size (20) + text spacing (12) + content spacing (12) = 44 per row
-                y += num_rows * 44
+                # Calculate actual height: 4 hours per row, 70px entry height, 10px row spacing
+                hours_per_row = 4
+                entry_height = 70
+                row_spacing = 10
+                num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
+                # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
+                if num_rows > 0:
+                    total_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
+                else:
+                    total_height = 0
+                y += total_height + self.SPACING_MEDIUM
             elif op_type == "progress_bar":
                 value = op_data.get("value", 0)
                 max_value = op_data.get("max_value", 100)
