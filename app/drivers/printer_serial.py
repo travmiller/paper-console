@@ -570,14 +570,14 @@ class PrinterDriver:
                 total_height += self.SPACING_SMALL + size + self.SPACING_SMALL
                 last_spacing = self.SPACING_SMALL
             elif op_type == "weather_forecast":
-                # Day height is 110px (as set in _draw_weather_forecast)
-                total_height += 110 + self.SPACING_MEDIUM
+                # Day height is 114px (as set in _draw_weather_forecast, updated for 24px icon)
+                total_height += 114 + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "hourly_forecast":
                 hourly_forecast = op_data.get("hourly_forecast", [])
-                # Calculate actual height: 4 hours per row, 80px entry height, 10px row spacing
+                # Calculate actual height: 4 hours per row, 86px entry height, 10px row spacing
                 hours_per_row = 4
-                entry_height = 80
+                entry_height = 86
                 row_spacing = 10
                 num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
                 # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
@@ -854,14 +854,14 @@ class PrinterDriver:
             elif op_type == "weather_forecast":
                 forecast = op_data.get("forecast", [])
                 self._draw_weather_forecast(draw, 0, y, width, forecast)
-                # Day height is 110px (as set in _draw_weather_forecast)
-                y += 110 + self.SPACING_MEDIUM
+                # Day height is 114px (as set in _draw_weather_forecast, updated for 24px icon)
+                y += 114 + self.SPACING_MEDIUM
             elif op_type == "hourly_forecast":
                 hourly_forecast = op_data.get("hourly_forecast", [])
                 self._draw_hourly_forecast(draw, 0, y, width, hourly_forecast)
-                # Calculate actual height: 4 hours per row, 80px entry height, 10px row spacing
+                # Calculate actual height: 4 hours per row, 86px entry height, 10px row spacing
                 hours_per_row = 4
-                entry_height = 80
+                entry_height = 86
                 row_spacing = 10
                 num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
                 # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
@@ -1557,7 +1557,7 @@ class PrinterDriver:
         # Horizontal layout: all 7 days in one row
         col_width = total_width // num_days
         icon_size = 24  # Increased size, matches 24-hour forecast
-        day_height = 110  # Increased height for better spacing
+        day_height = 114  # Recalculated height to accommodate 24px icon (was 110px for 20px icon)
         divider_width = 1  # Width of vertical divider lines
 
         # Get fonts
@@ -1762,7 +1762,7 @@ class PrinterDriver:
         col_width = (total_width - 16 - (hours_per_row - 1) * 5) // hours_per_row  # Account for spacing between columns
         hour_spacing = 5  # Horizontal spacing between hours
         icon_size = 24  # Increased size, matches 7-day forecast
-        entry_height = 80  # Increased height for each hourly entry: time + icon + temp + precip
+        entry_height = 86  # Recalculated height to accommodate 24px icon (was 80px for 18px icon)
         row_spacing = 10  # Vertical spacing between rows
         
         # Get fonts
