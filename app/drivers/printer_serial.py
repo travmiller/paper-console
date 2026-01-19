@@ -1577,10 +1577,11 @@ class PrinterDriver:
             day_label = day_data.get("day", "--")
             date_label = day_data.get("date", "")
             precip = day_data.get("precipitation")
-            has_precip = precip is not None and precip > 0
+            # Always show precipitation (even if 0%) for consistent alignment
+            precip_value = precip if precip is not None else 0
             
-            # Count elements to space: High, Low, Icon, Precip (optional), Day/Date
-            num_elements = 5 if has_precip else 4
+            # Count elements to space: High, Low, Icon, Precip (always), Day/Date
+            num_elements = 5
             
             # Calculate spacing between elements - use significantly more spacing
             available_height = day_height - 16  # Leave 8px top and bottom padding
@@ -1625,19 +1626,18 @@ class PrinterDriver:
             
             current_y += element_spacing
             
-            # 4. Precipitation probability (only if > 0)
-            if has_precip:
-                precip_str = f"{precip}%"
-                if font_sm:
-                    bbox = font_sm.getbbox(precip_str)
-                    text_w = bbox[2] - bbox[0] if bbox else 0
-                    text_x = col_center - text_w // 2
-                    draw.text((text_x, current_y), precip_str, font=font_sm, fill=0)
-                    current_y = current_y + (bbox[3] - bbox[1] if bbox else 10)
-                else:
-                    current_y = current_y + 10
-                
-                current_y += element_spacing
+            # 4. Precipitation probability (always show, even if 0%)
+            precip_str = f"{precip_value}%"
+            if font_sm:
+                bbox = font_sm.getbbox(precip_str)
+                text_w = bbox[2] - bbox[0] if bbox else 0
+                text_x = col_center - text_w // 2
+                draw.text((text_x, current_y), precip_str, font=font_sm, fill=0)
+                current_y = current_y + (bbox[3] - bbox[1] if bbox else 10)
+            else:
+                current_y = current_y + 10
+            
+            current_y += element_spacing
             
             # 5. Day/Date label (bottom)
             if font_sm:
@@ -1656,9 +1656,17 @@ class PrinterDriver:
                     draw.text((date_text_x, date_y), date_label, font=font_sm, fill=0)
             
             # Draw vertical divider line on the right (except for last day)
+            # Extend lines to full height of column
             if i < num_days - 1:
                 draw.line(
                     [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, day_bottom)],
+                    fill=0,
+                    width=divider_width
+                )
+            # Also draw left edge for first column to complete the grid
+            if i == 0:
+                draw.line(
+                    [(col_x, day_top), (col_x, day_bottom)],
                     fill=0,
                     width=divider_width
                 )
@@ -1749,6 +1757,16 @@ class PrinterDriver:
         # Calculate total forecast height
         total_forecast_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
         
+        # Calculate actual column positions for grid
+        actual_col_positions = []
+        for col in range(hours_per_row):
+            col_x = x + col * (col_width + hour_spacing) + 8  # 8px left margin
+            actual_col_positions.append(col_x)
+        # Add right edge
+        if actual_col_positions:
+            last_col_x = actual_col_positions[-1] + col_width
+            actual_col_positions.append(last_col_x)
+        
         # Draw horizontal grid lines (between rows)
         for row in range(num_rows + 1):
             line_y = y + row * (entry_height + row_spacing)
@@ -1758,9 +1776,8 @@ class PrinterDriver:
                 width=grid_line_width
             )
         
-        # Draw vertical grid lines (between hours)
-        for col in range(hours_per_row + 1):
-            col_x = x + col * (col_width + hour_spacing) + 8  # 8px left margin
+        # Draw vertical grid lines (between hours) - use actual column positions
+        for col_x in actual_col_positions:
             # Only draw if within bounds
             if col_x <= x + total_width:
                 draw.line(
@@ -1782,10 +1799,22 @@ class PrinterDriver:
                 col_x = x + col_idx * (col_width + hour_spacing) + 8  # 8px left margin
                 col_center = col_x + col_width // 2
 
-                # Temperature (top, prominent)
+                # Time (top of grid cell)
+                time_str = hour_data.get("time", "--")
+                time_y = row_y + 2
+                if font_sm:
+                    bbox = font_sm.getbbox(time_str)
+                    text_w = bbox[2] - bbox[0] if bbox else 0
+                    text_x = int(col_center - text_w // 2)
+                    draw.text((text_x, time_y), time_str, font=font_sm, fill=0)
+                    time_height = bbox[3] - bbox[1] if bbox else 10
+                else:
+                    time_height = 10
+
+                # Temperature (below time, prominent)
                 temp = hour_data.get("temperature", "--")
                 temp_str = f"{temp}°" if temp != "--" else "--"
-                temp_y = row_y + 2
+                temp_y = time_y + time_height + 6
                 if font_md:
                     bbox = font_md.getbbox(temp_str)
                     text_w = bbox[2] - bbox[0] if bbox else 0
@@ -1811,20 +1840,6 @@ class PrinterDriver:
                         text_w = bbox[2] - bbox[0] if bbox else 0
                         text_x = int(col_center - text_w // 2)
                         draw.text((text_x, precip_y), precip_str, font=font_sm, fill=0)
-                        precip_height = bbox[3] - bbox[1] if bbox else 10
-                        time_y = precip_y + precip_height + 6
-                    else:
-                        time_y = icon_y + icon_size + 16
-                else:
-                    time_y = icon_y + icon_size + 12
-
-                # Time (bottom)
-                time_str = hour_data.get("time", "--")
-                if font_sm:
-                    bbox = font_sm.getbbox(time_str)
-                    text_w = bbox[2] - bbox[0] if bbox else 0
-                    text_x = int(col_center - text_w // 2)
-                    draw.text((text_x, time_y), time_str, font=font_sm, fill=0)
 
     def _draw_progress_bar(
         self,
