@@ -466,7 +466,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
   }
 
   if (module.type === 'maze') {
-    return <div className={commonClasses.textMuted}>Standard 25x25 maze. No configuration needed.</div>;
+    return <div className={commonClasses.textMuted}>Large 61x61 maze. No configuration needed.</div>;
   }
 
   if (module.type === 'quotes') {

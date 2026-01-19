@@ -32,9 +32,12 @@ class MazeGenerator:
             else:
                 stack.pop()
         
-        # Ensure start and end are open
-        self.grid[0][1] = 0  # Entrance (top)
-        self.grid[self.height - 1][self.width - 2] = 0  # Exit (bottom)
+        # Randomize entrance and exit positions (must be odd to align with paths)
+        valid_positions = [x for x in range(1, self.width - 1) if x % 2 == 1]
+        entrance_x = random.choice(valid_positions)
+        exit_x = random.choice(valid_positions)
+        self.grid[0][entrance_x] = 0  # Entrance (top, random position)
+        self.grid[self.height - 1][exit_x] = 0  # Exit (bottom, random position)
 
     def _get_unvisited_neighbors(self, x, y) -> List[Tuple[int, int]]:
         directions = [
@@ -55,8 +58,8 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     """Prints a Maze puzzle."""
     from datetime import datetime
     
-    # Fixed size for thermal printer (25x25 for more challenge)
-    width, height = 25, 25
+    # Fixed size for thermal printer (61x61 for maximum challenge)
+    width, height = 61, 61
     
     # Generate Maze
     maze = MazeGenerator(width, height)
