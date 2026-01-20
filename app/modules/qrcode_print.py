@@ -87,7 +87,7 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
                 "enum": ["text", "url", "wifi", "email", "sms", "phone", "contact"],
                 "default": "text"
             },
-            "content": {"type": "string", "title": "Content / URL / Phone"},
+
             "text_content": {"type": "string", "title": "Text to Encode"},
             "url_content": {"type": "string", "title": "URL"},
             "email_address": {"type": "string", "title": "Email Address"},
