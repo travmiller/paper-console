@@ -5,7 +5,7 @@ import random
 import time
 import unicodedata
 from datetime import datetime, date
-from typing import List, Optional
+from typing import List, Optional, Any
 
 import serial
 from PIL import Image, ImageDraw, ImageFont
