@@ -1371,7 +1371,7 @@ async def check_for_updates():
             text=True,
             timeout=5,
         )
-        
+
         if version_result.returncode == 0:
             current_version = version_result.stdout.strip()
         else:
@@ -1403,7 +1403,9 @@ async def check_for_updates():
                 "available": False,
                 "message": "Could not check for updates",
                 "error": "Unable to connect to the update server. Check your internet connection.",
-                "current_version": current_version if 'current_version' in locals() else "unknown",
+                "current_version": (
+                    current_version if "current_version" in locals() else "unknown"
+                ),
             }
 
         # Compare local vs remote
@@ -1460,9 +1462,9 @@ async def check_for_updates():
                 else 0
             )
 
-            # Get the latest version using git describe
+            # Get the latest version using same logic as current version
             latest_version_result = subprocess.run(
-                ["git", "describe", "--tags", "--always", f"origin/{current_branch}"],
+                ["git", "describe", "--tags", "--exact-match", f"origin/{current_branch}"],
                 cwd=project_root,
                 capture_output=True,
                 text=True,
@@ -1472,19 +1474,59 @@ async def check_for_updates():
             if latest_version_result.returncode == 0:
                 latest_version = latest_version_result.stdout.strip()
             else:
-                # Fallback to short commit hash
-                latest_commit_result = subprocess.run(
-                    ["git", "rev-parse", "--short", f"origin/{current_branch}"],
+                # Try describe with commits
+                describe_result = subprocess.run(
+                    ["git", "describe", "--tags", "--always", f"origin/{current_branch}"],
                     cwd=project_root,
                     capture_output=True,
                     text=True,
                     timeout=5,
                 )
-                latest_version = (
-                    latest_commit_result.stdout.strip()
-                    if latest_commit_result.returncode == 0
-                    else "unknown"
-                )
+                
+                if describe_result.returncode == 0:
+                    desc = describe_result.stdout.strip()
+                    if '-' in desc and not desc.startswith('v'):
+                        parts = desc.split('-')
+                        if len(parts) >= 2:
+                            latest_version = f"{parts[0]}+{parts[1]}"
+                        else:
+                            latest_version = desc
+                    else:
+                        # No tag, use date-based version
+                        from datetime import datetime
+                        commit_date_result = subprocess.run(
+                            ["git", "log", "-1", "--format=%cd", "--date=format:%Y.%m.%d", f"origin/{current_branch}"],
+                            cwd=project_root,
+                            capture_output=True,
+                            text=True,
+                            timeout=5,
+                        )
+                        if commit_date_result.returncode == 0:
+                            date_str = commit_date_result.stdout.strip()
+                            hash_result = subprocess.run(
+                                ["git", "rev-parse", "--short", f"origin/{current_branch}"],
+                                cwd=project_root,
+                                capture_output=True,
+                                text=True,
+                                timeout=5,
+                            )
+                            short_hash = hash_result.stdout.strip()[:6] if hash_result.returncode == 0 else ""
+                            latest_version = f"{date_str}.{short_hash}" if short_hash else date_str
+                        else:
+                            latest_version = desc
+                else:
+                    # Last resort
+                    from datetime import datetime
+                    date_str = datetime.now().strftime("%Y.%m.%d")
+                    hash_result = subprocess.run(
+                        ["git", "rev-parse", "--short", f"origin/{current_branch}"],
+                        cwd=project_root,
+                        capture_output=True,
+                        text=True,
+                        timeout=5,
+                    )
+                    short_hash = hash_result.stdout.strip()[:6] if hash_result.returncode == 0 else ""
+                    latest_version = f"{date_str}.{short_hash}" if short_hash else date_str
 
             return {
                 "available": True,
