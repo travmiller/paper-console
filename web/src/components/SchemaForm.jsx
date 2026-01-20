@@ -102,7 +102,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 <div className="space-y-2">
                     {title && <label className={commonClasses.label}>{title}</label>}
                     <Checklist value={items} onChange={onChange} />
-                    {description && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+                    {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
                 </div>
             );
         }
@@ -129,7 +129,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                  <div className="flex justify-between items-center">
                     {title && <label className={commonClasses.label}>{title}</label>}
                 </div>
-                {description && <p className="text-xs text-gray-500 mb-2">{description}</p>}
+                {description && <p className="text-xs text-zinc-500 mb-2">{description}</p>}
                 
                 <div className="space-y-2">
                     {items.map((item, index) => (
@@ -163,7 +163,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 <button 
                     type="button"
                     onClick={handleAdd}
-                    className={`${commonClasses.buttonGhost} text-xs w-full py-2 border-dashed border-2 border-gray-200 hover:border-gray-400`}
+                    className={`${commonClasses.buttonGhost} text-xs w-full py-2 border-dashed border-2 border-zinc-200 hover:border-gray-400`}
                 >
                     + Add Item
                 </button>
@@ -179,7 +179,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                     type="checkbox"
                     checked={value || false}
                     onChange={(e) => onChange(e.target.checked)}
-                    className="w-4 h-4 text-black rounded border-2 border-gray-300 focus:ring-0 focus:ring-offset-0"
+                    className="w-4 h-4 text-black rounded border-2 border-zinc-300 focus:ring-0 focus:ring-offset-0"
                     style={{ accentColor: 'black' }}
                 />
                 <label className={`text-sm text-black select-none cursor-pointer ${compact ? 'font-medium' : ''}`} onClick={() => onChange(!value)}>
@@ -195,7 +195,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
             <div className="mb-4">
                 {title && <label className={commonClasses.label}>{title}</label>}
                 <LocationSearch value={value} onChange={onChange} />
-                {description && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
             </div>
         );
     }
@@ -205,7 +205,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
             <div className="mb-4">
                 {title && <label className={commonClasses.label}>{title}</label>}
                 <KeyValueList value={value} onChange={onChange} />
-                {description && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
             </div>
         );
     }
@@ -238,7 +238,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                     placeholder={uiSchema?.['ui:placeholder']}
                 />
             )}
-             {description && !compact && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+             {description && !compact && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
         </div>
     );
 };

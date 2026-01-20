@@ -90,7 +90,7 @@ const ChecklistWidget = ({ value = [], onChange }) => {
             onChange={(e) => updateItem(index, 'text', e.target.value)}
             onKeyDown={(e) => handleKeyDown(e, index)}
             placeholder="New checklist item..."
-            className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 py-1 text-base placeholder-gray-300"
+            className="flex-1 bg-transparent border-none focus:outline-none focus:ring-0 py-1 text-base placeholder-zinc-300 transition-colors"
           />
           <button
             type="button"
