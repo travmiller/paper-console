@@ -937,7 +937,7 @@ const GeneralSettings = ({
               Check for Updates
             </PrimaryButton>
 
-            {updateStatus && updateStatus.available && (
+            {updateStatus && updateStatus.available && !installingUpdate && (
               <PrimaryButton
                 onClick={async () => {
                   if (!confirm('Install the update now? The device will restart automatically. The page will refresh automatically once the update is complete.')) {
