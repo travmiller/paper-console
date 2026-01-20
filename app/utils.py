@@ -4,26 +4,59 @@ from app.hardware import printer, _is_raspberry_pi
 from app.config import PRINTER_WIDTH
 
 
-def wrap_text(text: str, width: int = 42, indent: int = 0) -> list[str]:
-    """Wraps text to fit the printer width with optional indentation."""
-    words = text.split()
-    lines = []
-    current_line = ""
+def wrap_text(text: str, width: int = 42, indent: int = 0, preserve_line_breaks: bool = False) -> list[str]:
+    """Wraps text to fit the printer width with optional indentation.
+    
+    Args:
+        text: The text to wrap
+        width: Maximum width for each line
+        indent: Number of spaces to indent (reduces available width)
+        preserve_line_breaks: If True, preserves explicit line breaks from input
+    """
+    if preserve_line_breaks:
+        # Split by newlines first to preserve explicit line breaks
+        input_lines = text.split('\n')
+        all_lines = []
+        
+        for input_line in input_lines:
+            # Wrap each line individually
+            words = input_line.split()
+            current_line = ""
+            available_width = width - indent
 
-    for word in words:
+            for word in words:
+                if len(current_line) + len(word) + 1 <= available_width:
+                    current_line += word + " "
+                else:
+                    if current_line:
+                        all_lines.append(current_line.strip())
+                    current_line = word + " "
+
+            if current_line:
+                all_lines.append(current_line.strip())
+            elif not words:  # Empty line - preserve it
+                all_lines.append("")
+        
+        return all_lines
+    else:
+        # Original behavior: split on all whitespace
+        words = text.split()
+        lines = []
+        current_line = ""
         available_width = width - indent
 
-        if len(current_line) + len(word) + 1 <= available_width:
-            current_line += word + " "
-        else:
-            if current_line:
-                lines.append(current_line.strip())
-            current_line = word + " "
+        for word in words:
+            if len(current_line) + len(word) + 1 <= available_width:
+                current_line += word + " "
+            else:
+                if current_line:
+                    lines.append(current_line.strip())
+                current_line = word + " "
 
-    if current_line:
-        lines.append(current_line.strip())
+        if current_line:
+            lines.append(current_line.strip())
 
-    return lines
+        return lines
 
 
 def print_setup_instructions_sync():

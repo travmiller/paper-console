@@ -13,8 +13,8 @@ def format_text_receipt(printer: PrinterDriver, config: TextConfig, module_name:
     
     content = config.content or "No content."
     
-    # Wrap and print body text
-    wrapped_lines = wrap_text(content, width=printer.width, indent=0)
+    # Wrap and print body text, preserving line breaks from textarea input
+    wrapped_lines = wrap_text(content, width=printer.width, indent=0, preserve_line_breaks=True)
     for line in wrapped_lines:
         printer.print_body(line)
     
