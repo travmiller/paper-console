@@ -400,12 +400,12 @@ def format_adventure_receipt(
         state.flags[current_node["set_flag"]] = True
         save_state(module_id, state)
     
-    # Print the current story node
-    print_story_node(printer, story, current_node, state, module_name or meta.get("title", "Adventure"))
-    
     # Enter selection mode for player input (including at endings for Start Over / Exit)
     # Note: Selection mode will be checked by main.py's button handler
     enter_selection_mode(
         lambda pos: process_choice(module_id, pos, printer),
         module_id
     )
+    
+    # Print the current story node
+    print_story_node(printer, story, current_node, state, module_name or meta.get("title", "Adventure"))

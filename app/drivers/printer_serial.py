@@ -10,6 +10,7 @@ from typing import List, Optional, Any
 import serial
 from PIL import Image, ImageDraw, ImageFont
 import app.config
+import app.selection_mode
 
 
 class PrinterDriver:
@@ -432,6 +433,18 @@ class PrinterDriver:
             return max(14, self.font_size - 3) + self.line_spacing
         return self.line_height
 
+    def _get_left_margin(self) -> int:
+        """Get the left margin, which increases when in selection mode."""
+        if app.selection_mode.is_selection_mode_active():
+            # 8px bar + 4px gap + 2px standard margin
+            return 14
+        return 2
+
+    def _get_content_width(self) -> int:
+        """Get the available width for content."""
+        # Total width - left margin - right margin (2px)
+        return self.PRINTER_WIDTH_DOTS - self._get_left_margin() - 2
+
     def _render_op(self, img: Image.Image, draw: ImageDraw.Draw, y: int, op_type: str, op_data: Any, dry_run: bool = False) -> tuple[int, int]:
         """Render a single operation or calculate its dimensions.
         
@@ -466,17 +479,20 @@ class PrinterDriver:
         current_height = 0
         
         paragraphs = clean_text.split("\n")
+        content_width = self._get_content_width()
+        left_margin = self._get_left_margin()
+
         for paragraph in paragraphs:
             if not paragraph.strip():
                 current_height += line_height
             else:
-                wrapped_lines = self._wrap_text_by_width(paragraph, font, self.PRINTER_WIDTH_DOTS)
+                wrapped_lines = self._wrap_text_by_width(paragraph, font, content_width)
                 for line in wrapped_lines:
                     if not dry_run and draw:
                         if font:
-                            draw.text((2, y + current_height), line, font=font, fill=0)
+                            draw.text((left_margin, y + current_height), line, font=font, fill=0)
                         else:
-                            draw.text((2, y + current_height), line, fill=0)
+                            draw.text((left_margin, y + current_height), line, fill=0)
                     current_height += line_height
         
         return (current_height, 0)
@@ -487,19 +503,22 @@ class PrinterDriver:
         current_height = 0
         
         paragraphs = clean_text.split("\n")
+        content_width = self._get_content_width()
+        left_margin = self._get_left_margin()
+
         for paragraph in paragraphs:
             if not paragraph.strip():
                 current_height += self.line_height
                 if not dry_run:
                     self.lines_printed += 1
             else:
-                wrapped_lines = self._wrap_text_by_width(paragraph, font, self.PRINTER_WIDTH_DOTS)
+                wrapped_lines = self._wrap_text_by_width(paragraph, font, content_width)
                 for line in wrapped_lines:
                     if not dry_run and draw:
                         if font:
-                            draw.text((2, y + current_height), line, font=font, fill=0)
+                            draw.text((left_margin, y + current_height), line, font=font, fill=0)
                         else:
-                            draw.text((2, y + current_height), line, fill=0)
+                            draw.text((left_margin, y + current_height), line, fill=0)
                     current_height += self.line_height
                     if not dry_run:
                         self.lines_printed += 1
@@ -516,11 +535,22 @@ class PrinterDriver:
         font = self._get_font(style)
         text_height = self._get_line_height_for_style(style)
 
-        box_width = self.PRINTER_WIDTH_DOTS - self.SPACING_SMALL
+        content_width = self._get_content_width()
+        left_margin = self._get_left_margin()
+        
+        # Adjust box width to fit within content area
+        # Box uses SPACING_SMALL as right margin relative to content width? 
+        # Original: box_width = self.PRINTER_WIDTH_DOTS - self.SPACING_SMALL
+        # This implies a right margin of SPACING_SMALL (4px)
+        # So we should use content_width - (SPACING_SMALL - 2)? 
+        # If content_width accounts for right margin of 2px.
+        # Let's keep the box width relative to content width.
+        box_width = content_width - (self.SPACING_SMALL - 2)
+        
         box_height = max(text_height, icon_size) + (padding * 2) + (border * 2)
         
         if not dry_run and draw:
-            box_x = 2
+            box_x = left_margin
             box_y = y + 2
             
             # Draw outer rectangle (black border)
@@ -577,7 +607,8 @@ class PrinterDriver:
         size = op_data.get("size", 32)
         
         if not dry_run and draw:
-            icon_x = (self.PRINTER_WIDTH_DOTS - size) // 2
+            # Center within content area
+            icon_x = self._get_left_margin() + (self._get_content_width() - size) // 2
             # SPACING_SMALL top margin
             icon_y = y + self.SPACING_SMALL
             self._draw_icon(draw, icon_x, icon_y, icon_type, size)
@@ -590,7 +621,7 @@ class PrinterDriver:
         if not image:
             return (0, 0)
             
-        target_width = self.PRINTER_WIDTH_DOTS
+        target_width = self._get_content_width()
         final_height = image.height
         
         if image.width > target_width:
@@ -605,7 +636,7 @@ class PrinterDriver:
             if img_to_draw.mode != "1":
                 img_to_draw = img_to_draw.convert("1")
                 
-            img_x = (target_width - img_to_draw.width) // 2
+            img_x = self._get_left_margin() + (target_width - img_to_draw.width) // 2
             # SPACING_SMALL top margin
             img_y = y + self.SPACING_SMALL
             img.paste(img_to_draw, (img_x, img_y))
@@ -628,7 +659,7 @@ class PrinterDriver:
             return (0, 0)
 
         # For height calc we assume scaling happens same way
-        max_qr_width = self.PRINTER_WIDTH_DOTS - (2 * self.SPACING_SMALL)
+        max_qr_width = self._get_content_width()
         qr_width = qr_img.width
         qr_height = qr_img.height
         if qr_width > max_qr_width:
@@ -645,7 +676,8 @@ class PrinterDriver:
             if qr_img.width > max_qr_width:
                 qr_img = qr_img.resize((qr_width, qr_height), Image.NEAREST)
             
-            qr_x = (self.PRINTER_WIDTH_DOTS - qr_width) // 2
+            # Center in content area
+            qr_x = self._get_left_margin() + (self._get_content_width() - qr_width) // 2
             qr_y = y + self.SPACING_SMALL
             img.paste(qr_img, (qr_x, qr_y))
 
@@ -663,10 +695,12 @@ class PrinterDriver:
              op_data["_qr_img"] = qr_img
         
         # 2. Text Layout
-        text_x = self.SPACING_SMALL
+        # Respect left margin + SPACING_SMALL indent
+        text_x = self._get_left_margin() + self.SPACING_SMALL
         current_offset = 2 # Start 2px down
         
         right_margin = self.SPACING_SMALL
+        # Available width is Total - text_start - right_margin
         available_text_width = self.PRINTER_WIDTH_DOTS - text_x - right_margin
         
         # Source
@@ -718,7 +752,9 @@ class PrinterDriver:
         if qr_img:
             current_offset += self.SPACING_SMALL
             if not dry_run and img:
-                 qr_x = (self.PRINTER_WIDTH_DOTS - qr_img.width) // 2
+                 # Center QR in content area? Or maintain simple center?
+                 # Let's simple center in content width
+                 qr_x = self._get_left_margin() + (self._get_content_width() - qr_img.width) // 2
                  img.paste(qr_img, (qr_x, y + current_offset))
             current_offset += qr_img.height + self.SPACING_SMALL
         else:
@@ -763,7 +799,22 @@ class PrinterDriver:
              h, s = self._render_op(img, draw, current_y, op_type, op_data, dry_run=False)
              if h > 0:
                  current_y += h + s
-             
+        
+        # Draw Selection Mode Visual Indicator
+        if app.selection_mode.is_selection_mode_active():
+            # Draw a solid black bar along the left side
+            # From cutter feed start to end of content
+            # x=0 to x=6 (7px wide? or 0-6 is 7px? 0..5 is 6px.)
+            # Using same width as loop: 6px width -> x2 = 6 (0,1,2,3,4,5).
+            
+            # The bar should span the content area
+            # Note: Before rotation, this is the "bottom" part of the image (y range [cutter_feed, current_y])
+            # After rotation, it becomes the "top" part of the paper.
+            draw.rectangle(
+                [0, self.cutter_feed_dots, 6, current_y], 
+                fill=0
+            )
+
         # Rotate
         img = img.rotate(180)
         return img
