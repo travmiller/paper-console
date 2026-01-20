@@ -91,11 +91,13 @@ def generate_puzzle(difficulty="medium"):
     gen.generate_full_board()
 
     # Simple difficulty mapping
-    remove_count = 30
-    if difficulty == "hard":
+    remove_count = 20
+    if difficulty.lower() == "hard":
         remove_count = 50
-    elif difficulty == "medium":
+    elif difficulty.lower() == "medium":
         remove_count = 40
+    elif difficulty.lower() == "easy":
+        remove_count = 20
 
     gen.remove_digits(remove_count)
     return gen.grid
@@ -198,8 +200,8 @@ def draw_sudoku_image(grid: List[List[int]], cell_size: int, font) -> Image.Imag
              "difficulty": {
                  "type": "string", 
                  "title": "Difficulty", 
-                 "enum": ["medium", "hard"], 
-                 "default": "medium"
+                 "enum": ["Easy", "Medium", "Hard"], 
+                 "default": "Easy"
              }
         }
     }
@@ -210,7 +212,7 @@ def format_sudoku_receipt(
     """Prints a Sudoku puzzle."""
 
     # Default Difficulty
-    difficulty = "medium"
+    difficulty = "Easy"
     if config and "difficulty" in config:
         difficulty = config["difficulty"]
 

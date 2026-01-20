@@ -279,7 +279,7 @@ def draw_maze_image(grid: List[List[int]], cell_size: int = 8) -> Image.Image:
                  "type": "string", 
                  "title": "Difficulty", 
                  "enum": ["Easy", "Medium", "Hard"],
-                 "default": "Hard"
+                 "default": "Easy"
              }
         }
     }
