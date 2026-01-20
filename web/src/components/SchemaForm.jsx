@@ -218,7 +218,20 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                     {title} {required && <span className="text-red-500 ml-1" title="Required">*</span>}
                 </label>
             )}
-            {widget === 'textarea' ? (
+            {schema.enum ? (
+                <select
+                    value={value ?? ''}
+                    onChange={(e) => onChange(e.target.value)}
+                    className={compact ? commonClasses.inputSmall : commonClasses.input}
+                >
+                    {!required && <option value="">Select...</option>}
+                    {schema.enum.map((option) => (
+                        <option key={option} value={option}>
+                            {option}
+                        </option>
+                    ))}
+                </select>
+            ) : widget === 'textarea' ? (
                  <textarea
                     value={value || ''}
                     onChange={(e) => onChange(e.target.value)}
