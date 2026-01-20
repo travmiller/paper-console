@@ -676,9 +676,14 @@ class PrinterDriver:
                 )
 
                 text_height = (
-                    source_height + title_height + summary_height + self.SPACING_SMALL
+                    source_height + title_height + summary_height
                 )
-                block_height = max(qr_size + self.SPACING_SMALL, text_height)
+                # QR code is now below text, so add heights together
+                # text_height + spacing + QR code + spacing
+                if qr_img:
+                    block_height = text_height + self.SPACING_SMALL + qr_size + self.SPACING_SMALL
+                else:
+                    block_height = text_height + self.SPACING_SMALL
                 total_height += block_height + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "qr":
