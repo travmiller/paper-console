@@ -80,7 +80,7 @@ class PrinterDriver:
 
         # Cutter feed space (pixels to add at end of print for cutter clearance)
         # Can be updated via set_cutter_feed() method
-        self.cutter_feed_dots = 7 * 24  # Default: 7 lines * 24 dots/line = 168 dots
+        self.cutter_feed_dots = 6 * 24  # Default: 6 lines * 24 dots/line = 144 dots
 
         # Font settings (fixed values)
         self.font_size = self.FONT_SIZE
