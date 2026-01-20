@@ -1572,6 +1572,7 @@ async def install_updates():
             if restart_result.returncode != 0:
                 # Give it a moment and check if service is actually running
                 import time
+
                 time.sleep(3)
                 status_result = subprocess.run(
                     ["systemctl", "is-active", "pc-1.service"],
@@ -1580,7 +1581,10 @@ async def install_updates():
                     timeout=5,
                 )
                 # If service is active, the restart actually worked
-                if status_result.returncode == 0 and status_result.stdout.strip() == "active":
+                if (
+                    status_result.returncode == 0
+                    and status_result.stdout.strip() == "active"
+                ):
                     # Service is running, restart was successful
                     pass
                 else:
@@ -1590,6 +1594,7 @@ async def install_updates():
 
             # Give the service a moment to start up
             import time
+
             time.sleep(1)
 
         return {
