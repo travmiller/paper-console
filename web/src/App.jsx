@@ -649,6 +649,7 @@ function App() {
         {showCreateUnassignedModal && (
           <AddModuleModal
             channelPosition={null}
+            isUnassigned={true}
             onClose={() => setShowCreateUnassignedModal(false)}
             onCreateModule={async (moduleType) => {
               const newModule = await createModule(moduleType);

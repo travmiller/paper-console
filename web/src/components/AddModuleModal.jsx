@@ -4,13 +4,10 @@ import { commonClasses } from '../design-tokens';
 import CloseButton from './CloseButton';
 import WiFiIcon from '../assets/WiFiIcon';
 
-const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModule, onOpenEdit }) => {
+const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModule, onOpenEdit, isUnassigned = false }) => {
   const modalMouseDownTarget = useRef(null);
 
   // Show modal if channelPosition is a number (assigned to channel) or if it's explicitly for unassigned
-  // We'll check if onAssignModule is a no-op function to detect unassigned mode
-  const isUnassigned = channelPosition === null && onAssignModule && onAssignModule.toString().includes('async () => {}');
-  
   if (channelPosition === null && !isUnassigned) return null;
 
   return (
