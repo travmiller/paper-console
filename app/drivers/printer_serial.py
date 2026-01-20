@@ -609,8 +609,7 @@ class PrinterDriver:
                     
                     total_height += height + self.SPACING_MEDIUM
                     last_spacing = self.SPACING_MEDIUM
-                total_height += grid_height + self.SPACING_MEDIUM
-                last_spacing = self.SPACING_MEDIUM
+
             elif op_type == "calendar_day_timeline":
                 height = op_data.get("height", 120)
                 total_height += height + self.SPACING_MEDIUM
@@ -1058,11 +1057,7 @@ class PrinterDriver:
                     full_img.paste(image, (img_x, img_y))
                     
                     y += image.height + self.SPACING_MEDIUM
-                    bar_height,
-                    bars,
-                    self._get_font("regular_sm"),
-                )
-                y += len(bars) * (bar_height + self.SPACING_SMALL) + self.SPACING_MEDIUM
+
             elif op_type == "feed":
                 # feed(n) adds n * SPACING_LARGE for module separation
                 y += op_data * self.SPACING_LARGE
