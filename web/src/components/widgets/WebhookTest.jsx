@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { commonClasses } from '../../design-tokens';
+import GCheckIcon from '../../assets/GCheckIcon';
+import WarningIcon from '../../assets/WarningIcon';
 
 /**
  * A button widget that tests a webhook configuration and shows the response.
@@ -34,15 +36,15 @@ const WebhookTest = ({ formData = {} }) => {
         type="button"
         onClick={handleTest}
         disabled={testing || !formData.url}
-        className={`${commonClasses.buttonGhost} w-full py-2 border-2 border-gray-300 hover:border-black disabled:opacity-50 disabled:cursor-not-allowed`}
+        className="text-sm px-3 py-1.5 border-2 border-gray-300 rounded-lg hover:border-black disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
       >
         {testing ? (
-          <span className="flex items-center justify-center gap-2">
-            <span className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
+          <span className="flex items-center gap-2">
+            <span className="w-3 h-3 border-2 border-black border-t-transparent rounded-full animate-spin"></span>
             Testing...
           </span>
         ) : (
-          '🧪 Test Webhook'
+          'Test Webhook'
         )}
       </button>
 
@@ -54,8 +56,8 @@ const WebhookTest = ({ formData = {} }) => {
         }`}>
           {result.success ? (
             <>
-              <div className="flex items-center gap-2 text-green-700 font-bold mb-2">
-                <span>✓</span>
+              <div className="flex items-center gap-2 text-black font-bold mb-2">
+                <GCheckIcon className="w-4 h-4" />
                 <span>Success</span>
                 {result.status_code && (
                   <span className="text-xs text-gray-500 font-normal">(HTTP {result.status_code})</span>
@@ -72,11 +74,11 @@ const WebhookTest = ({ formData = {} }) => {
             </>
           ) : (
             <>
-              <div className="flex items-center gap-2 text-red-700 font-bold mb-2">
-                <span>✗</span>
+              <div className="flex items-center gap-2 text-black font-bold mb-2">
+                <WarningIcon className="w-4 h-4" />
                 <span>Error</span>
               </div>
-              <div className="text-red-600 text-xs">
+              <div className="text-gray-600 text-xs">
                 {result.error}
               </div>
               {result.raw_response && (
