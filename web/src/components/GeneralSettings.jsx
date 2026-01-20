@@ -315,6 +315,214 @@ const GeneralSettings = ({
 
   return (
     <div className='space-y-4'>
+      {/* Update Check */}
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[5] || inkGradients[0] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
+          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Updates</h3>
+          <p className='text-sm text-gray-600 mb-4 '>
+            Check for software updates and keep your PC-1 running the latest version.
+          </p>
+
+          {/* Current Version Display */}
+          {currentVersion && (
+            <div className='mb-4 text-sm'>
+              <span className='text-gray-600 font-bold'>Current Version: </span>
+              <span className='font-mono font-bold text-black'>{currentVersion}</span>
+            </div>
+          )}
+
+          {updateStatus && !installingUpdate && (
+            <div className={`mb-4 p-3 rounded-lg text-sm ${
+              updateStatus.up_to_date 
+                ? 'bg-gray-100 text-black' 
+                : 'bg-white text-black border-2 border-gray-300 border-dashed'
+            }`}>
+              <div className='font-bold mb-1'>{updateStatus.message}</div>
+              <div className='text-xs text-gray-600 mt-1'>
+                {updateStatus.up_to_date ? (
+                  <>Current version: <span className='font-mono'>{updateStatus.current_version || 'unknown'}</span></>
+                ) : (
+                  <>
+                    Current: <span className='font-mono'>{updateStatus.current_version || 'unknown'}</span> → 
+                    Latest: <span className='font-mono'>{updateStatus.latest_version || 'unknown'}</span>
+                    {updateStatus.commits_behind > 0 && (
+                      <> ({updateStatus.commits_behind} {updateStatus.commits_behind === 1 ? 'update' : 'updates'})</>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          )}
+
+          {updateMessage.message && !installingUpdate && updateMessage.type === 'error' && (
+            <div className='mb-4 p-3 rounded-lg text-sm border-2 bg-white text-black border-black border-dashed'>
+              <span className='font-bold mr-2'>ERROR:</span>
+              {updateMessage.message}
+            </div>
+          )}
+
+          {/* Update Progress Bar */}
+          {installingUpdate && (
+            <div className='mb-4 p-4 bg-gray-50 border-2 border-gray-300 rounded-lg'>
+              <div className='flex items-center justify-between mb-2'>
+                <span className='text-sm font-bold text-black'>{updateProgress.stage || 'Installing update...'}</span>
+                <span className='text-xs text-gray-600 font-mono'>{updateProgress.progress}%</span>
+              </div>
+              <div className='w-full bg-gray-200 rounded-full h-2.5 overflow-hidden'>
+                <div 
+                  className='bg-black h-2.5 rounded-full transition-all duration-300 ease-out'
+                  style={{ width: `${updateProgress.progress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {!installingUpdate && (
+            <div className='flex gap-3'>
+              <PrimaryButton
+                onClick={async () => {
+                  setCheckingUpdates(true);
+                  setUpdateMessage({ type: '', message: '' });
+                  try {
+                    const response = await fetch('/api/system/updates/check');
+                    const data = await response.json();
+                    setUpdateStatus(data);
+                    if (data.error) {
+                      setUpdateMessage({ type: 'error', message: data.error });
+                      setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
+                    }
+                  } catch (err) {
+                    setUpdateMessage({ type: 'error', message: 'Could not check for updates. Check your internet connection.' });
+                    setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
+                  } finally {
+                    setCheckingUpdates(false);
+                  }
+                }}
+                disabled={checkingUpdates}
+                loading={checkingUpdates}
+                className='flex-1'>
+                Check for Updates
+              </PrimaryButton>
+
+            {updateStatus && updateStatus.available && !installingUpdate && (
+              <PrimaryButton
+                onClick={async () => {
+                  if (!confirm('Install the update now? The device will restart automatically. The page will refresh automatically once the update is complete.')) {
+                    return;
+                  }
+                  setInstallingUpdate(true);
+                  setUpdateMessage({ type: '', message: '' });
+                  setUpdateProgress({ stage: 'Installing update...', progress: 10 });
+                  
+                  try {
+                    // Simulate progress during installation
+                    const progressInterval = setInterval(() => {
+                      setUpdateProgress(prev => {
+                        if (prev.progress < 50) {
+                          return { ...prev, progress: Math.min(prev.progress + 2, 50) };
+                        }
+                        return prev;
+                      });
+                    }, 500);
+                    
+                    const response = await fetch('/api/system/updates/install', {
+                      method: 'POST',
+                    });
+                    
+                    clearInterval(progressInterval);
+                    setUpdateProgress({ stage: 'Update installed! Restarting service...', progress: 60 });
+                    
+                    const data = await response.json();
+                    if (data.success) {
+                      setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
+                      setUpdateStatus(null);
+                    } else {
+                      setUpdateProgress({ stage: '', progress: 0 });
+                      setUpdateMessage({ type: 'error', message: data.error || data.message || 'Update failed. Please try again.' });
+                      setInstallingUpdate(false);
+                      return;
+                    }
+                  } catch (err) {
+                    // Network error is expected during restart - treat as success
+                    setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
+                    setUpdateStatus(null);
+                  }
+                  
+                  // Set a maximum timeout to always reload after 45 seconds
+                  const maxReloadTimeout = setTimeout(() => {
+                    window.location.reload();
+                  }, 45000); // Always reload after 45 seconds maximum
+                  
+                  // Wait a bit, then start checking if service is back up
+                  setTimeout(() => {
+                    setUpdateProgress({ stage: 'Waiting for service to restart...', progress: 75 });
+                    
+                    let attempts = 0;
+                    const maxAttempts = 30; // Try for up to 30 seconds
+                    
+                    const checkService = async () => {
+                      attempts++;
+                      
+                      // Update progress based on attempts
+                      const progress = Math.min(75 + Math.floor((attempts / maxAttempts) * 20), 95);
+                      setUpdateProgress({ stage: 'Waiting for service to restart...', progress });
+                      
+                      // Create abort controller for timeout
+                      const controller = new AbortController();
+                      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+                      
+                      try {
+                        const healthCheck = await fetch('/api/health', { 
+                          method: 'GET',
+                          signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        
+                        if (healthCheck.ok) {
+                          // Service is back up, clear max timeout and reload the page
+                          setUpdateProgress({ stage: 'Service ready! Reloading page...', progress: 100 });
+                          clearTimeout(maxReloadTimeout);
+                          setTimeout(() => window.location.reload(), 500);
+                          return;
+                        } else {
+                          // Service not ready yet, keep trying
+                          if (attempts < maxAttempts) {
+                            setTimeout(checkService, 1000); // Try again in 1 second
+                          } else {
+                            // Give up and reload anyway
+                            setUpdateProgress({ stage: 'Reloading page...', progress: 100 });
+                            clearTimeout(maxReloadTimeout);
+                            setTimeout(() => window.location.reload(), 500);
+                          }
+                        }
+                      } catch (err) {
+                        clearTimeout(timeoutId);
+                        // Service not ready yet, keep trying
+                        if (attempts < maxAttempts) {
+                          setTimeout(checkService, 1000); // Try again in 1 second
+                        } else {
+                          // Give up and reload anyway after max attempts
+                          setUpdateProgress({ stage: 'Reloading page...', progress: 100 });
+                          clearTimeout(maxReloadTimeout);
+                          setTimeout(() => window.location.reload(), 500);
+                        }
+                      }
+                    };
+                    
+                    // Start checking
+                    checkService();
+                  }, 5000); // Wait 5 seconds before starting checks (give service time to restart)
+                }}
+                disabled={installingUpdate}
+                className='flex-1'>
+                Install Update
+              </PrimaryButton>
+            )}
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* WiFi Status Display */}
       {wifiStatus && (
         <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[0] }}>
@@ -844,214 +1052,6 @@ const GeneralSettings = ({
           ) : (
             <div className='p-4 border-2 border-gray-300 rounded-lg'>
               <p className='text-sm text-gray-500 '>SSH isn't available in testing mode</p>
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Update Check */}
-      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[5] || inkGradients[0] }}>
-        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
-          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Updates</h3>
-          <p className='text-sm text-gray-600 mb-4 '>
-            Check for software updates and keep your PC-1 running the latest version.
-          </p>
-
-          {/* Current Version Display */}
-          {currentVersion && (
-            <div className='mb-4 text-sm'>
-              <span className='text-gray-600 font-bold'>Current Version: </span>
-              <span className='font-mono font-bold text-black'>{currentVersion}</span>
-            </div>
-          )}
-
-          {updateStatus && !installingUpdate && (
-            <div className={`mb-4 p-3 rounded-lg text-sm ${
-              updateStatus.up_to_date 
-                ? 'bg-gray-100 text-black' 
-                : 'bg-white text-black border-2 border-gray-300 border-dashed'
-            }`}>
-              <div className='font-bold mb-1'>{updateStatus.message}</div>
-              <div className='text-xs text-gray-600 mt-1'>
-                {updateStatus.up_to_date ? (
-                  <>Current version: <span className='font-mono'>{updateStatus.current_version || 'unknown'}</span></>
-                ) : (
-                  <>
-                    Current: <span className='font-mono'>{updateStatus.current_version || 'unknown'}</span> → 
-                    Latest: <span className='font-mono'>{updateStatus.latest_version || 'unknown'}</span>
-                    {updateStatus.commits_behind > 0 && (
-                      <> ({updateStatus.commits_behind} {updateStatus.commits_behind === 1 ? 'update' : 'updates'})</>
-                    )}
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-
-          {updateMessage.message && !installingUpdate && updateMessage.type === 'error' && (
-            <div className='mb-4 p-3 rounded-lg text-sm border-2 bg-white text-black border-black border-dashed'>
-              <span className='font-bold mr-2'>ERROR:</span>
-              {updateMessage.message}
-            </div>
-          )}
-
-          {/* Update Progress Bar */}
-          {installingUpdate && (
-            <div className='mb-4 p-4 bg-gray-50 border-2 border-gray-300 rounded-lg'>
-              <div className='flex items-center justify-between mb-2'>
-                <span className='text-sm font-bold text-black'>{updateProgress.stage || 'Installing update...'}</span>
-                <span className='text-xs text-gray-600 font-mono'>{updateProgress.progress}%</span>
-              </div>
-              <div className='w-full bg-gray-200 rounded-full h-2.5 overflow-hidden'>
-                <div 
-                  className='bg-black h-2.5 rounded-full transition-all duration-300 ease-out'
-                  style={{ width: `${updateProgress.progress}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {!installingUpdate && (
-            <div className='flex gap-3'>
-              <PrimaryButton
-                onClick={async () => {
-                  setCheckingUpdates(true);
-                  setUpdateMessage({ type: '', message: '' });
-                  try {
-                    const response = await fetch('/api/system/updates/check');
-                    const data = await response.json();
-                    setUpdateStatus(data);
-                    if (data.error) {
-                      setUpdateMessage({ type: 'error', message: data.error });
-                      setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
-                    }
-                  } catch (err) {
-                    setUpdateMessage({ type: 'error', message: 'Could not check for updates. Check your internet connection.' });
-                    setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
-                  } finally {
-                    setCheckingUpdates(false);
-                  }
-                }}
-                disabled={checkingUpdates}
-                loading={checkingUpdates}
-                className='flex-1'>
-                Check for Updates
-              </PrimaryButton>
-
-            {updateStatus && updateStatus.available && !installingUpdate && (
-              <PrimaryButton
-                onClick={async () => {
-                  if (!confirm('Install the update now? The device will restart automatically. The page will refresh automatically once the update is complete.')) {
-                    return;
-                  }
-                  setInstallingUpdate(true);
-                  setUpdateMessage({ type: '', message: '' });
-                  setUpdateProgress({ stage: 'Installing update...', progress: 10 });
-                  
-                  try {
-                    // Simulate progress during installation
-                    const progressInterval = setInterval(() => {
-                      setUpdateProgress(prev => {
-                        if (prev.progress < 50) {
-                          return { ...prev, progress: Math.min(prev.progress + 2, 50) };
-                        }
-                        return prev;
-                      });
-                    }, 500);
-                    
-                    const response = await fetch('/api/system/updates/install', {
-                      method: 'POST',
-                    });
-                    
-                    clearInterval(progressInterval);
-                    setUpdateProgress({ stage: 'Update installed! Restarting service...', progress: 60 });
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                      setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
-                      setUpdateStatus(null);
-                    } else {
-                      setUpdateProgress({ stage: '', progress: 0 });
-                      setUpdateMessage({ type: 'error', message: data.error || data.message || 'Update failed. Please try again.' });
-                      setInstallingUpdate(false);
-                      return;
-                    }
-                  } catch (err) {
-                    // Network error is expected during restart - treat as success
-                    setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
-                    setUpdateStatus(null);
-                  }
-                  
-                  // Set a maximum timeout to always reload after 45 seconds
-                  const maxReloadTimeout = setTimeout(() => {
-                    window.location.reload();
-                  }, 45000); // Always reload after 45 seconds maximum
-                  
-                  // Wait a bit, then start checking if service is back up
-                  setTimeout(() => {
-                    setUpdateProgress({ stage: 'Waiting for service to restart...', progress: 75 });
-                    
-                    let attempts = 0;
-                    const maxAttempts = 30; // Try for up to 30 seconds
-                    
-                    const checkService = async () => {
-                      attempts++;
-                      
-                      // Update progress based on attempts
-                      const progress = Math.min(75 + Math.floor((attempts / maxAttempts) * 20), 95);
-                      setUpdateProgress({ stage: 'Waiting for service to restart...', progress });
-                      
-                      // Create abort controller for timeout
-                      const controller = new AbortController();
-                      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
-                      
-                      try {
-                        const healthCheck = await fetch('/api/health', { 
-                          method: 'GET',
-                          signal: controller.signal
-                        });
-                        clearTimeout(timeoutId);
-                        
-                        if (healthCheck.ok) {
-                          // Service is back up, clear max timeout and reload the page
-                          setUpdateProgress({ stage: 'Service ready! Reloading page...', progress: 100 });
-                          clearTimeout(maxReloadTimeout);
-                          setTimeout(() => window.location.reload(), 500);
-                          return;
-                        } else {
-                          // Service not ready yet, keep trying
-                          if (attempts < maxAttempts) {
-                            setTimeout(checkService, 1000); // Try again in 1 second
-                          } else {
-                            // Give up and reload anyway
-                            setUpdateProgress({ stage: 'Reloading page...', progress: 100 });
-                            clearTimeout(maxReloadTimeout);
-                            setTimeout(() => window.location.reload(), 500);
-                          }
-                        }
-                      } catch (err) {
-                        clearTimeout(timeoutId);
-                        // Service not ready yet, keep trying
-                        if (attempts < maxAttempts) {
-                          setTimeout(checkService, 1000); // Try again in 1 second
-                        } else {
-                          // Give up and reload anyway after max attempts
-                          setUpdateProgress({ stage: 'Reloading page...', progress: 100 });
-                          clearTimeout(maxReloadTimeout);
-                          setTimeout(() => window.location.reload(), 500);
-                        }
-                      }
-                    };
-                    
-                    // Start checking
-                    checkService();
-                  }, 5000); // Wait 5 seconds before starting checks (give service time to restart)
-                }}
-                disabled={installingUpdate}
-                className='flex-1'>
-                Install Update
-              </PrimaryButton>
-            )}
             </div>
           )}
         </div>
