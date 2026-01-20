@@ -145,7 +145,7 @@ const LocationSearch = ({ value = {}, onChange, placeholder = 'Type city name (e
       </div>
 
       {hasLocation ? (
-        <div className={`${commonClasses.cardNested} space-y-2`}>
+        <div className={`bg-gray-50 border-2 border-gray-300 rounded-lg p-3 space-y-2`}>
           <div className="flex justify-between">
             <span className={commonClasses.textSubtle}>City</span>
             <span className="text-sm font-medium">

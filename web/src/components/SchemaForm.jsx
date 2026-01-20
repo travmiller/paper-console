@@ -58,6 +58,56 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
     const uiOptions = uiSchema?.['ui:options'] || {};
     const widget = uiSchema?.['ui:widget'];
 
+    // 4. CUSTOM WIDGETS
+    if (widget === 'location-search') {
+        return (
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
+                <LocationSearch value={value} onChange={onChange} />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+            </div>
+        );
+    }
+    
+    if (widget === 'key-value-list') {
+        return (
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
+                <KeyValueList value={value} onChange={onChange} />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+            </div>
+        );
+    }
+    
+    if (widget === 'preset-select') {
+        const presets = uiOptions.presets || {};
+        return (
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
+                <PresetSelect 
+                    value={value} 
+                    onChange={onChange} 
+                    presets={presets}
+                    onPresetSelect={(presetValues) => {
+                        // Merge preset values with root form data
+                        if (onRootChange && rootValue) {
+                            onRootChange({ ...rootValue, ...presetValues });
+                        }
+                    }}
+                />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+            </div>
+        );
+    }
+    
+    if (widget === 'webhook-test') {
+        return (
+            <div className="mb-4">
+                <WebhookTest formData={rootValue} />
+            </div>
+        );
+    }
+
     // 1. OBJECTS
     if (type === 'object') {
         const isInline = uiOptions.layout === 'inline' || uiOptions.layout === 'compact';
@@ -166,7 +216,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                                 onClick={() => handleRemove(index)}
                                 className="text-gray-400 hover:text-red-500 transition-colors p-1"
                                 title="Remove Item"
-                             >
+                            >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
                                     <path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path>
                                 </svg>
@@ -200,56 +250,6 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 <label className={`text-sm text-black select-none cursor-pointer ${compact ? 'font-medium' : ''}`} onClick={() => onChange(!value)}>
                     {title}
                 </label>
-            </div>
-        );
-    }
-
-    // 4. CUSTOM WIDGETS
-    if (widget === 'location-search') {
-        return (
-            <div className="mb-4">
-                {title && <label className={commonClasses.label}>{title}</label>}
-                <LocationSearch value={value} onChange={onChange} />
-                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
-            </div>
-        );
-    }
-    
-    if (widget === 'key-value-list') {
-        return (
-            <div className="mb-4">
-                {title && <label className={commonClasses.label}>{title}</label>}
-                <KeyValueList value={value} onChange={onChange} />
-                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
-            </div>
-        );
-    }
-    
-    if (widget === 'preset-select') {
-        const presets = uiOptions.presets || {};
-        return (
-            <div className="mb-4">
-                {title && <label className={commonClasses.label}>{title}</label>}
-                <PresetSelect 
-                    value={value} 
-                    onChange={onChange} 
-                    presets={presets}
-                    onPresetSelect={(presetValues) => {
-                        // Merge preset values with root form data
-                        if (onRootChange && rootValue) {
-                            onRootChange({ ...rootValue, ...presetValues });
-                        }
-                    }}
-                />
-                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
-            </div>
-        );
-    }
-    
-    if (widget === 'webhook-test') {
-        return (
-            <div className="mb-4">
-                <WebhookTest formData={rootValue} />
             </div>
         );
     }
