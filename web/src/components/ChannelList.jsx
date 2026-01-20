@@ -303,7 +303,7 @@ const ChannelList = ({
 
       {/* Unassigned Modules Section */}
       <div className='mt-8'>
-        <h3 className='text-lg font-bold text-black mb-4 tracking-tight border-b-2 border-dashed pb-2' style={{ borderColor: 'var(--color-border-main)' }}>UNASSIGNED MODULES</h3>
+        <h3 className='text-lg font-bold text-black mb-4 tracking-tight border-b-2 border-dashed border-gray-300 pb-2'>UNASSIGNED MODULES</h3>
         <div className='space-y-2'>
           {unassignedModules.length === 0 ? (
             <div className='text-sm text-gray-500 italic py-4'>
