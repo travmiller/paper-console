@@ -1090,6 +1090,10 @@ class PrinterDriver:
                 qr_y = y + 2
                 text_x = qr_size + 12
                 text_y = y + 2
+                
+                # Calculate available width for text (accounting for right margin)
+                right_margin = self.SPACING_SMALL
+                available_text_width = self.PRINTER_WIDTH_DOTS - text_x - right_margin
 
                 if qr_img:
                     img.paste(qr_img, (qr_x, qr_y))
@@ -1098,22 +1102,45 @@ class PrinterDriver:
                 source_font = self._get_font("caption")
                 source_height = self._get_line_height_for_style("caption")
                 if source and source_font:
+                    # Truncate source if too long
+                    source_text = source.upper()
+                    if source_font:
+                        # Measure and truncate if needed
+                        max_source_width = available_text_width
+                        while source_text and source_font.getlength(source_text) > max_source_width:
+                            source_text = source_text[:-1]
                     draw.text(
-                        (text_x, text_y), source.upper()[:24], font=source_font, fill=0
+                        (text_x, text_y), source_text, font=source_font, fill=0
                     )
                 text_y += source_height
 
+                # Use pixel-based wrapping for title
                 title_font = self._get_font("bold")
                 title_line_height = self._get_line_height_for_style("bold")
-                title_lines = op_data.get("title_wrapped", [op_data.get("title", "")])
+                title_text = op_data.get("title", "")
+                if title_font:
+                    # Re-wrap using pixel-based width calculation
+                    title_lines = self._wrap_text_by_width(title_text, title_font, available_text_width + 4)
+                else:
+                    # Fallback to pre-wrapped lines
+                    title_lines = op_data.get("title_wrapped", [title_text])
                 for line in title_lines:
                     if title_font:
                         draw.text((text_x, text_y), line, font=title_font, fill=0)
                     text_y += title_line_height
 
-                summary_lines = op_data.get("summary_wrapped", [])
+                # Use pixel-based wrapping for summary
+                summary_text = op_data.get("summary", "")
                 summary_font = self._get_font("regular_sm")
                 summary_line_height = self._get_line_height_for_style("regular_sm")
+                max_summary_lines = op_data.get("max_summary_lines", 3)
+                if summary_text and summary_font:
+                    # Re-wrap using pixel-based width calculation
+                    summary_lines = self._wrap_text_by_width(summary_text, summary_font, available_text_width + 4)
+                    summary_lines = summary_lines[:max_summary_lines]
+                else:
+                    # Fallback to pre-wrapped lines
+                    summary_lines = op_data.get("summary_wrapped", [])
                 for line in summary_lines:
                     if summary_font:
                         draw.text((text_x, text_y), line, font=summary_font, fill=0)
@@ -3210,10 +3237,12 @@ class PrinterDriver:
         article_data = {
             "source": source,
             "title": title,
+            "summary": summary,  # Store raw summary for pixel-based re-wrapping
             "title_wrapped": title_wrapped,
             "summary_wrapped": summary_wrapped,
             "url": url,
             "qr_size": qr_size,
+            "max_summary_lines": max_summary_lines,
             "title_lines": len(title_wrapped),
             "summary_lines": len(summary_wrapped),
         }
