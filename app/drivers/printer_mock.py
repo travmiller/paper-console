@@ -515,6 +515,20 @@ class PrinterDriver:
         print(f"[PRINT] {checkbox}", end="")
         self.lines_printed += 0  # Will be on same line as text
 
+    def print_checkbox_text(self, text: str, checked: bool = False, size: int = 12, style: str = "regular"):
+        """Simulates printing a checkbox with text inline."""
+        checkbox = "[✓]" if checked else "[ ]"
+        # Handle multi-line text
+        lines = text.split('\n')
+        for i, line in enumerate(lines):
+            if i == 0:
+                print(f"[PRINT] {checkbox} {line}")
+            else:
+                # Indent continuation lines to align with text (not checkbox)
+                indent = " " * (len(checkbox) + 1)
+                print(f"[PRINT] {indent}{line}")
+            self.lines_printed += 1
+
     def print_separator(self, style: str = "dots", height: int = 8):
         """Simulates printing a separator."""
         if style == "dots":

@@ -17,7 +17,7 @@ def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = No
         printer.print_body("No items in checklist.")
         return
     
-    # Print each item with a bitmap checkbox
+    # Print each item with a checkbox inline with text
     for item in items:
         checked = item.get("checked", False) if isinstance(item, dict) else False
         item_text = item.get("text", "").strip() if isinstance(item, dict) else str(item).strip()
@@ -25,21 +25,8 @@ def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = No
         if not item_text:
             continue
         
-        # Print bitmap checkbox
-        printer.print_checkbox(checked=checked, size=14)
-        
-        # Print item text next to checkbox
-        if len(item_text) > printer.width - 20:  # Leave space for checkbox
-            # Wrap long items
-            from app.utils import wrap_text
-            wrapped = wrap_text(item_text, width=printer.width - 20, indent=0)
-            for i, line in enumerate(wrapped):
-                if i == 0:
-                    printer.print_body(f"  {line}")  # First line after checkbox
-                else:
-                    printer.print_body(f"  {line}")  # Indented continuation
-        else:
-            printer.print_body(f"  {item_text}")
+        # Print checkbox with text inline - printer will handle wrapping
+        printer.print_checkbox_text(item_text, checked=checked, size=14, style="regular")
     
     printer.print_line()
 

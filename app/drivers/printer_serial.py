@@ -582,7 +582,9 @@ class PrinterDriver:
                 num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
                 # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
                 if num_rows > 0:
-                    forecast_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
+                    forecast_height = (num_rows * entry_height) + (
+                        (num_rows - 1) * row_spacing
+                    )
                 else:
                     forecast_height = 0
                 total_height += forecast_height + self.SPACING_MEDIUM
@@ -611,6 +613,34 @@ class PrinterDriver:
                 size = op_data.get("size", 12)
                 total_height += size + 2
                 last_spacing = 2
+            elif op_type == "checkbox_text":
+                size = op_data.get("size", 12)
+                text = op_data.get("text", "")
+                style = op_data.get("style", "regular")
+                font = self._fonts.get(style, self._fonts.get("regular"))
+                line_height = self._get_line_height_for_style(style)
+
+                # Calculate text area width (printer width minus checkbox and spacing)
+                checkbox_width = size + self.SPACING_SMALL + 2  # checkbox + spacing
+                text_width = width - checkbox_width - 4  # Account for margins
+
+                # Wrap text to fit available width
+                clean_text = self._sanitize_text(text)
+                if not clean_text.strip():
+                    # Just checkbox, no text
+                    total_height += max(size, line_height) + self.SPACING_SMALL
+                else:
+                    # Split by newlines first
+                    paragraphs = clean_text.split("\n")
+                    for paragraph in paragraphs:
+                        if not paragraph.strip():
+                            total_height += line_height
+                        else:
+                            wrapped_lines = self._wrap_text_by_width(
+                                paragraph, font, text_width + checkbox_width
+                            )
+                            total_height += len(wrapped_lines) * line_height
+                last_spacing = self.SPACING_SMALL
             elif op_type == "separator":
                 height = op_data.get("height", self.SPACING_MEDIUM)
                 total_height += height + self.SPACING_SMALL
@@ -873,7 +903,9 @@ class PrinterDriver:
                 num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
                 # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
                 if num_rows > 0:
-                    total_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
+                    total_height = (num_rows * entry_height) + (
+                        (num_rows - 1) * row_spacing
+                    )
                 else:
                     total_height = 0
                 y += total_height + self.SPACING_MEDIUM
@@ -969,6 +1001,56 @@ class PrinterDriver:
                 checkbox_y = y + 2
                 self._draw_checkbox(draw, checkbox_x, checkbox_y, size, checked)
                 y += size + self.SPACING_SMALL
+            elif op_type == "checkbox_text":
+                checked = op_data.get("checked", False)
+                size = op_data.get("size", 12)
+                text = op_data.get("text", "")
+                style = op_data.get("style", "regular")
+                font = self._get_font(style)
+                line_height = self._get_line_height_for_style(style)
+
+                # Calculate positions
+                checkbox_x = 2  # Left margin
+                checkbox_y = y + 2
+                text_start_x = checkbox_x + size + self.SPACING_SMALL + 2
+                # Available width for text: total width minus left margin, checkbox, spacing, and right margin
+                text_width = width - text_start_x - 2
+
+                # Draw checkbox
+                self._draw_checkbox(draw, checkbox_x, checkbox_y, size, checked)
+
+                # Handle text
+                clean_text = self._sanitize_text(text)
+                if not clean_text.strip():
+                    # Just checkbox, no text - align checkbox to text baseline
+                    y += max(size, line_height) + self.SPACING_SMALL
+                else:
+                    # Split by newlines first, then wrap each paragraph
+                    paragraphs = clean_text.split("\n")
+                    current_y = y
+                    for paragraph in paragraphs:
+                        if not paragraph.strip():
+                            # Blank line
+                            current_y += line_height
+                        else:
+                            # Wrap paragraph to fit available text width
+                            # _wrap_text_by_width expects full bitmap width and accounts for 4px margins
+                            # We need to pass it a width that represents the text area + its margins
+                            # So: text_width + 4 (for margins that _wrap_text_by_width will account for)
+                            wrapped_lines = self._wrap_text_by_width(
+                                paragraph, font, text_width + 4
+                            )
+                            for i, line in enumerate(wrapped_lines):
+                                text_y = current_y
+                                if font:
+                                    draw.text(
+                                        (text_start_x, text_y), line, font=font, fill=0
+                                    )
+                                else:
+                                    draw.text((text_start_x, text_y), line, fill=0)
+                                current_y += line_height
+                    # Update y to the final position
+                    y = current_y + self.SPACING_SMALL
             elif op_type == "separator":
                 style = op_data.get("style", "dots")
                 sep_height = op_data.get("height", self.SPACING_MEDIUM)
@@ -1585,16 +1667,16 @@ class PrinterDriver:
             precip = day_data.get("precipitation")
             # Always show precipitation (even if 0%) for consistent alignment
             precip_value = precip if precip is not None else 0
-            
+
             # Count elements to space: High, Low, Icon, Precip (always), Day/Date
             num_elements = 5
-            
+
             # Calculate spacing between elements - use significantly more spacing
             available_height = day_height - 16  # Leave 8px top and bottom padding
             element_spacing = 12  # Fixed larger spacing between elements
-            
+
             current_y = day_top + 8
-            
+
             # 1. High temp (bold, top)
             high = day_data.get("high", "--")
             high_str = f"{high}°" if high != "--" else "--"
@@ -1606,9 +1688,9 @@ class PrinterDriver:
                 current_y = current_y + (bbox[3] - bbox[1] if bbox else 16)
             else:
                 current_y = current_y + 16
-            
+
             current_y += element_spacing
-            
+
             # 2. Low temp (medium)
             low = day_data.get("low", "--")
             low_str = f"{low}°" if low != "--" else "--"
@@ -1620,18 +1702,18 @@ class PrinterDriver:
                 current_y = current_y + (bbox[3] - bbox[1] if bbox else 14)
             else:
                 current_y = current_y + 14
-            
+
             current_y += element_spacing
-            
+
             # 3. Icon
             icon_x = col_center - icon_size // 2
             icon_y = current_y
             icon_type = get_icon_type(day_data.get("condition", ""))
             self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
             current_y = icon_y + icon_size
-            
+
             current_y += element_spacing
-            
+
             # 4. Precipitation probability (always show, even if 0%)
             precip_str = f"{precip_value}%"
             if font_sm:
@@ -1642,9 +1724,9 @@ class PrinterDriver:
                 current_y = current_y + (bbox[3] - bbox[1] if bbox else 10)
             else:
                 current_y = current_y + 10
-            
+
             current_y += element_spacing
-            
+
             # 5. Day/Date label (bottom)
             actual_bottom = day_bottom  # Track actual bottom of content
             if font_sm:
@@ -1653,44 +1735,58 @@ class PrinterDriver:
                 day_text_w = day_bbox[2] - day_bbox[0] if day_bbox else 0
                 day_text_x = col_center - day_text_w // 2
                 draw.text((day_text_x, current_y), day_label, font=font_sm, fill=0)
-                
+
                 # Date below day (if available)
                 if date_label:
                     date_bbox = font_sm.getbbox(date_label)
                     date_text_w = date_bbox[2] - date_bbox[0] if date_bbox else 0
                     date_text_x = col_center - date_text_w // 2
-                    date_y = current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10) + 2
+                    date_y = (
+                        current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10) + 2
+                    )
                     draw.text((date_text_x, date_y), date_label, font=font_sm, fill=0)
                     # Update actual bottom to include date
-                    actual_bottom = max(actual_bottom, date_y + (date_bbox[3] - date_bbox[1] if date_bbox else 10))
+                    actual_bottom = max(
+                        actual_bottom,
+                        date_y + (date_bbox[3] - date_bbox[1] if date_bbox else 10),
+                    )
                 else:
                     # Update actual bottom to include day label
-                    actual_bottom = max(actual_bottom, current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10))
-            
+                    actual_bottom = max(
+                        actual_bottom,
+                        current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10),
+                    )
+
             # Draw vertical divider lines - full height for all columns
             # Use actual_bottom to ensure lines extend to the very bottom of content
             line_bottom = max(day_bottom, actual_bottom)
-            
+
             # Right edge (for all columns except last)
             if i < num_days - 1:
                 draw.line(
-                    [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, line_bottom)],
+                    [
+                        (col_right - divider_width // 2, day_top),
+                        (col_right - divider_width // 2, line_bottom),
+                    ],
                     fill=0,
-                    width=divider_width
+                    width=divider_width,
                 )
             # Left edge for first column
             if i == 0:
                 draw.line(
                     [(col_x, day_top), (col_x, line_bottom)],
                     fill=0,
-                    width=divider_width
+                    width=divider_width,
                 )
             # Right edge for last column (to complete the grid)
             if i == num_days - 1:
                 draw.line(
-                    [(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, line_bottom)],
+                    [
+                        (col_right - divider_width // 2, day_top),
+                        (col_right - divider_width // 2, line_bottom),
+                    ],
                     fill=0,
-                    width=divider_width
+                    width=divider_width,
                 )
 
     def _draw_hourly_forecast(
@@ -1765,22 +1861,28 @@ class PrinterDriver:
         num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
         # Calculate column width with proper margins to avoid cutoff
         # Leave 8px left margin + 8px right margin = 16px total margin
-        col_width = (total_width - 16 - (hours_per_row - 1) * 5) // hours_per_row  # Account for spacing between columns
+        col_width = (
+            total_width - 16 - (hours_per_row - 1) * 5
+        ) // hours_per_row  # Account for spacing between columns
         hour_spacing = 5  # Horizontal spacing between hours
         icon_size = 24  # Increased size, matches 7-day forecast
-        entry_height = 86  # Recalculated height to accommodate 24px icon (was 80px for 18px icon)
+        entry_height = (
+            86  # Recalculated height to accommodate 24px icon (was 80px for 18px icon)
+        )
         row_spacing = 10  # Vertical spacing between rows
-        
+
         # Get fonts
         font_sm = self._get_font("regular_sm")
         font_md = self._get_font("regular")  # For temperature
 
         # Draw grid lines first (behind content)
         grid_line_width = 1
-        
+
         # Calculate total forecast height
-        total_forecast_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
-        
+        total_forecast_height = (num_rows * entry_height) + (
+            (num_rows - 1) * row_spacing
+        )
+
         # Calculate actual column positions for grid
         actual_col_positions = []
         left_margin = 8
@@ -1795,33 +1897,40 @@ class PrinterDriver:
             # Ensure we don't exceed the available width (account for right margin)
             last_col_x = min(last_col_x, x + total_width - right_margin)
             actual_col_positions.append(last_col_x)
-        
+
         # Calculate leftmost and rightmost positions for grid - ensure they're within bounds
-        leftmost_x = actual_col_positions[0] if actual_col_positions else x + left_margin
-        rightmost_x = min(x + total_width - right_margin, actual_col_positions[-1] if actual_col_positions else x + total_width - right_margin)
-        
+        leftmost_x = (
+            actual_col_positions[0] if actual_col_positions else x + left_margin
+        )
+        rightmost_x = min(
+            x + total_width - right_margin,
+            (
+                actual_col_positions[-1]
+                if actual_col_positions
+                else x + total_width - right_margin
+            ),
+        )
+
         # Calculate bottom position for vertical lines (should match bottom horizontal line)
         bottom_y = y + total_forecast_height
-        
+
         # Draw horizontal grid lines (between rows) - start at leftmost vertical line
         for row in range(num_rows + 1):
             line_y = y + row * (entry_height + row_spacing)
             draw.line(
                 [(leftmost_x, line_y), (rightmost_x, line_y)],
                 fill=0,
-                width=grid_line_width
+                width=grid_line_width,
             )
-        
+
         # Draw vertical grid lines (between hours) - extend to bottom horizontal line
         for col_x in actual_col_positions:
             # Only draw if within bounds - ensure we don't exceed total_width
             if col_x < x + total_width:
                 draw.line(
-                    [(col_x, y), (col_x, bottom_y)],
-                    fill=0,
-                    width=grid_line_width
+                    [(col_x, y), (col_x, bottom_y)], fill=0, width=grid_line_width
                 )
-        
+
         # Draw content on top of grid
         for row in range(num_rows):
             row_y = y + row * (entry_height + row_spacing)
@@ -2089,11 +2198,13 @@ class PrinterDriver:
             font: Font for text
         """
         current_y = y  # Track current Y position
-        line_height = self._get_line_height_for_style("regular") if font else self.line_height
+        line_height = (
+            self._get_line_height_for_style("regular") if font else self.line_height
+        )
 
         for i, item in enumerate(items):
             item_y = current_y
-            
+
             # Draw year label and calculate its width
             year = str(item.get("year", ""))
             year_width = 0
@@ -2105,11 +2216,11 @@ class PrinterDriver:
                 except:
                     year_width = len(year) * 8  # Fallback estimate
                 draw.text((x, item_y - 4), year, font=font, fill=0)
-            
+
             # Position vertical line after year with padding
             line_x = x + year_width + 12  # 12px padding after year
             text_x = line_x + 10  # Text starts 10px right of line
-            
+
             # Calculate available width for text (from text_x to right margin)
             max_text_width = self.PRINTER_WIDTH_DOTS - text_x - 10  # 10px right margin
 
@@ -2118,14 +2229,14 @@ class PrinterDriver:
             if font and text:
                 # Wrap text to fit available width
                 wrapped_lines = self._wrap_text_by_width(text, font, max_text_width)
-                
+
                 # Draw each wrapped line
                 text_y = item_y - 4
                 for line in wrapped_lines:
                     if line.strip():  # Only draw non-empty lines
                         draw.text((text_x, text_y), line, font=font, fill=0)
                         text_y += line_height
-                
+
                 # Calculate actual height used for this item
                 # Add some padding at the bottom
                 actual_height = max(item_height, (len(wrapped_lines) * line_height) + 8)
@@ -2134,14 +2245,12 @@ class PrinterDriver:
                 if text:
                     draw.text((text_x, item_y - 4), text, fill=0)
                 actual_height = item_height
-            
+
             # Draw vertical timeline line to next item (if not last item)
             if i < len(items) - 1:
                 line_end_y = item_y + actual_height
-                draw.line(
-                    [(line_x, item_y), (line_x, line_end_y)], fill=0, width=2
-                )
-            
+                draw.line([(line_x, item_y), (line_x, line_end_y)], fill=0, width=2)
+
             # Update position for next item
             current_y += actual_height
 
@@ -2983,10 +3092,10 @@ class PrinterDriver:
 
     def print_text(self, text: str, style: str = "regular"):
         """Print text with specified style. Buffers for unified bitmap rendering.
-        
+
         Handles multi-line text by splitting on newlines. Each line/paragraph
         will be wrapped to fit the printer width using font metrics.
-        
+
         Available styles:
             - "regular": Normal body text
             - "bold": Bold text
@@ -2998,11 +3107,11 @@ class PrinterDriver:
         """
         if not text:
             return
-            
+
         # Split by newlines to handle multi-line text properly
         # Empty lines are preserved as blank lines for spacing
-        lines = text.split('\n')
-        
+        lines = text.split("\n")
+
         # Safety: prevent unbounded buffer growth
         for line in lines:
             if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
@@ -3394,6 +3503,31 @@ class PrinterDriver:
                 {
                     "checked": checked,
                     "size": size,
+                },
+            )
+        )
+
+    def print_checkbox_text(
+        self, text: str, checked: bool = False, size: int = 12, style: str = "regular"
+    ):
+        """Print a checkbox with text inline on the same line.
+
+        Args:
+            text: Text to display next to the checkbox
+            checked: Whether checkbox is checked
+            size: Checkbox size in pixels (default 12)
+            style: Text style (default "regular")
+        """
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+        self.print_buffer.append(
+            (
+                "checkbox_text",
+                {
+                    "text": text,
+                    "checked": checked,
+                    "size": size,
+                    "style": style,
                 },
             )
         )
