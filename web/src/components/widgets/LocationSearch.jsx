@@ -29,14 +29,24 @@ const LocationSearch = ({ value = {}, onChange, placeholder = 'Type city name (e
     
     if (term.length < 2) {
       setSearchResults([]);
+      setIsSearching(false);
       return;
     }
 
     // Debounce the search to respect API rate limits
+    // Using 500ms to match system setting behavior
     searchTimerRef.current = setTimeout(async () => {
       setIsSearching(true);
       try {
-        const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=10`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        
+        // Use local database logic (use_api=false) and higher limit (20) to match General Settings
+        const response = await fetch(`/api/location/search?q=${encodeURIComponent(term)}&limit=20&use_api=false`, {
+            signal: controller.signal
+        });
+        clearTimeout(timeoutId);
+        
         const data = await response.json();
         if (data.results) {
           setSearchResults(data.results);
@@ -44,17 +54,25 @@ const LocationSearch = ({ value = {}, onChange, placeholder = 'Type city name (e
           setSearchResults([]);
         }
       } catch (err) {
-        console.error('Error fetching locations:', err);
-        setSearchResults([]);
+        if (err.name === 'AbortError') {
+             console.warn('Location search timed out');
+        } else {
+             console.error('Error fetching locations:', err);
+             setSearchResults([]);
+        }
       } finally {
         setIsSearching(false);
       }
-    }, 300);
+    }, 500);
   };
 
   const selectLocation = (loc) => {
+    // Smart mapping: Prefer raw city name if available, fallback to display name
+    // This prevents "City, State, State" issues in display
+    const cityName = loc.city || loc.name;
+
     const newLocation = {
-      city_name: loc.name,
+      city_name: cityName,
       latitude: loc.latitude,
       longitude: loc.longitude,
       timezone: loc.timezone,
