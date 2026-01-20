@@ -901,43 +901,74 @@ const GeneralSettings = ({
             {updateStatus && updateStatus.available && (
               <PrimaryButton
                 onClick={async () => {
-                  if (!confirm('Install the update now? The device will restart automatically. You may see a brief error message while it restarts - just wait a moment and refresh the page.')) {
+                  if (!confirm('Install the update now? The device will restart automatically. The page will refresh automatically once the update is complete.')) {
                     return;
                   }
                   setInstallingUpdate(true);
                   setUpdateMessage({ type: '', message: '' });
+                  
+                  // Show initial message
+                  setUpdateMessage({ 
+                    type: 'success', 
+                    message: 'Installing update... The device will restart shortly.' 
+                  });
+                  
                   try {
                     const response = await fetch('/api/system/updates/install', {
                       method: 'POST',
                     });
                     const data = await response.json();
                     if (data.success) {
-                      const message = data.warning 
-                        ? `${data.message} ${data.warning}`
-                        : (data.message || 'Update installed! The device is restarting. If you see an error, wait a moment and refresh the page.');
-                      setUpdateMessage({ type: 'success', message });
+                      setUpdateMessage({ 
+                        type: 'success', 
+                        message: 'Update installed! The device is restarting. Refreshing page...' 
+                      });
                       setUpdateStatus(null);
-                      // Reload page after a longer delay to allow service to restart
-                      setTimeout(() => {
-                        // Try to reload, but handle errors gracefully
-                        window.location.reload();
-                      }, 5000);
                     } else {
                       setUpdateMessage({ type: 'error', message: data.error || data.message || 'Update failed. Please try again.' });
+                      setInstallingUpdate(false);
+                      return;
                     }
                   } catch (err) {
-                    // If we get a network error, it might just be the service restarting
+                    // Network error is expected during restart - treat as success
                     setUpdateMessage({ 
                       type: 'success', 
-                      message: 'Update is being installed. The device is restarting - if you see an error, wait a moment and refresh the page.' 
+                      message: 'Update installed! The device is restarting. Refreshing page...' 
                     });
-                    setTimeout(() => {
-                      window.location.reload();
-                    }, 5000);
-                  } finally {
-                    setInstallingUpdate(false);
-                    setTimeout(() => setUpdateMessage({ type: '', message: '' }), 15000);
+                    setUpdateStatus(null);
                   }
+                  
+                  // Wait a bit, then start checking if service is back up
+                  setTimeout(() => {
+                    let attempts = 0;
+                    const maxAttempts = 20; // Try for up to 20 seconds
+                    
+                    const checkService = async () => {
+                      attempts++;
+                      try {
+                        const healthCheck = await fetch('/api/health', { 
+                          method: 'GET',
+                          signal: AbortSignal.timeout(2000) // 2 second timeout
+                        });
+                        if (healthCheck.ok) {
+                          // Service is back up, reload the page
+                          window.location.reload();
+                          return;
+                        }
+                      } catch (err) {
+                        // Service not ready yet, keep trying
+                        if (attempts < maxAttempts) {
+                          setTimeout(checkService, 1000); // Try again in 1 second
+                        } else {
+                          // Give up and reload anyway
+                          window.location.reload();
+                        }
+                      }
+                    };
+                    
+                    // Start checking
+                    checkService();
+                  }, 3000);
                 }}
                 disabled={installingUpdate}
                 loading={installingUpdate}
