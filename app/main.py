@@ -1426,7 +1426,7 @@ async def check_for_updates():
             return {
                 "available": False,
                 "up_to_date": True,
-                "message": "You're all set!",
+                "message": "You're on the latest version",
                 "current_version": current_commit,
             }
         else:

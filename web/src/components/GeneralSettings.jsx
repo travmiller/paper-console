@@ -839,10 +839,10 @@ const GeneralSettings = ({
           </p>
 
           {updateStatus && (
-            <div className={`mb-4 p-3 rounded-lg text-sm border-2 ${
+            <div className={`mb-4 p-3 rounded-lg text-sm ${
               updateStatus.up_to_date 
-                ? 'bg-gray-100 text-black border-black' 
-                : 'bg-white text-black border-black border-dashed'
+                ? 'bg-gray-100 text-black' 
+                : 'bg-white text-black border-2 border-gray-300 border-dashed'
             }`}>
               <div className='font-bold mb-1'>{updateStatus.message}</div>
               <div className='text-xs text-gray-600 mt-1'>
