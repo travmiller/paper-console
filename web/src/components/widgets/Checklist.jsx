@@ -70,9 +70,12 @@ const ChecklistWidget = ({ value = [], onChange }) => {
   }, [items.length]);
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-0 border border-gray-100 rounded-lg overflow-hidden bg-white">
       {items.map((item, index) => (
-        <div key={index} className="flex items-center gap-3 group px-2 py-1 rounded hover:bg-gray-50 transition-colors">
+        <div 
+            key={index} 
+            className={`flex items-center gap-3 group px-3 py-2 transition-all border-b border-gray-100 last:border-0 hover:bg-gray-50/80`}
+        >
           <input
             type="checkbox"
             checked={item.checked || false}
