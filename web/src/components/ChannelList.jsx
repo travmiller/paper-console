@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { AVAILABLE_MODULE_TYPES, INK_GRADIENTS } from '../constants';
 import WiFiIcon from '../assets/WiFiIcon';
 import WiFiOffIcon from '../assets/WiFiOffIcon';
@@ -58,7 +58,57 @@ const ChannelList = ({
     return Object.values(modules || {}).filter((module) => !assignedModuleIds.has(module.id));
   };
 
-  const unassignedModules = getUnassignedModules();
+  // Track display order of unassigned modules
+  const [unassignedModuleOrder, setUnassignedModuleOrder] = useState([]);
+  
+  useEffect(() => {
+    // Initialize order when modules change
+    const assignedModuleIds = new Set();
+    Object.values(settings.channels || {}).forEach((channel) => {
+      (channel.modules || []).forEach((assignment) => {
+        assignedModuleIds.add(assignment.module_id);
+      });
+    });
+    
+    const unassigned = Object.values(modules || {}).filter((module) => !assignedModuleIds.has(module.id));
+    const currentOrder = unassigned.map(m => m.id);
+    
+    // Only update if the set of module IDs has changed (new modules added/removed)
+    setUnassignedModuleOrder(prevOrder => {
+      const prevSet = new Set(prevOrder);
+      const currentSet = new Set(currentOrder);
+      // Check if sets are different
+      if (prevSet.size !== currentSet.size || 
+          ![...prevSet].every(id => currentSet.has(id))) {
+        return currentOrder;
+      }
+      // Keep existing order if modules haven't changed
+      return prevOrder;
+    });
+  }, [modules, settings.channels]);
+
+  // Get unassigned modules in display order
+  const unassignedModules = unassignedModuleOrder
+    .map(id => modules[id])
+    .filter(Boolean);
+
+  const moveUnassignedModule = (moduleId, direction) => {
+    const currentIndex = unassignedModuleOrder.findIndex(id => id === moduleId);
+    if (currentIndex === -1) return;
+    
+    const newOrder = [...unassignedModuleOrder];
+    if (direction === 'up' && currentIndex > 0) {
+      // Swap with previous
+      [newOrder[currentIndex], newOrder[currentIndex - 1]] = 
+        [newOrder[currentIndex - 1], newOrder[currentIndex]];
+      setUnassignedModuleOrder(newOrder);
+    } else if (direction === 'down' && currentIndex < newOrder.length - 1) {
+      // Swap with next
+      [newOrder[currentIndex], newOrder[currentIndex + 1]] = 
+        [newOrder[currentIndex + 1], newOrder[currentIndex]];
+      setUnassignedModuleOrder(newOrder);
+    }
+  };
 
   return (
     <div className='space-y-4'>
@@ -310,6 +360,38 @@ const ChannelList = ({
                       title='Print this module'>
                       <PrintIcon className='w-3 h-3 text-gray-400 hover:text-black transition-colors' />
                     </button>
+                    <div className='flex flex-col gap-0.5'>
+                      <button
+                        type='button'
+                        onClick={() => moveUnassignedModule(module.id, 'up')}
+                        disabled={unassignedModules.findIndex(m => m.id === module.id) === 0}
+                        className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                        onMouseEnter={(e) => {
+                          const icon = e.currentTarget.querySelector('svg');
+                          if (icon) icon.style.color = 'var(--color-text-main)';
+                        }}
+                        onMouseLeave={(e) => {
+                          const icon = e.currentTarget.querySelector('svg');
+                          if (icon) icon.style.color = 'var(--color-text-muted)';
+                        }}>
+                        <ArrowUpIcon className='w-2.5 h-2.5 transition-colors' style={{ color: 'var(--color-text-muted)' }} />
+                      </button>
+                      <button
+                        type='button'
+                        onClick={() => moveUnassignedModule(module.id, 'down')}
+                        disabled={unassignedModules.findIndex(m => m.id === module.id) === unassignedModules.length - 1}
+                        className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                        onMouseEnter={(e) => {
+                          const icon = e.currentTarget.querySelector('svg');
+                          if (icon) icon.style.color = 'var(--color-text-main)';
+                        }}
+                        onMouseLeave={(e) => {
+                          const icon = e.currentTarget.querySelector('svg');
+                          if (icon) icon.style.color = 'var(--color-text-muted)';
+                        }}>
+                        <ArrowDownIcon className='w-2.5 h-2.5 transition-colors' style={{ color: 'var(--color-text-muted)' }} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
