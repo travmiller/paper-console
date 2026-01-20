@@ -213,8 +213,8 @@ def on_button_press_threadsafe():
 
     try:
         if global_loop and global_loop.is_running():
-            # Check for selection mode (adventure game, etc.)
-            from app.modules.adventure import is_selection_mode_active, handle_selection
+            # Check for selection mode (adventure game, settings menu, etc.)
+            from app.selection_mode import is_selection_mode_active
             if is_selection_mode_active():
                 # In selection mode: use dial position as choice input
                 position = dial.read_position()
@@ -241,7 +241,7 @@ async def handle_selection_async(dial_position: int):
     """
     global print_in_progress
     from concurrent.futures import ThreadPoolExecutor
-    from app.modules.adventure import handle_selection
+    from app.selection_mode import handle_selection
 
     def _do_selection():
         handle_selection(dial_position)

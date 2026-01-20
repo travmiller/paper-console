@@ -114,59 +114,14 @@ def filter_choices(choices: List[Dict], state: AdventureState) -> List[Dict]:
 
 
 # --- Selection Mode Integration ---
+# Selection mode is now in app/selection_mode.py for reuse across modules
 
-# Global state for selection mode
-_selection_mode_active = False
-_selection_callback = None
-_current_module_id = None
-
-
-def is_selection_mode_active() -> bool:
-    """Check if selection mode is currently active."""
-    return _selection_mode_active
-
-
-def enter_selection_mode(callback, module_id: str):
-    """
-    Enter selection mode - the next button press will call callback(dial_position).
-    
-    Args:
-        callback: Function to call with dial position (1-8) when button is pressed
-        module_id: ID of the module that entered selection mode
-    """
-    global _selection_mode_active, _selection_callback, _current_module_id
-    _selection_mode_active = True
-    _selection_callback = callback
-    _current_module_id = module_id
-    logger.info(f"Adventure: Entered selection mode for module {module_id}")
-
-
-def exit_selection_mode():
-    """Exit selection mode and return to normal channel switching."""
-    global _selection_mode_active, _selection_callback, _current_module_id
-    _selection_mode_active = False
-    _selection_callback = None
-    _current_module_id = None
-    logger.info("Adventure: Exited selection mode")
-
-
-def handle_selection(dial_position: int) -> bool:
-    """
-    Handle a button press while in selection mode.
-    
-    Returns True if handled (was in selection mode), False otherwise.
-    """
-    global _selection_callback
-    if not _selection_mode_active or _selection_callback is None:
-        return False
-    
-    try:
-        _selection_callback(dial_position)
-    except Exception as e:
-        logger.error(f"Adventure selection callback error: {e}")
-        exit_selection_mode()
-    
-    return True
+from app.selection_mode import (
+    is_selection_mode_active,
+    enter_selection_mode,
+    exit_selection_mode,
+    handle_selection,
+)
 
 
 # --- Print Functions ---
@@ -204,12 +159,16 @@ def print_story_node(printer, story: Dict, node: Dict, state: AdventureState, mo
     printer.print_body(text)
     printer.print_line()
     
-    # If ending, show restart prompt
+    # If ending, show restart/exit options
     if node.get("ending"):
         printer.feed(1)
-        printer.print_caption("Your adventure has ended.")
-        printer.print_caption("Press button to start anew.")
+        printer.print_subheader("WHAT NOW?")
+        printer.feed(1)
+        printer.print_body("  [1] Start Over")
+        printer.print_caption("  [8] Exit")
         printer.print_line()
+        printer.print_caption("Turn dial to choice, press button")
+        printer.feed(1)
         return
     
     # Print choices
@@ -283,10 +242,29 @@ def process_choice(module_id: str, dial_position: int, printer):
         exit_selection_mode()
         return
     
-    # Handle game over / endings - any button starts new game
+    # Handle game over / endings
     if current_node.get("ending"):
-        state = reset_state(module_id)
-        current_node = get_node(story, "start")
+        if dial_position == 1:
+            # Start Over
+            state = reset_state(module_id)
+            current_node = get_node(story, "start")
+        else:
+            # Any other position (including 8) = Exit
+            exit_selection_mode()
+            
+            if hasattr(printer, "reset_buffer"):
+                printer.reset_buffer()
+            
+            printer.print_header("ADVENTURE", icon="book")
+            printer.print_body("Thanks for playing!")
+            printer.print_line()
+            printer.print_caption("Turn dial to select a channel,")
+            printer.print_caption("then press button to continue.")
+            printer.feed(1)
+            
+            if hasattr(printer, "flush_buffer"):
+                printer.flush_buffer()
+            return
     else:
         # Find the selected choice
         choices = filter_choices(current_node.get("choices", []), state)
@@ -424,10 +402,9 @@ def format_adventure_receipt(
     # Print the current story node
     print_story_node(printer, story, current_node, state, module_name or meta.get("title", "Adventure"))
     
-    # Enter selection mode (unless it's an ending)
+    # Enter selection mode for player input (including at endings for Start Over / Exit)
     # Note: Selection mode will be checked by main.py's button handler
-    if not current_node.get("ending"):
-        enter_selection_mode(
-            lambda pos: process_choice(module_id, pos, printer),
-            module_id
-        )
+    enter_selection_mode(
+        lambda pos: process_choice(module_id, pos, printer),
+        module_id
+    )
