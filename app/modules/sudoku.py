@@ -72,17 +72,52 @@ class SudokuGenerator:
                     return True
         return False
 
+    def count_solutions(self, grid, limit=2):
+        """Counts solutions up to 'limit'. Returns count (0, 1, or 2+)."""
+        count = [0]  # Use list to allow modification in nested function
+        
+        def solve_count(g):
+            if count[0] >= limit:
+                return
+            for i in range(9):
+                for j in range(9):
+                    if g[i][j] == 0:
+                        for num in range(1, 10):
+                            if self.is_valid(g, i, j, num):
+                                g[i][j] = num
+                                solve_count(g)
+                                g[i][j] = 0
+                                if count[0] >= limit:
+                                    return
+                        return
+            count[0] += 1
+        
+        # Work on a copy to avoid modifying original
+        grid_copy = [row[:] for row in grid]
+        solve_count(grid_copy)
+        return count[0]
+
     def remove_digits(self, count=40):
-        """Removes 'count' digits to create the puzzle."""
-        # Note: A true Sudoku generator checks for uniqueness of solution.
-        # For a V1 toy, random removal is usually "good enough" but technically imperfect.
-        attempts = count
-        while attempts > 0:
-            row = random.randint(0, 8)
-            col = random.randint(0, 8)
-            if self.grid[row][col] != 0:
-                self.grid[row][col] = 0
-                attempts -= 1
+        """Removes digits while ensuring unique solution."""
+        # Get all filled cells and shuffle them
+        cells = [(r, c) for r in range(9) for c in range(9) if self.grid[r][c] != 0]
+        random.shuffle(cells)
+        
+        removed = 0
+        for row, col in cells:
+            if removed >= count:
+                break
+            
+            # Tentatively remove the digit
+            backup = self.grid[row][col]
+            self.grid[row][col] = 0
+            
+            # Check if puzzle still has exactly one solution
+            if self.count_solutions(self.grid, limit=2) != 1:
+                # Not unique, restore the digit
+                self.grid[row][col] = backup
+            else:
+                removed += 1
 
 
 def generate_puzzle(difficulty="medium"):
