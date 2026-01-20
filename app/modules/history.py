@@ -3,7 +3,8 @@ import requests
 from typing import Dict, Any, List
 from pathlib import Path
 from datetime import datetime
-from app.utils import wrap_text
+from app.utils import wrap_text, wrap_text_pixels
+from PIL import Image, ImageDraw
 from app.module_registry import register_module
 
 # We will use a curated "On This Day" dataset.
@@ -151,6 +152,110 @@ def format_history_receipt(
             timeline_items.append({"year": year, "text": description})
         
         # Print timeline graphic
-        printer.print_timeline(timeline_items, item_height=24)
+        # Print timeline graphic
+        width = getattr(printer, "PRINTER_WIDTH_DOTS", 384)
+        regular_font = getattr(printer, "_get_font", lambda s: None)("regular")
+        
+        img = draw_timeline_image(
+            width, 
+            timeline_items, 
+            item_height=24, 
+            font=regular_font
+        )
+        printer.print_image(img)
 
     printer.print_line()
+
+
+def draw_timeline_image(
+    width: int, 
+    items: list, 
+    item_height: int, 
+    font
+) -> Image.Image:
+    """Draw a timeline graphic to an image."""
+    
+    # Calculate total height first (to create image)
+    total_height = 0
+    # Line height default
+    line_height = getattr(font, "size", 24) if font else 24
+    
+    # We need to calculate height for each item to know total image height
+    item_heights = []
+    
+    for item in items:
+        # Calculate year width
+        year = str(item.get("year", ""))
+        year_width = 0
+        if font and year and year != "0":
+            try:
+                bbox = font.getbbox(year)
+                year_width = bbox[2] - bbox[0] if bbox else len(year) * 8
+            except:
+                year_width = len(year) * 8
+        
+        # Position vertical line after year with padding
+        line_x = year_width + 12
+        text_x = line_x + 10
+        
+        # Calculate available width for text
+        max_text_width = width - text_x - 10
+        
+        # Calculate text height
+        text = item.get("text", "")
+        if font and text:
+            wrapped_lines = wrap_text_pixels(text, font, max_text_width)
+            actual_height = max(item_height, (len(wrapped_lines) * line_height) + 8)
+        else:
+            actual_height = item_height
+            
+        item_heights.append(actual_height)
+        total_height += actual_height
+        
+    # Create image
+    img = Image.new("1", (width, total_height), 1)  # White background
+    draw = ImageDraw.Draw(img)
+    
+    current_y = 0
+    x = 0
+    
+    for i, item in enumerate(items):
+        item_y = current_y
+        actual_height = item_heights[i]
+        
+        # Draw year label
+        year = str(item.get("year", ""))
+        year_width = 0
+        if font and year and year != "0":
+            try:
+                bbox = font.getbbox(year)
+                year_width = bbox[2] - bbox[0] if bbox else len(year) * 8
+            except:
+                year_width = len(year) * 8
+            draw.text((x, item_y - 4), year, font=font, fill=0)
+            
+        # Draw vertical line
+        line_x = x + year_width + 12
+        text_x = line_x + 10
+        max_text_width = width - text_x - 10
+        
+        # Draw text
+        text = item.get("text", "")
+        if font and text:
+            wrapped_lines = wrap_text_pixels(text, font, max_text_width)
+            text_y = item_y - 4
+            for line in wrapped_lines:
+                if line.strip():
+                    draw.text((text_x, text_y), line, font=font, fill=0)
+                    text_y += line_height
+        elif text:
+            draw.text((text_x, item_y - 4), text, fill=0)
+            
+        # Draw vertical timeline line to next item (if not last item)
+        if i < len(items) - 1:
+            line_end_y = item_y + actual_height
+            draw.line([(line_x, item_y), (line_x, line_end_y)], fill=0, width=2)
+            
+        current_y += actual_height
+        
+    return img

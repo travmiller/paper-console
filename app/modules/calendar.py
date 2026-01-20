@@ -8,6 +8,10 @@ from app.drivers.printer_mock import PrinterDriver
 from app.config import CalendarConfig, format_time
 import app.config
 from app.module_registry import register_module
+from PIL import Image, ImageDraw
+import app.config  # Ensure app.config is imported for timezone access
+
+APP_CONFIG = app.config  # Alias to avoid confusion if needed
 
 
 def fetch_ics(url: str) -> str:
@@ -189,7 +193,16 @@ def _print_calendar_timeline_view(printer, sorted_dates, all_events):
     printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
     
     # Print timeline visualization
-    printer.print_calendar_day_timeline(d, events)
+    # Print timeline visualization
+    width = printer.width
+    font = getattr(printer, "_get_font", lambda s: None)("regular")
+    font_sm = getattr(printer, "_get_font", lambda s: None)("regular_sm")
+    
+    # Generate image
+    img = draw_calendar_day_timeline_image(
+        width - 20, 120, d, events, False, font, font_sm
+    )
+    printer.print_image(img)
     printer.print_line()
 
 
@@ -247,15 +260,19 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
     grid_start = month_start - timedelta(days=days_since_sunday % 7)
     
     # Print full month calendar grid with event highlighting
-    printer.print_calendar_grid(
-        weeks=6,  # Enough for any month
-        cell_size=14,  # Slightly larger for better readability
+    # Print full month calendar grid with event highlighting
+    font_sm = getattr(printer, "_get_font", lambda s: None)("regular_sm")
+    img = draw_calendar_grid_image(
+        weeks=6,
+        cell_size=14,
         start_date=grid_start,
         events_by_date=events_by_date,
-        highlight_date=today,  # Highlight today
-        month_start=month_start,  # Pass month boundaries for highlighting
+        font=font_sm,
+        highlight_date=today,
+        month_start=month_start,
         month_end=next_month,
     )
+    printer.print_image(img)
     printer.print_line()
     
     # Print all events from the month below calendar
@@ -347,7 +364,7 @@ def _print_calendar_compact_view(printer, sorted_dates, all_events):
             printer.print_body(f"{time_str:<8}{summary}")
         
         if i < len(sorted_dates) - 1:
-            printer.print_separator(style="dashed", height=4)
+            printer.print_line()  # Separator
 
 
 def _print_calendar_week_view(printer, sorted_dates, all_events):
@@ -360,13 +377,18 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
     
     # Print mini calendar grid
     today = date.today()
-    printer.print_calendar_grid(
+    # Print mini calendar grid
+    today = date.today()
+    font_sm = getattr(printer, "_get_font", lambda s: None)("regular_sm")
+    img = draw_calendar_grid_image(
         weeks=1, 
         cell_size=10, 
         start_date=today, 
         events_by_date=events_by_date,
+        font=font_sm,
         highlight_date=today,
     )
+    printer.print_image(img)
     printer.print_line()
     
     # Print events for each day
@@ -476,3 +498,323 @@ def format_calendar_receipt(
     else:  # 7 days
         # Week view with calendar grid
         _print_calendar_week_view(printer, sorted_dates, all_events)
+
+
+def draw_calendar_grid_image(
+    weeks: int,
+    cell_size: int,
+    start_date: date,
+    events_by_date: dict,
+    font,
+    highlight_date=None,
+    month_start=None,
+    month_end=None,
+) -> Image.Image:
+    """Draw a calendar grid to an image."""
+    from datetime import datetime, timedelta
+
+    # Fixed parameters
+    header_height = 10
+    grid_width = 7 * cell_size
+    grid_height = header_height + 2 + (weeks * cell_size)
+    
+    # Create image
+    img = Image.new("1", (grid_width + 4, grid_height + 4), 1)  # White background
+    draw = ImageDraw.Draw(img)
+    x, y = 2, 0  # Offset
+
+    # Day headers (S M T W T F S)
+    day_names = ["S", "M", "T", "W", "T", "F", "S"]
+    header_y = y + 2
+    
+    # Draw header background line
+    draw.line(
+        [
+            (x, header_y + header_height),
+            (x + grid_width, header_y + header_height),
+        ],
+        fill=0,
+        width=1,
+    )
+    for i, day_name in enumerate(day_names):
+        day_x = x + i * cell_size
+        if font:
+            bbox = font.getbbox(day_name)
+            text_w = bbox[2] - bbox[0] if bbox else cell_size // 2
+            text_x = day_x + (cell_size - text_w) // 2
+            draw.text((text_x, header_y), day_name, font=font, fill=0)
+
+    # Draw grid cells
+    current_date = start_date if start_date else datetime.now().date()
+    # Find first Sunday before or on start_date
+    days_since_sunday = (current_date.weekday() + 1) % 7
+    # If using Python's weekday: Mon=0...Sun=6. 
+    # We want Sun=0...Sat=6 logic for this grid usually.
+    # Current logic: python weekday(): Mon=0, Sun=6.
+    # If today is Mon(0), days_since_sunday should be 1.
+    # If today is Sun(6), days_since_sunday should be 0.
+    days_since_sunday = (current_date.weekday() + 1) % 7
+    grid_start = current_date - timedelta(days=days_since_sunday)
+
+    for week in range(weeks):
+        for day in range(7):
+            cell_x = x + day * cell_size
+            cell_y = y + 12 + week * cell_size  # +12 for header
+
+            # Get date for this cell
+            cell_date = grid_start + timedelta(days=week * 7 + day)
+
+            # Check if this is the highlighted date (e.g., today)
+            is_highlighted = highlight_date and cell_date == highlight_date
+
+            # Check if date is in current month (for month view)
+            is_current_month = True
+            if month_start and month_end:
+                is_current_month = month_start <= cell_date < month_end
+            elif start_date:
+                try:
+                    # Check if start_date represents a month start
+                    if start_date.day <= 7:  # Likely a month start
+                        is_current_month = (
+                            cell_date.month == start_date.month
+                            and cell_date.year == start_date.year
+                        )
+                except:
+                    pass
+
+            # Check if date has events
+            date_key = cell_date.isoformat()
+            has_events = date_key in events_by_date and events_by_date[date_key] > 0
+
+            # Draw cell border
+            if is_highlighted:
+                border_width = 2
+            elif has_events:
+                border_width = 2  # Also thick for events
+            else:
+                border_width = 1
+
+            draw.rectangle(
+                [cell_x, cell_y, cell_x + cell_size - 1, cell_y + cell_size - 1],
+                outline=0,
+                width=border_width,
+            )
+
+            # Fill cell background if highlighted or has events
+            if is_highlighted:
+                # Draw filled rectangle with checkerboard pattern for today
+                for px in range(cell_x + 1, cell_x + cell_size - 1):
+                    for py in range(cell_y + 1, cell_y + cell_size - 1):
+                        if ((px - cell_x) + (py - cell_y)) % 3 < 2:
+                            draw.point((px, py), fill=0)
+            elif has_events and is_current_month:
+                # Draw lighter pattern for dates with events
+                for px in range(cell_x + 1, cell_x + cell_size - 1, 2):
+                    for py in range(cell_y + 1, cell_y + cell_size - 1, 2):
+                        draw.point((px, py), fill=0)
+
+            # Draw day number
+            day_num = str(cell_date.day)
+            if font:
+                bbox = font.getbbox(day_num)
+                text_x = cell_x + 2
+                text_y = cell_y + 2
+                # Use inverted fill for highlighted dates, lighter for other months
+                if is_highlighted:
+                    text_fill = 1  # White on black
+                elif not is_current_month:
+                    text_fill = 0  # Black, but we'll make it lighter with pattern
+                    # Draw lighter pattern for other months
+                    for px in range(cell_x + 1, cell_x + cell_size - 1, 2):
+                        for py in range(cell_y + 1, cell_y + cell_size - 1, 2):
+                            draw.point((px, py), fill=0)
+                else:
+                    text_fill = 0  # Normal black
+                draw.text((text_x, text_y), day_num, font=font, fill=text_fill)
+
+            # Draw event indicator (dot) - only if not already highlighted
+            if has_events and not is_highlighted:
+                dot_x = cell_x + cell_size - 4
+                dot_y = cell_y + cell_size - 4
+                # Draw a small filled circle for events
+                draw.ellipse([dot_x - 2, dot_y - 2, dot_x + 2, dot_y + 2], fill=0)
+            elif has_events and is_highlighted:
+                # For highlighted dates with events, draw a larger indicator
+                dot_x = cell_x + cell_size - 5
+                dot_y = cell_y + cell_size - 5
+                # Draw white circle on black background
+                draw.ellipse(
+                    [dot_x - 2, dot_y - 2, dot_x + 2, dot_y + 2], fill=1, outline=0
+                )
+    
+    return img
+
+
+def draw_calendar_day_timeline_image(
+    width: int,
+    height: int,
+    day: date,
+    events: list,
+    compact: bool,
+    font,
+    font_sm,
+) -> Image.Image:
+    """Draw a timeline visualization for a single calendar day to an image."""
+    from datetime import datetime, time as dt_time
+    import pytz
+
+    # Create image
+    img = Image.new("1", (width, height), 1)  # White background
+    draw = ImageDraw.Draw(img)
+    x, y = 0, 0
+
+    # Timeline area
+    timeline_x = x + 10
+    timeline_y = y + 20
+    timeline_width = width - 20
+    timeline_height = height - 60 if not compact else height - 40
+
+    # Get timezone
+    try:
+        tz = pytz.timezone(APP_CONFIG.settings.timezone)
+    except:
+        tz = pytz.UTC
+
+    # Current time
+    now = datetime.now(tz)
+    today = now.date()
+    is_today = day == today
+
+    # Draw timeline axis (horizontal line)
+    axis_y = timeline_y + timeline_height // 2
+    draw.line(
+        [(timeline_x, axis_y), (timeline_x + timeline_width, axis_y)],
+        fill=0,
+        width=2,
+    )
+
+    # Draw hour markers
+    if not compact:
+        for hour in [0, 6, 12, 18, 24]:
+            display_hour = 0 if hour == 24 else hour
+            marker_x = timeline_x + int((hour / 24) * timeline_width)
+            # Draw tick mark
+            draw.line(
+                [(marker_x, axis_y - 5), (marker_x, axis_y + 5)],
+                fill=0,
+                width=1,
+            )
+            # Draw hour label
+            if font_sm:
+                hour_str = f"{display_hour:02d}:00"
+                bbox = font_sm.getbbox(hour_str)
+                text_w = bbox[2] - bbox[0] if bbox else 20
+                draw.text(
+                    (marker_x - text_w // 2, axis_y + 8),
+                    hour_str,
+                    font=font_sm,
+                    fill=0,
+                )
+
+    # Draw current time indicator (if today)
+    if is_today and not compact:
+        current_hour = now.hour
+        current_minute = now.minute
+        current_pos = (current_hour * 60 + current_minute) / (24 * 60)
+        current_x = timeline_x + int(current_pos * timeline_width)
+        # Draw vertical line
+        draw.line(
+            [(current_x, timeline_y), (current_x, timeline_y + timeline_height)],
+            fill=0,
+            width=1,
+        )
+        # Draw triangle indicator
+        triangle_size = 4
+        draw.polygon(
+            [
+                (current_x, timeline_y),
+                (current_x - triangle_size, timeline_y + triangle_size),
+                (current_x + triangle_size, timeline_y + triangle_size),
+            ],
+            fill=0,
+        )
+
+    # Draw events
+    event_y_offset = 0
+    for event in events:
+        time_str = event.get("time", "")
+        summary = event.get("summary", "")
+        event_dt = event.get("datetime")
+        is_all_day = event.get("is_all_day", False)
+
+        if is_all_day:
+            # All-day event: draw full-width bar at top
+            bar_y = timeline_y + event_y_offset
+            bar_height = 12
+            draw.rectangle(
+                [
+                    (timeline_x, bar_y),
+                    (timeline_x + timeline_width, bar_y + bar_height),
+                ],
+                outline=0,
+                width=1,
+                fill=0,
+            )
+            # Draw text
+            if font_sm:
+                draw.text(
+                    (timeline_x + 4, bar_y + 2),
+                    f"All Day: {summary[:30]}",
+                    font=font_sm,
+                    fill=1,  # White text on black background
+                )
+            event_y_offset += bar_height + 4
+        elif event_dt and not compact:
+            # Timed event: position by time
+            event_hour = event_dt.hour
+            event_minute = event_dt.minute
+            event_pos = (event_hour * 60 + event_minute) / (24 * 60)
+            event_x = timeline_x + int(event_pos * timeline_width)
+
+            # Draw event marker (circle)
+            marker_radius = 4
+            marker_y = axis_y
+            draw.ellipse(
+                [
+                    event_x - marker_radius,
+                    marker_y - marker_radius,
+                    event_x + marker_radius,
+                    marker_y + marker_radius,
+                ],
+                fill=0,
+            )
+
+            # Draw event text above or below timeline
+            text_y = (
+                marker_y - 20
+                if marker_y > timeline_y + timeline_height // 2
+                else marker_y + 12
+            )
+            if font_sm:
+                # Truncate summary
+                max_text_width = timeline_width // 3
+                if len(summary) > max_text_width // 6:
+                    summary = summary[: max_text_width // 6 - 3] + "..."
+                draw.text((event_x + 6, text_y), summary, font=font_sm, fill=0)
+                # Draw time below
+                draw.text(
+                    (event_x + 6, text_y + 12), time_str, font=font_sm, fill=0
+                )
+        else:
+            # Compact mode: just list events
+            if font:
+                text = f"{time_str:<8}{summary[:30]}"
+                draw.text(
+                    (timeline_x, timeline_y + event_y_offset),
+                    text,
+                    font=font,
+                    fill=0,
+                )
+                event_y_offset += 18
+    
+    return img

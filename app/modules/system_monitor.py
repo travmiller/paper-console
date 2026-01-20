@@ -6,6 +6,7 @@ from typing import Dict, Any
 from app.wifi_manager import get_wifi_status
 from app.utils import wrap_text
 from app.module_registry import register_module
+from PIL import Image, ImageDraw
 
 
 @register_module(
@@ -51,7 +52,21 @@ def format_system_monitor_receipt(
         percent = (used / total) * 100 if total > 0 else 0
 
         printer.print_subheader("STORAGE")
-        printer.print_progress_bar(percent, 100, label=f"{percent:.0f}%")
+        printer.print_subheader("STORAGE")
+        
+        width = getattr(printer, "PRINTER_WIDTH_DOTS", 384)
+        font = getattr(printer, "_get_font", lambda s: None)("regular")
+        img = draw_progress_bar_image(
+            width, 
+            height=12, 
+            value=percent, 
+            max_value=100, 
+            label=f"{percent:.0f}%", 
+            font=font
+        )
+        printer.print_image(img)
+        
+        printer.print_body(f"{used_gb}GB / {total_gb}GB")
         printer.print_body(f"{used_gb}GB / {total_gb}GB")
         printer.print_caption(f"{free_gb}GB free")
     except Exception:
@@ -78,7 +93,21 @@ def format_system_monitor_receipt(
             mem_used = mem_total - mem_available
             mem_percent = (mem_used / mem_total) * 100
             printer.print_subheader("MEMORY")
-            printer.print_progress_bar(mem_percent, 100, label=f"{mem_percent:.0f}%")
+            printer.print_subheader("MEMORY")
+            
+            width = getattr(printer, "PRINTER_WIDTH_DOTS", 384)
+            font = getattr(printer, "_get_font", lambda s: None)("regular")
+            img = draw_progress_bar_image(
+                width, 
+                height=12, 
+                value=mem_percent, 
+                max_value=100, 
+                label=f"{mem_percent:.0f}%", 
+                font=font
+            )
+            printer.print_image(img)
+            
+            printer.print_body(f"{mem_used}MB / {mem_total}MB")
             printer.print_body(f"{mem_used}MB / {mem_total}MB")
             has_system_info = True
     except Exception:
@@ -149,3 +178,66 @@ def format_system_monitor_receipt(
         pass
 
     printer.print_line()
+
+
+def draw_progress_bar_image(
+    width: int,
+    height: int,
+    value: float,
+    max_value: float,
+    label: str,
+    font,
+) -> Image.Image:
+    """Draw a progress bar to an image."""
+    
+    # Create image
+    # Add extra width for label if needed?
+    # Original _draw_progress_bar drew label to the right of the bar.
+    # It seems it expected 'width' to be just the bar width?
+    # Let's check: "label_x = x + width + 4"
+    # So if we pass full printer width, the label would be off-screen.
+    # We need to calculate bar width to fit label.
+    
+    label_width = 0
+    if label and font:
+        try:
+            bbox = font.getbbox(label)
+            label_width = bbox[2] - bbox[0] if bbox else 0
+        except:
+             label_width = len(label) * 8
+        label_width += 4  # Spacing
+        
+    bar_width = width - label_width
+    
+    img = Image.new("1", (width, height), 1)  # White background
+    draw = ImageDraw.Draw(img)
+    x, y = 0, 0
+    
+    # Draw border
+    draw.rectangle([x, y, x + bar_width - 1, y + height - 1], outline=0, width=2)
+
+    # Calculate fill width
+    if max_value > 0:
+        fill_width = int((value / max_value) * (bar_width - 4))  # -4 for border
+        fill_width = max(0, min(fill_width, bar_width - 4))
+    else:
+        fill_width = 0
+
+    # Draw filled portion (checkerboard pattern for visual interest)
+    if fill_width > 0:
+        for px in range(x + 2, x + 2 + fill_width):
+            for py in range(y + 2, y + height - 2):
+                # Checkerboard pattern
+                if ((px - x) + (py - y)) % 4 < 2:
+                    draw.point((px, py), fill=0)
+
+    # Draw label if provided
+    if label and font:
+        # Position label to the right of bar
+        label_x = x + bar_width + 4
+        # Center vertically
+        text_height = getattr(font, "size", 12)
+        label_y = y + (height - text_height) // 2
+        draw.text((label_x, label_y), label, font=font, fill=0)
+        
+    return img
