@@ -25,8 +25,12 @@ Example usage:
 from dataclasses import dataclass, field
 from typing import Dict, Any, Callable, Optional, List
 import logging
-import jsonschema
-from jsonschema import validate, ValidationError
+try:
+    import jsonschema
+    from jsonschema import validate, ValidationError
+    HAS_JSONSCHEMA = True
+except ImportError:
+    HAS_JSONSCHEMA = False
 
 
 logger = logging.getLogger(__name__)
@@ -226,6 +230,10 @@ def validate_module_config(module_type: str, config: Dict[str, Any]) -> None:
         raise ValueError(f"Unknown module type: {module_type}")
         
     if defn.config_schema:
+        if not HAS_JSONSCHEMA:
+            logger.warning(f"jsonschema not installed. Skipping validation for {module_type}.")
+            return
+            
         try:
             validate(instance=config, schema=defn.config_schema)
         except ValidationError as e:
