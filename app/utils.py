@@ -14,13 +14,20 @@ def wrap_text(text: str, width: int = 42, indent: int = 0, preserve_line_breaks:
         preserve_line_breaks: If True, preserves explicit line breaks from input
     """
     if preserve_line_breaks:
-        # Split by newlines first to preserve explicit line breaks
+        # Split by newlines first to preserve explicit line breaks and empty lines
         input_lines = text.split('\n')
         all_lines = []
         
         for input_line in input_lines:
-            # Wrap each line individually
+            # Check if this is an empty line (whitespace-only lines are also considered empty)
             words = input_line.split()
+            
+            # If empty line, preserve it for spacing
+            if not words:
+                all_lines.append("")
+                continue
+            
+            # Wrap each non-empty line individually
             current_line = ""
             available_width = width - indent
 
@@ -32,10 +39,9 @@ def wrap_text(text: str, width: int = 42, indent: int = 0, preserve_line_breaks:
                         all_lines.append(current_line.strip())
                     current_line = word + " "
 
+            # Add the last line if there's content
             if current_line:
                 all_lines.append(current_line.strip())
-            elif not words:  # Empty line - preserve it
-                all_lines.append("")
         
         return all_lines
     else:
