@@ -238,157 +238,169 @@ def _get_welcome_marker_path() -> str:
 
 
 async def check_first_boot():
-    """Check if this is first boot and print welcome message."""
+    """Check if this is first boot and print welcome message.
+    Runs blocking printer operations in a thread pool to avoid blocking the event loop.
+    """
     logger = logging.getLogger(__name__)
     marker_path = _get_welcome_marker_path()
+    from concurrent.futures import ThreadPoolExecutor
 
     # Wait for printer to be ready (applies to all boots)
     await asyncio.sleep(2)
 
-    try:
-        if hasattr(printer, "reset_buffer"):
-            printer.reset_buffer()
+    # Check if marker exists first (this is fast, doesn't need thread pool)
+    is_first_boot = not os.path.exists(marker_path)
 
-        # If marker exists, just print ready message
-        if os.path.exists(marker_path):
-            # Visual header with inline icon (no feed before - content starts immediately)
-            printer.print_header("SYSTEM READY", icon="check", icon_size=28)
-        
-        from datetime import datetime
-        printer.print_bold(datetime.now().strftime("%A, %B %d, %Y"))
-        printer.print_bold(datetime.now().strftime("%I:%M %p"))
-        
-        printer.print_line()
-        
-        # Show channel assignments
-        printer.print_subheader("CHANNELS")
-        
-        import app.config as config_module
-        settings = config_module.settings
-        
-        # Show all 8 channels
-        for channel_num in range(1, 9):
-            channel = settings.channels.get(channel_num)
-            if channel and channel.modules:
-                # Get module names
-                module_names = []
-                for mod_assignment in sorted(channel.modules, key=lambda m: m.order):
-                    module_id = mod_assignment.module_id
-                    if module_id in settings.modules:
-                        module = settings.modules[module_id]
-                        module_names.append(module.name)
+    def _do_print():
+        """Synchronous function that does the actual printing work."""
+        try:
+            if hasattr(printer, "reset_buffer"):
+                printer.reset_buffer()
+
+            # If marker exists, just print ready message
+            if not is_first_boot:
+                # Visual header with inline icon (no feed before - content starts immediately)
+                printer.print_header("SYSTEM READY", icon="check", icon_size=28)
                 
-                if module_names:
-                    modules_str = " + ".join(module_names)
-                    printer.print_body(f"  {channel_num}. {modules_str}")
+                from datetime import datetime
+                printer.print_bold(datetime.now().strftime("%A, %B %d, %Y"))
+                printer.print_bold(datetime.now().strftime("%I:%M %p"))
+                
+                printer.print_line()
+                
+                # Show channel assignments
+                printer.print_subheader("CHANNELS")
+                
+                import app.config as config_module
+                settings = config_module.settings
+                
+                # Show all 8 channels
+                for channel_num in range(1, 9):
+                    channel = settings.channels.get(channel_num)
+                    if channel and channel.modules:
+                        # Get module names
+                        module_names = []
+                        for mod_assignment in sorted(channel.modules, key=lambda m: m.order):
+                            module_id = mod_assignment.module_id
+                            if module_id in settings.modules:
+                                module = settings.modules[module_id]
+                                module_names.append(module.name)
+                        
+                        if module_names:
+                            modules_str = " + ".join(module_names)
+                            printer.print_body(f"  {channel_num}. {modules_str}")
+                    else:
+                        printer.print_caption(f"  {channel_num}. (empty)")
+                
+                printer.print_line()
+                
+                # Flush buffer (spacing is built into bitmap)
+                if hasattr(printer, "flush_buffer"):
+                    printer.flush_buffer()
+                return
             else:
-                printer.print_caption(f"  {channel_num}. (empty)")
-        
-        printer.print_line()
-        
-        # Flush buffer (spacing is built into bitmap)
-        if hasattr(printer, "flush_buffer"):
-            try:
-                printer.flush_buffer()
-            except Exception as e:
-                logger.error(f"System Ready flush_buffer error: {e}", exc_info=True)
-        return
+                # First boot! Print welcome message
+                # Get device ID for SSID
+                ssid_suffix = "XXXX"
+                try:
+                    if _is_raspberry_pi:
+                        with open("/proc/cpuinfo", "r") as f:
+                            for line in f:
+                                if line.startswith("Serial"):
+                                    ssid_suffix = line.split(":")[1].strip()[-4:]
+                                    break
+                except Exception:
+                    pass
+
+                ssid = f"PC-1-Setup-{ssid_suffix}"
+
+                # Welcome header with icon (no feed before - content starts immediately)
+                printer.print_header("WELCOME")
+                printer.print_icon("home", size=56)
+                
+                printer.print_bold("PC-1 Paper Console")
+                printer.print_body("Your personal printer for")
+                printer.print_body("weather, news, puzzles,")
+                printer.print_body("and more.")
+                printer.print_line()
+                
+                # Setup instructions
+                printer.print_subheader("SETUP INSTRUCTIONS")
+                printer.print_line()
+                
+                # Step 1
+                printer.print_bold("STEP 1: CONNECT TO WIFI")
+                printer.print_icon("wifi", size=32)
+                printer.print_body("On your phone or computer,")
+                printer.print_body("connect to WiFi network:")
+                printer.print_line()
+                printer.print_bold(f"  {ssid}")
+                printer.print_caption("  Password: setup1234")
+                printer.print_line()
+                
+                # Step 2
+                printer.print_bold("STEP 2: OPEN SETUP PAGE")
+                printer.print_icon("arrow_right", size=32)
+                printer.print_body("Visit in your browser:")
+                printer.print_line()
+                printer.print_bold("  http://10.42.0.1")
+                printer.print_caption("  (or http://pc-1.local)")
+                printer.print_line()
+                
+                # Step 3
+                printer.print_bold("STEP 3: CONFIGURE WIFI")
+                printer.print_icon("settings", size=32)
+                printer.print_body("Select your home WiFi and")
+                printer.print_body("enter the password.")
+                printer.print_caption("PC-1 will remember it.")
+                printer.print_line()
+                
+                # After setup section
+                printer.print_subheader("AFTER SETUP")
+                printer.print_line()
+                printer.print_body("Turn the dial to select a")
+                printer.print_body("channel, then press the")
+                printer.print_body("button to print!")
+                printer.print_line()
+                
+                printer.print_bold("Example Channels:")
+                printer.print_body("  • Weather forecast")
+                printer.print_body("  • News headlines")
+                printer.print_body("  • Moon & sunrise")
+                printer.print_body("  • Sudoku puzzle")
+                printer.print_body("  • Calendar events")
+                printer.print_line()
+                
+                printer.print_caption("Customize channels at:")
+                printer.print_bold("  http://pc-1.local")
+                printer.print_line()
+                
+                printer.print_subheader("QUICK HELP")
+                printer.print_body("Button 5s = WiFi setup")
+                printer.print_body("Button 15s = Reset all")
+                printer.print_line()
+                printer.feed(1)
+
+                # Flush buffer to print (spacing is built into bitmap)
+                if hasattr(printer, "flush_buffer"):
+                    printer.flush_buffer()
+
+                # Create marker file so we don't print again
+                try:
+                    with open(marker_path, "w") as f:
+                        f.write("1")
+                except Exception:
+                    pass
+        except Exception as e:
+            logger.error(f"System Ready print error: {e}", exc_info=True)
+
+    try:
+        # Run blocking printer operations in thread pool to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _do_print)
     except Exception as e:
-        logger.error(f"System Ready print error: {e}", exc_info=True)
-        return
-
-    # First boot! Print welcome message (if marker doesn't exist)
-    # Get device ID for SSID
-    ssid_suffix = "XXXX"
-    try:
-        if _is_raspberry_pi:
-            with open("/proc/cpuinfo", "r") as f:
-                for line in f:
-                    if line.startswith("Serial"):
-                        ssid_suffix = line.split(":")[1].strip()[-4:]
-                        break
-    except Exception:
-        pass
-
-    ssid = f"PC-1-Setup-{ssid_suffix}"
-
-    # Welcome header with icon (no feed before - content starts immediately)
-    printer.print_header("WELCOME")
-    printer.print_icon("home", size=56)
-    
-    printer.print_bold("PC-1 Paper Console")
-    printer.print_body("Your personal printer for")
-    printer.print_body("weather, news, puzzles,")
-    printer.print_body("and more.")
-    printer.print_line()
-    
-    # Setup instructions
-    printer.print_subheader("SETUP INSTRUCTIONS")
-    printer.print_line()
-    
-    # Step 1
-    printer.print_bold("STEP 1: CONNECT TO WIFI")
-    printer.print_icon("wifi", size=32)
-    printer.print_body("On your phone or computer,")
-    printer.print_body("connect to WiFi network:")
-    printer.print_line()
-    printer.print_bold(f"  {ssid}")
-    printer.print_caption("  Password: setup1234")
-    printer.print_line()
-    
-    # Step 2
-    printer.print_bold("STEP 2: OPEN SETUP PAGE")
-    printer.print_icon("arrow_right", size=32)
-    printer.print_body("Visit in your browser:")
-    printer.print_line()
-    printer.print_bold("  http://10.42.0.1")
-    printer.print_caption("  (or http://pc-1.local)")
-    printer.print_line()
-    
-    # Step 3
-    printer.print_bold("STEP 3: CONFIGURE WIFI")
-    printer.print_icon("settings", size=32)
-    printer.print_body("Select your home WiFi and")
-    printer.print_body("enter the password.")
-    printer.print_caption("PC-1 will remember it.")
-    printer.print_line()
-    
-    # After setup section
-    printer.print_subheader("AFTER SETUP")
-    printer.print_line()
-    printer.print_body("Turn the dial to select a")
-    printer.print_body("channel, then press the")
-    printer.print_body("button to print!")
-    printer.print_line()
-    
-    printer.print_bold("Example Channels:")
-    printer.print_body("  • Weather forecast")
-    printer.print_body("  • News headlines")
-    printer.print_body("  • Moon & sunrise")
-    printer.print_body("  • Sudoku puzzle")
-    printer.print_body("  • Calendar events")
-    printer.print_line()
-    
-    printer.print_caption("Customize channels at:")
-    printer.print_bold("  http://pc-1.local")
-    printer.print_line()
-    
-    printer.print_subheader("QUICK HELP")
-    printer.print_body("Button 5s = WiFi setup")
-    printer.print_body("Button 15s = Reset all")
-    printer.print_line()
-    printer.feed(1)
-
-    # Flush buffer to print (spacing is built into bitmap)
-    if hasattr(printer, "flush_buffer"):
-        printer.flush_buffer()
-
-    # Create marker file so we don't print again
-    try:
-        with open(marker_path, "w") as f:
-            f.write("1")
-    except Exception:
-        pass
+        logger.error(f"Error in check_first_boot: {e}", exc_info=True)
 
 
 async def check_wifi_startup():
