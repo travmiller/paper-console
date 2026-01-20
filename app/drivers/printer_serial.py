@@ -802,7 +802,7 @@ class PrinterDriver:
                     img_y = y + self.SPACING_SMALL
                     
                     # Paste onto the canvas
-                    full_img.paste(image, (img_x, img_y))
+                    img.paste(image, (img_x, img_y))
                     
                     y += image.height + self.SPACING_MEDIUM
 
