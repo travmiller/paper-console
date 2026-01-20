@@ -32,13 +32,13 @@ WEBHOOK_PRESETS = {
         "body": "",
         "json_path": "value"
     },
-    "random_quote": {
-        "label": "Random Quote",
-        "url": "https://api.quotable.io/random",
+    "cat_facts": {
+        "label": "Cat Facts",
+        "url": "https://catfact.ninja/fact",
         "method": "GET",
         "headers": {},
         "body": "",
-        "json_path": "content"
+        "json_path": "fact"
     }
 }
 
@@ -56,7 +56,7 @@ WEBHOOK_PRESETS = {
              "preset": {
                  "type": "string",
                  "title": "Preset",
-                 "enum": ["custom", "dad_jokes", "chuck_norris", "random_quote"],
+                 "enum": ["custom", "dad_jokes", "chuck_norris", "cat_facts"],
                  "default": "custom"
              },
              "url": {"type": "string", "title": "URL"},
@@ -68,14 +68,16 @@ WEBHOOK_PRESETS = {
                  "default": {}
              },
              "body": {"type": "string", "title": "Body (JSON)"},
-             "json_path": {"type": "string", "title": "JSON Path"}
+             "json_path": {"type": "string", "title": "JSON Path"},
+             "test_button": {"type": "null", "title": ""}
         },
         "required": ["url"]
     },
     ui_schema={
         "preset": {"ui:widget": "preset-select", "ui:options": {"presets": WEBHOOK_PRESETS}},
         "headers": {"ui:widget": "key-value-list"},
-        "body": {"ui:widget": "textarea"}
+        "body": {"ui:widget": "textarea", "ui:showWhen": {"field": "method", "value": "POST"}},
+        "test_button": {"ui:widget": "webhook-test"}
     },
 )
 def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str = None):

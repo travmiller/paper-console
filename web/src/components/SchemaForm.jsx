@@ -4,6 +4,7 @@ import LocationSearch from './widgets/LocationSearch';
 import KeyValueList from './widgets/KeyValueList';
 import Checklist from './widgets/Checklist';
 import PresetSelect from './widgets/PresetSelect';
+import WebhookTest from './widgets/WebhookTest';
 
 /**
  * A lightweight JSON Schema form renderer.
@@ -70,6 +71,15 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                     const propUiSchema = uiSchema?.[key] || {};
                     const propValue = value?.[key];
                     const isCompactItem = isInline || propUiSchema['ui:options']?.compact;
+                    
+                    // Support conditional visibility with ui:showWhen
+                    const showWhen = propUiSchema['ui:showWhen'];
+                    if (showWhen) {
+                        const siblingValue = value?.[showWhen.field];
+                        if (siblingValue !== showWhen.value) {
+                            return null; // Hide this field
+                        }
+                    }
                     
                     return (
                         <div key={key} className={isInline ? "flex-1 min-w-[120px]" : ""}>
@@ -232,6 +242,14 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                     }}
                 />
                 {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+            </div>
+        );
+    }
+    
+    if (widget === 'webhook-test') {
+        return (
+            <div className="mb-4">
+                <WebhookTest formData={rootValue} />
             </div>
         );
     }
