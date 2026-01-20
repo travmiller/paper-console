@@ -28,8 +28,14 @@ class PrinterDriver:
     def print_text(self, text: str, style: str = "regular"):
         """Simulates printing styled text.
         
+        Handles multi-line text by splitting on newlines. Each line/paragraph
+        will be printed separately with the same style.
+        
         Available styles: regular, bold, bold_lg, medium, semibold, light, regular_sm
         """
+        if not text:
+            return
+            
         style_markers = {
             "regular": "",
             "bold": "**",
@@ -41,8 +47,13 @@ class PrinterDriver:
         }
         marker = style_markers.get(style, "")
         prefix = f"{marker} " if marker else ""
-        print(f"[PRINT] {prefix}{text}")
-        self.lines_printed += text.count("\n") + 1
+        
+        # Split by newlines to handle multi-line text properly
+        lines = text.split('\n')
+        for line in lines:
+            # Print all lines (including blank lines for spacing)
+            print(f"[PRINT] {prefix}{line}")
+            self.lines_printed += 1
 
     def print_header(self, text: str, icon: str = None, icon_size: int = 24):
         """Prints large bold header text in a full-width drawn box (simulated)."""
@@ -73,8 +84,7 @@ class PrinterDriver:
     
     def print_body(self, text: str):
         """Prints regular body text."""
-        print(f"[PRINT] {text}")
-        self.lines_printed += text.count("\n") + 1
+        self.print_text(text, "regular")
     
     def print_caption(self, text: str):
         """Prints small, light caption text."""

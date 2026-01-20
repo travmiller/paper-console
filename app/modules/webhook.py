@@ -3,7 +3,6 @@ import json
 from typing import Optional
 from app.drivers.printer_mock import PrinterDriver
 from app.config import WebhookConfig
-from app.utils import wrap_text
 
 
 def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str = None):
@@ -75,12 +74,9 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
             except:
                 content_to_print = response.text
 
-        # Print result with styled text
+        # Print result with styled text - pass directly, printer will handle wrapping and newlines
         if content_to_print:
-            for original_line in content_to_print.split("\n"):
-                wrapped_lines = wrap_text(original_line, width=printer.width, indent=0)
-                for wrapped_line in wrapped_lines:
-                    printer.print_body(wrapped_line)
+            printer.print_body(content_to_print)
 
     except Exception:
         printer.print_caption("Could not connect.")

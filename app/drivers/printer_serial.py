@@ -692,11 +692,14 @@ class PrinterDriver:
                 font = self._get_font(style)
                 line_height = self._get_line_height_for_style(style)
 
-                # Split by newlines first, then wrap each paragraph
-                paragraphs = clean_text.split("\n")
-                for paragraph in paragraphs:
-                    # Wrap each paragraph to fit printer width
-                    wrapped_lines = self._wrap_text_by_width(paragraph, font, width)
+                # Text is already split by newlines in print_text()
+                # Empty strings represent blank lines (preserved for spacing)
+                if not clean_text.strip():
+                    # Blank line - just advance y position
+                    y += line_height
+                else:
+                    # Wrap paragraph to fit printer width
+                    wrapped_lines = self._wrap_text_by_width(clean_text, font, width)
                     for line in wrapped_lines:
                         if font:
                             draw.text((2, y), line, font=font, fill=0)
@@ -707,11 +710,15 @@ class PrinterDriver:
                 # Legacy support
                 clean_text = self._sanitize_text(op_data)
                 font = self._get_font("regular")
-                # Split by newlines first, then wrap each paragraph
-                paragraphs = clean_text.split("\n")
-                for paragraph in paragraphs:
-                    # Wrap each paragraph to fit printer width
-                    wrapped_lines = self._wrap_text_by_width(paragraph, font, width)
+                # Text is already split by newlines in print_text()
+                # Empty strings represent blank lines (preserved for spacing)
+                if not clean_text.strip():
+                    # Blank line - just advance y position
+                    y += self.line_height
+                    self.lines_printed += 1
+                else:
+                    # Wrap paragraph to fit printer width
+                    wrapped_lines = self._wrap_text_by_width(clean_text, font, width)
                     for line in wrapped_lines:
                         if font:
                             draw.text((2, y), line, font=font, fill=0)
@@ -2976,7 +2983,10 @@ class PrinterDriver:
 
     def print_text(self, text: str, style: str = "regular"):
         """Print text with specified style. Buffers for unified bitmap rendering.
-
+        
+        Handles multi-line text by splitting on newlines. Each line/paragraph
+        will be wrapped to fit the printer width using font metrics.
+        
         Available styles:
             - "regular": Normal body text
             - "bold": Bold text
@@ -2986,10 +2996,20 @@ class PrinterDriver:
             - "light": Light weight
             - "regular_sm": Small regular text
         """
+        if not text:
+            return
+            
+        # Split by newlines to handle multi-line text properly
+        # Empty lines are preserved as blank lines for spacing
+        lines = text.split('\n')
+        
         # Safety: prevent unbounded buffer growth
-        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
-            self.flush_buffer()
-        self.print_buffer.append(("styled", {"text": text, "style": style}))
+        for line in lines:
+            if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+                self.flush_buffer()
+            # Buffer each line separately with the same style
+            # Empty strings represent blank lines (preserved for spacing)
+            self.print_buffer.append(("styled", {"text": line, "style": style}))
 
     def print_header(self, text: str, icon: str = None, icon_size: int = 24):
         """Print large bold header text in a drawn box.

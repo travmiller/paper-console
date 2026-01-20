@@ -7,9 +7,14 @@ from app.config import PRINTER_WIDTH
 def wrap_text(text: str, width: int = 42, indent: int = 0, preserve_line_breaks: bool = False) -> list[str]:
     """Wraps text to fit the printer width with optional indentation.
     
+    Note: For most use cases, you should pass text directly to printer.print_body()
+    or printer.print_text(), which will handle wrapping automatically using font
+    metrics (more accurate than character-based wrapping). Use this function only
+    when you need character-based pre-wrapping for specific layout requirements.
+    
     Args:
         text: The text to wrap
-        width: Maximum width for each line
+        width: Maximum width for each line (in characters, approximate)
         indent: Number of spaces to indent (reduces available width)
         preserve_line_breaks: If True, preserves explicit line breaks from input
     """

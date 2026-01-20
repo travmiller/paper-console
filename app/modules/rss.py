@@ -32,10 +32,11 @@ def clean_text(text: str) -> str:
         except:
             return ""
 
-    # Remove HTML tags using BeautifulSoup
+    # Remove HTML tags using BeautifulSoup, preserving paragraph structure
     try:
         soup = BeautifulSoup(text, "html.parser")
-        text = soup.get_text(separator=" ", strip=True)
+        # Use separator="\n" to preserve paragraph structure from HTML
+        text = soup.get_text(separator="\n", strip=False)
     except:
         # Fallback: simple regex removal
         text = re.sub(r"<[^>]+>", "", text)
@@ -62,8 +63,12 @@ def clean_text(text: str) -> str:
         char for char in text if (32 <= ord(char) < 127) or char in ["\n", "\t", "\r"]
     )
 
-    # Normalize whitespace
-    text = " ".join(text.split())
+    # Normalize whitespace but preserve newlines for paragraph structure
+    # Normalize multiple spaces/tabs to single space (within lines)
+    text = re.sub(r'[ \t]+', ' ', text)
+    # Normalize newlines (remove spaces around newlines, limit consecutive newlines)
+    text = re.sub(r'[ \t]*\n[ \t]*', '\n', text)
+    text = re.sub(r'\n{3,}', '\n\n', text)  # Max 2 consecutive newlines
 
     return text.strip()
 
@@ -137,18 +142,12 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
             source = article["source"].upper()[:24]
             printer.print_subheader(source)
 
-            # Headline in bold
-            wrapped_lines = wrap_text(article["title"], width=42, indent=0)
-            for line in wrapped_lines:
-                printer.print_bold(line)
+            # Headline in bold - pass directly, printer will handle wrapping
+            printer.print_bold(article["title"])
 
-            # Summary in regular body text
-            wrapped_summary = wrap_text(article["summary"], width=42, indent=0)
-            for line in wrapped_summary[:4]:
-                printer.print_body(line)
-
-            if len(wrapped_summary) > 4:
-                printer.print_caption("...")
+            # Summary in regular body text - pass directly, printer will handle wrapping
+            # Note: The printer will automatically wrap based on font metrics
+            printer.print_body(article["summary"])
 
             # QR code linking to full article
             if article.get("url"):

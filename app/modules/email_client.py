@@ -41,37 +41,22 @@ def clean_text(text):
 
 
 def strip_html(html_content):
-    """Removes HTML tags to return clean text."""
+    """Removes HTML tags to return clean text, preserving newlines."""
     try:
         soup = BeautifulSoup(html_content, "html.parser")
-        return soup.get_text(separator=" ", strip=True)
+        # Use separator="\n" to preserve paragraph structure from HTML
+        # This converts <p>, <br>, <div> etc. to newlines
+        text = soup.get_text(separator="\n", strip=False)
+        # Normalize multiple newlines but preserve structure
+        import re
+        text = re.sub(r'\n{3,}', '\n\n', text)  # Max 2 consecutive newlines
+        return text.strip()
     except Exception as e:
         logger.error(f"Error stripping HTML: {e}")
         return html_content
 
-def wrap_text(text: str, width: int = 42) -> List[str]:
-    """Wraps text into lines of specified width."""
-    words = text.split()
-    lines = []
-    current_line = ""
-    
-    for word in words:
-        if len(current_line) + len(word) + 1 <= width:
-            current_line += (word + " ")
-        else:
-            if current_line:
-                lines.append(current_line.rstrip())
-            current_line = word + " "
-            
-            # Handle single words longer than width
-            while len(current_line) > width:
-                lines.append(current_line[:width])
-                current_line = current_line[width:]
-    
-    if current_line:
-        lines.append(current_line.rstrip())
-        
-    return lines
+# Use wrap_text from utils instead of duplicating
+from app.utils import wrap_text
 
 # --- REAL IMAP LOGIC ---
 def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
@@ -183,8 +168,13 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
                             except Exception as e:
                                 logger.warning(f"Error extracting message body: {e}")
 
-                        # Clean up body whitespace (newlines to spaces)
-                        body = " ".join(body.split())
+                        # Preserve newlines in body text - let printer handle wrapping
+                        # Only normalize excessive whitespace (multiple spaces/tabs to single space)
+                        # but preserve newlines for paragraph structure
+                        import re
+                        body = re.sub(r'[ \t]+', ' ', body)  # Normalize spaces/tabs
+                        body = re.sub(r'[ \t]*\n[ \t]*', '\n', body)  # Normalize newlines
+                        body = body.strip()
 
                         results.append(
                             {
@@ -252,20 +242,15 @@ def format_email_receipt(
     printer.print_line()
 
     for i, msg in enumerate(messages):
-        # Sender
-        from_lines = wrap_text(msg['from'], PRINTER_WIDTH)
-        printer.print_subheader(from_lines[0] if from_lines else "Unknown")
+        # Sender - pass directly, printer will handle wrapping
+        printer.print_subheader(msg['from'] or "Unknown")
         
-        # Subject in bold
-        subj_lines = wrap_text(msg['subject'], PRINTER_WIDTH)
-        for line in subj_lines:
-            printer.print_bold(line)
+        # Subject in bold - pass directly, printer will handle wrapping
+        printer.print_bold(msg['subject'])
             
         printer.print_line()
 
-        # Body in regular text
-        body_lines = wrap_text(msg["body"], PRINTER_WIDTH)
-        for line in body_lines:
-            printer.print_body(line)
+        # Body in regular text - pass with newlines preserved, printer will handle wrapping
+        printer.print_body(msg["body"])
 
         printer.print_line()
