@@ -412,8 +412,8 @@ const ChannelList = ({
             style={{ backgroundColor: 'transparent' }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-white)'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-            title='Create a new unassigned module'>
-            + CREATE MODULE
+            title='Add a new unassigned module'>
+            + ADD MODULE
           </button>
         </div>
       </div>
