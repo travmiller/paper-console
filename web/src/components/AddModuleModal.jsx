@@ -7,7 +7,11 @@ import WiFiIcon from '../assets/WiFiIcon';
 const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModule, onOpenEdit }) => {
   const modalMouseDownTarget = useRef(null);
 
-  if (channelPosition === null) return null;
+  // Show modal if channelPosition is a number (assigned to channel) or if it's explicitly for unassigned
+  // We'll check if onAssignModule is a no-op function to detect unassigned mode
+  const isUnassigned = channelPosition === null && onAssignModule && onAssignModule.toString().includes('async () => {}');
+  
+  if (channelPosition === null && !isUnassigned) return null;
 
   return (
     <div
@@ -25,7 +29,9 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
       }}>
       <div className={commonClasses.modalContent} onClick={(e) => e.stopPropagation()}>
         <div className='flex justify-between items-center mb-6'>
-          <h3 className='text-xl font-bold text-black '>Add Module to Channel {channelPosition}</h3>
+          <h3 className='text-xl font-bold text-black '>
+            {channelPosition ? `Add Module to Channel ${channelPosition}` : 'Create Module'}
+          </h3>
           <CloseButton onClick={onClose} />
         </div>
 
@@ -43,7 +49,9 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
               onClick={async () => {
                 const newModule = await onCreateModule(type.id);
                 if (newModule) {
-                  await onAssignModule(channelPosition, newModule.id);
+                  if (channelPosition) {
+                    await onAssignModule(channelPosition, newModule.id);
+                  }
                   onClose();
                   onOpenEdit(newModule.id, newModule);
                 }

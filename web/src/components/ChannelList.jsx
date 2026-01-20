@@ -18,6 +18,7 @@ const ChannelList = ({
   setEditingModule,
   moveModuleInChannel,
   setShowAddModuleModal,
+  setShowCreateUnassignedModal,
   wifiStatus,
 }) => {
   const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
@@ -44,6 +45,20 @@ const ChannelList = ({
         return true;
     }
   };
+
+  // Find modules that aren't assigned to any channel
+  const getUnassignedModules = () => {
+    const assignedModuleIds = new Set();
+    Object.values(settings.channels || {}).forEach((channel) => {
+      (channel.modules || []).forEach((assignment) => {
+        assignedModuleIds.add(assignment.module_id);
+      });
+    });
+    
+    return Object.values(modules || {}).filter((module) => !assignedModuleIds.has(module.id));
+  };
+
+  const unassignedModules = getUnassignedModules();
 
   return (
     <div className='space-y-4'>
@@ -234,6 +249,97 @@ const ChannelList = ({
             </div>
           );
         })}
+      </div>
+
+      {/* Unassigned Modules Section */}
+      <div className='mt-8 pt-8 border-t-2 border-gray-200'>
+        <h3 className='text-lg font-bold text-black mb-4 tracking-tight'>UNASSIGNED MODULES</h3>
+        <div className='space-y-2'>
+          {unassignedModules.length === 0 ? (
+            <div className='text-sm text-gray-500 italic py-4'>
+              No unassigned modules. Create a module below or assign existing modules to channels.
+            </div>
+          ) : (
+            unassignedModules.map((module) => {
+              const typeMeta = AVAILABLE_MODULE_TYPES.find((t) => t.id === module.type);
+              const isOnline = typeMeta ? !typeMeta.offline : false;
+              const configured = moduleIsConfigured(module);
+              const needsSetup = isOnline && !configured;
+              const hasWifi = wifiStatus?.connected;
+              
+              let iconColor = 'var(--color-text-muted)';
+              if (!hasWifi) {
+                iconColor = 'var(--color-error)';
+              } else if (needsSetup) {
+                iconColor = 'var(--color-brass)';
+              }
+
+              return (
+                <div
+                  key={module.id}
+                  className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-300 hover:border-black group transition-all'
+                  style={{ backgroundColor: 'var(--color-bg-card)' }}
+                  onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-white)', 'important')}
+                  onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-card)', 'important')}>
+                  <div className='flex-1 min-w-0 mr-2'>
+                    <div className='text-sm font-bold text-gray-700 group-hover:text-black truncate transition-colors'>{module.name}</div>
+                    <div
+                      className={`text-[10px] truncate flex items-baseline gap-1 ${
+                        needsSetup ? '' : 'text-gray-700'
+                      }`}
+                      style={needsSetup ? { color: 'var(--color-brass)' } : {}}>
+                      {isOnline && (
+                        hasWifi ? (
+                          <WiFiIcon className="w-2.5 h-2.5 flex-shrink-0 group-hover:text-black transition-colors" style={{ transform: 'translateY(0.125rem)', color: iconColor }} />
+                        ) : (
+                          <WiFiOffIcon className="w-2.5 h-2.5 flex-shrink-0" style={{ transform: 'translateY(0.125rem)', color: 'var(--color-error)' }} />
+                        )
+                      )}
+                      <span className="truncate font-mono group-hover:text-black transition-colors" style={{ color: 'var(--color-text-muted)' }}>{typeMeta?.label?.toUpperCase()}</span>
+                    </div>
+                  </div>
+                  <div className='flex gap-2 items-center' onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type='button'
+                      onClick={() => triggerModulePrint(module.id)}
+                      className='px-1.5 py-1 rounded border border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
+                      title='Print this module'>
+                      <PrintIcon className='w-3 h-3 text-gray-400 hover:text-black transition-colors' />
+                    </button>
+                    <button
+                      type='button'
+                      onClick={() => {
+                        setShowEditModuleModal(module.id);
+                        setEditingModule(JSON.parse(JSON.stringify(module)));
+                      }}
+                      className='px-2 py-1 rounded border border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer text-xs font-bold'
+                      title='Edit module'>
+                      EDIT
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        
+        {/* Add Unassigned Module Button */}
+        <div className='mt-4'>
+          <button
+            type='button'
+            onClick={() => {
+              if (setShowCreateUnassignedModal) {
+                setShowCreateUnassignedModal(true);
+              }
+            }}
+            className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs font-bold tracking-wider cursor-pointer'
+            style={{ backgroundColor: 'transparent' }}
+            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-white)'}
+            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            title='Create a new unassigned module'>
+            + CREATE MODULE
+          </button>
+        </div>
       </div>
     </div>
   );

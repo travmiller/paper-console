@@ -34,6 +34,7 @@ function App() {
   const [isSearching, setIsSearching] = useState(false);
   const [activeTab, setActiveTab] = useState('channels'); // 'general', 'channels'
   const [showAddModuleModal, setShowAddModuleModal] = useState(null); // channel position or null
+  const [showCreateUnassignedModal, setShowCreateUnassignedModal] = useState(false); // true/false for unassigned module creation
   const [showEditModuleModal, setShowEditModuleModal] = useState(null); // module ID or null
   const [editingModule, setEditingModule] = useState(null); // Local copy of module being edited
   const [showScheduleModal, setShowScheduleModal] = useState(null); // channel position or null
@@ -627,6 +628,7 @@ function App() {
             setEditingModule={setEditingModule}
             moveModuleInChannel={moveModuleInChannel}
             setShowAddModuleModal={setShowAddModuleModal}
+            setShowCreateUnassignedModal={setShowCreateUnassignedModal}
             wifiStatus={wifiStatus}
           />
         )}
@@ -642,6 +644,30 @@ function App() {
             setEditingModule(module);
           }}
         />
+
+        {/* Modal for creating unassigned modules */}
+        {showCreateUnassignedModal && (
+          <AddModuleModal
+            channelPosition={null}
+            onClose={() => setShowCreateUnassignedModal(false)}
+            onCreateModule={async (moduleType) => {
+              const newModule = await createModule(moduleType);
+              if (newModule) {
+                setShowCreateUnassignedModal(false);
+                setShowEditModuleModal(newModule.id);
+                setEditingModule(JSON.parse(JSON.stringify(newModule)));
+              }
+              return newModule;
+            }}
+            onAssignModule={async () => {
+              // No-op for unassigned modules
+            }}
+            onOpenEdit={(moduleId, module) => {
+              setShowEditModuleModal(moduleId);
+              setEditingModule(module);
+            }}
+          />
+        )}
 
         <EditModuleModal
           moduleId={showEditModuleModal}
