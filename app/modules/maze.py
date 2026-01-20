@@ -275,8 +275,12 @@ def draw_maze_image(grid: List[List[int]], cell_size: int = 8) -> Image.Image:
     config_schema={
         "type": "object",
         "properties": {
-             "width": {"type": "integer", "title": "Width (Odd number)", "default": 61, "minimum": 15, "maximum": 99},
-             "height": {"type": "integer", "title": "Height (Odd number)", "default": 61, "minimum": 15, "maximum": 99}
+             "difficulty": {
+                 "type": "string", 
+                 "title": "Difficulty", 
+                 "enum": ["Easy", "Medium", "Hard"],
+                 "default": "Hard"
+             }
         }
     }
 )
@@ -284,9 +288,15 @@ def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str
     """Prints a challenging Maze puzzle."""
     from datetime import datetime
     
-    # Configurable size (default to 61x61 for maximum challenge)
-    width = int(config.get("width", 61)) if config else 61
-    height = int(config.get("height", 61)) if config else 61
+    # Difficulty mapping
+    difficulty = config.get("difficulty", "Hard") if config else "Hard"
+    
+    if difficulty == "Easy":
+        width, height = 21, 21
+    elif difficulty == "Medium":
+        width, height = 41, 41
+    else:  # Hard (default)
+        width, height = 61, 61
     
     # Generate enhanced Maze
     maze = MazeGenerator(width, height)
