@@ -102,7 +102,31 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
         }
     },
     ui_schema={
-        "wifi_password": {"ui:widget": "password"}
+        "content": {
+            "ui:showWhen": {
+                "field": "qr_type",
+                "value": ["text", "url", "email", "sms", "phone"]
+            }
+        },
+        "wifi_ssid": {
+            "ui:showWhen": {"field": "qr_type", "value": "wifi"}
+        },
+        "wifi_password": {
+            "ui:widget": "password",
+            "ui:showWhen": {"field": "qr_type", "value": "wifi"}
+        },
+        "wifi_security": {
+            "ui:showWhen": {"field": "qr_type", "value": "wifi"}
+        },
+        "contact_name": {
+            "ui:showWhen": {"field": "qr_type", "value": "contact"}
+        },
+        "contact_phone": {
+            "ui:showWhen": {"field": "qr_type", "value": "contact"}
+        },
+        "contact_email": {
+            "ui:showWhen": {"field": "qr_type", "value": "contact"}
+        }
     }
 )
 def format_qrcode_receipt(printer: PrinterDriver, config: dict, module_name: str = None):
