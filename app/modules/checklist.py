@@ -32,11 +32,7 @@ from app.utils import wrap_text_pixels
     },
     ui_schema={
         "items": {
-            "ui:options": {
-                "orderable": True,
-                "removable": True,
-                "addable": True,
-            }
+            "ui:widget": "checklist"
         }
     },
 )

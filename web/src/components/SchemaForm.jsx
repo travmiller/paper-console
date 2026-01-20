@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { commonClasses } from '../design-tokens';
 import LocationSearch from './widgets/LocationSearch';
 import KeyValueList from './widgets/KeyValueList';
+import Checklist from './widgets/Checklist';
 
 /**
  * A lightweight JSON Schema form renderer.
@@ -95,6 +96,17 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
         const itemSchema = schema.items;
         const itemUiSchema = uiSchema?.items || {};
         
+        // Support custom array widgets
+        if (widget === 'checklist') {
+            return (
+                <div className="space-y-2">
+                    {title && <label className={commonClasses.label}>{title}</label>}
+                    <Checklist value={items} onChange={onChange} />
+                    {description && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+                </div>
+            );
+        }
+
         const handleAdd = () => {
             const emptyItem = createEmptyValue(itemSchema);
             onChange([...items, emptyItem]);
