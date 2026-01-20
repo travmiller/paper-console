@@ -432,486 +432,339 @@ class PrinterDriver:
             return max(14, self.font_size - 3) + self.line_spacing
         return self.line_height
 
+    def _render_op(self, img: Image.Image, draw: ImageDraw.Draw, y: int, op_type: str, op_data: Any, dry_run: bool = False) -> tuple[int, int]:
+        """Render a single operation or calculate its dimensions.
+        
+        Returns:
+            tuple: (content_height, spacing_after)
+        """
+        if op_type == "styled":
+            return self._render_op_styled(draw, y, op_data, dry_run)
+        elif op_type == "text":
+            return self._render_op_text_legacy(draw, y, op_data, dry_run)
+        elif op_type == "box":
+            return self._render_op_box(img, draw, y, op_data, dry_run)
+        elif op_type == "icon":
+            return self._render_op_icon(draw, y, op_data, dry_run)
+        elif op_type == "image":
+            return self._render_op_image(img, y, op_data, dry_run)
+        elif op_type == "article_block":
+            return self._render_op_article_block(img, draw, y, op_data, dry_run)
+        elif op_type == "qr":
+            return self._render_op_qr(img, y, op_data, dry_run)
+        elif op_type == "feed":
+            return (op_data * self.SPACING_LARGE, 0)
+        
+        return (0, 0)
+
+    def _render_op_styled(self, draw: ImageDraw.Draw, y: int, op_data: dict, dry_run: bool) -> tuple[int, int]:
+        clean_text = self._sanitize_text(op_data["text"])
+        style = op_data.get("style", "regular")
+        font = self._get_font(style)
+        line_height = self._get_line_height_for_style(style)
+        
+        current_height = 0
+        
+        paragraphs = clean_text.split("\n")
+        for paragraph in paragraphs:
+            if not paragraph.strip():
+                current_height += line_height
+            else:
+                wrapped_lines = self._wrap_text_by_width(paragraph, font, self.PRINTER_WIDTH_DOTS)
+                for line in wrapped_lines:
+                    if not dry_run and draw:
+                        if font:
+                            draw.text((2, y + current_height), line, font=font, fill=0)
+                        else:
+                            draw.text((2, y + current_height), line, fill=0)
+                    current_height += line_height
+        
+        return (current_height, 0)
+
+    def _render_op_text_legacy(self, draw: ImageDraw.Draw, y: int, op_data: str, dry_run: bool) -> tuple[int, int]:
+        clean_text = self._sanitize_text(op_data)
+        font = self._get_font("regular")
+        current_height = 0
+        
+        paragraphs = clean_text.split("\n")
+        for paragraph in paragraphs:
+            if not paragraph.strip():
+                current_height += self.line_height
+                if not dry_run:
+                    self.lines_printed += 1
+            else:
+                wrapped_lines = self._wrap_text_by_width(paragraph, font, self.PRINTER_WIDTH_DOTS)
+                for line in wrapped_lines:
+                    if not dry_run and draw:
+                        if font:
+                            draw.text((2, y + current_height), line, font=font, fill=0)
+                        else:
+                            draw.text((2, y + current_height), line, fill=0)
+                    current_height += self.line_height
+                    if not dry_run:
+                        self.lines_printed += 1
+        
+        return (current_height, 0)
+
+    def _render_op_box(self, img: Image.Image, draw: ImageDraw.Draw, y: int, op_data: dict, dry_run: bool) -> tuple[int, int]:
+        text = self._sanitize_text(op_data.get("text", ""))
+        style = op_data.get("style", "bold_lg")
+        padding = op_data.get("padding", self.SPACING_MEDIUM)
+        border = op_data.get("border", 2)
+        icon_type = op_data.get("icon")
+        icon_size = op_data.get("icon_size", 24) if icon_type else 0
+        font = self._get_font(style)
+        text_height = self._get_line_height_for_style(style)
+
+        box_width = self.PRINTER_WIDTH_DOTS - self.SPACING_SMALL
+        box_height = max(text_height, icon_size) + (padding * 2) + (border * 2)
+        
+        if not dry_run and draw:
+            box_x = 2
+            box_y = y + 2
+            
+            # Draw outer rectangle (black border)
+            draw.rectangle(
+                [box_x, box_y, box_x + box_width, box_y + box_height], fill=0
+            )
+            # Draw inner rectangle (white) - creates border effect
+            draw.rectangle(
+                [
+                    box_x + border,
+                    box_y + border,
+                    box_x + box_width - border,
+                    box_y + box_height - border,
+                ],
+                fill=1,
+            )
+
+            # Calculate content layout
+            if font:
+                bbox = font.getbbox(text)
+                text_width = bbox[2] - bbox[0] if bbox else len(text) * 10
+            else:
+                text_width = len(text) * 10
+
+            icon_spacing = 6 if icon_type else 0
+            total_content_width = (
+                text_width + icon_size + icon_spacing if icon_type else text_width
+            )
+
+            content_start_x = box_x + (box_width - total_content_width) // 2
+            content_y = box_y + border + padding
+
+            if icon_type:
+                icon_x = content_start_x
+                icon_y = content_y + (text_height - icon_size) // 2
+                self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
+
+            text_x = (
+                content_start_x + icon_size + icon_spacing
+                if icon_type
+                else content_start_x
+            )
+            text_y = content_y
+            if font:
+                draw.text((text_x, text_y), text, font=font, fill=0)
+            else:
+                draw.text((text_x, text_y), text, fill=0)
+
+        # 2px margin top + box height
+        return (2 + box_height, self.SPACING_MEDIUM)
+
+    def _render_op_icon(self, draw: ImageDraw.Draw, y: int, op_data: dict, dry_run: bool) -> tuple[int, int]:
+        icon_type = op_data.get("type", "sun")
+        size = op_data.get("size", 32)
+        
+        if not dry_run and draw:
+            icon_x = (self.PRINTER_WIDTH_DOTS - size) // 2
+            # SPACING_SMALL top margin
+            icon_y = y + self.SPACING_SMALL
+            self._draw_icon(draw, icon_x, icon_y, icon_type, size)
+            
+        # Top margin + icon size
+        return (self.SPACING_SMALL + size, self.SPACING_SMALL)
+
+    def _render_op_image(self, img: Image.Image, y: int, op_data: dict, dry_run: bool) -> tuple[int, int]:
+        image = op_data.get("image")
+        if not image:
+            return (0, 0)
+            
+        target_width = self.PRINTER_WIDTH_DOTS
+        final_height = image.height
+        
+        if image.width > target_width:
+             ratio = target_width / image.width
+             final_height = int(image.height * ratio)
+             
+        if not dry_run and img:
+            img_to_draw = image
+            if img_to_draw.width > target_width:
+                 img_to_draw = img_to_draw.resize((target_width, final_height), Image.Resampling.LANCZOS)
+            
+            if img_to_draw.mode != "1":
+                img_to_draw = img_to_draw.convert("1")
+                
+            img_x = (target_width - img_to_draw.width) // 2
+            # SPACING_SMALL top margin
+            img_y = y + self.SPACING_SMALL
+            img.paste(img_to_draw, (img_x, img_y))
+        
+        return (final_height + self.SPACING_SMALL, self.SPACING_MEDIUM)  # Height + top margin
+
+    def _render_op_qr(self, img: Image.Image, y: int, op_data: dict, dry_run: bool) -> tuple[int, int]:
+        # Reuse key if already generated
+        qr_img = op_data.get("_qr_img")
+        if not qr_img:
+            qr_img = self._generate_qr_image(
+                op_data["data"],
+                op_data["size"],
+                op_data["ec"],
+                op_data.get("fixed", False),
+            )
+            op_data["_qr_img"] = qr_img
+            
+        if not qr_img:
+            return (0, 0)
+
+        # For height calc we assume scaling happens same way
+        max_qr_width = self.PRINTER_WIDTH_DOTS - (2 * self.SPACING_SMALL)
+        qr_width = qr_img.width
+        qr_height = qr_img.height
+        if qr_width > max_qr_width:
+             # re-sim resize
+             scale_factor = max_qr_width / qr_width
+             qr_height = int(qr_height * scale_factor)
+
+        if not dry_run and img:
+            # Check constraints and flush if needed logic is upstream
+            # But here we assume it fits or is resized.
+            
+            # Since we recalculated qr_width/qr_height for constraint, use it for resize
+            if qr_img.width > max_qr_width:
+                qr_img = qr_img.resize((qr_width, qr_height), Image.LANCZOS)
+            
+            qr_x = (self.PRINTER_WIDTH_DOTS - qr_width) // 2
+            qr_y = y + self.SPACING_SMALL
+            img.paste(qr_img, (qr_x, qr_y))
+
+        return (qr_height + self.SPACING_SMALL, self.SPACING_SMALL)
+
+    def _render_op_article_block(self, img: Image.Image, draw: ImageDraw.Draw, y: int, op_data: dict, dry_run: bool) -> tuple[int, int]:
+        qr_size = op_data.get("qr_size", 64)
+        
+        # 1. QR Gen
+        qr_img = op_data.get("_qr_img")
+        if not qr_img and "url" in op_data:
+             qr_raw = self._generate_qr_image(op_data.get("url", ""), 10, "M", False)
+             if qr_raw:
+                 qr_img = qr_raw.resize((qr_size, qr_size), Image.LANCZOS)
+             op_data["_qr_img"] = qr_img
+        
+        # 2. Text Layout
+        text_x = self.SPACING_SMALL
+        current_offset = 2 # Start 2px down
+        
+        right_margin = self.SPACING_SMALL
+        available_text_width = self.PRINTER_WIDTH_DOTS - text_x - right_margin
+        
+        # Source
+        source = op_data.get("source", "")
+        source_font = self._get_font("caption")
+        source_height = self._get_line_height_for_style("caption")
+        
+        if source and source_font and not dry_run and draw:
+            source_text = source.upper()
+            # Truncate
+            max_source_width = available_text_width
+            while source_text and source_font.getlength(source_text) > max_source_width:
+                source_text = source_text[:-1]
+            draw.text((text_x, y + current_offset), source_text, font=source_font, fill=0)
+
+        if source:
+             current_offset += source_height
+        
+        # Title
+        title_font = self._get_font("bold")
+        title_line_height = self._get_line_height_for_style("bold")
+        title_text = op_data.get("title", "")
+        
+        title_lines = self._wrap_text_by_width(title_text, title_font, available_text_width) if title_font else []
+        
+        if not dry_run and draw and title_font:
+             for line in title_lines:
+                 draw.text((text_x, y + current_offset), line, font=title_font, fill=0)
+                 current_offset += title_line_height
+        else:
+             current_offset += len(title_lines) * title_line_height
+             
+        # Summary
+        summary_font = self._get_font("regular_sm")
+        summary_line_height = self._get_line_height_for_style("regular_sm")
+        summary_text = op_data.get("summary", "")
+        max_summary_lines = op_data.get("max_summary_lines", 3)
+        
+        summary_lines = self._wrap_text_by_width(summary_text, summary_font, available_text_width)[:max_summary_lines] if summary_font else []
+        
+        if not dry_run and draw and summary_font:
+             for line in summary_lines:
+                 draw.text((text_x, y + current_offset), line, font=summary_font, fill=0)
+                 current_offset += summary_line_height
+        else:
+             current_offset += len(summary_lines) * summary_line_height
+             
+        # QR
+        if qr_img:
+            current_offset += self.SPACING_SMALL
+            if not dry_run and img:
+                 qr_x = (self.PRINTER_WIDTH_DOTS - qr_img.width) // 2
+                 img.paste(qr_img, (qr_x, y + current_offset))
+            current_offset += qr_img.height + self.SPACING_SMALL
+        else:
+            current_offset += self.SPACING_SMALL
+            
+        return (current_offset, self.SPACING_MEDIUM)
+
     def _render_unified_bitmap(self, ops: list) -> Image.Image:
         """Render ALL buffer operations into one unified bitmap.
 
-        This is faster than multiple small bitmaps because:
-        - Single GS v 0 command overhead
-        - Continuous data stream to printer
-
-        Supports styled text with different fonts and sizes.
-        Uses fixed spacing constants for consistency:
-        - SPACING_SMALL (4px): after inline elements
-        - SPACING_MEDIUM (8px): between content blocks
-        - SPACING_LARGE (16px): between sections/modules
+        Refactored to use a 2-pass system with dry-run capabilities
+        to ensure height calculation perfectly matches drawing.
         """
         import qrcode as qr_lib
 
         if not ops:
             return None
 
-        # First pass: calculate total height needed
-        # Note: bitmap is rotated 180° before printing, so:
-        #   - Top of bitmap (y=0) = printed LAST (end of print)
-        #   - Bottom of bitmap = printed FIRST (start of print)
-        # We want content at TOP (printed last) and padding at BOTTOM (printed first)
-        # So we calculate content height, then add 5 lines padding at the end
-        total_height = 0  # Start with content height only
-        last_spacing = (
-            0  # Track spacing added by last operation to remove it (start padding)
-        )
-
+        # Pass 1: Measure
+        measured_content_height = 0
+        last_spacing = 0
         for op_type, op_data in ops:
-            if op_type == "styled":
-                clean_text = self._sanitize_text(op_data["text"])
-                style = op_data.get("style", "regular")
-                font = self._get_font(style)
-                line_height = self._get_line_height_for_style(style)
-
-                # Calculate wrapped lines for accurate height
-                paragraphs = clean_text.split("\n")
-                total_wrapped_lines = 0
-                for paragraph in paragraphs:
-                    wrapped_lines = self._wrap_text_by_width(
-                        paragraph, font, self.PRINTER_WIDTH_DOTS
-                    )
-                    total_wrapped_lines += len(wrapped_lines)
-
-                total_height += total_wrapped_lines * line_height
-                last_spacing = 0  # Text has no trailing spacing
-            elif op_type == "text":
-                clean_text = self._sanitize_text(op_data)
-                font = self._get_font("regular")
-
-                # Calculate wrapped lines for accurate height
-                paragraphs = clean_text.split("\n")
-                total_wrapped_lines = 0
-                for paragraph in paragraphs:
-                    wrapped_lines = self._wrap_text_by_width(
-                        paragraph, font, self.PRINTER_WIDTH_DOTS
-                    )
-                    total_wrapped_lines += len(wrapped_lines)
-
-                total_height += total_wrapped_lines * self.line_height
-                last_spacing = 0
-            elif op_type == "box":
-                style = op_data.get("style", "bold_lg")
-                padding = op_data.get("padding", self.SPACING_MEDIUM)
-                border = op_data.get("border", 2)
-                icon_type = op_data.get("icon")
-                text_height = self._get_line_height_for_style(style)
-                icon_size = op_data.get("icon_size", 24) if icon_type else 0
-                box_height = (
-                    border + padding + max(text_height, icon_size) + padding + border
-                )
-                # +2 accounts for the box_y = y + 2 margin in the drawing code
-                total_height += 2 + box_height + self.SPACING_MEDIUM
-                last_spacing = self.SPACING_MEDIUM
-            elif op_type == "moon":
-                size = op_data.get("size", 60)
-                # SPACING_SMALL accounts for moon_y = y + SPACING_SMALL in drawing
-                total_height += self.SPACING_SMALL + size + self.SPACING_MEDIUM
-                last_spacing = self.SPACING_MEDIUM
-            elif op_type == "sun_path":
-                height = op_data.get("height", 120)
-                # SPACING_SMALL accounts for sun_path_y = y + SPACING_SMALL in drawing
-                total_height += self.SPACING_SMALL + height + self.SPACING_MEDIUM
-                last_spacing = self.SPACING_MEDIUM
-            elif op_type == "maze":
-                grid = op_data.get("grid", [])
-                cell_size = op_data.get("cell_size", 4)
-                if grid:
-                    maze_height = len(grid) * cell_size
-                    # SPACING_SMALL accounts for maze_y = y + SPACING_SMALL in drawing
-                    total_height += (
-                        self.SPACING_SMALL + maze_height + self.SPACING_MEDIUM
-                    )
-                    last_spacing = self.SPACING_MEDIUM
-            elif op_type == "sudoku":
-                grid = op_data.get("grid", [])
-                cell_size = op_data.get("cell_size", 8)
-                if grid:
-                    sudoku_size = 9 * cell_size + self.SPACING_SMALL
-                    # SPACING_SMALL accounts for sudoku_y = y + SPACING_SMALL in drawing
-                    total_height += (
-                        self.SPACING_SMALL + sudoku_size + self.SPACING_MEDIUM
-                    )
-                    last_spacing = self.SPACING_MEDIUM
-            elif op_type == "icon":
-                icon_type = op_data.get("type", "sun")
-                size = op_data.get("size", 32)
-                # SPACING_SMALL accounts for icon_y = y + SPACING_SMALL in drawing
-                total_height += self.SPACING_SMALL + size + self.SPACING_SMALL
-                last_spacing = self.SPACING_SMALL
-            elif op_type == "weather_forecast":
-                # Day height is 114px (as set in _draw_weather_forecast, updated for 24px icon)
-                total_height += 114 + self.SPACING_MEDIUM
-                last_spacing = self.SPACING_MEDIUM
-            elif op_type == "hourly_forecast":
-                hourly_forecast = op_data.get("hourly_forecast", [])
-                # Calculate actual height: 4 hours per row, 86px entry height, 10px row spacing
-                hours_per_row = 4
-                entry_height = 86
-                row_spacing = 10
-                num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
-                # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
-                if num_rows > 0:
-                    forecast_height = (num_rows * entry_height) + (
-                        (num_rows - 1) * row_spacing
-                    )
-                else:
-                    forecast_height = 0
-                total_height += forecast_height + self.SPACING_MEDIUM
-                last_spacing = self.SPACING_MEDIUM
-
-            elif op_type == "image":
-                image = op_data.get("image")
-                if image:
-                    height = image.height
-                    # Check if resizing will happen
-                    if image.width > self.PRINTER_WIDTH_DOTS:
-                        ratio = self.PRINTER_WIDTH_DOTS / image.width
-                        height = int(image.height * ratio)
-                    
-                    total_height += height + self.SPACING_MEDIUM
-                    last_spacing = self.SPACING_MEDIUM
-
-
-            elif op_type == "feed":
-                total_height += op_data * self.SPACING_LARGE
-                last_spacing = op_data * self.SPACING_LARGE
-            elif op_type == "article_block":
-                qr_size = op_data.get("qr_size", 64)
-                # Generate QR at high resolution (box_size=10) with medium error correction for better scannability
-                # Medium error correction provides good balance of data capacity and robustness
-                # Use fixed_size=False since we'll resize ourselves to the exact qr_size
-                qr_img = self._generate_qr_image(op_data.get("url", ""), 10, "M", False)
-                if qr_img:
-                    # Use LANCZOS resampling for better quality when scaling to exact size
-                    qr_img = qr_img.resize((qr_size, qr_size), Image.LANCZOS)
-                op_data["_qr_img"] = qr_img
-
-                # Use pixel-based wrapping to match rendering (critical for accurate height calculation)
-                source_height = self._get_line_height_for_style("caption")
-                title_font = self._get_font("bold")
-                title_text = op_data.get("title", "")
-                # Calculate available width (matches rendering)
-                available_text_width = self.PRINTER_WIDTH_DOTS - self.SPACING_SMALL - self.SPACING_SMALL
-                if title_font:
-                    title_lines = self._wrap_text_by_width(title_text, title_font, available_text_width)
-                else:
-                    title_lines = op_data.get("title_wrapped", [title_text])
-                title_height = len(title_lines) * self._get_line_height_for_style("bold")
-                
-                summary_font = self._get_font("regular_sm")
-                summary_text = op_data.get("summary", "")
-                max_summary_lines = op_data.get("max_summary_lines", 3)
-                if summary_text and summary_font:
-                    summary_lines = self._wrap_text_by_width(summary_text, summary_font, available_text_width)
-                    summary_lines = summary_lines[:max_summary_lines]
-                else:
-                    summary_lines = op_data.get("summary_wrapped", [])
-                summary_height = len(summary_lines) * self._get_line_height_for_style("regular_sm")
-
-                text_height = (
-                    source_height + title_height + summary_height
-                )
-                # QR code is now below text, so add heights together
-                # text_height + spacing + QR code + spacing
-                # Note: rendering starts at y + 2, and block_height = text_y - (y + 2)
-                # So block_height includes all content from the +2 offset
-                if qr_img:
-                    # Total content height: text + spacing + QR + spacing
-                    block_height = text_height + self.SPACING_SMALL + qr_size + self.SPACING_SMALL
-                else:
-                    block_height = text_height + self.SPACING_SMALL
-                # Add SPACING_MEDIUM for separation between modules (matches rendering: y += block_height + SPACING_MEDIUM)
-                total_height += block_height + self.SPACING_MEDIUM
-                last_spacing = self.SPACING_MEDIUM
-            elif op_type == "qr":
-                qr_img = self._generate_qr_image(
-                    op_data["data"],
-                    op_data["size"],
-                    op_data["ec"],
-                    op_data.get("fixed", False),
-                )
-                op_data["_qr_img"] = qr_img
-                if qr_img:
-                    total_height += qr_img.height + self.SPACING_SMALL
-                    last_spacing = self.SPACING_SMALL
-
-        # Remove last operation's trailing spacing (it becomes START padding after 180° rotation)
-        total_height -= last_spacing
-
-        # Add safety buffer to account for any calculation discrepancies
-        # This prevents content from being cut off due to rounding or wrapping differences
-        # Use a larger buffer to ensure all content fits
-        total_height += self.SPACING_LARGE * 2  # 32px safety buffer
-
-        # Add 7 lines (168 dots) of padding at the TOP of original bitmap (y=0)
-        # After 180° rotation: top of original → bottom of rotated → printed LAST (end spacing)
-        # This provides consistent spacing at the end of every print job
-        padding_dots = 7 * 24  # 168 dots
-        total_height += padding_dots
-
-        # Create the unified image
+             h, s = self._render_op(None, None, 0, op_type, op_data, dry_run=True)
+             if h > 0:
+                 measured_content_height += h + s
+                 last_spacing = s
+             
+        # Remove trailing spacing
+        measured_content_height -= last_spacing
+        
+        # Add safety buffer (32px) + Start Padding (168px)
+        total_height = measured_content_height + (self.SPACING_LARGE * 2) + self.cutter_feed_dots
+        
+        # Create Image
         width = self.PRINTER_WIDTH_DOTS
-        img = Image.new("1", (width, total_height), 1)  # White background
+        img = Image.new("1", (width, total_height), 1)
         draw = ImageDraw.Draw(img)
-
-        # Second pass: draw everything
-        # Start drawing content BELOW the padding (at top of original bitmap)
-        # After 180° rotation:
-        #   - Padding (y=0 to y=120) → bottom of rotated → printed LAST ✓
-        #   - Content (y=120+) → top of rotated → printed FIRST ✓
-        y = padding_dots  # Start content below padding
-
+        
+        # Pass 2: Draw
+        current_y = self.cutter_feed_dots
         for op_type, op_data in ops:
-            if op_type == "styled":
-                clean_text = self._sanitize_text(op_data["text"])
-                style = op_data.get("style", "regular")
-                font = self._get_font(style)
-                line_height = self._get_line_height_for_style(style)
-
-                # Text is already split by newlines in print_text()
-                # Empty strings represent blank lines (preserved for spacing)
-                if not clean_text.strip():
-                    # Blank line - just advance y position
-                    y += line_height
-                else:
-                    # Wrap paragraph to fit printer width
-                    wrapped_lines = self._wrap_text_by_width(clean_text, font, width)
-                    for line in wrapped_lines:
-                        if font:
-                            draw.text((2, y), line, font=font, fill=0)
-                        else:
-                            draw.text((2, y), line, fill=0)
-                        y += line_height
-            elif op_type == "text":
-                # Legacy support
-                clean_text = self._sanitize_text(op_data)
-                font = self._get_font("regular")
-                # Text is already split by newlines in print_text()
-                # Empty strings represent blank lines (preserved for spacing)
-                if not clean_text.strip():
-                    # Blank line - just advance y position
-                    y += self.line_height
-                    self.lines_printed += 1
-                else:
-                    # Wrap paragraph to fit printer width
-                    wrapped_lines = self._wrap_text_by_width(clean_text, font, width)
-                    for line in wrapped_lines:
-                        if font:
-                            draw.text((2, y), line, font=font, fill=0)
-                        else:
-                            draw.text((2, y), line, fill=0)
-                        y += self.line_height
-                        self.lines_printed += 1
-            elif op_type == "box":
-                # Draw a full-width box with text centered inside
-                text = self._sanitize_text(op_data.get("text", ""))
-                style = op_data.get("style", "bold_lg")
-                padding = op_data.get("padding", self.SPACING_MEDIUM)
-                border = op_data.get("border", 2)
-                icon_type = op_data.get("icon")
-                icon_size = op_data.get("icon_size", 24) if icon_type else 0
-                font = self._get_font(style)
-                text_height = self._get_line_height_for_style(style)
-
-                box_width = width - self.SPACING_SMALL
-                box_height = max(text_height, icon_size) + (padding * 2) + (border * 2)
-                box_x = 2
-                box_y = y + 2
-
-                # Draw outer rectangle (black border)
-                draw.rectangle(
-                    [box_x, box_y, box_x + box_width, box_y + box_height], fill=0
-                )
-                # Draw inner rectangle (white) - creates border effect
-                draw.rectangle(
-                    [
-                        box_x + border,
-                        box_y + border,
-                        box_x + box_width - border,
-                        box_y + box_height - border,
-                    ],
-                    fill=1,
-                )
-
-                # Calculate text width
-                if font:
-                    bbox = font.getbbox(text)
-                    text_width = bbox[2] - bbox[0] if bbox else len(text) * 10
-                else:
-                    text_width = len(text) * 10
-
-                icon_spacing = 6 if icon_type else 0
-                total_content_width = (
-                    text_width + icon_size + icon_spacing if icon_type else text_width
-                )
-
-                content_start_x = box_x + (box_width - total_content_width) // 2
-                content_y = box_y + border + padding
-
-                if icon_type:
-                    icon_x = content_start_x
-                    icon_y = content_y + (text_height - icon_size) // 2
-                    self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
-
-                text_x = (
-                    content_start_x + icon_size + icon_spacing
-                    if icon_type
-                    else content_start_x
-                )
-                text_y = content_y
-                if font:
-                    draw.text((text_x, text_y), text, font=font, fill=0)
-                else:
-                    draw.text((text_x, text_y), text, fill=0)
-
-                # +2 matches the box_y = y + 2 offset
-                y += 2 + box_height + self.SPACING_MEDIUM
-
-
-
-
-            elif op_type == "icon":
-                icon_type = op_data.get("type", "sun")
-                size = op_data.get("size", 32)
-                icon_x = (width - size) // 2
-                icon_y = y + self.SPACING_SMALL
-                self._draw_icon(draw, icon_x, icon_y, icon_type, size)
-                y += self.SPACING_SMALL + size + self.SPACING_SMALL
-
-
-
-            elif op_type == "image":
-                image = op_data.get("image")
-                if image:
-                    # Resize if wider than paper
-                    if image.width > self.PRINTER_WIDTH_DOTS:
-                        ratio = self.PRINTER_WIDTH_DOTS / image.width
-                        new_height = int(image.height * ratio)
-                        image = image.resize((self.PRINTER_WIDTH_DOTS, new_height), Image.Resampling.LANCZOS)
-                    
-                    # Convert to binary if needed (basic thresholding)
-                    if image.mode != "1":
-                        image = image.convert("1")
-
-                    img_x = (width - image.width) // 2
-                    img_y = y + self.SPACING_SMALL
-                    
-                    # Paste onto the canvas
-                    img.paste(image, (img_x, img_y))
-                    
-                    y += image.height + self.SPACING_MEDIUM
-
-            elif op_type == "feed":
-                # feed(n) adds n * SPACING_LARGE for module separation
-                y += op_data * self.SPACING_LARGE
-            elif op_type == "article_block":
-                qr_size = op_data.get("qr_size", 64)
-                qr_img = op_data.get("_qr_img")
-                text_x = self.SPACING_SMALL
-                text_y = y + 2
-                
-                # Calculate available width for text (full width, accounting for margins)
-                right_margin = self.SPACING_SMALL
-                available_text_width = self.PRINTER_WIDTH_DOTS - text_x - right_margin
-
-                # Render text first at full width
-                source = op_data.get("source", "")
-                source_font = self._get_font("caption")
-                source_height = self._get_line_height_for_style("caption")
-                if source and source_font:
-                    # Truncate source if too long
-                    source_text = source.upper()
-                    if source_font:
-                        # Measure and truncate if needed
-                        max_source_width = available_text_width
-                        while source_text and source_font.getlength(source_text) > max_source_width:
-                            source_text = source_text[:-1]
-                    draw.text(
-                        (text_x, text_y), source_text, font=source_font, fill=0
-                    )
-                text_y += source_height
-
-                # Use pixel-based wrapping for title
-                title_font = self._get_font("bold")
-                title_line_height = self._get_line_height_for_style("bold")
-                title_text = op_data.get("title", "")
-                if title_font:
-                    # Re-wrap using pixel-based width calculation (full width)
-                    title_lines = self._wrap_text_by_width(title_text, title_font, available_text_width)
-                else:
-                    # Fallback to pre-wrapped lines
-                    title_lines = op_data.get("title_wrapped", [title_text])
-                for line in title_lines:
-                    if title_font:
-                        draw.text((text_x, text_y), line, font=title_font, fill=0)
-                    text_y += title_line_height
-
-                # Use pixel-based wrapping for summary
-                summary_text = op_data.get("summary", "")
-                summary_font = self._get_font("regular_sm")
-                summary_line_height = self._get_line_height_for_style("regular_sm")
-                max_summary_lines = op_data.get("max_summary_lines", 3)
-                if summary_text and summary_font:
-                    # Re-wrap using pixel-based width calculation (full width)
-                    summary_lines = self._wrap_text_by_width(summary_text, summary_font, available_text_width)
-                    summary_lines = summary_lines[:max_summary_lines]
-                else:
-                    # Fallback to pre-wrapped lines
-                    summary_lines = op_data.get("summary_wrapped", [])
-                for line in summary_lines:
-                    if summary_font:
-                        draw.text((text_x, text_y), line, font=summary_font, fill=0)
-                    text_y += summary_line_height
-
-                # Render QR code below the text on a new line
-                if qr_img:
-                    # Add some spacing between text and QR code
-                    text_y += self.SPACING_SMALL
-                    # Center the QR code horizontally
-                    qr_x = (self.PRINTER_WIDTH_DOTS - qr_img.width) // 2
-                    qr_y = text_y
-                    img.paste(qr_img, (qr_x, qr_y))
-                    text_y += qr_img.height + self.SPACING_SMALL
-                else:
-                    # If no QR code, just add a small gap
-                    text_y += self.SPACING_SMALL
-
-                # Calculate block height: text_y includes all content and spacing
-                # text_y started at (y + 2), so block_height = text_y - (y + 2) gives total content height
-                block_height = text_y - (y + 2)
-                # Add SPACING_MEDIUM for separation between modules (consistent with other block types)
-                y += block_height + self.SPACING_MEDIUM
-            elif op_type == "qr":
-                qr_img = op_data.get("_qr_img")
-                if qr_img:
-                    # Center the QR code horizontally and ensure it fits within printer width
-                    max_qr_width = width - (2 * self.SPACING_SMALL)  # Leave margins on both sides
-                    qr_width = qr_img.width
-                    qr_height = qr_img.height
-                    
-                    # Scale down if QR code is too wide
-                    if qr_width > max_qr_width:
-                        scale_factor = max_qr_width / qr_width
-                        new_width = int(qr_width * scale_factor)
-                        new_height = int(qr_height * scale_factor)
-                        qr_img = qr_img.resize((new_width, new_height), Image.LANCZOS)
-                        qr_width = new_width
-                        qr_height = new_height
-                    
-                    # Center horizontally
-                    qr_x = (width - qr_width) // 2
-                    qr_y = y + self.SPACING_SMALL
-                    img.paste(qr_img, (qr_x, qr_y))
-                    y += qr_height + self.SPACING_MEDIUM
-
-        # Rotate 180° for upside-down printing
+             h, s = self._render_op(img, draw, current_y, op_type, op_data, dry_run=False)
+             if h > 0:
+                 current_y += h + s
+             
+        # Rotate
         img = img.rotate(180)
-
         return img
 
 
