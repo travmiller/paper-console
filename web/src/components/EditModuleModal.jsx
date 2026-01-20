@@ -1,14 +1,15 @@
 import React, { useRef } from 'react';
 import ModuleConfig from './ModuleConfig';
-import { AVAILABLE_MODULE_TYPES } from '../constants';
+import { useModuleTypes } from '../hooks/useModuleTypes';
 import { commonClasses } from '../design-tokens';
 import CloseButton from './CloseButton';
 import PrimaryButton from './PrimaryButton';
 import BinIcon from '../assets/BinIcon';
-import GCheckIcon from '../assets/GCheckIcon';
+
 
 const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelete }) => {
   const modalMouseDownTarget = useRef(null);
+  const { moduleTypes } = useModuleTypes();
 
   if (moduleId === null || !module) return null;
 
@@ -32,7 +33,7 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
           <div>
             <h3 className='text-xl font-bold text-black mb-1 '>Edit Module</h3>
             <div className={`text-gray-600 text-sm `}>
-              <span className="font-mono">Type: {AVAILABLE_MODULE_TYPES.find((t) => t.id === module?.type)?.label}</span>
+              <span className="font-mono">Type: {moduleTypes.find((t) => t.id === module?.type)?.label}</span>
             </div>
           </div>
           <CloseButton

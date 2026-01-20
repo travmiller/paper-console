@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { AVAILABLE_MODULE_TYPES, INK_GRADIENTS } from '../constants';
+import { INK_GRADIENTS } from '../constants';
+import { useModuleTypes } from '../hooks/useModuleTypes';
 import WiFiIcon from '../assets/WiFiIcon';
 import WiFiOffIcon from '../assets/WiFiOffIcon';
 import PrintIcon from '../assets/PrintIcon';
@@ -21,6 +22,8 @@ const ChannelList = ({
   setShowCreateUnassignedModal,
   wifiStatus,
 }) => {
+  const { moduleTypes } = useModuleTypes();
+
   const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
 
   const moduleIsConfigured = (module) => {
@@ -199,7 +202,7 @@ const ChannelList = ({
                     }}>
                     <div className='flex-1 min-w-0 mr-2'>
                       {(() => {
-                        const typeMeta = AVAILABLE_MODULE_TYPES.find((t) => t.id === item.module.type);
+                        const typeMeta = moduleTypes.find((t) => t.id === item.module.type);
                         const isOnline = typeMeta ? !typeMeta.offline : false;
                         const configured = moduleIsConfigured(item.module);
                         const showState = isOnline;
@@ -311,7 +314,7 @@ const ChannelList = ({
             </div>
           ) : (
             unassignedModules.map((module) => {
-              const typeMeta = AVAILABLE_MODULE_TYPES.find((t) => t.id === module.type);
+              const typeMeta = moduleTypes.find((t) => t.id === module.type);
               const isOnline = typeMeta ? !typeMeta.offline : false;
               const configured = moduleIsConfigured(module);
               const needsSetup = isOnline && !configured;

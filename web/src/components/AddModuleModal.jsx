@@ -1,11 +1,12 @@
 import React, { useRef } from 'react';
-import { AVAILABLE_MODULE_TYPES } from '../constants';
+import { useModuleTypes } from '../hooks/useModuleTypes';
 import { commonClasses } from '../design-tokens';
 import CloseButton from './CloseButton';
 import WiFiIcon from '../assets/WiFiIcon';
 
 const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModule, onOpenEdit, isUnassigned = false }) => {
   const modalMouseDownTarget = useRef(null);
+  const { moduleTypes } = useModuleTypes();
 
   // Show modal if channelPosition is a number (assigned to channel) or if it's explicitly for unassigned
   if (channelPosition === null && !isUnassigned) return null;
@@ -33,7 +34,7 @@ const AddModuleModal = ({ channelPosition, onClose, onCreateModule, onAssignModu
         </div>
 
         <div className='grid grid-cols-2 md:grid-cols-3 gap-3'>
-          {[...AVAILABLE_MODULE_TYPES].sort((a, b) => {
+          {[...moduleTypes].sort((a, b) => {
             // Offline modules first (offline: true), then online modules (offline: false)
             if (a.offline && !b.offline) return -1;
             if (!a.offline && b.offline) return 1;

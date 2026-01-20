@@ -1,10 +1,12 @@
 import React from 'react';
-import { AVAILABLE_MODULE_TYPES } from '../constants';
+import { useModuleTypes } from '../hooks/useModuleTypes';
 import WiFiIcon from '../assets/WiFiIcon';
 import WiFiOffIcon from '../assets/WiFiOffIcon';
 import PrintIcon from '../assets/PrintIcon';
 
 const ModuleTestList = ({ settings, modules, triggerModulePrint, wifiStatus, setShowEditModuleModal, setEditingModule }) => {
+  const { moduleTypes } = useModuleTypes();
+
   const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
 
   const moduleIsConfigured = (module) => {
@@ -58,7 +60,7 @@ const ModuleTestList = ({ settings, modules, triggerModulePrint, wifiStatus, set
       ) : (
         <div className='space-y-3'>
           {allModules.map((module) => {
-            const typeMeta = AVAILABLE_MODULE_TYPES.find((t) => t.id === module.type);
+            const typeMeta = moduleTypes.find((t) => t.id === module.type);
             const isOnline = typeMeta ? !typeMeta.offline : false;
             const configured = moduleIsConfigured(module);
             const showState = isOnline;

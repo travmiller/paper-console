@@ -1,21 +1,3 @@
-export const AVAILABLE_MODULE_TYPES = [
-  { id: 'news', label: 'News API', offline: false },
-  { id: 'rss', label: 'RSS Feeds', offline: false },
-  { id: 'weather', label: 'Weather', offline: false },
-  { id: 'email', label: 'Email Inbox', offline: false },
-  { id: 'games', label: 'Sudoku', offline: true },
-  { id: 'maze', label: 'Maze Generator', offline: true },
-  { id: 'quotes', label: 'Daily Quote', offline: true },
-  { id: 'history', label: 'On This Day', offline: true },
-  { id: 'astronomy', label: 'Astronomy', offline: true },
-  { id: 'calendar', label: 'Calendar', offline: false },
-  { id: 'webhook', label: 'Webhook', offline: false },
-  { id: 'text', label: 'Text / Note', offline: true },
-  { id: 'checklist', label: 'Checklist', offline: true },
-  { id: 'qrcode', label: 'QR Code', offline: true },
-  { id: 'system_monitor', label: 'System Monitor', offline: true },
-];
-
 // Ink gradient colors (matching CSS variables)
 const INK_BLACK = '#000000';        // --color-ink-black
 const INK_GRAY_DARK = '#3a3a3a';    // --color-ink-gray-dark

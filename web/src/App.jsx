@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import WiFiSetup from './WiFiSetup';
 import GeneralSettings from './components/GeneralSettings';
 import ChannelList from './components/ChannelList';
@@ -8,15 +8,16 @@ import ScheduleModal from './components/ScheduleModal';
 import APInstructionsModal from './components/APInstructionsModal';
 import StatusMessage from './components/StatusMessage';
 import ResetSettingsButton from './components/ResetSettingsButton';
-import { AVAILABLE_MODULE_TYPES } from './constants';
+import { useModuleTypes } from './hooks/useModuleTypes';
 import GitHubIcon from './assets/GitHubIcon';
 import BorderWidthIcon from './assets/BorderWidthIcon';
 import PreferencesIcon from './assets/PreferencesIcon';
-import PrintIcon from './assets/PrintIcon';
+
 
 function App() {
   const [wifiMode, setWifiMode] = useState(null); // null = checking, 'client' = normal, 'ap' = setup mode
   const [wifiStatus, setWifiStatus] = useState(null); // WiFi connection status
+  const { moduleTypes } = useModuleTypes();
   const [settings, setSettings] = useState({
     timezone: '',
     latitude: 0,
@@ -41,7 +42,6 @@ function App() {
   const [showAPInstructions, setShowAPInstructions] = useState(false);
 
   // Debounce timers for module updates
-  const moduleUpdateTimers = useRef({});
   // Debounce timer for location search (respects Nominatim 1 req/sec limit)
   const locationSearchTimer = useRef(null);
 
@@ -288,7 +288,7 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           type: moduleType,
-          name: name || `${AVAILABLE_MODULE_TYPES.find((m) => m.id === moduleType)?.label || moduleType}`,
+          name: name || `${moduleTypes.find((m) => m.id === moduleType)?.label || moduleType}`,
           config: getDefaultConfig(moduleType),
         }),
       });
@@ -307,7 +307,7 @@ function App() {
     }
   };
 
-  const updateModule = async (moduleId, updates, immediate = false) => {
+  const updateModule = async (moduleId, updates) => {
     try {
       const targetModule = modules[moduleId];
       if (!targetModule) {
@@ -518,7 +518,7 @@ function App() {
       await fetch('/api/wifi/ap-mode', { method: 'POST' });
       setStatus({ type: 'success', message: 'AP mode activating...' });
       setShowAPInstructions(true);
-    } catch (err) {
+    } catch {
       setStatus({ type: 'error', message: 'Failed to activate AP mode' });
     }
   };
