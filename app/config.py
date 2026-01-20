@@ -16,7 +16,6 @@ class WebhookConfig(BaseModel):
     headers: Dict[str, str] = {}
     body: Optional[str] = None
     json_path: Optional[str] = None
-    label: str = "Webhook"
 
 
 class NewsConfig(BaseModel):
@@ -40,7 +39,6 @@ class EmailConfig(BaseModel):
 
 class TextConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    label: str = "Note"
     content: str = ""
 
 
@@ -60,7 +58,6 @@ class QRCodeConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
     qr_type: str = "url"  # text, url, wifi, contact, phone, sms, email
     content: str = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"  # Main content (URL, text, phone number, etc.)
-    label: str = "QR Code"  # Header label for the printout
     
     # WiFi-specific fields
     wifi_ssid: str = ""
@@ -97,7 +94,6 @@ class CalendarSource(BaseModel):
 class CalendarConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
     ical_sources: List[CalendarSource] = []
-    label: str = "My Calendar"
     days_to_show: int = 2  # 1=Today, 2=Today+Tomorrow
 
 
@@ -196,7 +192,7 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             id=DEFAULT_TEXT_ID,
             type="text",
             name="Note",
-            config={"label": "Note", "content": ""},
+            config={"content": ""},
         ),
         DEFAULT_CHECKLIST_ID: ModuleInstance(
             id=DEFAULT_CHECKLIST_ID,

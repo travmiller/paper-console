@@ -136,11 +136,6 @@ const ModuleConfig = ({ module, updateConfig }) => {
     return (
       <div className='space-y-4'>
         <div>
-          <label className={labelClass}>Label</label>
-          <input type='text' value={config.label || ''} onChange={(e) => updateConfig('label', e.target.value)} className={inputClass} placeholder='e.g. Dad Jokes' />
-        </div>
-
-        <div>
           <label className={labelClass}>Quick Presets</label>
           <div className='flex flex-wrap gap-2'>
             <button
@@ -496,10 +491,6 @@ const ModuleConfig = ({ module, updateConfig }) => {
     return (
       <div className='space-y-3'>
         <div>
-          <label className={labelClass}>Label</label>
-          <input type='text' value={config.label || ''} onChange={(e) => updateConfig('label', e.target.value)} className={inputClass} />
-        </div>
-        <div>
           <label className={labelClass}>Content</label>
           <textarea
             value={config.content || ''}
@@ -731,17 +722,6 @@ const ModuleConfig = ({ module, updateConfig }) => {
     
     return (
       <div className='space-y-4'>
-        <div>
-          <label className={labelClass}>Label</label>
-          <input
-            type='text'
-            value={config.label || ''}
-            onChange={(e) => updateConfig('label', e.target.value)}
-            className={inputClass}
-            placeholder='e.g. WiFi, My Contact'
-          />
-        </div>
-        
         <div>
           <label className={labelClass}>QR Code Type</label>
           <select

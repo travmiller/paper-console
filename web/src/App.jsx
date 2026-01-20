@@ -274,9 +274,9 @@ function App() {
       email: { email_host: 'imap.gmail.com', email_user: '', email_password: '', polling_interval: 60 },
       games: { difficulty: 'medium' },
       astronomy: {},
-      calendar: { ical_sources: [], label: 'My Calendar', days_to_show: 2 },
-      webhook: { label: 'Webhook', url: '', method: 'GET', headers: {}, json_path: '' },
-      text: { label: 'Note', content: '' },
+      calendar: { ical_sources: [], days_to_show: 2 },
+      webhook: { url: '', method: 'GET', headers: {}, json_path: '' },
+      text: { content: '' },
     };
     return defaults[moduleType] || {};
   };

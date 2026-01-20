@@ -74,7 +74,7 @@ def format_qrcode_receipt(printer: PrinterDriver, config: dict, module_name: str
     """Print a QR code based on configuration."""
     qr_config = QRCodeConfig(**config) if isinstance(config, dict) else config
     
-    header_label = module_name or qr_config.label or "QR CODE"
+    header_label = module_name or "QR CODE"
     
     printer.print_header(header_label)
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))

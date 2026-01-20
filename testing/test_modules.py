@@ -46,7 +46,7 @@ modules_to_test = [
     ("Sudoku", lambda: sudoku.format_sudoku_receipt(printer, {"difficulty": "medium"}, "Sudoku Puzzle")),
     ("Maze", lambda: maze.format_maze_receipt(printer, {"difficulty": "medium"}, "Maze")),
     ("Weather", lambda: weather.format_weather_receipt(printer, {}, "Weather")),
-    ("Text/Note", lambda: text.format_text_receipt(printer, TextConfig(label="Test Note", content="This is a test note."), "Test Note")),
+    ("Text/Note", lambda: text.format_text_receipt(printer, TextConfig(content="This is a test note."), "Test Note")),
     ("Checklist", lambda: checklist.format_checklist_receipt(printer, {"items": [{"text": "Item 1"}, {"text": "Item 2"}]}, "Test Checklist")),
 ]
 
