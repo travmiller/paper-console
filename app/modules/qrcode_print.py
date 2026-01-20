@@ -88,8 +88,11 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
                 "default": "text"
             },
             "content": {"type": "string", "title": "Content / URL / Phone"},
-            "content": {"type": "string", "title": "Content / URL / Phone"},            
-
+            "text_content": {"type": "string", "title": "Text to Encode"},
+            "url_content": {"type": "string", "title": "URL"},
+            "email_address": {"type": "string", "title": "Email Address"},
+            "sms_phone": {"type": "string", "title": "Phone Number"},
+            "phone_number": {"type": "string", "title": "Phone Number"},
             
             # WiFi Specifics
             "wifi_ssid": {"type": "string", "title": "WiFi SSID"},
@@ -103,11 +106,20 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
         }
     },
     ui_schema={
-        "content": {
-            "ui:showWhen": {
-                "field": "qr_type",
-                "value": ["text", "url", "email", "sms", "phone"]
-            }
+        "text_content": {
+            "ui:showWhen": {"field": "qr_type", "value": "text"}
+        },
+        "url_content": {
+            "ui:showWhen": {"field": "qr_type", "value": "url"}
+        },
+        "email_address": {
+            "ui:showWhen": {"field": "qr_type", "value": "email"}
+        },
+        "sms_phone": {
+            "ui:showWhen": {"field": "qr_type", "value": "sms"}
+        },
+        "phone_number": {
+            "ui:showWhen": {"field": "qr_type", "value": "phone"}
         },
         "wifi_ssid": {
             "ui:showWhen": {"field": "qr_type", "value": "wifi"}
@@ -132,6 +144,20 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
 )
 def format_qrcode_receipt(printer: PrinterDriver, config: dict, module_name: str = None):
     """Print a QR code based on configuration."""
+    # Map independent fields to content
+    if isinstance(config, dict):
+        qtype = config.get("qr_type", "text")
+        if qtype == "text":
+            config["content"] = config.get("text_content", "")
+        elif qtype == "url":
+            config["content"] = config.get("url_content", "")
+        elif qtype == "email":
+            config["content"] = config.get("email_address", "")
+        elif qtype == "sms":
+            config["content"] = config.get("sms_phone", "")
+        elif qtype == "phone":
+            config["content"] = config.get("phone_number", "")
+            
     qr_config = QRCodeConfig(**config) if isinstance(config, dict) else config
     
     header_label = module_name or "QR CODE"
