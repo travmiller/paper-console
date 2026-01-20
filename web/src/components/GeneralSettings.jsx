@@ -43,6 +43,7 @@ const GeneralSettings = ({
   const [checkingUpdates, setCheckingUpdates] = useState(false);
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState({ type: '', message: '' });
+  const [currentVersion, setCurrentVersion] = useState(null);
 
   // Fetch current system time on mount and periodically
   useEffect(() => {
@@ -93,6 +94,23 @@ const GeneralSettings = ({
     // Refresh SSH status every 30 seconds
     const interval = setInterval(fetchSshStatus, 30000);
     return () => clearInterval(interval);
+  }, []);
+
+  // Fetch current version on mount
+  useEffect(() => {
+    const fetchCurrentVersion = async () => {
+      try {
+        const response = await fetch('/api/system/version');
+        const data = await response.json();
+        if (data.version) {
+          setCurrentVersion(data.version);
+        }
+      } catch (err) {
+        console.error('Error fetching current version:', err);
+      }
+    };
+
+    fetchCurrentVersion();
   }, []);
 
   // Format timezone to a more readable format
@@ -837,6 +855,14 @@ const GeneralSettings = ({
           <p className='text-sm text-gray-600 mb-4 '>
             Check for software updates and keep your PC-1 running the latest version.
           </p>
+
+          {/* Current Version Display */}
+          {currentVersion && (
+            <div className='mb-4 p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
+              <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Version</div>
+              <div className='text-sm font-mono font-bold text-black'>{currentVersion}</div>
+            </div>
+          )}
 
           {updateStatus && (
             <div className={`mb-4 p-3 rounded-lg text-sm ${

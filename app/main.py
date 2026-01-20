@@ -1324,6 +1324,51 @@ async def sync_system_time():
 # --- SSH MANAGEMENT API ---
 
 
+@app.get("/api/system/version")
+async def get_current_version():
+    """
+    Get the current version (git commit hash) without checking for updates.
+    """
+    try:
+        import subprocess
+        from pathlib import Path
+
+        # Get the project root directory (parent of app/)
+        project_root = Path(__file__).parent.parent
+
+        # Check if we're in a git repository
+        if not (project_root / ".git").exists():
+            return {
+                "version": "unknown",
+                "error": "Not a git repository",
+            }
+
+        # Get current commit hash (short)
+        current_commit_result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+
+        current_commit = (
+            current_commit_result.stdout.strip()
+            if current_commit_result.returncode == 0
+            else "unknown"
+        )
+
+        return {
+            "version": current_commit,
+        }
+
+    except Exception as e:
+        return {
+            "version": "unknown",
+            "error": str(e),
+        }
+
+
 @app.get("/api/system/updates/check")
 async def check_for_updates():
     """
