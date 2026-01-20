@@ -2627,36 +2627,143 @@ async def trigger_channel(position: int):
                 printer.flush_buffer()
             return
 
-        # Sort modules by order and execute each
+        # Sort modules by order
         sorted_modules = sorted(channel.modules, key=lambda m: m.order)
-
+        
+        # Separate standard and interactive modules
+        from app.module_registry import get_module
+        standard_modules = []
+        interactive_modules = []
+        
         for assignment in sorted_modules:
             module = settings.modules.get(assignment.module_id)
             if module:
-                execute_module(module)
+                module_def = get_module(module.type)
+                if module_def and getattr(module_def, "interactive", False):
+                    interactive_modules.append(module)
+                else:
+                    standard_modules.append(module)
+        
+        # 1. Execute all standard modules first
+        for module in standard_modules:
+            execute_module(module)
+            
+            # Separator between modules (unless it's the last standard one)
+            if module != standard_modules[-1]:
+                printer.feed(2)
 
-                # Check for max lines exceeded after each module
-                if (
-                    hasattr(printer, "is_max_lines_exceeded")
-                    and printer.is_max_lines_exceeded()
-                ):
-                    # Flush buffer first so content prints
-                    if hasattr(printer, "flush_buffer"):
-                        printer.flush_buffer()
+            # Check for max lines exceeded
+            if (
+                hasattr(printer, "is_max_lines_exceeded")
+                and printer.is_max_lines_exceeded()
+            ):
+                if hasattr(printer, "flush_buffer"):
+                    printer.flush_buffer()
+                printer.print_text("")
+                printer.print_text("--- MAX LENGTH REACHED ---")
+                printer.feed(1)
+                
+                # Flush again for the message
+                if hasattr(printer, "flush_buffer"):
+                    printer.flush_buffer()
+                return
 
-                    # Print message AFTER flush so it appears at the end
-                    printer.print_text("")
-                    printer.print_text("--- MAX LENGTH REACHED ---")
-                    printer.feed(1)
-
-                    # Flush again for the message (spacing is built into bitmap)
-                    if hasattr(printer, "flush_buffer"):
-                        printer.flush_buffer()
+        # 2. Handle Interactive Modules
+        if not interactive_modules:
+            # Done
+            pass
+            
+        elif len(interactive_modules) == 1:
+            # Single interactive module - run it directly
+            if standard_modules:
+                printer.feed(2)  # Separator from previous content
+            execute_module(interactive_modules[0])
+            
+        else:
+            # Multiple interactive modules - show selection menu
+            if standard_modules:
+                printer.feed(2)
+                
+            printer.print_header("SELECT APP", icon="list")
+            printer.print_line()
+            
+            # Print menu options
+            for i, module in enumerate(interactive_modules, 1):
+                # Ensure we don't exceed 7 options (8 is reserved for Exit)
+                if i > 7:
+                    break
+                printer.print_body(f"[{i}] {module.name}")
+            
+            printer.feed(1)
+            printer.print_caption("[8] Cancel")
+            printer.print_line()
+            printer.print_caption("Turn dial to select")
+            printer.feed(1)
+            
+            if hasattr(printer, "flush_buffer"):
+                printer.flush_buffer()
+            
+            # Enter special selection mode to choose the app
+            from app.selection_mode import enter_selection_mode, exit_selection_mode
+            
+            def handle_app_selection(dial_position: int):
+                # Position 8 = Cancel
+                if dial_position == 8:
+                    exit_selection_mode()
+                    # Print cancellation message
+                    from app.hardware import printer as hw_printer
+                    if hasattr(hw_printer, "reset_buffer"):
+                        hw_printer.reset_buffer()
+                    hw_printer.print_header("CANCELLED", icon="x")
+                    hw_printer.print_line()
+                    hw_printer.feed(1)
+                    if hasattr(hw_printer, "flush_buffer"):
+                        hw_printer.flush_buffer()
                     return
+                
+                # Check valid selection index (1-based)
+                idx = dial_position - 1
+                if 0 <= idx < len(interactive_modules):
+                    # Valid selection - Exit menu selection mode first
+                    exit_selection_mode()
+                    
+                    # Execute the chosen module
+                    # This module will then likely enter its OWN selection mode
+                    target_module = interactive_modules[idx]
+                    
+                    # We need to run this on the main thread via execute_module,
+                    # but we are currently in the selection callback (potentially thread pool).
+                    # Actually, execute_module just queues prints or runs logic.
+                    # The tricky part is the adventure module expects to be called to PRINT content
+                    # and enters its OWN selection mode.
+                    
+                    # We can directly call execute_module from here.
+                    # IMPORTANT: The printer buffer needs reset? Maybe.
+                    from app.hardware import printer as hw_printer
+                    if hasattr(hw_printer, "reset_buffer"):
+                        hw_printer.reset_buffer()
+                        
+                    execute_module(target_module)
+                    
+                    if hasattr(hw_printer, "flush_buffer"):
+                        hw_printer.flush_buffer()
+                        
+                else:
+                    # Invalid selection
+                    # Ideally we'd re-print or just beep, but for now we do nothing
+                    pass
 
-                # Add a separator between modules
-                if assignment != sorted_modules[-1]:
-                    printer.feed(2)
+            # Register the callback
+            # We use a special ID to indicate this is the channel meta-menu
+            enter_selection_mode(handle_app_selection, f"channel-menu-{position}")
+            
+            # Return early since we've handled the printing/logic
+            return
+
+        if hasattr(printer, "flush_buffer"):
+            printer.flush_buffer()
+
+
 
         # Flush buffer to actually print (in reverse order for tear-off orientation)
         # Spacing is built into the bitmap (5 lines at end of each print job)

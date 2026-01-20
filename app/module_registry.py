@@ -58,6 +58,7 @@ class ModuleDefinition:
     description: str
     icon: str
     offline: bool
+    interactive: bool  # New flag for dial-hijacking modules
     execute_fn: Callable
     config_schema: Optional[Dict[str, Any]] = None
     ui_schema: Optional[Dict[str, Any]] = None
@@ -75,6 +76,7 @@ def register_module(
     description: str = "",
     icon: str = "file",
     offline: bool = True,
+    interactive: bool = False,
     config_schema: Optional[Dict[str, Any]] = None,
     ui_schema: Optional[Dict[str, Any]] = None,
     config_class: Optional[type] = None,
@@ -119,6 +121,7 @@ def register_module(
             description=description,
             icon=icon,
             offline=offline,
+            interactive=interactive,
             execute_fn=fn,
             config_schema=config_schema,
             ui_schema=ui_schema,
@@ -169,6 +172,7 @@ def list_module_types() -> List[Dict[str, Any]]:
             "description": defn.description,
             "icon": defn.icon,
             "offline": defn.offline,
+            "interactive": getattr(defn, "interactive", False),
             "category": defn.category,
             "configSchema": defn.config_schema,
             "uiSchema": defn.ui_schema,

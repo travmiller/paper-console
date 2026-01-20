@@ -275,6 +275,7 @@ def _handle_menu_choice(module_id: str, dial_position: int, module_name: str):
     description="Access settings from the dial: view channels, system status, WiFi reset, factory reset",
     icon="settings",
     offline=True,
+    interactive=True,
     category="utilities",
     config_schema={
         "type": "object",

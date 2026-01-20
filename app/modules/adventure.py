@@ -347,6 +347,7 @@ def process_choice(module_id: str, dial_position: int, printer):
     description="A choose-your-own-adventure text game! Make choices with the dial, confirm with button.",
     icon="book",
     offline=True,
+    interactive=True,
     category="games",
     config_schema={
         "type": "object",
