@@ -782,7 +782,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
                 onChange={(e) => updateConfig('content', e.target.value)}
                 className={inputClass}
                 placeholder={
-                  qrType === 'url' ? 'https://example.com' :
+                  qrType === 'url' ? 'https://www.youtube.com/watch?v=dQw4w9WgXcQ' :
                   qrType === 'phone' ? '+1-555-123-4567' :
                   qrType === 'sms' ? '+1-555-123-4567' :
                   'email@example.com'

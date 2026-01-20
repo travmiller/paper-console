@@ -58,8 +58,8 @@ class ChecklistConfig(BaseModel):
 class QRCodeConfig(BaseModel):
     """Configuration for QR code generation."""
     model_config = ConfigDict(extra="ignore")
-    qr_type: str = "text"  # text, url, wifi, contact, phone, sms, email
-    content: str = ""  # Main content (URL, text, phone number, etc.)
+    qr_type: str = "url"  # text, url, wifi, contact, phone, sms, email
+    content: str = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"  # Main content (URL, text, phone number, etc.)
     label: str = "QR Code"  # Header label for the printout
     
     # WiFi-specific fields
