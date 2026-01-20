@@ -258,75 +258,9 @@ def draw_maze_image(grid: List[List[int]], cell_size: int = 8) -> Image.Image:
                     outline=None,
                 )
 
-    # Draw entrance marker (top)
-    # We need to find the entrance column in the first row
-    if rows > 0:
-        entrance_col = -1
-        for x in range(cols):
-            if grid[0][x] == 0:
-                entrance_col = x
-                break
-        
-        if entrance_col != -1:
-            entrance_x = entrance_col * cell_size
-            entrance_y = 0
-            # Draw arrow pointing down
-            draw.line(
-                [
-                    entrance_x + cell_size // 2,
-                    entrance_y,
-                    entrance_x + cell_size // 2,
-                    entrance_y + cell_size // 2,
-                ],
-                fill=0,
-                width=2,
-            )
-            # Arrow head
-            arrow_size = 3
-            arrow_x = entrance_x + cell_size // 2
-            arrow_y = entrance_y + cell_size // 2
-            draw.line(
-                [arrow_x, arrow_y, arrow_x - arrow_size, arrow_y - arrow_size],
-                fill=0,
-                width=2,
-            )
-            draw.line(
-                [arrow_x, arrow_y, arrow_x + arrow_size, arrow_y - arrow_size],
-                fill=0,
-                width=2,
-            )
+    # Entrance and exit markers (arrows) have been removed as requested.
+    # The entrance and exit cells are already drawn as white path cells in the loop above.
 
-    # Draw exit marker (bottom)
-    # We need to find the exit column in the last row
-    if rows > 0:
-        exit_col = -1
-        last_row = rows - 1
-        for x in range(cols):
-            if grid[last_row][x] == 0:
-                exit_col = x
-                break
-        
-        if exit_col != -1:
-            exit_x = exit_col * cell_size
-            exit_y = (rows - 1) * cell_size
-            # Draw arrow pointing down
-            arrow_x = exit_x + cell_size // 2
-            arrow_y = exit_y + cell_size - cell_size // 2
-            draw.line(
-                [arrow_x, arrow_y - cell_size // 2, arrow_x, arrow_y], fill=0, width=2
-            )
-            # Arrow head pointing down
-            arrow_size = 3
-            draw.line(
-                [arrow_x, arrow_y, arrow_x - arrow_size, arrow_y - arrow_size],
-                fill=0,
-                width=2,
-            )
-            draw.line(
-                [arrow_x, arrow_y, arrow_x + arrow_size, arrow_y - arrow_size],
-                fill=0,
-                width=2,
-            )
             
     return image
 
