@@ -436,8 +436,8 @@ class PrinterDriver:
     def _get_left_margin(self) -> int:
         """Get the left margin, which increases when in selection mode."""
         if app.selection_mode.is_selection_mode_active():
-            # 8px bar + 4px gap + 2px standard margin
-            return 14
+            # 2px dashed line + 6px gap + 2px standard margin
+            return 10
         return 2
 
     def _get_content_width(self) -> int:
@@ -802,18 +802,21 @@ class PrinterDriver:
         
         # Draw Selection Mode Visual Indicator
         if app.selection_mode.is_selection_mode_active():
-            # Draw a solid black bar along the left side
-            # From cutter feed start to end of content
-            # x=0 to x=6 (7px wide? or 0-6 is 7px? 0..5 is 6px.)
-            # Using same width as loop: 6px width -> x2 = 6 (0,1,2,3,4,5).
+            # Draw a thin dashed line along the left side
+            # 2px wide, dashed
             
-            # The bar should span the content area
-            # Note: Before rotation, this is the "bottom" part of the image (y range [cutter_feed, current_y])
-            # After rotation, it becomes the "top" part of the paper.
-            draw.rectangle(
-                [0, self.cutter_feed_dots, 6, current_y], 
-                fill=0
-            )
+            line_x = 0
+            line_width = 2
+            dash_length = 8
+            gap_length = 4
+            
+            for y in range(self.cutter_feed_dots, current_y, dash_length + gap_length):
+                segment_end = min(y + dash_length, current_y)
+                if segment_end > y:
+                    draw.rectangle(
+                        [line_x, y, line_x + line_width - 1, segment_end - 1], 
+                        fill=0
+                    )
 
         # Rotate
         img = img.rotate(180)
