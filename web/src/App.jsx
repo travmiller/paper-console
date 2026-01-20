@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import WiFiSetup from './WiFiSetup';
 import GeneralSettings from './components/GeneralSettings';
 import ChannelList from './components/ChannelList';
-import ModuleTestList from './components/ModuleTestList';
 import AddModuleModal from './components/AddModuleModal';
 import EditModuleModal from './components/EditModuleModal';
 import ScheduleModal from './components/ScheduleModal';
@@ -33,7 +32,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [activeTab, setActiveTab] = useState('channels'); // 'general', 'channels', 'test'
+  const [activeTab, setActiveTab] = useState('channels'); // 'general', 'channels'
   const [showAddModuleModal, setShowAddModuleModal] = useState(null); // channel position or null
   const [showEditModuleModal, setShowEditModuleModal] = useState(null); // module ID or null
   const [editingModule, setEditingModule] = useState(null); // Local copy of module being edited
@@ -195,24 +194,6 @@ function App() {
     }
   };
 
-  const triggerModulePrint = async (moduleId) => {
-    try {
-      const response = await fetch(`/debug/print-module/${moduleId}`, { method: 'POST' });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Failed to trigger print' }));
-        throw new Error(errorData.detail || 'Failed to trigger print');
-      }
-
-      const data = await response.json();
-      setStatus({ type: 'success', message: data.message || 'Printing module...' });
-      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
-    } catch (err) {
-      console.error('Error triggering module print:', err);
-      setStatus({ type: 'error', message: err.message || 'Failed to trigger print' });
-      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
-    }
-  };
 
   // --- Settings Save ---
 
@@ -582,26 +563,6 @@ function App() {
           <BorderWidthIcon className='w-4 h-4' />
           CHANNELS
         </button>
-        <button
-          type='button'
-          onClick={() => setActiveTab('test')}
-          className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
-            activeTab === 'test' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
-          }`}
-          style={
-            activeTab === 'test'
-              ? { borderColor: 'var(--color-border-main)', color: 'var(--color-text-main)' }
-              : { color: 'var(--color-text-muted)' }
-          }
-          onMouseEnter={(e) => {
-            if (activeTab !== 'test') e.currentTarget.style.color = 'var(--color-text-main)';
-          }}
-          onMouseLeave={(e) => {
-            if (activeTab !== 'test') e.currentTarget.style.color = 'var(--color-text-muted)';
-          }}>
-          <PrintIcon className='w-4 h-4' />
-          TEST
-        </button>
       </div>
 
       <div className='contents'>
@@ -650,16 +611,6 @@ function App() {
           />
         )}
 
-        {activeTab === 'test' && (
-          <ModuleTestList
-            settings={settings}
-            modules={modules}
-            triggerModulePrint={triggerModulePrint}
-            wifiStatus={wifiStatus}
-            setShowEditModuleModal={setShowEditModuleModal}
-            setEditingModule={setEditingModule}
-          />
-        )}
 
         <AddModuleModal
           channelPosition={showAddModuleModal}
