@@ -34,8 +34,10 @@ class AdventureState:
 
 def _get_state_path(module_id: str) -> Path:
     """Get the path to save game state for a specific module instance."""
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    state_dir = Path(base_dir) / "app" / "data" / "adventure_saves"
+    # __file__ is app/modules/adventure.py
+    # Go up one dir to app/, then into data/adventure_saves/
+    module_dir = Path(__file__).parent  # app/modules/
+    state_dir = module_dir.parent / "data" / "adventure_saves"  # app/data/adventure_saves/
     state_dir.mkdir(parents=True, exist_ok=True)
     return state_dir / f"{module_id}.json"
 
@@ -74,8 +76,10 @@ def reset_state(module_id: str) -> AdventureState:
 
 def _get_story_path() -> Path:
     """Get the path to the adventure story file."""
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return Path(base_dir) / "app" / "data" / "adventure_story.json"
+    # __file__ is app/modules/adventure.py
+    # Go up one dir to app/, then into data/
+    module_dir = Path(__file__).parent  # app/modules/
+    return module_dir.parent / "data" / "adventure_story.json"  # app/data/adventure_story.json
 
 
 def load_story() -> Dict[str, Any]:
