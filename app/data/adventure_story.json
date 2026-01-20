@@ -1,0 +1,439 @@
+{
+  "meta": {
+    "title": "The Dark Cave",
+    "author": "PC-1 Adventure System",
+    "version": "1.0"
+  },
+  "nodes": {
+    "start": {
+      "text": "You stand at the mouth of a dark cave. A cool breeze carries the scent of earth and something else... adventure? The morning sun warms your back, but shadows beckon from within.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Light your torch and enter",
+          "next": "cave_entrance"
+        },
+        {
+          "dial": 2,
+          "text": "Search the ground outside",
+          "next": "search_outside"
+        },
+        {
+          "dial": 3,
+          "text": "Call out into the darkness",
+          "next": "call_out"
+        }
+      ]
+    },
+    "cave_entrance": {
+      "text": "Your torch flickers to life, casting dancing shadows on ancient stone walls. The passage splits ahead - one path slopes downward into darkness, the other winds upward. You hear dripping water from the lower path.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Take the downward path",
+          "next": "underground_river"
+        },
+        {
+          "dial": 2,
+          "text": "Climb the upper path",
+          "next": "crystal_chamber"
+        },
+        {
+          "dial": 3,
+          "text": "Examine the cave walls",
+          "next": "wall_paintings"
+        }
+      ]
+    },
+    "search_outside": {
+      "text": "Among the rocks and weeds, you find a rusty key half-buried in the dirt. It looks old, perhaps centuries old. There's an inscription but it's too worn to read.",
+      "set_flag": "has_key",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Pocket the key and enter",
+          "next": "cave_entrance"
+        },
+        {
+          "dial": 2,
+          "text": "Leave the key, enter cave",
+          "next": "cave_entrance"
+        },
+        {
+          "dial": 3,
+          "text": "Examine the key closer",
+          "next": "examine_key"
+        }
+      ]
+    },
+    "examine_key": {
+      "text": "The key is made of bronze, green with age. The inscription seems to read '...treasure of the...' but the rest is illegible. It feels significant somehow.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Keep it and enter cave",
+          "next": "cave_entrance"
+        }
+      ]
+    },
+    "call_out": {
+      "text": "\"HELLO?\" Your voice echoes deep into the cave. For a moment, silence. Then... something stirs in the darkness. Heavy footsteps approach. You see two glowing eyes!",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Stand your ground",
+          "next": "face_guardian"
+        },
+        {
+          "dial": 2,
+          "text": "Run inside past it!",
+          "next": "run_past"
+        },
+        {
+          "dial": 3,
+          "text": "Flee back to safety",
+          "next": "flee_ending"
+        }
+      ]
+    },
+    "face_guardian": {
+      "text": "A massive stone golem emerges, but stops when it sees you. \"A visitor after all these years,\" it rumbles. \"Seek you the treasure? Only the worthy may pass.\"",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "\"I am worthy!\"",
+          "next": "golem_test"
+        },
+        {
+          "dial": 2,
+          "text": "\"What treasure?\"",
+          "next": "golem_lore"
+        },
+        {
+          "dial": 3,
+          "text": "Attack the golem!",
+          "next": "bad_ending_golem"
+        }
+      ]
+    },
+    "golem_lore": {
+      "text": "\"Long ago, a great wizard hid his grimoire here. Many have tried to claim it. All have failed. The crystal chamber holds the answer, but only for those who truly see.\"",
+      "set_flag": "knows_secret",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "\"I am worthy!\"",
+          "next": "golem_test"
+        },
+        {
+          "dial": 2,
+          "text": "Thank it and proceed",
+          "next": "cave_entrance"
+        }
+      ]
+    },
+    "golem_test": {
+      "text": "\"Answer this: What has roots nobody sees, is taller than trees, up up it goes, yet never grows?\"",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "\"A mountain!\"",
+          "next": "golem_correct"
+        },
+        {
+          "dial": 2,
+          "text": "\"A tower!\"",
+          "next": "golem_wrong"
+        },
+        {
+          "dial": 3,
+          "text": "\"I don't know.\"",
+          "next": "golem_wrong"
+        }
+      ]
+    },
+    "golem_correct": {
+      "text": "The golem nods slowly. \"You may pass, and I grant you this blessing.\" A warm light envelops you. You feel stronger, wiser. The golem steps aside, revealing a hidden passage.",
+      "set_flag": "golem_blessing",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Take the hidden passage",
+          "next": "treasure_room"
+        },
+        {
+          "dial": 2,
+          "text": "Enter the main cave",
+          "next": "cave_entrance"
+        }
+      ]
+    },
+    "golem_wrong": {
+      "text": "\"Incorrect.\" The golem's eyes dim. \"You may still enter, but the easy path is not for you.\" It moves aside, blocking a hidden passage you briefly glimpsed.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Enter the main cave",
+          "next": "cave_entrance"
+        }
+      ]
+    },
+    "run_past": {
+      "text": "You sprint into the darkness! The creature swipes at you but misses. You tumble down a slope and land in an underground river. Cold water rushes around you.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Swim with the current",
+          "next": "river_ride"
+        },
+        {
+          "dial": 2,
+          "text": "Grab a rock, climb out",
+          "next": "underground_river"
+        }
+      ]
+    },
+    "underground_river": {
+      "text": "The river flows through a vast cavern, lit by glowing mushrooms. Fish dart beneath crystal-clear water. On a small island in the middle, you see a chest!",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Wade to the island",
+          "next": "chest_approach"
+        },
+        {
+          "dial": 2,
+          "text": "Follow river downstream",
+          "next": "river_ride"
+        },
+        {
+          "dial": 3,
+          "text": "Eat some mushrooms",
+          "next": "mushroom_vision"
+        }
+      ]
+    },
+    "chest_approach": {
+      "text": "The chest is ornate but locked. There's a keyhole shaped like... a bronze key? The chest is cold to the touch.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Try the rusty key",
+          "next": "chest_open",
+          "requires_flag": "has_key"
+        },
+        {
+          "dial": 1,
+          "text": "Force it open",
+          "next": "chest_trap",
+          "requires_not_flag": "has_key"
+        },
+        {
+          "dial": 2,
+          "text": "Leave it alone",
+          "next": "underground_river"
+        }
+      ]
+    },
+    "chest_open": {
+      "text": "The key fits perfectly! Inside you find a glowing amulet and a map. The map shows a treasure room behind the crystal chamber. The amulet pulses with warmth.",
+      "set_flag": "has_amulet",
+      "set_flag2": "has_map",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Head to crystal chamber",
+          "next": "crystal_chamber"
+        }
+      ]
+    },
+    "chest_trap": {
+      "text": "As you pry at the lock, a needle jabs your finger! Poison! Your vision blurs... When you wake, the chest is gone. Was it ever real? You feel weakened.",
+      "set_flag": "poisoned",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Continue exploring",
+          "next": "underground_river"
+        }
+      ]
+    },
+    "mushroom_vision": {
+      "text": "The mushroom tastes earthy. Colors swirl. You see visions of an ancient wizard hiding a book, speaking words of power. \"Only through crystal truth shall the path be revealed.\" The vision fades.",
+      "set_flag": "had_vision",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Seek the crystals",
+          "next": "crystal_chamber"
+        },
+        {
+          "dial": 2,
+          "text": "Rest by the river",
+          "next": "underground_river"
+        }
+      ]
+    },
+    "river_ride": {
+      "text": "The current carries you through twisting tunnels. Light appears ahead! You emerge at a beautiful waterfall inside the mountain. Behind the falls, you spot a cave entrance.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Enter the hidden cave",
+          "next": "treasure_room"
+        },
+        {
+          "dial": 2,
+          "text": "Climb up the waterfall",
+          "next": "crystal_chamber"
+        }
+      ]
+    },
+    "crystal_chamber": {
+      "text": "Massive crystals fill this chamber, refracting your torchlight into rainbows. In the center, a pedestal holds a strange mirror. Your reflection looks... different somehow.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Look in the mirror",
+          "next": "mirror_look"
+        },
+        {
+          "dial": 2,
+          "text": "Touch a crystal",
+          "next": "crystal_touch"
+        },
+        {
+          "dial": 3,
+          "text": "Search for hidden doors",
+          "next": "find_secret",
+          "requires_flag": "has_map"
+        }
+      ]
+    },
+    "mirror_look": {
+      "text": "The mirror shows not your face, but a door behind you that isn't really there. Or is it? When you turn, a faint outline shimmers in the crystal wall.",
+      "set_flag": "saw_door",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Reach for the wall",
+          "next": "find_secret"
+        },
+        {
+          "dial": 2,
+          "text": "Examine the pedestal",
+          "next": "pedestal_secret"
+        }
+      ]
+    },
+    "crystal_touch": {
+      "text": "The crystal hums at your touch. Energy flows through you! You feel a connection to the cave itself, sensing its passages and secrets. A hidden room lies behind the east wall.",
+      "set_flag": "crystal_bonded",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Find the hidden room",
+          "next": "treasure_room"
+        },
+        {
+          "dial": 2,
+          "text": "Take a crystal shard",
+          "next": "take_shard"
+        }
+      ]
+    },
+    "take_shard": {
+      "text": "You break off a small crystal. It glows softly in your hand - a permanent light source. The cave seems to sigh, but doesn't object.",
+      "set_flag": "has_shard",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Find the hidden room",
+          "next": "treasure_room"
+        }
+      ]
+    },
+    "pedestal_secret": {
+      "text": "The pedestal has a small drawer! Inside: a note reading \"The worthy see beyond reflections\" and a tiny silver key.",
+      "set_flag": "has_silver_key",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Go through shimmer wall",
+          "next": "treasure_room"
+        }
+      ]
+    },
+    "find_secret": {
+      "text": "Your hand passes through what seemed solid stone! It's an illusion. Beyond lies a passage lined with gold-flecked marble.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Enter the passage",
+          "next": "treasure_room"
+        }
+      ]
+    },
+    "wall_paintings": {
+      "text": "Ancient paintings cover the walls! They tell of a wizard who sought to preserve forbidden knowledge. The final panel shows the treasure room... guarded by a riddle lock.",
+      "set_flag": "knows_riddle",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Continue into cave",
+          "next": "cave_entrance"
+        }
+      ]
+    },
+    "treasure_room": {
+      "text": "You've found it! A vast chamber filled with gold coins, jewels, and ancient artifacts. In the center, on a stone lectern, rests a leather-bound grimoire radiating power.",
+      "choices": [
+        {
+          "dial": 1,
+          "text": "Take the grimoire",
+          "next": "grimoire_take"
+        },
+        {
+          "dial": 2,
+          "text": "Fill pockets with gold",
+          "next": "gold_ending"
+        },
+        {
+          "dial": 3,
+          "text": "Read the grimoire here",
+          "next": "read_grimoire"
+        }
+      ]
+    },
+    "grimoire_take": {
+      "text": "As your hands close on the grimoire, knowledge floods your mind! Ancient spells, forgotten lore, secrets of the universe. You've claimed the wizard's legacy.",
+      "ending": true,
+      "ending_type": "victory",
+      "choices": []
+    },
+    "gold_ending": {
+      "text": "You fill your pockets and bags with treasure. Rich beyond imagination! As you turn to leave, you notice the grimoire has vanished. Wealth is yours, but wisdom remains hidden.",
+      "ending": true,
+      "ending_type": "partial",
+      "choices": []
+    },
+    "read_grimoire": {
+      "text": "The first page reads: \"Knowledge shared is knowledge multiplied.\" As you read aloud, the treasure transforms into copies of the book. They scatter magically across the world, enlightening all humanity. You've transcended mere treasure.",
+      "ending": true,
+      "ending_type": "perfect",
+      "choices": []
+    },
+    "bad_ending_golem": {
+      "text": "Your weapon shatters against living stone. The golem's fist crashes down. In the darkness, you wonder if the treasure was ever real...",
+      "ending": true,
+      "ending_type": "death",
+      "choices": []
+    },
+    "flee_ending": {
+      "text": "You run from the cave, never looking back. Years later, you wonder what might have been. The cave's secrets remain hidden, waiting for a braver soul.",
+      "ending": true,
+      "ending_type": "flee",
+      "choices": []
+    }
+  }
+}

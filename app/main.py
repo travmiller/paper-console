@@ -213,13 +213,45 @@ def on_button_press_threadsafe():
 
     try:
         if global_loop and global_loop.is_running():
-            asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
+            # Check for selection mode (adventure game, etc.)
+            from app.modules.adventure import is_selection_mode_active, handle_selection
+            if is_selection_mode_active():
+                # In selection mode: use dial position as choice input
+                position = dial.read_position()
+                asyncio.run_coroutine_threadsafe(
+                    handle_selection_async(position), global_loop
+                )
+            else:
+                # Normal mode: trigger the current channel
+                asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
         else:
             # Loop not running, reset flag
             with print_lock:
                 print_in_progress = False
     except Exception:
         # Failed to schedule, reset flag
+        with print_lock:
+            print_in_progress = False
+
+
+async def handle_selection_async(dial_position: int):
+    """
+    Async wrapper to handle selection mode input.
+    Runs blocking operations in a thread pool.
+    """
+    global print_in_progress
+    from concurrent.futures import ThreadPoolExecutor
+    from app.modules.adventure import handle_selection
+
+    def _do_selection():
+        handle_selection(dial_position)
+
+    try:
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _do_selection)
+    finally:
+        # Always mark print as complete
         with print_lock:
             print_in_progress = False
 
