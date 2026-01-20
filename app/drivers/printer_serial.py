@@ -634,6 +634,7 @@ class PrinterDriver:
         if qr_width > max_qr_width:
              # re-sim resize
              scale_factor = max_qr_width / qr_width
+             qr_width = int(qr_width * scale_factor)
              qr_height = int(qr_height * scale_factor)
 
         if not dry_run and img:
@@ -642,7 +643,7 @@ class PrinterDriver:
             
             # Since we recalculated qr_width/qr_height for constraint, use it for resize
             if qr_img.width > max_qr_width:
-                qr_img = qr_img.resize((qr_width, qr_height), Image.LANCZOS)
+                qr_img = qr_img.resize((qr_width, qr_height), Image.NEAREST)
             
             qr_x = (self.PRINTER_WIDTH_DOTS - qr_width) // 2
             qr_y = y + self.SPACING_SMALL
@@ -919,7 +920,7 @@ class PrinterDriver:
 
             # Use version 1 and let it auto-fit, then resize for consistency
             # Generate at higher resolution (box_size) for better quality when scaling
-            box_size = max(size, 8) if fixed_size else 10
+            box_size = max(size, 8) if fixed_size else size
             qr = qrcode.QRCode(
                 version=1,
                 error_correction=ec_level,
