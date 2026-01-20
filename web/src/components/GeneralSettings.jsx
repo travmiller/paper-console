@@ -865,7 +865,7 @@ const GeneralSettings = ({
             </div>
           )}
 
-          {updateStatus && (
+          {updateStatus && !installingUpdate && (
             <div className={`mb-4 p-3 rounded-lg text-sm ${
               updateStatus.up_to_date 
                 ? 'bg-gray-100 text-black' 
@@ -888,13 +888,9 @@ const GeneralSettings = ({
             </div>
           )}
 
-          {updateMessage.message && (
-            <div className={`mb-4 p-3 rounded-lg text-sm border-2 ${
-              updateMessage.type === 'success' 
-                ? 'bg-gray-100 text-black border-black' 
-                : 'bg-white text-black border-black border-dashed'
-            }`}>
-              {updateMessage.type === 'error' && <span className='font-bold mr-2'>ERROR:</span>}
+          {updateMessage.message && !installingUpdate && updateMessage.type === 'error' && (
+            <div className='mb-4 p-3 rounded-lg text-sm border-2 bg-white text-black border-black border-dashed'>
+              <span className='font-bold mr-2'>ERROR:</span>
               {updateMessage.message}
             </div>
           )}
@@ -951,12 +947,6 @@ const GeneralSettings = ({
                   setUpdateMessage({ type: '', message: '' });
                   setUpdateProgress({ stage: 'Installing update...', progress: 10 });
                   
-                  // Show initial message
-                  setUpdateMessage({ 
-                    type: 'success', 
-                    message: 'Installing update... The device will restart shortly.' 
-                  });
-                  
                   try {
                     // Simulate progress during installation
                     const progressInterval = setInterval(() => {
@@ -978,10 +968,6 @@ const GeneralSettings = ({
                     const data = await response.json();
                     if (data.success) {
                       setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
-                      setUpdateMessage({ 
-                        type: 'success', 
-                        message: 'Update installed! The device is restarting. Refreshing page...' 
-                      });
                       setUpdateStatus(null);
                     } else {
                       setUpdateProgress({ stage: '', progress: 0 });
@@ -992,10 +978,6 @@ const GeneralSettings = ({
                   } catch (err) {
                     // Network error is expected during restart - treat as success
                     setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
-                    setUpdateMessage({ 
-                      type: 'success', 
-                      message: 'Update installed! The device is restarting. Refreshing page...' 
-                    });
                     setUpdateStatus(null);
                   }
                   
@@ -1065,7 +1047,6 @@ const GeneralSettings = ({
                   }, 5000); // Wait 5 seconds before starting checks (give service time to restart)
                 }}
                 disabled={installingUpdate}
-                loading={installingUpdate}
                 className='flex-1'>
                 Install Update
               </PrimaryButton>
