@@ -680,10 +680,14 @@ class PrinterDriver:
                 )
                 # QR code is now below text, so add heights together
                 # text_height + spacing + QR code + spacing
+                # Note: rendering starts at y + 2, and block_height = text_y - (y + 2)
+                # So block_height includes all content from the +2 offset
                 if qr_img:
+                    # Total content height: text + spacing + QR + spacing
                     block_height = text_height + self.SPACING_SMALL + qr_size + self.SPACING_SMALL
                 else:
                     block_height = text_height + self.SPACING_SMALL
+                # Add SPACING_MEDIUM for separation between modules (matches rendering: y += block_height + SPACING_MEDIUM)
                 total_height += block_height + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "qr":
@@ -1160,7 +1164,10 @@ class PrinterDriver:
                     # If no QR code, just add a small gap
                     text_y += self.SPACING_SMALL
 
+                # Calculate block height: text_y includes all content and spacing
+                # text_y started at (y + 2), so block_height = text_y - (y + 2) gives total content height
                 block_height = text_y - (y + 2)
+                # Add SPACING_MEDIUM for separation between modules (consistent with other block types)
                 y += block_height + self.SPACING_MEDIUM
             elif op_type == "qr":
                 qr_img = op_data.get("_qr_img")
