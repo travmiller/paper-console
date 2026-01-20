@@ -118,7 +118,7 @@ async def email_polling_loop():
                 try:
                     # Run email fetching and printing in thread pool to avoid blocking event loop
                     from concurrent.futures import ThreadPoolExecutor
-                    
+
                     def _fetch_and_print_email():
                         # Fetch emails (blocking IMAP operation)
                         emails = email_client.fetch_emails(module.config)
@@ -138,7 +138,7 @@ async def email_polling_loop():
                             # Flush to hardware (spacing is built into bitmap)
                             if hasattr(printer, "flush_buffer"):
                                 printer.flush_buffer()
-                    
+
                     loop = asyncio.get_event_loop()
                     with ThreadPoolExecutor() as executor:
                         await loop.run_in_executor(executor, _fetch_and_print_email)
@@ -182,6 +182,7 @@ async def scheduler_loop():
 
 # Print state tracking with proper thread synchronization
 import threading
+
 print_lock = threading.Lock()
 print_in_progress = False
 last_print_time = 0.0
@@ -200,12 +201,12 @@ def on_button_press_threadsafe():
         # Check if print is already in progress
         if print_in_progress:
             return
-        
+
         # Debounce: ignore presses that come too quickly after the last one
         current_time = time.time()
         if (current_time - last_print_time) < PRINT_DEBOUNCE_SECONDS:
             return
-        
+
         # Set flag immediately to prevent multiple clicks
         print_in_progress = True
         last_print_time = current_time
@@ -238,7 +239,7 @@ async def print_setup_instructions():
     Runs blocking printer operations in a thread pool to avoid blocking the event loop.
     """
     from concurrent.futures import ThreadPoolExecutor
-    
+
     try:
         # Run blocking printer operations in thread pool to avoid blocking event loop
         loop = asyncio.get_event_loop()
@@ -281,39 +282,43 @@ async def check_first_boot():
             if not is_first_boot:
                 # Visual header with inline icon (no feed before - content starts immediately)
                 printer.print_header("SYSTEM READY", icon="check", icon_size=28)
-                
+
                 from datetime import datetime
+
                 printer.print_bold(datetime.now().strftime("%A, %B %d, %Y"))
                 printer.print_bold(datetime.now().strftime("%I:%M %p"))
-                
+
                 printer.print_line()
-                
+
                 # Show channel assignments
                 printer.print_subheader("CHANNELS")
-                
+
                 import app.config as config_module
+
                 settings = config_module.settings
-                
+
                 # Show all 8 channels
                 for channel_num in range(1, 9):
                     channel = settings.channels.get(channel_num)
                     if channel and channel.modules:
                         # Get module names
                         module_names = []
-                        for mod_assignment in sorted(channel.modules, key=lambda m: m.order):
+                        for mod_assignment in sorted(
+                            channel.modules, key=lambda m: m.order
+                        ):
                             module_id = mod_assignment.module_id
                             if module_id in settings.modules:
                                 module = settings.modules[module_id]
                                 module_names.append(module.name)
-                        
+
                         if module_names:
                             modules_str = " + ".join(module_names)
                             printer.print_body(f"  {channel_num}. {modules_str}")
                     else:
                         printer.print_caption(f"  {channel_num}. (empty)")
-                
+
                 printer.print_line()
-                
+
                 # Flush buffer (spacing is built into bitmap)
                 if hasattr(printer, "flush_buffer"):
                     printer.flush_buffer()
@@ -337,17 +342,17 @@ async def check_first_boot():
                 # Welcome header with icon (no feed before - content starts immediately)
                 printer.print_header("WELCOME")
                 printer.print_icon("home", size=56)
-                
+
                 printer.print_bold("PC-1 Paper Console")
                 printer.print_body("Your personal printer for")
                 printer.print_body("weather, news, puzzles,")
                 printer.print_body("and more.")
                 printer.print_line()
-                
+
                 # Setup instructions
                 printer.print_subheader("SETUP INSTRUCTIONS")
                 printer.print_line()
-                
+
                 # Step 1
                 printer.print_bold("STEP 1: CONNECT TO WIFI")
                 printer.print_icon("wifi", size=32)
@@ -357,7 +362,7 @@ async def check_first_boot():
                 printer.print_bold(f"  {ssid}")
                 printer.print_caption("  Password: setup1234")
                 printer.print_line()
-                
+
                 # Step 2
                 printer.print_bold("STEP 2: OPEN SETUP PAGE")
                 printer.print_icon("arrow_right", size=32)
@@ -366,7 +371,7 @@ async def check_first_boot():
                 printer.print_bold("  http://10.42.0.1")
                 printer.print_caption("  (or http://pc-1.local)")
                 printer.print_line()
-                
+
                 # Step 3
                 printer.print_bold("STEP 3: CONFIGURE WIFI")
                 printer.print_icon("settings", size=32)
@@ -374,7 +379,7 @@ async def check_first_boot():
                 printer.print_body("enter the password.")
                 printer.print_caption("PC-1 will remember it.")
                 printer.print_line()
-                
+
                 # After setup section
                 printer.print_subheader("AFTER SETUP")
                 printer.print_line()
@@ -382,7 +387,7 @@ async def check_first_boot():
                 printer.print_body("channel, then press the")
                 printer.print_body("button to print!")
                 printer.print_line()
-                
+
                 printer.print_bold("Example Channels:")
                 printer.print_body("  • Weather forecast")
                 printer.print_body("  • News headlines")
@@ -390,11 +395,11 @@ async def check_first_boot():
                 printer.print_body("  • Sudoku puzzle")
                 printer.print_body("  • Calendar events")
                 printer.print_line()
-                
+
                 printer.print_caption("Customize channels at:")
                 printer.print_bold("  http://pc-1.local")
                 printer.print_line()
-                
+
                 printer.print_subheader("QUICK HELP")
                 printer.print_body("Button 5s = WiFi setup")
                 printer.print_body("Button 15s = Reset all")
@@ -466,7 +471,7 @@ async def manual_ap_mode_trigger():
     """Manually trigger AP mode (e.g. via button hold 5-15 seconds)."""
     logger = logging.getLogger(__name__)
     logger.info("Manual AP mode trigger initiated")
-    
+
     # Print instructions BEFORE switching network mode
     await print_setup_instructions()
 
@@ -475,7 +480,7 @@ async def manual_ap_mode_trigger():
 
     logger.info("Starting AP mode...")
     success = wifi_manager.start_ap_mode()
-    
+
     if success:
         logger.info("AP mode started successfully")
     else:
@@ -580,7 +585,7 @@ async def lifespan(app: FastAPI):
         if hasattr(printer, "set_cutter_feed"):
             cutter_lines = getattr(settings, "cutter_feed_lines", 7)
             printer.set_cutter_feed(cutter_lines)
-    
+
     try:
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor() as executor:
@@ -764,7 +769,7 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
     settings = new_settings
     # Update module-level reference so modules that access app.config.settings will see the update
     config_module.settings = settings
-    
+
     # Update printer cutter feed if setting changed
     if hasattr(printer, "set_cutter_feed"):
         cutter_lines = getattr(settings, "cutter_feed_lines", 7)
@@ -783,7 +788,7 @@ async def reset_settings(background_tasks: BackgroundTasks):
 
     # Create fresh settings instance (uses defaults from config.py)
     settings = Settings()
-    
+
     # Update printer cutter feed to default
     if hasattr(printer, "set_cutter_feed"):
         cutter_lines = getattr(settings, "cutter_feed_lines", 7)
@@ -1328,10 +1333,10 @@ async def check_for_updates():
     try:
         import subprocess
         from pathlib import Path
-        
+
         # Get the project root directory (parent of app/)
         project_root = Path(__file__).parent.parent
-        
+
         # Check if we're in a git repository
         if not (project_root / ".git").exists():
             return {
@@ -1339,7 +1344,7 @@ async def check_for_updates():
                 "message": "Not a git repository",
                 "error": "This installation doesn't appear to be a git repository.",
             }
-        
+
         # Get current branch
         branch_result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
@@ -1348,16 +1353,16 @@ async def check_for_updates():
             text=True,
             timeout=5,
         )
-        
+
         if branch_result.returncode != 0:
             return {
                 "available": False,
                 "message": "Could not determine current branch",
                 "error": branch_result.stderr,
             }
-        
+
         current_branch = branch_result.stdout.strip()
-        
+
         # Get current commit hash (short)
         current_commit_result = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
@@ -1366,9 +1371,13 @@ async def check_for_updates():
             text=True,
             timeout=5,
         )
-        
-        current_commit = current_commit_result.stdout.strip() if current_commit_result.returncode == 0 else "unknown"
-        
+
+        current_commit = (
+            current_commit_result.stdout.strip()
+            if current_commit_result.returncode == 0
+            else "unknown"
+        )
+
         # Fetch from origin (without pulling)
         fetch_result = subprocess.run(
             ["git", "fetch", "origin", current_branch],
@@ -1377,7 +1386,7 @@ async def check_for_updates():
             text=True,
             timeout=30,
         )
-        
+
         if fetch_result.returncode != 0:
             return {
                 "available": False,
@@ -1385,7 +1394,7 @@ async def check_for_updates():
                 "error": "Unable to connect to the update server. Check your internet connection.",
                 "current_commit": current_commit,
             }
-        
+
         # Compare local vs remote
         local_commit_result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -1401,66 +1410,72 @@ async def check_for_updates():
             text=True,
             timeout=5,
         )
-        
+
         if local_commit_result.returncode != 0 or remote_commit_result.returncode != 0:
             return {
                 "available": False,
                 "message": "Could not compare versions",
                 "error": "Unable to determine version information.",
             }
-        
+
         local_commit = local_commit_result.stdout.strip()
         remote_commit = remote_commit_result.stdout.strip()
-        
+
         # Check if there are updates
         if local_commit == remote_commit:
-            # Get the latest commit message for display
-            commit_msg_result = subprocess.run(
-                ["git", "log", "-1", "--pretty=format:%s", "HEAD"],
-                cwd=project_root,
-                capture_output=True,
-                text=True,
-                timeout=5,
-            )
-            latest_message = commit_msg_result.stdout.strip() if commit_msg_result.returncode == 0 else ""
-            
             return {
                 "available": False,
                 "up_to_date": True,
                 "message": "You're all set!",
-                "current_commit": current_commit,
-                "latest_message": latest_message,
+                "current_version": current_commit,
             }
         else:
             # Count commits behind
             behind_result = subprocess.run(
-                ["git", "rev-list", "--count", f"{local_commit}..origin/{current_branch}"],
+                [
+                    "git",
+                    "rev-list",
+                    "--count",
+                    f"{local_commit}..origin/{current_branch}",
+                ],
                 cwd=project_root,
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
-            commits_behind = int(behind_result.stdout.strip()) if behind_result.returncode == 0 else 0
-            
-            # Get the latest commit message
-            latest_msg_result = subprocess.run(
-                ["git", "log", "-1", "--pretty=format:%s", f"origin/{current_branch}"],
+            commits_behind = (
+                int(behind_result.stdout.strip())
+                if behind_result.returncode == 0
+                else 0
+            )
+
+            # Get the latest version (short commit hash)
+            latest_version_result = subprocess.run(
+                ["git", "rev-parse", "--short", f"origin/{current_branch}"],
                 cwd=project_root,
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
-            latest_message = latest_msg_result.stdout.strip() if latest_msg_result.returncode == 0 else ""
-            
+            latest_version = (
+                latest_version_result.stdout.strip()
+                if latest_version_result.returncode == 0
+                else "unknown"
+            )
+
             return {
                 "available": True,
                 "up_to_date": False,
-                "message": "New update available!" if commits_behind > 0 else "Update available",
+                "message": (
+                    "New update available!"
+                    if commits_behind > 0
+                    else "Update available"
+                ),
                 "commits_behind": commits_behind,
-                "current_commit": current_commit,
-                "latest_message": latest_message,
+                "current_version": current_commit,
+                "latest_version": latest_version,
             }
-    
+
     except subprocess.TimeoutExpired:
         return {
             "available": False,
@@ -1483,10 +1498,10 @@ async def install_updates():
     try:
         import subprocess
         from pathlib import Path
-        
+
         # Get the project root directory
         project_root = Path(__file__).parent.parent
-        
+
         # Get current branch
         branch_result = subprocess.run(
             ["git", "rev-parse", "--abbrev-ref", "HEAD"],
@@ -1495,16 +1510,16 @@ async def install_updates():
             text=True,
             timeout=5,
         )
-        
+
         if branch_result.returncode != 0:
             return {
                 "success": False,
                 "message": "Could not determine current branch",
                 "error": branch_result.stderr,
             }
-        
+
         current_branch = branch_result.stdout.strip()
-        
+
         # Pull latest changes
         pull_result = subprocess.run(
             ["git", "pull", "origin", current_branch],
@@ -1513,14 +1528,14 @@ async def install_updates():
             text=True,
             timeout=60,
         )
-        
+
         if pull_result.returncode != 0:
             return {
                 "success": False,
                 "message": "Update failed",
                 "error": pull_result.stderr or "Could not pull latest changes",
             }
-        
+
         # Rebuild UI if web directory exists
         web_dir = project_root / "web"
         if web_dir.exists() and (web_dir / "package.json").exists():
@@ -1542,7 +1557,7 @@ async def install_updates():
                 )
             except Exception:
                 pass  # UI rebuild is optional
-        
+
         # Restart the service
         if platform.system() == "Linux":
             restart_result = subprocess.run(
@@ -1551,7 +1566,7 @@ async def install_updates():
                 text=True,
                 timeout=10,
             )
-            
+
             if restart_result.returncode != 0:
                 return {
                     "success": True,
@@ -1559,12 +1574,12 @@ async def install_updates():
                     "warning": "You may need to restart the service manually",
                     "error": restart_result.stderr,
                 }
-        
+
         return {
             "success": True,
             "message": "Update installed successfully!",
         }
-    
+
     except subprocess.TimeoutExpired:
         return {
             "success": False,
@@ -1599,7 +1614,10 @@ async def get_ssh_status():
             text=True,
             timeout=5,
         )
-        service_enabled = result.returncode == 0 and result.stdout.strip() in ("enabled", "enabled-runtime")
+        service_enabled = result.returncode == 0 and result.stdout.strip() in (
+            "enabled",
+            "enabled-runtime",
+        )
 
         # Check if SSH service is active
         result_active = subprocess.run(
@@ -1608,7 +1626,9 @@ async def get_ssh_status():
             text=True,
             timeout=5,
         )
-        service_active = result_active.returncode == 0 and result_active.stdout.strip() == "active"
+        service_active = (
+            result_active.returncode == 0 and result_active.stdout.strip() == "active"
+        )
 
         # Get current username
         username = os.environ.get("USER") or os.environ.get("USERNAME") or "admin"
@@ -2024,11 +2044,11 @@ async def search_location(q: str, limit: int = 20, use_api: Optional[str] = None
                 return requests.get(
                     nominatim_url, params=params, headers=headers, timeout=3
                 )
-            
+
             loop = asyncio.get_event_loop()
             with ThreadPoolExecutor() as executor:
                 response = await loop.run_in_executor(executor, _fetch_location_api)
-            
+
             if response.status_code == 200:
                 api_results = response.json()
                 if api_results:
@@ -2404,6 +2424,7 @@ def execute_module(module: ModuleInstance) -> bool:
 
         elif module_type == "system_monitor":
             from app.modules import system_monitor
+
             system_monitor.format_system_monitor_receipt(printer, config, module_name)
 
         elif module_type == "qrcode":
@@ -2601,7 +2622,7 @@ async def print_channel(position: int, background_tasks: BackgroundTasks):
 async def print_module(module_id: str, background_tasks: BackgroundTasks):
     """Forces a specific module instance to print (for testing)."""
     global print_in_progress
-    
+
     module = settings.modules.get(module_id)
     if not module:
         raise HTTPException(status_code=404, detail="Module not found")
@@ -2624,7 +2645,7 @@ async def print_module_direct(module_id: str):
     global print_in_progress
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
-    
+
     def _do_print():
         """Synchronous function that does the actual printing work."""
         module = settings.modules.get(module_id)
@@ -2681,10 +2702,10 @@ async def test_webhook(action: WebhookConfig):
     Runs blocking operations in a thread pool to avoid blocking the event loop.
     """
     from concurrent.futures import ThreadPoolExecutor
-    
+
     def _run_webhook():
         webhook.run_webhook(action, printer, module_name=None)
-    
+
     try:
         loop = asyncio.get_event_loop()
         with ThreadPoolExecutor() as executor:
@@ -2692,8 +2713,10 @@ async def test_webhook(action: WebhookConfig):
     except Exception as e:
         logger = logging.getLogger(__name__)
         logger.error(f"Error in test_webhook: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Webhook execution failed: {str(e)}")
-    
+        raise HTTPException(
+            status_code=500, detail=f"Webhook execution failed: {str(e)}"
+        )
+
     return {"message": "Webhook executed"}
 
 
@@ -2749,9 +2772,10 @@ async def captive_other():
 # Ensure 'web/dist' exists (run 'npm run build' in web/ directory first)
 if os.path.exists("web/dist"):
     app.mount("/assets", StaticFiles(directory="web/dist/assets"), name="assets")
-    
+
     # Serve fonts directory with explicit MIME type
     if os.path.exists("web/dist/fonts"):
+
         @app.get("/fonts/{font_path:path}")
         async def serve_font(font_path: str):
             font_file_path = os.path.join("web/dist/fonts", font_path)

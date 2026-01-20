@@ -845,16 +845,19 @@ const GeneralSettings = ({
                 : 'bg-white text-black border-black border-dashed'
             }`}>
               <div className='font-bold mb-1'>{updateStatus.message}</div>
-              {updateStatus.latest_message && (
-                <div className='text-xs text-gray-600 mt-1 italic'>
-                  {updateStatus.latest_message}
-                </div>
-              )}
-              {updateStatus.commits_behind > 0 && (
-                <div className='text-xs text-gray-600 mt-1'>
-                  {updateStatus.commits_behind} {updateStatus.commits_behind === 1 ? 'update' : 'updates'} available
-                </div>
-              )}
+              <div className='text-xs text-gray-600 mt-1'>
+                {updateStatus.up_to_date ? (
+                  <>Current version: <span className='font-mono'>{updateStatus.current_version || 'unknown'}</span></>
+                ) : (
+                  <>
+                    Current: <span className='font-mono'>{updateStatus.current_version || 'unknown'}</span> → 
+                    Latest: <span className='font-mono'>{updateStatus.latest_version || 'unknown'}</span>
+                    {updateStatus.commits_behind > 0 && (
+                      <> ({updateStatus.commits_behind} {updateStatus.commits_behind === 1 ? 'update' : 'updates'})</>
+                    )}
+                  </>
+                )}
+              </div>
             </div>
           )}
 
