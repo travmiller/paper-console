@@ -74,7 +74,7 @@ const ChecklistWidget = ({ value = [], onChange }) => {
       {items.map((item, index) => (
         <div 
             key={index} 
-            className={`flex items-center gap-3 group px-3 py-2 transition-all border-b border-zinc-100 last:border-0 hover:bg-zinc-50`}
+            className={`flex items-center gap-3 group px-3 py-2 transition-all border-b border-zinc-100 last:border-0 hover:bg-zinc-100/50`}
         >
           <input
             type="checkbox"
