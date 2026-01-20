@@ -78,6 +78,32 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
     icon="qr-code",
     offline=True,
     category="utilities",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "qr_type": {
+                "type": "string",
+                "title": "Type",
+                "enum": ["text", "url", "wifi", "email", "sms", "phone", "contact"],
+                "default": "text"
+            },
+            "content": {"type": "string", "title": "Content / URL / Phone"},
+            "size": {"type": "integer", "title": "Size (pixels)", "default": 300},
+            
+            # WiFi Specifics
+            "wifi_ssid": {"type": "string", "title": "WiFi SSID"},
+            "wifi_password": {"type": "string", "title": "WiFi Password"},
+            "wifi_security": {"type": "string", "title": "Security", "enum": ["WPA", "WEP", "nopass"], "default": "WPA"},
+            
+            # Contact Specifics
+            "contact_name": {"type": "string", "title": "Contact Name"},
+            "contact_phone": {"type": "string", "title": "Contact Phone"},
+            "contact_email": {"type": "string", "title": "Contact Email"},
+        }
+    },
+    ui_schema={
+        "wifi_password": {"ui:widget": "password"}
+    }
 )
 def format_qrcode_receipt(printer: PrinterDriver, config: dict, module_name: str = None):
     """Print a QR code based on configuration."""

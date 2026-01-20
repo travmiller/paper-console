@@ -220,6 +220,19 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
     icon="envelope",
     offline=False,
     category="content",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "email_host": {"type": "string", "title": "IMAP Host", "default": "imap.gmail.com"},
+            "email_port": {"type": "integer", "title": "IMAP Port", "default": 993},
+            "email_user": {"type": "string", "title": "Email Address"},
+            "email_password": {"type": "string", "title": "Password / App Password"},
+            "email_use_ssl": {"type": "boolean", "title": "Use SSL", "default": True}
+        }
+    },
+    ui_schema={
+        "email_password": {"ui:widget": "password"}
+    }
 )
 def format_email_receipt(
     printer, messages=None, config: Dict[str, Any] = None, module_name: str = None

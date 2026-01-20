@@ -13,6 +13,25 @@ from app.module_registry import register_module
     icon="plugs",
     offline=False,
     category="utilities",
+    config_schema={
+        "type": "object",
+        "properties": {
+             "url": {"type": "string", "title": "URL"},
+             "method": {"type": "string", "title": "Method", "enum": ["GET", "POST"], "default": "GET"},
+             "headers": {
+                 "type": "object",
+                 "title": "Headers",
+                 "description": "Custom HTTP headers",
+                 "default": {}
+             },
+             "body": {"type": "string", "title": "Body (JSON)"},
+             "json_path": {"type": "string", "title": "JSON Path"}
+        }
+    },
+    ui_schema={
+        "headers": {"ui:widget": "key-value-list"},
+        "body": {"ui:widget": "textarea"}
+    },
 )
 def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str = None):
     """

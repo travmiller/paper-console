@@ -66,10 +66,12 @@ def get_weather_condition_openweather(code: int) -> str:
 def get_weather(config: Optional[Dict[str, Any]] = None):
     """Fetches weather from OpenWeather API or Open-Meteo."""
     if config:
-        latitude = config.get("latitude") or app.config.settings.latitude
-        longitude = config.get("longitude") or app.config.settings.longitude
-        timezone = config.get("timezone") or app.config.settings.timezone
-        city_name = config.get("city_name") or app.config.settings.city_name
+        # Support new nested location object
+        location = config.get("location", {})
+        latitude = location.get("latitude") or config.get("latitude") or app.config.settings.latitude
+        longitude = location.get("longitude") or config.get("longitude") or app.config.settings.longitude
+        timezone = location.get("timezone") or config.get("timezone") or app.config.settings.timezone
+        city_name = location.get("city_name") or config.get("city_name") or app.config.settings.city_name
         api_key = config.get("openweather_api_key")
     else:
         latitude = app.config.settings.latitude
@@ -545,6 +547,32 @@ def draw_hourly_forecast_image(hourly_forecast: list, total_width: int, fonts: D
     icon="cloud-sun",
     offline=False,
     category="content",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "openweather_api_key": {
+                "type": "string", 
+                "title": "OpenWeather API Key (Optional)",
+                "description": "Leave duplicate keys blank to use free Open-Meteo API"
+            },
+            "location": {
+                "type": "object",
+                "title": "Location",
+                "properties": {
+                    "city_name": {"type": "string"},
+                    "latitude": {"type": "number"},
+                    "longitude": {"type": "number"},
+                    "timezone": {"type": "string"},
+                    "state": {"type": "string"},
+                    "zipcode": {"type": "string"}
+                }
+            }
+        },
+    },
+    ui_schema={
+        "openweather_api_key": {"ui:widget": "password"},
+        "location": {"ui:widget": "location-search"}
+    },
 )
 def format_weather_receipt(
     printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None

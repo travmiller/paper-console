@@ -83,6 +83,12 @@ def get_events_for_today() -> List[str]:
     icon="hourglass",
     offline=True,
     category="content",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "count": {"type": "integer", "title": "Number of Events", "default": 1}
+        }
+    }
 )
 def format_history_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None

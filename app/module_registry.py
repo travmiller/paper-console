@@ -42,6 +42,7 @@ class ModuleDefinition:
         offline: Whether the module works without internet
         execute_fn: The function to call when printing (format_xxx_receipt)
         config_schema: JSON Schema for generating config forms (optional)
+        ui_schema: UI Schema for customizing form rendering (optional)
         config_class: Pydantic config class if the module uses one (optional)
         category: For grouping in UI (e.g., "content", "games", "utilities")
     """
@@ -52,6 +53,7 @@ class ModuleDefinition:
     offline: bool
     execute_fn: Callable
     config_schema: Optional[Dict[str, Any]] = None
+    ui_schema: Optional[Dict[str, Any]] = None
     config_class: Optional[type] = None
     category: str = "general"
 
@@ -67,6 +69,7 @@ def register_module(
     icon: str = "file",
     offline: bool = True,
     config_schema: Optional[Dict[str, Any]] = None,
+    ui_schema: Optional[Dict[str, Any]] = None,
     config_class: Optional[type] = None,
     category: str = "general",
 ):
@@ -80,6 +83,7 @@ def register_module(
             description="Current conditions and 7-day forecast",
             icon="sun",
             offline=False,
+            config_schema={...},
         )
         def format_weather_receipt(printer, config, module_name):
             ...
@@ -91,6 +95,7 @@ def register_module(
         icon: Icon name for the UI
         offline: Whether the module works without internet
         config_schema: JSON Schema for config form generation (optional)
+        ui_schema: UI Schema for customizing form rendering (optional)
         config_class: Pydantic config class (optional)
         category: Grouping category for UI (optional)
     
@@ -109,6 +114,7 @@ def register_module(
             offline=offline,
             execute_fn=fn,
             config_schema=config_schema,
+            ui_schema=ui_schema,
             config_class=config_class,
             category=category,
         )
@@ -158,6 +164,7 @@ def list_module_types() -> List[Dict[str, Any]]:
             "offline": defn.offline,
             "category": defn.category,
             "configSchema": defn.config_schema,
+            "uiSchema": defn.ui_schema,
         })
     return modules
 

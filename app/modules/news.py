@@ -74,6 +74,19 @@ from app.utils import wrap_text
     icon="newspaper",
     offline=False,
     category="content",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "news_api_key": {
+                "type": "string", 
+                "title": "NewsAPI Key",
+                "description": "Get free key from newsapi.org"
+            }
+        }
+    },
+    ui_schema={
+        "news_api_key": {"ui:widget": "password"}
+    }
 )
 def format_news_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None

@@ -368,6 +368,10 @@ def draw_sun_path_image(
     icon="moon-stars",
     offline=True,
     category="content",
+    config_schema={
+        "type": "object",
+        "properties": {}
+    }
 )
 def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name: str = None):
     """Prints the Almanac to the provided printer driver."""

@@ -101,6 +101,10 @@ def get_random_quote() -> Dict[str, str]:
     icon="quotes",
     offline=True,
     category="content",
+    config_schema={
+        "type": "object",
+        "properties": {},
+    },
 )
 def format_quotes_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None

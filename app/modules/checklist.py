@@ -14,6 +14,31 @@ from app.utils import wrap_text_pixels
     icon="check-square",
     offline=True,
     category="utilities",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "items": {
+                "type": "array",
+                "title": "Items",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "text": {"type": "string", "title": "Item Text"},
+                        "checked": {"type": "boolean", "title": "Checked", "default": False},
+                    },
+                },
+            }
+        },
+    },
+    ui_schema={
+        "items": {
+            "ui:options": {
+                "orderable": True,
+                "removable": True,
+                "addable": True,
+            }
+        }
+    },
 )
 def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None):
     """Prints a checklist with items that can be checked off."""

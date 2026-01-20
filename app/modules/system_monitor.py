@@ -16,6 +16,10 @@ from PIL import Image, ImageDraw
     icon="desktop",
     offline=True,
     category="utilities",
+    config_schema={
+        "type": "object",
+        "properties": {}
+    }
 )
 def format_system_monitor_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None

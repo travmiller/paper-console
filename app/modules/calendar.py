@@ -428,6 +428,36 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
     icon="calendar-blank",
     offline=False,
     category="content",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "ical_sources": {
+                "type": "array",
+                "title": "iCal Sources",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "url": {"type": "string", "title": "iCal URL"},
+                        "name": {"type": "string", "title": "Label (Optional)"},
+                    }
+                }
+            },
+            "days_to_show": {
+                "type": "integer", 
+                "title": "View Mode", 
+                "enum": [1, 2, 3, 7],
+                "enumNames": ["1 Day (Timeline)", "Month View", "3 Days (Compact)", "Week View"],
+                "default": 2
+            }
+        }
+    },
+    ui_schema={
+        "ical_sources": {
+            "items": {
+                 "url": {"ui:placeholder": "https://calendar.google.com/..."}
+            }
+        }
+    }
 )
 def format_calendar_receipt(
     printer: PrinterDriver, config: CalendarConfig, module_name: str = None

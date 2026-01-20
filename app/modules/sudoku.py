@@ -192,6 +192,17 @@ def draw_sudoku_image(grid: List[List[int]], cell_size: int, font) -> Image.Imag
     icon="grid-nine",
     offline=True,
     category="games",
+    config_schema={
+        "type": "object",
+        "properties": {
+             "difficulty": {
+                 "type": "string", 
+                 "title": "Difficulty", 
+                 "enum": ["medium", "hard"], 
+                 "default": "medium"
+             }
+        }
+    }
 )
 def format_sudoku_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None

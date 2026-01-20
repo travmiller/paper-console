@@ -1,9 +1,37 @@
 import React, { useState, useRef, useEffect } from 'react';
+import SchemaForm from './SchemaForm';
 import JsonTextarea from './JsonTextarea';
 import { commonClasses } from '../design-tokens';
 
 const ModuleConfig = ({ module, updateConfig }) => {
   const config = module.config || {};
+  
+  // 1. Dynamic Schema-Driven Configuration (New System)
+  if (module.configSchema) {
+      const handleSchemaChange = (newConfig) => {
+          // Compare new config with old to find changes, or just simple bulk update if supported
+          // Since updateConfig takes key/value, we iterate.
+          // In a real app, we might want a bulkUpdateConfig prop.
+          Object.keys(newConfig).forEach(key => {
+              if (newConfig[key] !== config[key]) {
+                  updateConfig(key, newConfig[key]);
+              }
+          });
+          
+          // Also handle keys that might have been removed (though rare in this simple schema form)
+      };
+      
+      return (
+          <SchemaForm 
+              schema={module.configSchema}
+              uiSchema={module.uiSchema}
+              formData={config}
+              onChange={handleSchemaChange}
+          />
+      );
+  }
+
+  // 2. Legacy Hardcoded Configuration (Old System)
   const inputClass = commonClasses.input;
   const labelClass = commonClasses.label;
 

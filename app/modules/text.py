@@ -9,6 +9,23 @@ from app.module_registry import register_module
     icon="note",
     offline=True,
     category="utilities",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "content": {
+                "type": "string",
+                "title": "Content",
+                "default": "",
+            }
+        },
+    },
+    ui_schema={
+        "content": {
+            "ui:widget": "textarea",
+            "ui:placeholder": "Enter text to print...",
+            "ui:options": {"rows": 4},
+        }
+    },
 )
 def format_text_receipt(printer: PrinterDriver, config: TextConfig, module_name: str = None):
     """Prints a static text note."""

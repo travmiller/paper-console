@@ -338,13 +338,21 @@ def draw_maze_image(grid: List[List[int]], cell_size: int = 8) -> Image.Image:
     icon="path",
     offline=True,
     category="games",
+    config_schema={
+        "type": "object",
+        "properties": {
+             "width": {"type": "integer", "title": "Width (Odd number)", "default": 61, "minimum": 15, "maximum": 99},
+             "height": {"type": "integer", "title": "Height (Odd number)", "default": 61, "minimum": 15, "maximum": 99}
+        }
+    }
 )
 def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str = None):
     """Prints a challenging Maze puzzle."""
     from datetime import datetime
     
-    # Fixed size for thermal printer (61x61 for maximum challenge)
-    width, height = 61, 61
+    # Configurable size (default to 61x61 for maximum challenge)
+    width = int(config.get("width", 61)) if config else 61
+    height = int(config.get("height", 61)) if config else 61
     
     # Generate enhanced Maze
     maze = MazeGenerator(width, height)

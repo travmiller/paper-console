@@ -133,6 +133,21 @@ def get_rss_articles(config: Dict[str, Any] = None):
     icon="rss",
     offline=False,
     category="content",
+    config_schema={
+        "type": "object",
+        "properties": {
+            "rss_feeds": {
+                "type": "array", 
+                "title": "RSS Feed URLs",
+                "items": {"type": "string"}
+            }
+        }
+    },
+    ui_schema={
+        "rss_feeds": {
+            "items": {"ui:placeholder": "https://feeds.bbci.co.uk/news/rss.xml"}
+        }
+    }
 )
 def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str = None):
     """Compiles and prints the RSS feed receipt."""
