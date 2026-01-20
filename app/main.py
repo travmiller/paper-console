@@ -14,7 +14,7 @@ import platform
 import pytz
 import logging
 
-# Configure logging stuff
+# Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -1363,20 +1363,31 @@ async def check_for_updates():
 
         current_branch = branch_result.stdout.strip()
 
-        # Get current commit hash (short)
-        current_commit_result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
+        # Get user-friendly version using git describe (preferred) or short hash
+        version_result = subprocess.run(
+            ["git", "describe", "--tags", "--always", "--dirty"],
             cwd=project_root,
             capture_output=True,
             text=True,
             timeout=5,
         )
-
-        current_commit = (
-            current_commit_result.stdout.strip()
-            if current_commit_result.returncode == 0
-            else "unknown"
-        )
+        
+        if version_result.returncode == 0:
+            current_version = version_result.stdout.strip()
+        else:
+            # Fallback to short commit hash
+            commit_result = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            current_version = (
+                commit_result.stdout.strip()
+                if commit_result.returncode == 0
+                else "unknown"
+            )
 
         # Fetch from origin (without pulling)
         fetch_result = subprocess.run(
@@ -1392,7 +1403,7 @@ async def check_for_updates():
                 "available": False,
                 "message": "Could not check for updates",
                 "error": "Unable to connect to the update server. Check your internet connection.",
-                "current_commit": current_commit,
+                "current_version": current_version if 'current_version' in locals() else "unknown",
             }
 
         # Compare local vs remote
@@ -1427,7 +1438,7 @@ async def check_for_updates():
                 "available": False,
                 "up_to_date": True,
                 "message": "You're on the latest version",
-                "current_version": current_commit,
+                "current_version": current_version,
             }
         else:
             # Count commits behind
@@ -1449,19 +1460,31 @@ async def check_for_updates():
                 else 0
             )
 
-            # Get the latest version (short commit hash)
+            # Get the latest version using git describe
             latest_version_result = subprocess.run(
-                ["git", "rev-parse", "--short", f"origin/{current_branch}"],
+                ["git", "describe", "--tags", "--always", f"origin/{current_branch}"],
                 cwd=project_root,
                 capture_output=True,
                 text=True,
                 timeout=5,
             )
-            latest_version = (
-                latest_version_result.stdout.strip()
-                if latest_version_result.returncode == 0
-                else "unknown"
-            )
+            
+            if latest_version_result.returncode == 0:
+                latest_version = latest_version_result.stdout.strip()
+            else:
+                # Fallback to short commit hash
+                latest_commit_result = subprocess.run(
+                    ["git", "rev-parse", "--short", f"origin/{current_branch}"],
+                    cwd=project_root,
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                )
+                latest_version = (
+                    latest_commit_result.stdout.strip()
+                    if latest_commit_result.returncode == 0
+                    else "unknown"
+                )
 
             return {
                 "available": True,
@@ -1472,7 +1495,7 @@ async def check_for_updates():
                     else "Update available"
                 ),
                 "commits_behind": commits_behind,
-                "current_version": current_commit,
+                "current_version": current_version,
                 "latest_version": latest_version,
             }
 
