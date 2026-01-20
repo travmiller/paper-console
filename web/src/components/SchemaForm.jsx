@@ -44,7 +44,7 @@ const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange }) => {
   );
 };
 
-const SchemaField = ({ schema, uiSchema, value, onChange, path, label }) => {
+const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required }) => {
     const type = schema.type;
     const title = schema.title || label;
     const description = schema.description;
@@ -76,6 +76,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label }) => {
                                 }}
                                 path={[...path, key]}
                                 label={propSchema.title || key}
+                                required={schema.required && schema.required.includes(key)}
                             />
                         </div>
                     );
@@ -191,7 +192,11 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label }) => {
     // 5. STRINGS & NUMBERS
     return (
         <div className="mb-2">
-            {title && <label className={commonClasses.label}>{title}</label>}
+            {title && (
+                <label className={commonClasses.label}>
+                    {title} {required && <span className="text-red-500 ml-1" title="Required">*</span>}
+                </label>
+            )}
             {widget === 'textarea' ? (
                  <textarea
                     value={value || ''}

@@ -46,6 +46,7 @@ from app.module_registry import (
     get_all_modules,
     list_module_types,
     is_registered,
+    validate_module_config,
 )
 
 # Legacy imports for modules with special handling (can be removed after full migration)
@@ -766,6 +767,23 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
 
     # Update in-memory - create new settings object
     settings = new_settings
+    
+    # VALIDATE MODULE CONFIGS
+    # Ensure all modules have valid configuration before saving
+    for module_id, module in settings.modules.items():
+        if module_id == "unassigned":
+            continue
+            
+        try:
+            # We don't validate unassigned explicitly here since they are just copies
+            # but we definitely validate the configured ones.
+            # Note: module.type is reliable, module.config is what we check.
+            validate_module_config(module.type, module.config or {})
+        except ValueError as e:
+            # Revert in-memory settings on failure
+            config_module.settings = load_config()  # Reload old config
+            raise HTTPException(status_code=400, detail=str(e))
+            
     # Update module-level reference so modules that access app.config.settings will see the update
     config_module.settings = settings
 

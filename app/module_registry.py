@@ -25,6 +25,9 @@ Example usage:
 from dataclasses import dataclass, field
 from typing import Dict, Any, Callable, Optional, List
 import logging
+import jsonschema
+from jsonschema import validate, ValidationError
+
 
 logger = logging.getLogger(__name__)
 
@@ -204,6 +207,30 @@ def execute_module_by_type(
     except Exception as e:
         logger.error(f"Error executing module '{module_type}': {e}", exc_info=True)
         return False
+
+
+
+def validate_module_config(module_type: str, config: Dict[str, Any]) -> None:
+    """
+    Validate a module configuration against its registered schema.
+    
+    Args:
+        module_type: The module type identifier
+        config: The configuration dictionary to validate
+        
+    Raises:
+        ValueError: If the module type is unknown or validation fails
+    """
+    defn = _registry.get(module_type)
+    if defn is None:
+        raise ValueError(f"Unknown module type: {module_type}")
+        
+    if defn.config_schema:
+        try:
+            validate(instance=config, schema=defn.config_schema)
+        except ValidationError as e:
+            path = ".".join(str(p) for p in e.path) if e.path else "root"
+            raise ValueError(f"Invalid configuration for {module_type} at '{path}': {e.message}")
 
 
 def is_registered(type_id: str) -> bool:
