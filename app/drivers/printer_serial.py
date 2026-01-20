@@ -1211,8 +1211,7 @@ class PrinterDriver:
                             cell_y + cell_size - 1,
                         ],
                         fill=1,  # White
-                        outline=0,  # Black border
-                        width=1,
+                        outline=None,
                     )
 
         # Draw entrance marker (top center)
