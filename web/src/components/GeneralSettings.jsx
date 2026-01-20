@@ -38,6 +38,12 @@ const GeneralSettings = ({
   const [confirmPassword, setConfirmPassword] = useState('');
   const [changingPassword, setChangingPassword] = useState(false);
 
+  // Update check state
+  const [updateStatus, setUpdateStatus] = useState(null);
+  const [checkingUpdates, setCheckingUpdates] = useState(false);
+  const [installingUpdate, setInstallingUpdate] = useState(false);
+  const [updateMessage, setUpdateMessage] = useState({ type: '', message: '' });
+
   // Fetch current system time on mount and periodically
   useEffect(() => {
     const fetchTime = async () => {
@@ -821,6 +827,111 @@ const GeneralSettings = ({
               <p className='text-sm text-gray-500 '>SSH isn't available in testing mode</p>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Update Check */}
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[5] || inkGradients[0] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
+          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Updates</h3>
+          <p className='text-sm text-gray-600 mb-4 '>
+            Check for software updates and keep your PC-1 running the latest version.
+          </p>
+
+          {updateStatus && (
+            <div className={`mb-4 p-3 rounded-lg text-sm border-2 ${
+              updateStatus.up_to_date 
+                ? 'bg-gray-100 text-black border-black' 
+                : 'bg-white text-black border-black border-dashed'
+            }`}>
+              <div className='font-bold mb-1'>{updateStatus.message}</div>
+              {updateStatus.latest_message && (
+                <div className='text-xs text-gray-600 mt-1 italic'>
+                  {updateStatus.latest_message}
+                </div>
+              )}
+              {updateStatus.commits_behind > 0 && (
+                <div className='text-xs text-gray-600 mt-1'>
+                  {updateStatus.commits_behind} {updateStatus.commits_behind === 1 ? 'update' : 'updates'} available
+                </div>
+              )}
+            </div>
+          )}
+
+          {updateMessage.message && (
+            <div className={`mb-4 p-3 rounded-lg text-sm border-2 ${
+              updateMessage.type === 'success' 
+                ? 'bg-gray-100 text-black border-black' 
+                : 'bg-white text-black border-black border-dashed'
+            }`}>
+              {updateMessage.type === 'error' && <span className='font-bold mr-2'>ERROR:</span>}
+              {updateMessage.message}
+            </div>
+          )}
+
+          <div className='flex gap-3'>
+            <PrimaryButton
+              onClick={async () => {
+                setCheckingUpdates(true);
+                setUpdateMessage({ type: '', message: '' });
+                try {
+                  const response = await fetch('/api/system/updates/check');
+                  const data = await response.json();
+                  setUpdateStatus(data);
+                  if (data.error) {
+                    setUpdateMessage({ type: 'error', message: data.error });
+                    setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
+                  }
+                } catch (err) {
+                  setUpdateMessage({ type: 'error', message: 'Could not check for updates. Check your internet connection.' });
+                  setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
+                } finally {
+                  setCheckingUpdates(false);
+                }
+              }}
+              disabled={checkingUpdates}
+              loading={checkingUpdates}
+              className='flex-1'>
+              Check for Updates
+            </PrimaryButton>
+
+            {updateStatus && updateStatus.available && (
+              <PrimaryButton
+                onClick={async () => {
+                  if (!confirm('Install the update now? The device will restart automatically.')) {
+                    return;
+                  }
+                  setInstallingUpdate(true);
+                  setUpdateMessage({ type: '', message: '' });
+                  try {
+                    const response = await fetch('/api/system/updates/install', {
+                      method: 'POST',
+                    });
+                    const data = await response.json();
+                    if (data.success) {
+                      setUpdateMessage({ type: 'success', message: data.message || 'Update installed! The device will restart shortly.' });
+                      setUpdateStatus(null);
+                      // Reload page after a delay to show the restart
+                      setTimeout(() => {
+                        window.location.reload();
+                      }, 3000);
+                    } else {
+                      setUpdateMessage({ type: 'error', message: data.error || data.message || 'Update failed' });
+                    }
+                  } catch (err) {
+                    setUpdateMessage({ type: 'error', message: 'Update failed. Please try again.' });
+                  } finally {
+                    setInstallingUpdate(false);
+                    setTimeout(() => setUpdateMessage({ type: '', message: '' }), 10000);
+                  }
+                }}
+                disabled={installingUpdate}
+                loading={installingUpdate}
+                className='flex-1'>
+                Install Update
+              </PrimaryButton>
+            )}
+          </div>
         </div>
       </div>
     </div>

@@ -1319,6 +1319,266 @@ async def sync_system_time():
 # --- SSH MANAGEMENT API ---
 
 
+@app.get("/api/system/updates/check")
+async def check_for_updates():
+    """
+    Check if there are updates available from the remote repository.
+    Returns user-friendly status information.
+    """
+    try:
+        import subprocess
+        from pathlib import Path
+        
+        # Get the project root directory (parent of app/)
+        project_root = Path(__file__).parent.parent
+        
+        # Check if we're in a git repository
+        if not (project_root / ".git").exists():
+            return {
+                "available": False,
+                "message": "Not a git repository",
+                "error": "This installation doesn't appear to be a git repository.",
+            }
+        
+        # Get current branch
+        branch_result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        
+        if branch_result.returncode != 0:
+            return {
+                "available": False,
+                "message": "Could not determine current branch",
+                "error": branch_result.stderr,
+            }
+        
+        current_branch = branch_result.stdout.strip()
+        
+        # Get current commit hash (short)
+        current_commit_result = subprocess.run(
+            ["git", "rev-parse", "--short", "HEAD"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        
+        current_commit = current_commit_result.stdout.strip() if current_commit_result.returncode == 0 else "unknown"
+        
+        # Fetch from origin (without pulling)
+        fetch_result = subprocess.run(
+            ["git", "fetch", "origin", current_branch],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        
+        if fetch_result.returncode != 0:
+            return {
+                "available": False,
+                "message": "Could not check for updates",
+                "error": "Unable to connect to the update server. Check your internet connection.",
+                "current_commit": current_commit,
+            }
+        
+        # Compare local vs remote
+        local_commit_result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        remote_commit_result = subprocess.run(
+            ["git", "rev-parse", f"origin/{current_branch}"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        
+        if local_commit_result.returncode != 0 or remote_commit_result.returncode != 0:
+            return {
+                "available": False,
+                "message": "Could not compare versions",
+                "error": "Unable to determine version information.",
+            }
+        
+        local_commit = local_commit_result.stdout.strip()
+        remote_commit = remote_commit_result.stdout.strip()
+        
+        # Check if there are updates
+        if local_commit == remote_commit:
+            # Get the latest commit message for display
+            commit_msg_result = subprocess.run(
+                ["git", "log", "-1", "--pretty=format:%s", "HEAD"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            latest_message = commit_msg_result.stdout.strip() if commit_msg_result.returncode == 0 else ""
+            
+            return {
+                "available": False,
+                "up_to_date": True,
+                "message": "You're all set!",
+                "current_commit": current_commit,
+                "latest_message": latest_message,
+            }
+        else:
+            # Count commits behind
+            behind_result = subprocess.run(
+                ["git", "rev-list", "--count", f"{local_commit}..origin/{current_branch}"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            commits_behind = int(behind_result.stdout.strip()) if behind_result.returncode == 0 else 0
+            
+            # Get the latest commit message
+            latest_msg_result = subprocess.run(
+                ["git", "log", "-1", "--pretty=format:%s", f"origin/{current_branch}"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            latest_message = latest_msg_result.stdout.strip() if latest_msg_result.returncode == 0 else ""
+            
+            return {
+                "available": True,
+                "up_to_date": False,
+                "message": "New update available!" if commits_behind > 0 else "Update available",
+                "commits_behind": commits_behind,
+                "current_commit": current_commit,
+                "latest_message": latest_message,
+            }
+    
+    except subprocess.TimeoutExpired:
+        return {
+            "available": False,
+            "message": "Update check timed out",
+            "error": "The update check took too long. Please try again.",
+        }
+    except Exception as e:
+        return {
+            "available": False,
+            "message": "Could not check for updates",
+            "error": f"Something went wrong: {str(e)}",
+        }
+
+
+@app.post("/api/system/updates/install")
+async def install_updates():
+    """
+    Install available updates by pulling from the remote repository and restarting the service.
+    """
+    try:
+        import subprocess
+        from pathlib import Path
+        
+        # Get the project root directory
+        project_root = Path(__file__).parent.parent
+        
+        # Get current branch
+        branch_result = subprocess.run(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        
+        if branch_result.returncode != 0:
+            return {
+                "success": False,
+                "message": "Could not determine current branch",
+                "error": branch_result.stderr,
+            }
+        
+        current_branch = branch_result.stdout.strip()
+        
+        # Pull latest changes
+        pull_result = subprocess.run(
+            ["git", "pull", "origin", current_branch],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        
+        if pull_result.returncode != 0:
+            return {
+                "success": False,
+                "message": "Update failed",
+                "error": pull_result.stderr or "Could not pull latest changes",
+            }
+        
+        # Rebuild UI if web directory exists
+        web_dir = project_root / "web"
+        if web_dir.exists() and (web_dir / "package.json").exists():
+            try:
+                # Try to rebuild UI (non-blocking, don't fail if npm isn't available)
+                subprocess.run(
+                    ["npm", "ci"],
+                    cwd=web_dir,
+                    capture_output=True,
+                    timeout=120,
+                    check=False,
+                )
+                subprocess.run(
+                    ["npm", "run", "build"],
+                    cwd=web_dir,
+                    capture_output=True,
+                    timeout=120,
+                    check=False,
+                )
+            except Exception:
+                pass  # UI rebuild is optional
+        
+        # Restart the service
+        if platform.system() == "Linux":
+            restart_result = subprocess.run(
+                ["sudo", "systemctl", "restart", "pc-1.service"],
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+            
+            if restart_result.returncode != 0:
+                return {
+                    "success": True,
+                    "message": "Update installed, but service restart failed",
+                    "warning": "You may need to restart the service manually",
+                    "error": restart_result.stderr,
+                }
+        
+        return {
+            "success": True,
+            "message": "Update installed successfully!",
+        }
+    
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "message": "Update timed out",
+            "error": "The update process took too long. Please try again.",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": "Update failed",
+            "error": str(e),
+        }
+
+
 @app.get("/api/system/ssh/status")
 async def get_ssh_status():
     """
