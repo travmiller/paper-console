@@ -911,31 +911,32 @@ const GeneralSettings = ({
             </div>
           )}
 
-          <div className='flex gap-3'>
-            <PrimaryButton
-              onClick={async () => {
-                setCheckingUpdates(true);
-                setUpdateMessage({ type: '', message: '' });
-                try {
-                  const response = await fetch('/api/system/updates/check');
-                  const data = await response.json();
-                  setUpdateStatus(data);
-                  if (data.error) {
-                    setUpdateMessage({ type: 'error', message: data.error });
+          {!installingUpdate && (
+            <div className='flex gap-3'>
+              <PrimaryButton
+                onClick={async () => {
+                  setCheckingUpdates(true);
+                  setUpdateMessage({ type: '', message: '' });
+                  try {
+                    const response = await fetch('/api/system/updates/check');
+                    const data = await response.json();
+                    setUpdateStatus(data);
+                    if (data.error) {
+                      setUpdateMessage({ type: 'error', message: data.error });
+                      setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
+                    }
+                  } catch (err) {
+                    setUpdateMessage({ type: 'error', message: 'Could not check for updates. Check your internet connection.' });
                     setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
+                  } finally {
+                    setCheckingUpdates(false);
                   }
-                } catch (err) {
-                  setUpdateMessage({ type: 'error', message: 'Could not check for updates. Check your internet connection.' });
-                  setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
-                } finally {
-                  setCheckingUpdates(false);
-                }
-              }}
-              disabled={checkingUpdates}
-              loading={checkingUpdates}
-              className='flex-1'>
-              Check for Updates
-            </PrimaryButton>
+                }}
+                disabled={checkingUpdates}
+                loading={checkingUpdates}
+                className='flex-1'>
+                Check for Updates
+              </PrimaryButton>
 
             {updateStatus && updateStatus.available && !installingUpdate && (
               <PrimaryButton
@@ -1051,7 +1052,8 @@ const GeneralSettings = ({
                 Install Update
               </PrimaryButton>
             )}
-          </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
