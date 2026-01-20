@@ -941,15 +941,22 @@ const GeneralSettings = ({
                   // Wait a bit, then start checking if service is back up
                   setTimeout(() => {
                     let attempts = 0;
-                    const maxAttempts = 20; // Try for up to 20 seconds
+                    const maxAttempts = 30; // Try for up to 30 seconds
                     
                     const checkService = async () => {
                       attempts++;
                       try {
+                        // Create a timeout controller for the fetch
+                        const controller = new AbortController();
+                        const timeoutId = setTimeout(() => controller.abort(), 2000);
+                        
                         const healthCheck = await fetch('/api/health', { 
                           method: 'GET',
-                          signal: AbortSignal.timeout(2000) // 2 second timeout
+                          signal: controller.signal
                         });
+                        
+                        clearTimeout(timeoutId);
+                        
                         if (healthCheck.ok) {
                           // Service is back up, reload the page
                           window.location.reload();
@@ -960,13 +967,15 @@ const GeneralSettings = ({
                         if (attempts < maxAttempts) {
                           setTimeout(checkService, 1000); // Try again in 1 second
                         } else {
-                          // Give up and reload anyway
+                          // Give up and reload anyway after max attempts
+                          console.log('Max attempts reached, reloading page');
                           window.location.reload();
                         }
                       }
                     };
                     
                     // Start checking
+                    console.log('Starting service health check...');
                     checkService();
                   }, 3000);
                 }}
