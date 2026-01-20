@@ -667,13 +667,27 @@ class PrinterDriver:
                     qr_img = qr_img.resize((qr_size, qr_size), Image.LANCZOS)
                 op_data["_qr_img"] = qr_img
 
+                # Use pixel-based wrapping to match rendering (critical for accurate height calculation)
                 source_height = self._get_line_height_for_style("caption")
-                title_lines = op_data.get("title_lines", 1)
-                title_height = title_lines * self._get_line_height_for_style("bold")
-                summary_lines = op_data.get("summary_lines", 0)
-                summary_height = summary_lines * self._get_line_height_for_style(
-                    "regular_sm"
-                )
+                title_font = self._get_font("bold")
+                title_text = op_data.get("title", "")
+                # Calculate available width (matches rendering)
+                available_text_width = self.PRINTER_WIDTH_DOTS - self.SPACING_SMALL - self.SPACING_SMALL
+                if title_font:
+                    title_lines = self._wrap_text_by_width(title_text, title_font, available_text_width)
+                else:
+                    title_lines = op_data.get("title_wrapped", [title_text])
+                title_height = len(title_lines) * self._get_line_height_for_style("bold")
+                
+                summary_font = self._get_font("regular_sm")
+                summary_text = op_data.get("summary", "")
+                max_summary_lines = op_data.get("max_summary_lines", 3)
+                if summary_text and summary_font:
+                    summary_lines = self._wrap_text_by_width(summary_text, summary_font, available_text_width)
+                    summary_lines = summary_lines[:max_summary_lines]
+                else:
+                    summary_lines = op_data.get("summary_wrapped", [])
+                summary_height = len(summary_lines) * self._get_line_height_for_style("regular_sm")
 
                 text_height = (
                     source_height + title_height + summary_height
