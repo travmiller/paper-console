@@ -277,10 +277,14 @@ const ChannelList = ({
               return (
                 <div
                   key={module.id}
-                  className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-300 hover:border-black group transition-all'
+                  className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-300 hover:border-black group transition-all cursor-pointer'
                   style={{ backgroundColor: 'var(--color-bg-card)' }}
                   onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-white)', 'important')}
-                  onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-card)', 'important')}>
+                  onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-card)', 'important')}
+                  onClick={() => {
+                    setShowEditModuleModal(module.id);
+                    setEditingModule(JSON.parse(JSON.stringify(module)));
+                  }}>
                   <div className='flex-1 min-w-0 mr-2'>
                     <div className='text-sm font-bold text-gray-700 group-hover:text-black truncate transition-colors'>{module.name}</div>
                     <div
@@ -305,16 +309,6 @@ const ChannelList = ({
                       className='px-1.5 py-1 rounded border border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
                       title='Print this module'>
                       <PrintIcon className='w-3 h-3 text-gray-400 hover:text-black transition-colors' />
-                    </button>
-                    <button
-                      type='button'
-                      onClick={() => {
-                        setShowEditModuleModal(module.id);
-                        setEditingModule(JSON.parse(JSON.stringify(module)));
-                      }}
-                      className='px-2 py-1 rounded border border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer text-xs font-bold'
-                      title='Edit module'>
-                      EDIT
                     </button>
                   </div>
                 </div>
