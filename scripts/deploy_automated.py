@@ -11,6 +11,7 @@ import argparse
 import subprocess
 import sys
 import os
+import platform
 from pathlib import Path
 
 # Configuration file path
@@ -39,15 +40,16 @@ def load_config():
     
     return config
 
-def run_command(cmd, check=True, capture_output=False):
+def run_command(cmd, check=True, capture_output=False, shell=False):
     """Run a shell command and return the result."""
-    print(f"[*] Running: {' '.join(cmd)}")
+    print(f"[*] Running: {' '.join(cmd) if isinstance(cmd, list) else cmd}")
     try:
         result = subprocess.run(
             cmd,
             check=check,
             capture_output=capture_output,
-            text=True
+            text=True,
+            shell=shell
         )
         if capture_output:
             return result.stdout.strip()
@@ -58,6 +60,9 @@ def run_command(cmd, check=True, capture_output=False):
             print(f"   Output: {e.stdout}")
         if capture_output and e.stderr:
             print(f"   Error: {e.stderr}")
+        raise
+    except FileNotFoundError as e:
+        print(f"[X] Command not found: {e}")
         raise
 
 def check_git_status():
@@ -95,6 +100,54 @@ def commit_changes(message):
     run_command(["git", "commit", "-m", message])
     
     return True
+
+def build_ui(required=False):
+    """Build the web UI before deployment.
+    
+    Args:
+        required: If True, failure will raise an exception. If False, failures are non-fatal.
+    """
+    web_dir = Path("web")
+    if not web_dir.exists():
+        if required:
+            print("[X] Error: web directory not found")
+            raise FileNotFoundError("web directory not found")
+        print("[!] Warning: web directory not found, skipping UI build")
+        return True
+    
+    print("\n[*] Building web UI...")
+    original_dir = os.getcwd()
+    
+    try:
+        os.chdir(web_dir)
+        
+        # Check if node_modules exists, if not install dependencies
+        if not Path("node_modules").exists():
+            print("[*] Installing npm dependencies...")
+            # Try npm ci first (faster, more reliable), fall back to npm install
+            # Use shell=True on Windows to ensure PATH is respected
+            use_shell = platform.system() == "Windows"
+            try:
+                run_command(["npm", "ci"], check=True, shell=use_shell)
+            except Exception:
+                print("[*] npm ci failed, trying npm install...")
+                run_command(["npm", "install"], check=required, shell=use_shell)
+        
+        # Build the UI
+        print("[*] Running npm build...")
+        use_shell = platform.system() == "Windows"
+        run_command(["npm", "run", "build"], check=required, shell=use_shell)
+        print("[OK] UI build complete")
+        
+        return True
+    except Exception as e:
+        if required:
+            raise
+        print(f"[!] Warning: UI build failed: {e}")
+        print("   Continuing with deployment anyway...")
+        return False
+    finally:
+        os.chdir(original_dir)
 
 def push_to_remote(branch):
     """Push changes to remote repository."""
@@ -149,6 +202,19 @@ def deploy_to_pi(config):
     except Exception:
         print("[X] Failed to pull changes on Pi")
         return False
+    
+    # Rebuild UI on Pi (optional - dist is already committed, but ensures consistency)
+    print("\n[*] Rebuilding UI on Pi (if Node.js available)...")
+    build_cmd = [
+        "ssh",
+        f"{pi_user}@{pi_host}",
+        f"cd {pi_path}/web && npm ci && npm run build 2>/dev/null || echo 'UI build skipped (Node.js may not be installed)'"
+    ]
+    try:
+        run_command(build_cmd, check=False)  # Don't fail if build fails
+        print("[OK] UI rebuild attempted on Pi")
+    except Exception:
+        print("[!] UI rebuild skipped on Pi (non-critical)")
     
     # Restart service if requested
     if restart_service:
@@ -223,6 +289,15 @@ def main():
         response = input("Continue anyway? (y/N): ")
         if response.lower() != 'y':
             print("Deployment cancelled.")
+            return 1
+    
+    # Build UI before committing (so built files are included in commit)
+    # Make it required when committing to ensure build artifacts are included
+    if not args.skip_commit:
+        try:
+            build_ui(required=True)
+        except Exception as e:
+            print(f"[X] UI build failed and is required for commit: {e}")
             return 1
     
     # Commit changes if requested
