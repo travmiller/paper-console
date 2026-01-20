@@ -82,7 +82,7 @@ def format_news_receipt(
         printer.print_caption("Check your API key.")
     else:
         for i, article in enumerate(news_data):
-            # Print article with inline QR code on the left
+            # Print article with QR code below text on a new line
             cleaned_url = clean_url(article.get("url", ""))
             printer.print_article_block(
                 source=article["source"],

@@ -1086,18 +1086,14 @@ class PrinterDriver:
             elif op_type == "article_block":
                 qr_size = op_data.get("qr_size", 64)
                 qr_img = op_data.get("_qr_img")
-                qr_x = self.SPACING_SMALL
-                qr_y = y + 2
-                text_x = qr_size + 12
+                text_x = self.SPACING_SMALL
                 text_y = y + 2
                 
-                # Calculate available width for text (accounting for right margin)
+                # Calculate available width for text (full width, accounting for margins)
                 right_margin = self.SPACING_SMALL
                 available_text_width = self.PRINTER_WIDTH_DOTS - text_x - right_margin
 
-                if qr_img:
-                    img.paste(qr_img, (qr_x, qr_y))
-
+                # Render text first at full width
                 source = op_data.get("source", "")
                 source_font = self._get_font("caption")
                 source_height = self._get_line_height_for_style("caption")
@@ -1119,8 +1115,8 @@ class PrinterDriver:
                 title_line_height = self._get_line_height_for_style("bold")
                 title_text = op_data.get("title", "")
                 if title_font:
-                    # Re-wrap using pixel-based width calculation
-                    title_lines = self._wrap_text_by_width(title_text, title_font, available_text_width + 4)
+                    # Re-wrap using pixel-based width calculation (full width)
+                    title_lines = self._wrap_text_by_width(title_text, title_font, available_text_width)
                 else:
                     # Fallback to pre-wrapped lines
                     title_lines = op_data.get("title_wrapped", [title_text])
@@ -1135,8 +1131,8 @@ class PrinterDriver:
                 summary_line_height = self._get_line_height_for_style("regular_sm")
                 max_summary_lines = op_data.get("max_summary_lines", 3)
                 if summary_text and summary_font:
-                    # Re-wrap using pixel-based width calculation
-                    summary_lines = self._wrap_text_by_width(summary_text, summary_font, available_text_width + 4)
+                    # Re-wrap using pixel-based width calculation (full width)
+                    summary_lines = self._wrap_text_by_width(summary_text, summary_font, available_text_width)
                     summary_lines = summary_lines[:max_summary_lines]
                 else:
                     # Fallback to pre-wrapped lines
@@ -1146,8 +1142,20 @@ class PrinterDriver:
                         draw.text((text_x, text_y), line, font=summary_font, fill=0)
                     text_y += summary_line_height
 
-                text_height = text_y - (y + 2)
-                block_height = max(qr_size + self.SPACING_SMALL, text_height)
+                # Render QR code below the text on a new line
+                if qr_img:
+                    # Add some spacing between text and QR code
+                    text_y += self.SPACING_SMALL
+                    # Center the QR code horizontally
+                    qr_x = (self.PRINTER_WIDTH_DOTS - qr_img.width) // 2
+                    qr_y = text_y
+                    img.paste(qr_img, (qr_x, qr_y))
+                    text_y += qr_img.height + self.SPACING_SMALL
+                else:
+                    # If no QR code, just add a small gap
+                    text_y += self.SPACING_SMALL
+
+                block_height = text_y - (y + 2)
                 y += block_height + self.SPACING_MEDIUM
             elif op_type == "qr":
                 qr_img = op_data.get("_qr_img")
@@ -3209,7 +3217,7 @@ class PrinterDriver:
         summary_width: int = 32,
         max_summary_lines: int = 3,
     ):
-        """Print an article with QR code inline on the left.
+        """Print an article with QR code below the text on a new line.
 
         Args:
             source: News source name
@@ -3217,14 +3225,14 @@ class PrinterDriver:
             summary: Article summary/description
             url: URL to encode as QR code
             qr_size: Size of QR code in pixels (default 64)
-            title_width: Characters per line for title wrapping
-            summary_width: Characters per line for summary wrapping
+            title_width: Characters per line for title wrapping (fallback, uses pixel-based wrapping)
+            summary_width: Characters per line for summary wrapping (fallback, uses pixel-based wrapping)
             max_summary_lines: Maximum summary lines to show
         """
         if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
             self.flush_buffer()
 
-        # Wrap title and summary to fit next to QR code
+        # Wrap title and summary (fallback for pixel-based wrapping in renderer)
         from app.utils import wrap_text
 
         title_wrapped = wrap_text(title, width=title_width, indent=0)
