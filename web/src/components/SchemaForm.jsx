@@ -55,17 +55,20 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required 
 
     // 1. OBJECTS
     if (type === 'object') {
+        const isInline = uiOptions.layout === 'inline' || uiOptions.layout === 'compact';
+        
         return (
-            <div className="space-y-3">
-                {title && <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wider">{title}</h3>}
-                {description && <p className="text-xs text-gray-500 mb-2">{description}</p>}
+            <div className={isInline ? "flex flex-wrap gap-x-4 gap-y-2 items-end" : "space-y-3"}>
+                {title && !isInline && <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wider">{title}</h3>}
+                {description && !isInline && <p className="text-xs text-gray-500 mb-2">{description}</p>}
                 
                 {Object.entries(schema.properties || {}).map(([key, propSchema]) => {
                     const propUiSchema = uiSchema?.[key] || {};
                     const propValue = value?.[key];
+                    const isCompactItem = isInline || propUiSchema['ui:options']?.compact;
                     
                     return (
-                        <div key={key}>
+                        <div key={key} className={isInline ? "flex-1 min-w-[120px]" : ""}>
                             <SchemaField 
                                 schema={propSchema}
                                 uiSchema={propUiSchema}
@@ -77,6 +80,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required 
                                 path={[...path, key]}
                                 label={propSchema.title || key}
                                 required={schema.required && schema.required.includes(key)}
+                                compact={isCompactItem}
                             />
                         </div>
                     );
@@ -117,11 +121,14 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required 
                 
                 <div className="space-y-2">
                     {items.map((item, index) => (
-                        <div key={index} className="flex gap-2 items-start p-2 border border-gray-100 rounded bg-gray-50/50">
+                        <div key={index} className="flex gap-2 items-center p-3 border border-gray-200 rounded-lg bg-white relative group">
                              <div className="flex-1">
                                 <SchemaField 
                                     schema={itemSchema}
-                                    uiSchema={itemUiSchema}
+                                    uiSchema={{
+                                        ...itemUiSchema,
+                                        'ui:options': { ...itemUiSchema['ui:options'], layout: 'compact' }
+                                    }}
                                     value={item}
                                     onChange={(val) => handleChangeItem(index, val)}
                                     path={[...path, index]}
@@ -130,10 +137,12 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required 
                              <button 
                                 type="button" 
                                 onClick={() => handleRemove(index)}
-                                className="text-red-500 hover:text-red-700 px-2 py-1 mt-1 font-bold"
+                                className="text-gray-400 hover:text-red-500 transition-colors p-1"
                                 title="Remove Item"
                              >
-                                ×
+                                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
+                                    <path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path>
+                                </svg>
                              </button>
                         </div>
                     ))}
@@ -153,15 +162,15 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required 
     // 3. BOOLEANS
     if (type === 'boolean') {
         return (
-            <div className="flex items-center gap-2 py-1">
+            <div className={`flex items-center gap-2 ${compact ? 'py-0' : 'py-1'}`}>
                 <input 
                     type="checkbox"
                     checked={value || false}
                     onChange={(e) => onChange(e.target.checked)}
-                    className="w-4 h-4 text-amber-600 rounded focus:ring-amber-500 border-gray-300"
-                    style={{ accentColor: 'var(--color-brass)' }}
+                    className="w-4 h-4 text-black rounded border-2 border-gray-300 focus:ring-0 focus:ring-offset-0"
+                    style={{ accentColor: 'black' }}
                 />
-                <label className="text-sm text-gray-700 select-none cursor-pointer" onClick={() => onChange(!value)}>
+                <label className={`text-sm text-black select-none cursor-pointer ${compact ? 'font-medium' : ''}`} onClick={() => onChange(!value)}>
                     {title}
                 </label>
             </div>
@@ -191,9 +200,9 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required 
 
     // 5. STRINGS & NUMBERS
     return (
-        <div className="mb-2">
+        <div className={compact ? "mb-0" : "mb-2"}>
             {title && (
-                <label className={commonClasses.label}>
+                <label className={compact ? commonClasses.labelSmall : commonClasses.label}>
                     {title} {required && <span className="text-red-500 ml-1" title="Required">*</span>}
                 </label>
             )}
@@ -201,7 +210,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required 
                  <textarea
                     value={value || ''}
                     onChange={(e) => onChange(e.target.value)}
-                    className={`${commonClasses.input} min-h-[100px] text-sm`}
+                    className={`${compact ? commonClasses.inputSmall : commonClasses.input} min-h-[100px] text-sm`}
                     placeholder={uiSchema?.['ui:placeholder']}
                     rows={uiOptions.rows || 3}
                 />
@@ -213,11 +222,11 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required 
                         const val = e.target.value;
                         onChange(type === 'number' || type === 'integer' ? (val === '' ? undefined : parseFloat(val)) : val);
                     }}
-                    className={commonClasses.input}
+                    className={compact ? commonClasses.inputSmall : commonClasses.input}
                     placeholder={uiSchema?.['ui:placeholder']}
                 />
             )}
-             {description && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+             {description && !compact && <p className="text-xs text-gray-500 mt-1">{description}</p>}
         </div>
     );
 };
