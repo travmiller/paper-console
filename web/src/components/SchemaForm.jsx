@@ -44,7 +44,7 @@ const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange }) => {
   );
 };
 
-const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required }) => {
+const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required, compact }) => {
     const type = schema.type;
     const title = schema.title || label;
     const description = schema.description;
