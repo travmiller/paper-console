@@ -44,27 +44,8 @@ def get_weather_condition(code: int) -> str:
     return "Unknown"
 
 
-def get_weather_condition_openweather(code: int) -> str:
-    """Maps OpenWeather condition codes to text."""
-    if code in [800]:
-        return "Clear"
-    if code in [801, 802]:
-        return "Cloudy"
-    if code in [803, 804]:
-        return "Overcast"
-    if code in [300, 301, 302, 310, 311, 312, 313, 314, 321, 500, 501, 502, 503, 504, 520, 521, 522, 531]:
-        return "Rain"
-    if code in [200, 201, 202, 210, 211, 212, 221, 230, 231, 232]:
-        return "Storm"
-    if code in [511, 600, 601, 602, 611, 612, 613, 615, 616, 620, 621, 622]:
-        return "Snow"
-    if code in [701, 711, 721, 731, 741, 751, 761, 762, 771, 781]:
-        return "Fog"
-    return "Unknown"
-
-
 def get_weather(config: Optional[Dict[str, Any]] = None):
-    """Fetches weather from OpenWeather API or Open-Meteo."""
+    """Fetches weather from Open-Meteo API."""
     if config:
         # Support new nested location object
         location = config.get("location", {})
@@ -72,76 +53,14 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         longitude = location.get("longitude") or config.get("longitude") or app.config.settings.longitude
         timezone = location.get("timezone") or config.get("timezone") or app.config.settings.timezone
         city_name = location.get("city_name") or config.get("city_name") or app.config.settings.city_name
-        api_key = config.get("openweather_api_key")
     else:
         latitude = app.config.settings.latitude
         longitude = app.config.settings.longitude
         timezone = app.config.settings.timezone
         city_name = app.config.settings.city_name
-        api_key = None
 
     empty_forecast = [{"day": "--", "high": "--", "low": "--", "condition": "Unknown", "icon": "cloud"} for _ in range(7)]
     empty_hourly = []
-
-    if api_key:
-        try:
-            url = "https://api.openweathermap.org/data/2.5/weather"
-            params = {
-                "lat": latitude,
-                "lon": longitude,
-                "appid": api_key,
-                "units": "imperial",
-            }
-            resp = requests.get(url, params=params, timeout=10)
-            data = resp.json()
-
-            if resp.status_code == 200:
-                current_temp = int(data["main"]["temp"])
-                condition_code = data["weather"][0]["id"]
-                condition = get_weather_condition_openweather(condition_code)
-                high = int(data["main"]["temp_max"])
-                low = int(data["main"]["temp_min"])
-                city = data.get("name", city_name)
-
-                forecast = []
-                try:
-                    forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
-                    forecast_resp = requests.get(forecast_url, params=params, timeout=10)
-                    forecast_data = forecast_resp.json()
-                    
-                    if forecast_resp.status_code == 200:
-                        today_key = datetime.now().strftime("%Y-%m-%d")
-                        days_seen = {}
-                        for item in forecast_data.get("list", []):
-                            dt = datetime.fromtimestamp(item["dt"])
-                            day_key = dt.strftime("%Y-%m-%d")
-                            if day_key == today_key:
-                                continue
-                            if day_key not in days_seen:
-                                days_seen[day_key] = {
-                                    "day": dt.strftime("%a"),
-                                    "high": int(item["main"]["temp_max"]),
-                                    "low": int(item["main"]["temp_min"]),
-                                    "condition": get_weather_condition_openweather(item["weather"][0]["id"]),
-                                }
-                            else:
-                                days_seen[day_key]["high"] = max(days_seen[day_key]["high"], int(item["main"]["temp_max"]))
-                                days_seen[day_key]["low"] = min(days_seen[day_key]["low"], int(item["main"]["temp_min"]))
-                        forecast = list(days_seen.values())[:7]
-                except Exception:
-                    pass
-
-                return {
-                    "current": current_temp,
-                    "condition": condition,
-                    "high": high,
-                    "low": low,
-                    "city": city,
-                    "forecast": forecast if forecast else empty_forecast,
-                    "hourly_forecast": [],
-                }
-        except Exception:
-            pass
 
     try:
         url = "https://api.open-meteo.com/v1/forecast"
@@ -550,11 +469,6 @@ def draw_hourly_forecast_image(hourly_forecast: list, total_width: int, fonts: D
     config_schema={
         "type": "object",
         "properties": {
-            "openweather_api_key": {
-                "type": "string", 
-                "title": "OpenWeather API Key (Optional)",
-                "description": "Leave duplicate keys blank to use free Open-Meteo API"
-            },
             "location": {
                 "type": "object",
                 "title": "Location",
@@ -571,7 +485,6 @@ def draw_hourly_forecast_image(hourly_forecast: list, total_width: int, fonts: D
         },
     },
     ui_schema={
-        "openweather_api_key": {"ui:widget": "password"},
         "location": {"ui:widget": "location-search"}
     },
 )

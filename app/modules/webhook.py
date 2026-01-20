@@ -6,6 +6,43 @@ from app.config import WebhookConfig
 from app.module_registry import register_module
 
 
+# Preset configurations for common webhooks
+WEBHOOK_PRESETS = {
+    "custom": {
+        "label": "Custom",
+        "url": "",
+        "method": "GET",
+        "headers": {},
+        "body": "",
+        "json_path": ""
+    },
+    "dad_jokes": {
+        "label": "Dad Jokes",
+        "url": "https://icanhazdadjoke.com/",
+        "method": "GET",
+        "headers": {"Accept": "application/json"},
+        "body": "",
+        "json_path": "joke"
+    },
+    "chuck_norris": {
+        "label": "Chuck Norris Facts",
+        "url": "https://api.chucknorris.io/jokes/random",
+        "method": "GET",
+        "headers": {},
+        "body": "",
+        "json_path": "value"
+    },
+    "random_quote": {
+        "label": "Random Quote",
+        "url": "https://api.quotable.io/random",
+        "method": "GET",
+        "headers": {},
+        "body": "",
+        "json_path": "content"
+    }
+}
+
+
 @register_module(
     type_id="webhook",
     label="Webhook",
@@ -16,6 +53,12 @@ from app.module_registry import register_module
     config_schema={
         "type": "object",
         "properties": {
+             "preset": {
+                 "type": "string",
+                 "title": "Preset",
+                 "enum": ["custom", "dad_jokes", "chuck_norris", "random_quote"],
+                 "default": "custom"
+             },
              "url": {"type": "string", "title": "URL"},
              "method": {"type": "string", "title": "Method", "enum": ["GET", "POST"], "default": "GET"},
              "headers": {
@@ -30,6 +73,7 @@ from app.module_registry import register_module
         "required": ["url"]
     },
     ui_schema={
+        "preset": {"ui:widget": "preset-select", "ui:options": {"presets": WEBHOOK_PRESETS}},
         "headers": {"ui:widget": "key-value-list"},
         "body": {"ui:widget": "textarea"}
     },

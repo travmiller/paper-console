@@ -3,6 +3,7 @@ import { commonClasses } from '../design-tokens';
 import LocationSearch from './widgets/LocationSearch';
 import KeyValueList from './widgets/KeyValueList';
 import Checklist from './widgets/Checklist';
+import PresetSelect from './widgets/PresetSelect';
 
 /**
  * A lightweight JSON Schema form renderer.
@@ -40,12 +41,14 @@ const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange }) => {
         value={formData} 
         onChange={(val) => onChange(val)} 
         path={[]} 
+        rootValue={formData}
+        onRootChange={onChange}
       />
     </div>
   );
 };
 
-const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required, compact }) => {
+const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required, compact, rootValue, onRootChange }) => {
     const type = schema.type;
     const title = schema.title || label;
     const description = schema.description;
@@ -82,6 +85,8 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                                 label={propSchema.title || key}
                                 required={schema.required && schema.required.includes(key)}
                                 compact={isCompactItem}
+                                rootValue={rootValue}
+                                onRootChange={onRootChange}
                             />
                         </div>
                     );
@@ -205,6 +210,27 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
             <div className="mb-4">
                 {title && <label className={commonClasses.label}>{title}</label>}
                 <KeyValueList value={value} onChange={onChange} />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+            </div>
+        );
+    }
+    
+    if (widget === 'preset-select') {
+        const presets = uiOptions.presets || {};
+        return (
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
+                <PresetSelect 
+                    value={value} 
+                    onChange={onChange} 
+                    presets={presets}
+                    onPresetSelect={(presetValues) => {
+                        // Merge preset values with root form data
+                        if (onRootChange && rootValue) {
+                            onRootChange({ ...rootValue, ...presetValues });
+                        }
+                    }}
+                />
                 {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
             </div>
         );

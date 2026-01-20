@@ -80,7 +80,7 @@ from app.utils import wrap_text
             "news_api_key": {
                 "type": "string", 
                 "title": "NewsAPI Key",
-                "description": "Get free key from newsapi.org"
+                "description": "Get a free API key at https://newsapi.org/"
             }
         },
         "required": ["news_api_key"]
