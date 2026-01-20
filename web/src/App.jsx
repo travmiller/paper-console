@@ -194,6 +194,25 @@ function App() {
     }
   };
 
+  const triggerModulePrint = async (moduleId) => {
+    try {
+      const response = await fetch(`/debug/print-module/${moduleId}`, { method: 'POST' });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ detail: 'Failed to trigger print' }));
+        throw new Error(errorData.detail || 'Failed to trigger print');
+      }
+
+      const data = await response.json();
+      setStatus({ type: 'success', message: data.message || 'Printing module...' });
+      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+    } catch (err) {
+      console.error('Error triggering module print:', err);
+      setStatus({ type: 'error', message: err.message || 'Failed to trigger print' });
+      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+    }
+  };
+
 
   // --- Settings Save ---
 
@@ -601,6 +620,7 @@ function App() {
             settings={settings}
             modules={modules}
             triggerChannelPrint={triggerChannelPrint}
+            triggerModulePrint={triggerModulePrint}
             setShowScheduleModal={setShowScheduleModal}
             swapChannels={swapChannels}
             setShowEditModuleModal={setShowEditModuleModal}

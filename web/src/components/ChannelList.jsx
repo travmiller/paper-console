@@ -11,6 +11,7 @@ const ChannelList = ({
   settings,
   modules,
   triggerChannelPrint,
+  triggerModulePrint,
   setShowScheduleModal,
   swapChannels,
   setShowEditModuleModal,
@@ -173,6 +174,13 @@ const ChannelList = ({
                       })()}
                     </div>
                     <div className='flex gap-2 items-center' onClick={(e) => e.stopPropagation()}>
+                      <button
+                        type='button'
+                        onClick={() => triggerModulePrint(item.module_id)}
+                        className='px-1.5 py-1 rounded border border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
+                        title='Print this module'>
+                        <PrintIcon className='w-3 h-3 text-gray-400 hover:text-black transition-colors' />
+                      </button>
                       <div className='flex flex-col gap-0.5'>
                         <button
                           type='button'
