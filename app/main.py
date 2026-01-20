@@ -1574,9 +1574,10 @@ async def install_updates():
                     "warning": "Service restart may have failed. The device will restart shortly - if you see an error, wait a moment and refresh the page.",
                     "error": restart_result.stderr,
                 }
-            
+
             # Give the service a moment to start up
             import time
+
             time.sleep(2)
 
         return {
