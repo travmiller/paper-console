@@ -36,22 +36,21 @@ from app.config import (
     ChannelConfig,
     PRINTER_WIDTH,
 )
-from app.modules import (
-    astronomy,
-    sudoku,
-    news,
-    rss,
-    email_client,
-    webhook,
-    text,
-    calendar,
-    weather,
-    maze,
-    quotes,
-    history,
-    checklist,
-    qrcode_print,
+
+# Import modules package to trigger auto-discovery and registration
+import app.modules  # noqa: F401
+
+# Import module registry for dynamic dispatch
+from app.module_registry import (
+    get_module as get_module_def,
+    get_all_modules,
+    list_module_types,
+    is_registered,
 )
+
+# Legacy imports for modules with special handling (can be removed after full migration)
+from app.modules import email_client, webhook, text, calendar
+
 from app.routers import wifi
 import app.wifi_manager as wifi_manager
 import app.hardware as hardware
@@ -2251,6 +2250,24 @@ async def search_location(q: str, limit: int = 20, use_api: Optional[str] = None
 # --- MODULE MANAGEMENT API ---
 
 
+@app.get("/api/module-types")
+async def get_module_types():
+    """
+    Returns all available module types from the registry.
+    
+    This endpoint enables the frontend to dynamically discover what module
+    types are available without hardcoding them. Each module type includes:
+    - id: The module type identifier (e.g., "weather", "quotes")
+    - label: Human-readable name for the UI
+    - description: Brief description of what the module does
+    - icon: Icon name for the UI
+    - offline: Whether the module works without internet
+    - category: Grouping category for UI organization
+    - configSchema: JSON schema for config form generation (optional)
+    """
+    return {"moduleTypes": list_module_types()}
+
+
 @app.get("/api/modules")
 async def list_modules():
     """List all module instances."""
@@ -2443,69 +2460,51 @@ async def update_channel_schedule(
 
 
 def execute_module(module: ModuleInstance) -> bool:
-    """Execute a single module instance. Returns True if successful, False if failed."""
+    """
+    Execute a single module instance using the module registry.
+    
+    Returns True if successful, False if failed.
+    """
     module_type = module.type
     config = module.config or {}
     module_name = module.name or module_type.upper()
 
+    # Handle disabled modules
+    if module_type == "off":
+        return True  # Disabled modules are "successful" (intentionally empty)
+
     try:
-        # Dispatch Logic
+        # Special handling for modules with Pydantic config classes
+        # These require config to be parsed into specific types before calling
         if module_type == "webhook":
             action_config = WebhookConfig(**config)
             webhook.run_webhook(action_config, printer, module_name)
+            return True
 
         elif module_type == "text":
             text_config = TextConfig(**config)
             text.format_text_receipt(printer, text_config, module_name)
+            return True
 
         elif module_type == "calendar":
             cal_config = CalendarConfig(**config)
             calendar.format_calendar_receipt(printer, cal_config, module_name)
-
-        elif module_type == "news":
-            news.format_news_receipt(printer, config, module_name)
-
-        elif module_type == "rss":
-            rss.format_rss_receipt(printer, config, module_name)
+            return True
 
         elif module_type == "email":
+            # Email has special handling - fetch emails first, then format
             emails = email_client.fetch_emails(config)
             email_client.format_email_receipt(
                 printer, messages=emails, config=config, module_name=module_name
             )
+            return True
 
-        elif module_type == "games":
-            sudoku.format_sudoku_receipt(printer, config, module_name)
-
-        elif module_type == "maze":
-            maze.format_maze_receipt(printer, config, module_name)
-
-        elif module_type == "quotes":
-            quotes.format_quotes_receipt(printer, config, module_name)
-
-        elif module_type == "history":
-            history.format_history_receipt(printer, config, module_name)
-
-        elif module_type == "checklist":
-            checklist.format_checklist_receipt(printer, config, module_name)
-
-        elif module_type == "system_monitor":
-            from app.modules import system_monitor
-
-            system_monitor.format_system_monitor_receipt(printer, config, module_name)
-
-        elif module_type == "qrcode":
-            qrcode_print.format_qrcode_receipt(printer, config, module_name)
-
-        elif module_type == "astronomy":
-            astronomy.format_astronomy_receipt(printer, module_name=module_name)
-
-        elif module_type == "weather":
-            weather.format_weather_receipt(printer, config, module_name)
-
-        elif module_type == "off":
-            return True  # Disabled modules are "successful" (intentionally empty)
-
+        # Use registry for all other modules
+        module_def = get_module_def(module_type)
+        if module_def:
+            # Standard call signature: (printer, config, module_name)
+            module_def.execute_fn(printer, config, module_name)
+            return True
         else:
             # Unknown module type
             printer.print_text(f"{module_name}")
@@ -2515,9 +2514,9 @@ def execute_module(module: ModuleInstance) -> bool:
             printer.print_text("your settings.")
             return False
 
-        return True
-
-    except Exception:
+    except Exception as e:
+        # Log the error for debugging
+        logging.error(f"Error executing module '{module_type}': {e}")
         # Print a friendly error message
         printer.print_text(f"{module_name}")
         printer.print_line()

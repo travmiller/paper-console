@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 import re
 from app.config import settings
 from app.modules.news import clean_url
+from app.module_registry import register_module
 
 # Maximum size for RSS feed content (500KB)
 MAX_FEED_SIZE = 500 * 1024
@@ -125,6 +126,14 @@ def get_rss_articles(config: Dict[str, Any] = None):
     return articles[:10]  # Cap at 10 items total
 
 
+@register_module(
+    type_id="rss",
+    label="RSS Feeds",
+    description="Articles from custom RSS feed URLs",
+    icon="rss",
+    offline=False,
+    category="content",
+)
 def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str = None):
     """Compiles and prints the RSS feed receipt."""
     articles = get_rss_articles(config)

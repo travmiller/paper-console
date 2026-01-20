@@ -4,6 +4,7 @@ from typing import Dict, Any, List
 from pathlib import Path
 from datetime import datetime
 from app.utils import wrap_text
+from app.module_registry import register_module
 
 # We will use a curated "On This Day" dataset.
 # There are several options, but zenorocha/voice-history is a good source of historical events in JSON.
@@ -74,6 +75,14 @@ def get_events_for_today() -> List[str]:
         return ["Error reading history database."]
 
 
+@register_module(
+    type_id="history",
+    label="On This Day",
+    description="Random historical events that happened on today's date",
+    icon="hourglass",
+    offline=True,
+    category="content",
+)
 def format_history_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None
 ):

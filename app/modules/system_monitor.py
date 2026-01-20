@@ -5,8 +5,17 @@ from datetime import datetime
 from typing import Dict, Any
 from app.wifi_manager import get_wifi_status
 from app.utils import wrap_text
+from app.module_registry import register_module
 
 
+@register_module(
+    type_id="system_monitor",
+    label="System Monitor",
+    description="System status: IP address, disk usage, memory, uptime, CPU temperature",
+    icon="desktop",
+    offline=True,
+    category="utilities",
+)
 def format_system_monitor_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None
 ):

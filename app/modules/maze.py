@@ -1,5 +1,6 @@
 import random
 from typing import Dict, Any, List, Tuple
+from app.module_registry import register_module
 
 
 class MazeGenerator:
@@ -208,6 +209,14 @@ class MazeGenerator:
         self.grid[self.height - 1][self.exit_x] = 0  # Exit (bottom)
 
 
+@register_module(
+    type_id="maze",
+    label="Maze Generator",
+    description="Enhanced 61x61 maze with loops and extended dead-ends",
+    icon="path",
+    offline=True,
+    category="games",
+)
 def format_maze_receipt(printer, config: Dict[str, Any] = None, module_name: str = None):
     """Prints a challenging Maze puzzle."""
     from datetime import datetime

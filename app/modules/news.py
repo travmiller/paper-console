@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict, Any
 from urllib.parse import urlparse, urlunparse
 from app.config import settings
+from app.module_registry import register_module
 
 
 def clean_url(url: str) -> str:
@@ -66,6 +67,14 @@ def get_newsapi_articles(config: Dict[str, Any] = None):
 from app.utils import wrap_text
 
 
+@register_module(
+    type_id="news",
+    label="News API",
+    description="Top headlines from NewsAPI (requires API key)",
+    icon="newspaper",
+    offline=False,
+    category="content",
+)
 def format_news_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None
 ):

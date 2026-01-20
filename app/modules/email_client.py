@@ -7,6 +7,7 @@ from bs4 import BeautifulSoup
 from typing import Dict, Any, List
 from app.config import EmailConfig, PRINTER_WIDTH
 import app.config
+from app.module_registry import register_module
 
 # Set default socket timeout for IMAP operations (30 seconds)
 IMAP_TIMEOUT = 30
@@ -212,6 +213,14 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
 
 
 # --- FORMATTER ---
+@register_module(
+    type_id="email",
+    label="Email Inbox",
+    description="Print unread emails from IMAP inbox",
+    icon="envelope",
+    offline=False,
+    category="content",
+)
 def format_email_receipt(
     printer, messages=None, config: Dict[str, Any] = None, module_name: str = None
 ):

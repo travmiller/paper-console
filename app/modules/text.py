@@ -1,6 +1,15 @@
 from app.config import TextConfig
 from app.drivers.printer_mock import PrinterDriver
+from app.module_registry import register_module
 
+@register_module(
+    type_id="text",
+    label="Text / Note",
+    description="Print custom text or notes",
+    icon="note",
+    offline=True,
+    category="utilities",
+)
 def format_text_receipt(printer: PrinterDriver, config: TextConfig, module_name: str = None):
     """Prints a static text note."""
     from datetime import datetime

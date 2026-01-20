@@ -1,5 +1,6 @@
 import random
 from typing import Dict, Any
+from app.module_registry import register_module
 
 
 class SudokuGenerator:
@@ -99,6 +100,14 @@ def generate_puzzle(difficulty="medium"):
     return gen.grid
 
 
+@register_module(
+    type_id="games",
+    label="Sudoku",
+    description="Generate printable Sudoku puzzles in medium or hard difficulty",
+    icon="grid-nine",
+    offline=True,
+    category="games",
+)
 def format_sudoku_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None
 ):

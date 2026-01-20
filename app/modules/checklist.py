@@ -1,8 +1,17 @@
 from typing import Dict, Any, List
 from datetime import datetime
 from app.drivers.printer_mock import PrinterDriver
+from app.module_registry import register_module
 
 
+@register_module(
+    type_id="checklist",
+    label="Checklist",
+    description="Printable checklist with checkbox items",
+    icon="check-square",
+    offline=True,
+    category="utilities",
+)
 def format_checklist_receipt(printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None):
     """Prints a checklist with items that can be checked off."""
     

@@ -3,8 +3,17 @@ import json
 from typing import Optional
 from app.drivers.printer_mock import PrinterDriver
 from app.config import WebhookConfig
+from app.module_registry import register_module
 
 
+@register_module(
+    type_id="webhook",
+    label="Webhook",
+    description="Fetch and print data from any API endpoint",
+    icon="plugs",
+    offline=False,
+    category="utilities",
+)
 def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str = None):
     """
     Executes a custom webhook action and prints the result.

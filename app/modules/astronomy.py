@@ -6,6 +6,7 @@ from astral.moon import phase
 from typing import Dict, Any, List, Tuple
 import app.config
 from app.config import format_time
+from app.module_registry import register_module
 
 # Dynamic Location from Config
 def get_city_info():
@@ -115,6 +116,14 @@ def get_almanac_data():
         "day_length": str(s["sunset"] - s["sunrise"]).split('.')[0] # HH:MM:SS
     }
 
+@register_module(
+    type_id="astronomy",
+    label="Astronomy",
+    description="Sunrise, sunset, moon phase, and sun path visualization",
+    icon="moon-stars",
+    offline=True,
+    category="content",
+)
 def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name: str = None):
     """Prints the Almanac to the provided printer driver."""
     

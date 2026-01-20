@@ -5,6 +5,7 @@ import requests
 from typing import Dict, Any, List
 from pathlib import Path
 from app.utils import wrap_text
+from app.module_registry import register_module
 
 # Curated list of quotes (approx 5k) - clean and reliable source
 # Using JamesFT/Database-Quotes-JSON
@@ -93,6 +94,14 @@ def get_random_quote() -> Dict[str, str]:
         }
 
 
+@register_module(
+    type_id="quotes",
+    label="Daily Quote",
+    description="Prints a random inspirational quote from offline database (5000+ quotes)",
+    icon="quotes",
+    offline=True,
+    category="content",
+)
 def format_quotes_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None
 ):

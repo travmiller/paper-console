@@ -3,6 +3,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 import app.config
 from app.drivers.printer_mock import PrinterDriver
+from app.module_registry import register_module
 
 
 def get_weather_condition(code: int) -> str:
@@ -412,6 +413,14 @@ def _get_icon_type(condition: str) -> str:
         return "cloud"  # Maps to cloud.png
 
 
+@register_module(
+    type_id="weather",
+    label="Weather Forecast",
+    description="Current conditions, 24-hour, and 7-day forecast",
+    icon="cloud-sun",
+    offline=False,
+    category="content",
+)
 def format_weather_receipt(
     printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None
 ):

@@ -14,6 +14,7 @@ Supports multiple QR code types:
 from app.config import QRCodeConfig
 from app.drivers.printer_mock import PrinterDriver
 from datetime import datetime
+from app.module_registry import register_module
 
 
 def _generate_wifi_string(ssid: str, password: str, security: str = "WPA", hidden: bool = False) -> str:
@@ -70,6 +71,14 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
     return result
 
 
+@register_module(
+    type_id="qrcode",
+    label="QR Code",
+    description="Generate QR codes for URLs, WiFi, contacts, phone numbers, and more",
+    icon="qr-code",
+    offline=True,
+    category="utilities",
+)
 def format_qrcode_receipt(printer: PrinterDriver, config: dict, module_name: str = None):
     """Print a QR code based on configuration."""
     qr_config = QRCodeConfig(**config) if isinstance(config, dict) else config

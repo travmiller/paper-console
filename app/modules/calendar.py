@@ -7,6 +7,7 @@ from dateutil.rrule import rrulestr
 from app.drivers.printer_mock import PrinterDriver
 from app.config import CalendarConfig, format_time
 import app.config
+from app.module_registry import register_module
 
 
 def fetch_ics(url: str) -> str:
@@ -398,6 +399,14 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
             printer.print_line()
 
 
+@register_module(
+    type_id="calendar",
+    label="Calendar",
+    description="Events from iCal calendar URLs",
+    icon="calendar-blank",
+    offline=False,
+    category="content",
+)
 def format_calendar_receipt(
     printer: PrinterDriver, config: CalendarConfig, module_name: str = None
 ):
