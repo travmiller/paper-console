@@ -225,8 +225,19 @@ from app.utils import print_setup_instructions_sync
 
 
 async def print_setup_instructions():
-    """Prints the WiFi setup instructions."""
-    print_setup_instructions_sync()
+    """Prints the WiFi setup instructions.
+    Runs blocking printer operations in a thread pool to avoid blocking the event loop.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    
+    try:
+        # Run blocking printer operations in thread pool to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, print_setup_instructions_sync)
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in print_setup_instructions: {e}", exc_info=True)
 
 
 def _get_welcome_marker_path() -> str:
@@ -535,18 +546,26 @@ def on_factory_reset_threadsafe():
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     global email_polling_task, scheduler_task, task_monitor_task, global_loop
+    from concurrent.futures import ThreadPoolExecutor
 
     # Capture the running loop
     global_loop = asyncio.get_running_loop()
 
     # Clear printer hardware buffer first to prevent startup garbage
-    if hasattr(printer, "clear_hardware_buffer"):
-        printer.clear_hardware_buffer()
+    # Run in thread pool to avoid blocking event loop
+    def _init_printer():
+        if hasattr(printer, "clear_hardware_buffer"):
+            printer.clear_hardware_buffer()
+        if hasattr(printer, "set_cutter_feed"):
+            cutter_lines = getattr(settings, "cutter_feed_lines", 7)
+            printer.set_cutter_feed(cutter_lines)
     
-    # Set cutter feed space from settings (added to bitmap for reliable paper feed)
-    if hasattr(printer, "set_cutter_feed"):
-        cutter_lines = getattr(settings, "cutter_feed_lines", 7)
-        printer.set_cutter_feed(cutter_lines)
+    try:
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _init_printer)
+    except Exception:
+        pass  # Non-critical, continue startup even if printer init fails
 
     # Check for first boot and print welcome message
     asyncio.create_task(check_first_boot())
