@@ -26,7 +26,8 @@ from app.module_registry import register_module
              },
              "body": {"type": "string", "title": "Body (JSON)"},
              "json_path": {"type": "string", "title": "JSON Path"}
-        }
+        },
+        "required": ["url"]
     },
     ui_schema={
         "headers": {"ui:widget": "key-value-list"},

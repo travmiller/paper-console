@@ -565,7 +565,8 @@ def draw_hourly_forecast_image(hourly_forecast: list, total_width: int, fonts: D
                     "timezone": {"type": "string"},
                     "state": {"type": "string"},
                     "zipcode": {"type": "string"}
-                }
+                },
+                "required": ["city_name", "latitude", "longitude"]
             }
         },
     },

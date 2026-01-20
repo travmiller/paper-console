@@ -82,7 +82,8 @@ from app.utils import wrap_text
                 "title": "NewsAPI Key",
                 "description": "Get free key from newsapi.org"
             }
-        }
+        },
+        "required": ["news_api_key"]
     },
     ui_schema={
         "news_api_key": {"ui:widget": "password"}
