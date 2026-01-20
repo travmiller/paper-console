@@ -116,12 +116,13 @@ async def email_polling_loop():
             # Check each email module silently
             for module in email_modules:
                 try:
-                    emails = email_client.fetch_emails(module.config)
-                    if emails:
-                        # Run printer operations in thread pool to avoid blocking event loop
-                        from concurrent.futures import ThreadPoolExecutor
-                        
-                        def _print_email():
+                    # Run email fetching and printing in thread pool to avoid blocking event loop
+                    from concurrent.futures import ThreadPoolExecutor
+                    
+                    def _fetch_and_print_email():
+                        # Fetch emails (blocking IMAP operation)
+                        emails = email_client.fetch_emails(module.config)
+                        if emails:
                             # Prepare printer for new job
                             if hasattr(printer, "reset_buffer"):
                                 max_lines = getattr(settings, "max_print_lines", 200)
@@ -137,10 +138,10 @@ async def email_polling_loop():
                             # Flush to hardware (spacing is built into bitmap)
                             if hasattr(printer, "flush_buffer"):
                                 printer.flush_buffer()
-                        
-                        loop = asyncio.get_event_loop()
-                        with ThreadPoolExecutor() as executor:
-                            await loop.run_in_executor(executor, _print_email)
+                    
+                    loop = asyncio.get_event_loop()
+                    with ThreadPoolExecutor() as executor:
+                        await loop.run_in_executor(executor, _fetch_and_print_email)
 
                 except Exception:
                     pass  # Silently skip failed email checks
@@ -1742,6 +1743,7 @@ async def search_location(q: str, limit: int = 20, use_api: Optional[str] = None
         try:
             import requests
             import time
+            from concurrent.futures import ThreadPoolExecutor
 
             # Use Nominatim API (free, no API key required)
             # Rate limit: 1 request per second - we'll respect this
@@ -1757,9 +1759,16 @@ async def search_location(q: str, limit: int = 20, use_api: Optional[str] = None
                 "User-Agent": "Paper-Console/1.0 (PC-1 Thermal Printer)",  # Required by Nominatim
             }
 
-            response = requests.get(
-                nominatim_url, params=params, headers=headers, timeout=3
-            )
+            # Run blocking network request in thread pool to avoid blocking event loop
+            def _fetch_location_api():
+                return requests.get(
+                    nominatim_url, params=params, headers=headers, timeout=3
+                )
+            
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor() as executor:
+                response = await loop.run_in_executor(executor, _fetch_location_api)
+            
             if response.status_code == 200:
                 api_results = response.json()
                 if api_results:
@@ -2409,8 +2418,22 @@ async def test_webhook(action: WebhookConfig):
     """
     Executes a custom webhook immediately for testing.
     Pass the webhook configuration in the body.
+    Runs blocking operations in a thread pool to avoid blocking the event loop.
     """
-    webhook.run_webhook(action, printer, module_name=None)
+    from concurrent.futures import ThreadPoolExecutor
+    
+    def _run_webhook():
+        webhook.run_webhook(action, printer, module_name=None)
+    
+    try:
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _run_webhook)
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in test_webhook: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Webhook execution failed: {str(e)}")
+    
     return {"message": "Webhook executed"}
 
 
