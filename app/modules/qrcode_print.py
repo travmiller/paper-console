@@ -88,7 +88,8 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
                 "default": "text"
             },
             "content": {"type": "string", "title": "Content / URL / Phone"},
-            "size": {"type": "integer", "title": "Size (pixels)", "default": 300},
+            "content": {"type": "string", "title": "Content / URL / Phone"},            
+
             
             # WiFi Specifics
             "wifi_ssid": {"type": "string", "title": "WiFi SSID"},
