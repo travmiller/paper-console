@@ -1186,8 +1186,25 @@ class PrinterDriver:
             elif op_type == "qr":
                 qr_img = op_data.get("_qr_img")
                 if qr_img:
-                    img.paste(qr_img, (self.SPACING_SMALL, y + 2))
-                    y += qr_img.height + self.SPACING_SMALL
+                    # Center the QR code horizontally and ensure it fits within printer width
+                    max_qr_width = width - (2 * self.SPACING_SMALL)  # Leave margins on both sides
+                    qr_width = qr_img.width
+                    qr_height = qr_img.height
+                    
+                    # Scale down if QR code is too wide
+                    if qr_width > max_qr_width:
+                        scale_factor = max_qr_width / qr_width
+                        new_width = int(qr_width * scale_factor)
+                        new_height = int(qr_height * scale_factor)
+                        qr_img = qr_img.resize((new_width, new_height), Image.LANCZOS)
+                        qr_width = new_width
+                        qr_height = new_height
+                    
+                    # Center horizontally
+                    qr_x = (width - qr_width) // 2
+                    qr_y = y + self.SPACING_SMALL
+                    img.paste(qr_img, (qr_x, qr_y))
+                    y += qr_height + self.SPACING_MEDIUM
 
         # Rotate 180° for upside-down printing
         img = img.rotate(180)
