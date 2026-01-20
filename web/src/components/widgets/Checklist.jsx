@@ -70,17 +70,17 @@ const ChecklistWidget = ({ value = [], onChange }) => {
   }, [items.length]);
 
   return (
-    <div className="space-y-0 border border-gray-100 rounded-lg overflow-hidden bg-white">
+    <div className="space-y-0 border border-zinc-200 rounded-lg overflow-hidden bg-white">
       {items.map((item, index) => (
         <div 
             key={index} 
-            className={`flex items-center gap-3 group px-3 py-2 transition-all border-b border-gray-100 last:border-0 hover:bg-neutral-50`}
+            className={`flex items-center gap-3 group px-3 py-2 transition-all border-b border-zinc-100 last:border-0 hover:bg-zinc-50`}
         >
           <input
             type="checkbox"
             checked={item.checked || false}
             onChange={(e) => updateItem(index, 'checked', e.target.checked)}
-            className="w-5 h-5 text-black rounded border-2 border-gray-300 focus:ring-0 cursor-pointer flex-shrink-0"
+            className="w-5 h-5 text-black rounded border-2 border-zinc-300 focus:ring-0 cursor-pointer flex-shrink-0"
             style={{ accentColor: 'black' }}
           />
           <input

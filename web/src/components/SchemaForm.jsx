@@ -60,8 +60,8 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
         
         return (
             <div className={isInline ? "flex flex-wrap gap-x-4 gap-y-2 items-end" : "space-y-3"}>
-                {title && !isInline && <h3 className="font-bold text-sm text-gray-700 uppercase tracking-wider">{title}</h3>}
-                {description && !isInline && <p className="text-xs text-gray-500 mb-2">{description}</p>}
+                {title && !isInline && <h3 className="font-bold text-sm text-zinc-700 uppercase tracking-wider">{title}</h3>}
+                {description && !isInline && <p className="text-xs text-zinc-500 mb-2">{description}</p>}
                 
                 {Object.entries(schema.properties || {}).map(([key, propSchema]) => {
                     const propUiSchema = uiSchema?.[key] || {};
@@ -133,7 +133,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 
                 <div className="space-y-2">
                     {items.map((item, index) => (
-                        <div key={index} className="flex gap-2 items-center p-3 border border-gray-200 rounded-lg bg-white relative group">
+                        <div key={index} className="flex gap-2 items-center p-3 border border-zinc-200 rounded-lg bg-white relative group">
                              <div className="flex-1">
                                 <SchemaField 
                                     schema={itemSchema}
