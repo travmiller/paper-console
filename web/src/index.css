@@ -245,16 +245,6 @@ body {
     border-color: var(--color-border-main) !important;
   }
   
-  /* Brass/Gold color utilities (replacing blue) */
-  .text-blue-500 { color: var(--color-brass) !important; }
-  .text-blue-600 { color: var(--color-brass) !important; }
-  .bg-blue-50 { background-color: var(--color-brass-10) !important; }
-  .bg-blue-500 { background-color: var(--color-brass) !important; }
-  .border-blue-600 { border-color: var(--color-brass) !important; }
-  .hover\:bg-blue-50:hover { background-color: var(--color-brass-10) !important; }
-  .accent-blue-500 { accent-color: var(--color-brass) !important; }
-  .focus\:ring-blue-500:focus { --tw-ring-color: var(--color-brass) !important; }
-  
   /* Error/Red color utilities (replacing amber/orange) */
   .text-amber-700 { color: var(--color-error) !important; }
   .text-orange-500 { color: var(--color-error) !important; }
