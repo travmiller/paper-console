@@ -89,9 +89,9 @@ def format_news_receipt(
                 title=article["title"],
                 summary=article.get("summary", ""),
                 url=cleaned_url,
-                qr_size=112,
-                title_width=28,
-                summary_width=32,
+                qr_size=160,
+                title_width=24,
+                summary_width=28,
                 max_summary_lines=2,
             )
             printer.print_line()

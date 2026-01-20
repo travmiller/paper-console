@@ -658,9 +658,13 @@ class PrinterDriver:
                 last_spacing = op_data * self.SPACING_LARGE
             elif op_type == "article_block":
                 qr_size = op_data.get("qr_size", 64)
-                qr_img = self._generate_qr_image(op_data.get("url", ""), 2, "L", True)
+                # Generate QR at high resolution (box_size=10) with medium error correction for better scannability
+                # Medium error correction provides good balance of data capacity and robustness
+                # Use fixed_size=False since we'll resize ourselves to the exact qr_size
+                qr_img = self._generate_qr_image(op_data.get("url", ""), 10, "M", False)
                 if qr_img:
-                    qr_img = qr_img.resize((qr_size, qr_size), Image.NEAREST)
+                    # Use LANCZOS resampling for better quality when scaling to exact size
+                    qr_img = qr_img.resize((qr_size, qr_size), Image.LANCZOS)
                 op_data["_qr_img"] = qr_img
 
                 source_height = self._get_line_height_for_style("caption")
@@ -2799,10 +2803,12 @@ class PrinterDriver:
             )
 
             # Use version 1 and let it auto-fit, then resize for consistency
+            # Generate at higher resolution (box_size) for better quality when scaling
+            box_size = max(size, 8) if fixed_size else 10
             qr = qrcode.QRCode(
                 version=1,
                 error_correction=ec_level,
-                box_size=10,  # Generate at higher resolution for quality
+                box_size=box_size,
                 border=1,
             )
             qr.add_data(data)
@@ -2813,9 +2819,10 @@ class PrinterDriver:
 
             # If fixed_size, resize all QR codes to the same dimensions
             if fixed_size:
-                # Target size: 80x80 pixels for consistent appearance
+                # Target size: 80x80 pixels for consistent appearance (for standalone QR codes)
                 target_size = 80
-                qr_img = qr_img.resize((target_size, target_size), Image.NEAREST)
+                # Use LANCZOS for better quality when scaling
+                qr_img = qr_img.resize((target_size, target_size), Image.LANCZOS)
 
             return qr_img
         except Exception:
