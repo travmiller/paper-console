@@ -1,0 +1,14 @@
+# Deployment Configuration for PC-1 Paper Console
+# Copy this file to .deploy_config and customize for your setup
+# The .deploy_config file is gitignored and will not be committed
+
+# Raspberry Pi connection details
+PI_HOST=pc-1.local
+PI_USER=admin
+PI_PATH=~/paper-console
+
+# Git branch to deploy
+BRANCH=main
+
+# Whether to restart the service after deployment
+RESTART_SERVICE=true

@@ -87,3 +87,6 @@ docs/raspberry-pi-config-full.md
 deploy.bat
 deploy.sh
 
+# Deployment configuration (contains Pi connection details)
+.deploy_config
+

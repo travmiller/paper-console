@@ -2195,7 +2195,7 @@ async def trigger_channel(position: int):
 
                 # Add a separator between modules
                 if assignment != sorted_modules[-1]:
-                    printer.feed(1)
+                    printer.feed(2)
 
         # Flush buffer to actually print (in reverse order for tear-off orientation)
         # Spacing is built into the bitmap (5 lines at end of each print job)
