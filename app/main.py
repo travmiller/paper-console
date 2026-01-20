@@ -118,21 +118,29 @@ async def email_polling_loop():
                 try:
                     emails = email_client.fetch_emails(module.config)
                     if emails:
-                        # Prepare printer for new job
-                        if hasattr(printer, "reset_buffer"):
-                            max_lines = getattr(settings, "max_print_lines", 200)
-                            printer.reset_buffer(max_lines)
+                        # Run printer operations in thread pool to avoid blocking event loop
+                        from concurrent.futures import ThreadPoolExecutor
+                        
+                        def _print_email():
+                            # Prepare printer for new job
+                            if hasattr(printer, "reset_buffer"):
+                                max_lines = getattr(settings, "max_print_lines", 200)
+                                printer.reset_buffer(max_lines)
 
-                        email_client.format_email_receipt(
-                            printer,
-                            messages=emails,
-                            config=module.config,
-                            module_name=module.name,
-                        )
+                            email_client.format_email_receipt(
+                                printer,
+                                messages=emails,
+                                config=module.config,
+                                module_name=module.name,
+                            )
 
-                        # Flush to hardware (spacing is built into bitmap)
-                        if hasattr(printer, "flush_buffer"):
-                            printer.flush_buffer()
+                            # Flush to hardware (spacing is built into bitmap)
+                            if hasattr(printer, "flush_buffer"):
+                                printer.flush_buffer()
+                        
+                        loop = asyncio.get_event_loop()
+                        with ThreadPoolExecutor() as executor:
+                            await loop.run_in_executor(executor, _print_email)
 
                 except Exception:
                     pass  # Silently skip failed email checks
@@ -474,29 +482,41 @@ async def manual_ap_mode_trigger():
 
 
 async def factory_reset_trigger():
-    """Factory reset (button hold 15+ seconds) - deletes config and reboots."""
+    """Factory reset (button hold 15+ seconds) - deletes config and reboots.
+    Runs blocking printer operations in a thread pool to avoid blocking the event loop.
+    """
     import subprocess
+    from concurrent.futures import ThreadPoolExecutor
 
-    # Reset printer buffer
-    if hasattr(printer, "reset_buffer"):
-        printer.reset_buffer()
+    def _print_reset_message():
+        # Reset printer buffer
+        if hasattr(printer, "reset_buffer"):
+            printer.reset_buffer()
 
-    # Print factory reset message
-    printer.feed(1)
-    printer.print_text("=" * 32)
-    printer.print_text("")
-    printer.print_text("     FACTORY RESET")
-    printer.print_text("")
-    printer.print_text("  All settings will be")
-    printer.print_text("  cleared. Device will")
-    printer.print_text("  reboot in setup mode.")
-    printer.print_text("")
-    printer.print_text("=" * 32)
-    printer.feed(2)
+        # Print factory reset message
+        printer.feed(1)
+        printer.print_text("=" * 32)
+        printer.print_text("")
+        printer.print_text("     FACTORY RESET")
+        printer.print_text("")
+        printer.print_text("  All settings will be")
+        printer.print_text("  cleared. Device will")
+        printer.print_text("  reboot in setup mode.")
+        printer.print_text("")
+        printer.print_text("=" * 32)
+        printer.feed(2)
 
-    # Flush buffer to print (spacing is built into bitmap)
-    if hasattr(printer, "flush_buffer"):
-        printer.flush_buffer()
+        # Flush buffer to print (spacing is built into bitmap)
+        if hasattr(printer, "flush_buffer"):
+            printer.flush_buffer()
+
+    # Run blocking printer operations in thread pool to avoid blocking event loop
+    try:
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _print_reset_message)
+    except Exception:
+        pass  # Continue with reset even if print fails
 
     # Wait for print to complete
     await asyncio.sleep(3)
