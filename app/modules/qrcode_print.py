@@ -168,5 +168,3 @@ def format_qrcode_receipt(printer: PrinterDriver, config: dict, module_name: str
         size=qr_config.size,
         error_correction=qr_config.error_correction
     )
-    
-    printer.print_caption(description)
