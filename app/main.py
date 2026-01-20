@@ -2122,10 +2122,14 @@ def execute_module(module: ModuleInstance) -> bool:
 async def trigger_channel(position: int):
     """
     Executes all modules assigned to a specific channel position.
+    Runs blocking printer operations in a thread pool to avoid blocking the event loop.
     """
     global print_in_progress
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
 
-    try:
+    def _do_print():
+        """Synchronous function that does the actual printing work."""
         # Instant tactile feedback - tiny paper blip (2 dots, ~0.01")
         if hasattr(printer, "blip"):
             printer.blip()
@@ -2202,6 +2206,11 @@ async def trigger_channel(position: int):
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
 
+    try:
+        # Run blocking printer operations in thread pool to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _do_print)
     finally:
         # Always mark print as complete (thread-safe)
         with print_lock:
@@ -2289,10 +2298,15 @@ async def print_module(module_id: str, background_tasks: BackgroundTasks):
 
 
 async def print_module_direct(module_id: str):
-    """Internal function to print a single module with proper buffer setup."""
+    """Internal function to print a single module with proper buffer setup.
+    Runs blocking printer operations in a thread pool to avoid blocking the event loop.
+    """
     global print_in_progress
+    import asyncio
+    from concurrent.futures import ThreadPoolExecutor
     
-    try:
+    def _do_print():
+        """Synchronous function that does the actual printing work."""
         module = settings.modules.get(module_id)
         if not module:
             return
@@ -2328,6 +2342,11 @@ async def print_module_direct(module_id: str):
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
 
+    try:
+        # Run blocking printer operations in thread pool to avoid blocking event loop
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _do_print)
     finally:
         # Always mark print as complete (thread-safe)
         with print_lock:
