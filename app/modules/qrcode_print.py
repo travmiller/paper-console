@@ -138,8 +138,8 @@ def format_qrcode_receipt(printer: PrinterDriver, config: dict, module_name: str
             qr_data = "https://" + qr_data
         description = "Scan to visit"
         printer.print_subheader("Link")
-        display_url = qr_config.content[:35] + "..." if len(qr_config.content) > 38 else qr_config.content
-        printer.print_body(display_url)
+        # Let print_body handle wrapping automatically
+        printer.print_body(qr_config.content)
     
     else:  # Default to plain text
         qr_data = qr_config.content
