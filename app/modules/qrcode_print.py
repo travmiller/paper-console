@@ -31,12 +31,14 @@ def _generate_wifi_string(ssid: str, password: str, security: str = "WPA", hidde
         return f"WIFI:T:{security};S:{ssid};P:{password};H:{hidden_str};;"
 
 
-def _generate_vcard(name: str, phone: str = "", email: str = "") -> str:
+def _generate_vcard(first_name: str, last_name: str = "", phone: str = "", email: str = "") -> str:
     """Generate vCard QR code string format."""
+    full_name = f"{first_name} {last_name}".strip()
     lines = [
         "BEGIN:VCARD",
         "VERSION:3.0",
-        f"FN:{name}",
+        f"N:{last_name};{first_name};;;",
+        f"FN:{full_name}",
     ]
     if phone:
         lines.append(f"TEL:{phone}")
@@ -100,7 +102,8 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
             "wifi_security": {"type": "string", "title": "Security", "enum": ["WPA", "WEP", "nopass"], "default": "WPA"},
             
             # Contact Specifics
-            "contact_name": {"type": "string", "title": "Contact Name"},
+            "contact_name": {"type": "string", "title": "First Name"},
+            "contact_last_name": {"type": "string", "title": "Last Name"},
             "contact_phone": {"type": "string", "title": "Contact Phone"},
             "contact_email": {"type": "string", "title": "Contact Email"},
         }
@@ -132,6 +135,9 @@ def _generate_email(email: str, subject: str = "", body: str = "") -> str:
             "ui:showWhen": {"field": "qr_type", "value": "wifi"}
         },
         "contact_name": {
+            "ui:showWhen": {"field": "qr_type", "value": "contact"}
+        },
+        "contact_last_name": {
             "ui:showWhen": {"field": "qr_type", "value": "contact"}
         },
         "contact_phone": {
@@ -188,13 +194,16 @@ def format_qrcode_receipt(printer: PrinterDriver, config: dict, module_name: str
     
     elif qr_type == "contact":
         qr_data = _generate_vcard(
-            name=qr_config.contact_name,
+            first_name=qr_config.contact_name,
+            last_name=qr_config.contact_last_name,
             phone=qr_config.contact_phone,
             email=qr_config.contact_email
         )
         description = "Scan to add contact"
         printer.print_subheader("Contact")
-        printer.print_bold(qr_config.contact_name)
+        
+        full_name = f"{qr_config.contact_name} {qr_config.contact_last_name}".strip()
+        printer.print_bold(full_name)
         if qr_config.contact_phone:
             printer.print_body(qr_config.contact_phone)
         if qr_config.contact_email:

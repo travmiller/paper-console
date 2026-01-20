@@ -67,6 +67,7 @@ class QRCodeConfig(BaseModel):
     
     # Contact (vCard) fields
     contact_name: str = ""
+    contact_last_name: str = ""
     contact_phone: str = ""
     contact_email: str = ""
     
