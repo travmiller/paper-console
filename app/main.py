@@ -1564,16 +1564,20 @@ async def install_updates():
                 ["sudo", "systemctl", "restart", "pc-1.service"],
                 capture_output=True,
                 text=True,
-                timeout=10,
+                timeout=15,
             )
 
             if restart_result.returncode != 0:
                 return {
                     "success": True,
-                    "message": "Update installed, but service restart failed",
-                    "warning": "You may need to restart the service manually",
+                    "message": "Update installed successfully!",
+                    "warning": "Service restart may have failed. The device will restart shortly - if you see an error, wait a moment and refresh the page.",
                     "error": restart_result.stderr,
                 }
+            
+            # Give the service a moment to start up
+            import time
+            time.sleep(2)
 
         return {
             "success": True,

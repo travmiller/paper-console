@@ -901,7 +901,7 @@ const GeneralSettings = ({
             {updateStatus && updateStatus.available && (
               <PrimaryButton
                 onClick={async () => {
-                  if (!confirm('Install the update now? The device will restart automatically.')) {
+                  if (!confirm('Install the update now? The device will restart automatically. You may see a brief error message while it restarts - just wait a moment and refresh the page.')) {
                     return;
                   }
                   setInstallingUpdate(true);
@@ -912,20 +912,31 @@ const GeneralSettings = ({
                     });
                     const data = await response.json();
                     if (data.success) {
-                      setUpdateMessage({ type: 'success', message: data.message || 'Update installed! The device will restart shortly.' });
+                      const message = data.warning 
+                        ? `${data.message} ${data.warning}`
+                        : (data.message || 'Update installed! The device is restarting. If you see an error, wait a moment and refresh the page.');
+                      setUpdateMessage({ type: 'success', message });
                       setUpdateStatus(null);
-                      // Reload page after a delay to show the restart
+                      // Reload page after a longer delay to allow service to restart
                       setTimeout(() => {
+                        // Try to reload, but handle errors gracefully
                         window.location.reload();
-                      }, 3000);
+                      }, 5000);
                     } else {
-                      setUpdateMessage({ type: 'error', message: data.error || data.message || 'Update failed' });
+                      setUpdateMessage({ type: 'error', message: data.error || data.message || 'Update failed. Please try again.' });
                     }
                   } catch (err) {
-                    setUpdateMessage({ type: 'error', message: 'Update failed. Please try again.' });
+                    // If we get a network error, it might just be the service restarting
+                    setUpdateMessage({ 
+                      type: 'success', 
+                      message: 'Update is being installed. The device is restarting - if you see an error, wait a moment and refresh the page.' 
+                    });
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 5000);
                   } finally {
                     setInstallingUpdate(false);
-                    setTimeout(() => setUpdateMessage({ type: '', message: '' }), 10000);
+                    setTimeout(() => setUpdateMessage({ type: '', message: '' }), 15000);
                   }
                 }}
                 disabled={installingUpdate}
