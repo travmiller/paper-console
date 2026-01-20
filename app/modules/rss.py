@@ -5,6 +5,7 @@ from typing import Dict, Any
 from bs4 import BeautifulSoup
 import re
 from app.config import settings
+from app.modules.news import clean_url
 
 # Maximum size for RSS feed content (500KB)
 MAX_FEED_SIZE = 500 * 1024
@@ -138,19 +139,15 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
         printer.print_caption("Check your RSS feed URLs.")
     else:
         for i, article in enumerate(articles):
-            # Source as subheader
-            source = article["source"].upper()[:24]
-            printer.print_subheader(source)
-
-            # Headline in bold - pass directly, printer will handle wrapping
-            printer.print_bold(article["title"])
-
-            # Summary in regular body text - pass directly, printer will handle wrapping
-            # Note: The printer will automatically wrap based on font metrics
-            printer.print_body(article["summary"])
-
-            # QR code linking to full article
-            if article.get("url"):
-                printer.print_qr(article["url"], size=2, error_correction="L", fixed_size=True)
-
+            cleaned_url = clean_url(article.get("url", ""))
+            printer.print_article_block(
+                source=article["source"],
+                title=article["title"],
+                summary=article.get("summary", ""),
+                url=cleaned_url,
+                qr_size=160,
+                title_width=24,
+                summary_width=28,
+                max_summary_lines=2,
+            )
             printer.print_line()
