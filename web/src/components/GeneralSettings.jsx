@@ -44,6 +44,7 @@ const GeneralSettings = ({
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState({ type: '', message: '' });
   const [currentVersion, setCurrentVersion] = useState(null);
+  const [updateProgress, setUpdateProgress] = useState({ stage: '', progress: 0 });
 
   // Fetch current system time on mount and periodically
   useEffect(() => {
@@ -858,9 +859,9 @@ const GeneralSettings = ({
 
           {/* Current Version Display */}
           {currentVersion && (
-            <div className='mb-4 p-3 bg-gray-50 border-2 border-gray-300 rounded-lg'>
-              <div className='text-xs text-gray-600 mb-1 uppercase font-bold'>Current Version</div>
-              <div className='text-sm font-mono font-bold text-black'>{currentVersion}</div>
+            <div className='mb-4 text-sm'>
+              <span className='text-gray-600 font-bold'>Current Version: </span>
+              <span className='font-mono font-bold text-black'>{currentVersion}</span>
             </div>
           )}
 
@@ -898,6 +899,22 @@ const GeneralSettings = ({
             </div>
           )}
 
+          {/* Update Progress Bar */}
+          {installingUpdate && (
+            <div className='mb-4 p-4 bg-gray-50 border-2 border-gray-300 rounded-lg'>
+              <div className='flex items-center justify-between mb-2'>
+                <span className='text-sm font-bold text-black'>{updateProgress.stage || 'Installing update...'}</span>
+                <span className='text-xs text-gray-600 font-mono'>{updateProgress.progress}%</span>
+              </div>
+              <div className='w-full bg-gray-200 rounded-full h-2.5 overflow-hidden'>
+                <div 
+                  className='bg-black h-2.5 rounded-full transition-all duration-300 ease-out'
+                  style={{ width: `${updateProgress.progress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
           <div className='flex gap-3'>
             <PrimaryButton
               onClick={async () => {
@@ -932,6 +949,7 @@ const GeneralSettings = ({
                   }
                   setInstallingUpdate(true);
                   setUpdateMessage({ type: '', message: '' });
+                  setUpdateProgress({ stage: 'Installing update...', progress: 10 });
                   
                   // Show initial message
                   setUpdateMessage({ 
@@ -940,23 +958,40 @@ const GeneralSettings = ({
                   });
                   
                   try {
+                    // Simulate progress during installation
+                    const progressInterval = setInterval(() => {
+                      setUpdateProgress(prev => {
+                        if (prev.progress < 50) {
+                          return { ...prev, progress: Math.min(prev.progress + 2, 50) };
+                        }
+                        return prev;
+                      });
+                    }, 500);
+                    
                     const response = await fetch('/api/system/updates/install', {
                       method: 'POST',
                     });
+                    
+                    clearInterval(progressInterval);
+                    setUpdateProgress({ stage: 'Update installed! Restarting service...', progress: 60 });
+                    
                     const data = await response.json();
                     if (data.success) {
+                      setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
                       setUpdateMessage({ 
                         type: 'success', 
                         message: 'Update installed! The device is restarting. Refreshing page...' 
                       });
                       setUpdateStatus(null);
                     } else {
+                      setUpdateProgress({ stage: '', progress: 0 });
                       setUpdateMessage({ type: 'error', message: data.error || data.message || 'Update failed. Please try again.' });
                       setInstallingUpdate(false);
                       return;
                     }
                   } catch (err) {
                     // Network error is expected during restart - treat as success
+                    setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
                     setUpdateMessage({ 
                       type: 'success', 
                       message: 'Update installed! The device is restarting. Refreshing page...' 
@@ -964,37 +999,70 @@ const GeneralSettings = ({
                     setUpdateStatus(null);
                   }
                   
+                  // Set a maximum timeout to always reload after 45 seconds
+                  const maxReloadTimeout = setTimeout(() => {
+                    window.location.reload();
+                  }, 45000); // Always reload after 45 seconds maximum
+                  
                   // Wait a bit, then start checking if service is back up
                   setTimeout(() => {
+                    setUpdateProgress({ stage: 'Waiting for service to restart...', progress: 75 });
+                    
                     let attempts = 0;
-                    const maxAttempts = 20; // Try for up to 20 seconds
+                    const maxAttempts = 30; // Try for up to 30 seconds
                     
                     const checkService = async () => {
                       attempts++;
+                      
+                      // Update progress based on attempts
+                      const progress = Math.min(75 + Math.floor((attempts / maxAttempts) * 20), 95);
+                      setUpdateProgress({ stage: 'Waiting for service to restart...', progress });
+                      
+                      // Create abort controller for timeout
+                      const controller = new AbortController();
+                      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
+                      
                       try {
                         const healthCheck = await fetch('/api/health', { 
                           method: 'GET',
-                          signal: AbortSignal.timeout(2000) // 2 second timeout
+                          signal: controller.signal
                         });
+                        clearTimeout(timeoutId);
+                        
                         if (healthCheck.ok) {
-                          // Service is back up, reload the page
-                          window.location.reload();
+                          // Service is back up, clear max timeout and reload the page
+                          setUpdateProgress({ stage: 'Service ready! Reloading page...', progress: 100 });
+                          clearTimeout(maxReloadTimeout);
+                          setTimeout(() => window.location.reload(), 500);
                           return;
+                        } else {
+                          // Service not ready yet, keep trying
+                          if (attempts < maxAttempts) {
+                            setTimeout(checkService, 1000); // Try again in 1 second
+                          } else {
+                            // Give up and reload anyway
+                            setUpdateProgress({ stage: 'Reloading page...', progress: 100 });
+                            clearTimeout(maxReloadTimeout);
+                            setTimeout(() => window.location.reload(), 500);
+                          }
                         }
                       } catch (err) {
+                        clearTimeout(timeoutId);
                         // Service not ready yet, keep trying
                         if (attempts < maxAttempts) {
                           setTimeout(checkService, 1000); // Try again in 1 second
                         } else {
-                          // Give up and reload anyway
-                          window.location.reload();
+                          // Give up and reload anyway after max attempts
+                          setUpdateProgress({ stage: 'Reloading page...', progress: 100 });
+                          clearTimeout(maxReloadTimeout);
+                          setTimeout(() => window.location.reload(), 500);
                         }
                       }
                     };
                     
                     // Start checking
                     checkService();
-                  }, 3000);
+                  }, 5000); // Wait 5 seconds before starting checks (give service time to restart)
                 }}
                 disabled={installingUpdate}
                 loading={installingUpdate}
