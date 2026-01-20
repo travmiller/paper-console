@@ -1137,8 +1137,18 @@ class PrinterDriver:
             for i, byte in enumerate(pixels):
                 command[8 + i] = byte ^ 0xFF  # Invert bits
 
-            # Send entire image in one write
-            self._write(bytes(command))
+            # Send entire image in chunks to prevent buffer overflow
+            print(f"[DEBUG] Sending bitmap: {width}x{height} ({len(command)} bytes)")
+            CHUNK_SIZE = 4096
+            total_sent = 0
+            for i in range(0, len(command), CHUNK_SIZE):
+                chunk = command[i : i + CHUNK_SIZE]
+                self._write(bytes(chunk))
+                total_sent += len(chunk)
+                # Small yield to let hardware buffer drain slightly
+                time.sleep(0.01)
+            print(f"[DEBUG] Bitmap send complete. Total bytes: {total_sent}")
+
 
         except Exception:
             pass
@@ -1154,8 +1164,8 @@ class PrinterDriver:
                 # Write all data at once - don't flush() as that blocks
                 # until all bytes transmit (slow at 9600 baud)
                 self.ser.write(data)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[ERROR] Serial write failed: {e}")
 
     def _read(self, size: int = 1, timeout: float = 1.0) -> bytes:
         """Read bytes from serial interface. Returns empty bytes on error."""
@@ -1542,7 +1552,11 @@ class PrinterDriver:
         rotated 180°, and sent as one raster graphics command.
         """
         if not self.print_buffer:
+            print("[DEBUG] Flush called on empty buffer.")
             return
+
+        print(f"[DEBUG] Flushing buffer with {len(self.print_buffer)} ops...")
+
 
         # If max_lines is set, trim content from END of buffer
         total_lines_in_buffer = 0
@@ -1578,10 +1592,17 @@ class PrinterDriver:
 
         img = self._render_unified_bitmap(ops)
         if img:
+            print(f"[DEBUG] Rendered unified bitmap: {img.size}")
             self._send_bitmap(img)
             # Ensure all data is transmitted before returning
             if self.ser and self.ser.is_open:
-                self.ser.flush()
+                try:
+                    self.ser.flush()
+                except Exception as e:
+                    print(f"[ERROR] Serial flush failed: {e}")
+        else:
+            print("[DEBUG] No bitmap rendered from ops.")
+
 
     def reset_buffer(self, max_lines: int = 0):
         """Reset/clear the print buffer (call at start of new print job).
