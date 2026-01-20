@@ -598,6 +598,17 @@ class PrinterDriver:
                 cell_size = op_data.get("cell_size", 8)
                 # Account for header (12px) + weeks * cell_size + spacing
                 grid_height = 12 + weeks * cell_size + self.SPACING_SMALL
+            elif op_type == "image":
+                image = op_data.get("image")
+                if image:
+                    height = image.height
+                    # Check if resizing will happen
+                    if image.width > self.PRINTER_WIDTH_DOTS:
+                        ratio = self.PRINTER_WIDTH_DOTS / image.width
+                        height = int(image.height * ratio)
+                    
+                    total_height += height + self.SPACING_MEDIUM
+                    last_spacing = self.SPACING_MEDIUM
                 total_height += grid_height + self.SPACING_MEDIUM
                 last_spacing = self.SPACING_MEDIUM
             elif op_type == "calendar_day_timeline":
@@ -847,67 +858,10 @@ class PrinterDriver:
 
                 # +2 matches the box_y = y + 2 offset
                 y += 2 + box_height + self.SPACING_MEDIUM
-            elif op_type == "moon":
-                phase = op_data.get("phase", 0)
-                size = op_data.get("size", 60)
-                moon_x = (width - size) // 2
-                moon_y = y + self.SPACING_SMALL
-                self._draw_moon_phase(draw, moon_x, moon_y, size, phase)
-                y += self.SPACING_SMALL + size + self.SPACING_MEDIUM
-            elif op_type == "sun_path":
-                sun_path = op_data.get("sun_path", [])
-                sunrise = op_data.get("sunrise")
-                sunset = op_data.get("sunset")
-                current_time = op_data.get("current_time")
-                current_altitude = op_data.get("current_altitude", 0)
-                sunrise_time = op_data.get("sunrise_time", "")
-                sunset_time = op_data.get("sunset_time", "")
-                day_length = op_data.get("day_length", "")
-                path_height = op_data.get("height", 120)
-                path_x = self.SPACING_SMALL
-                path_y = y + self.SPACING_SMALL
-                path_width = width - (2 * self.SPACING_SMALL)
-                self._draw_sun_path(
-                    draw,
-                    path_x,
-                    path_y,
-                    path_width,
-                    path_height,
-                    sun_path,
-                    sunrise,
-                    sunset,
-                    current_time,
-                    current_altitude,
-                    sunrise_time,
-                    sunset_time,
-                    day_length,
-                    self._get_font("bold"),
-                    self._get_font("regular_sm"),
-                    self._get_font("light"),
-                )
-                y += self.SPACING_SMALL + path_height + self.SPACING_MEDIUM
-            elif op_type == "maze":
-                grid = op_data.get("grid", [])
-                cell_size = op_data.get("cell_size", 4)
-                if grid:
-                    maze_width = len(grid[0]) * cell_size if grid else 0
-                    maze_height = len(grid) * cell_size
-                    maze_x = (width - maze_width) // 2
-                    maze_y = y + self.SPACING_SMALL
-                    self._draw_maze(draw, maze_x, maze_y, grid, cell_size)
-                    y += self.SPACING_SMALL + maze_height + self.SPACING_MEDIUM
-            elif op_type == "sudoku":
-                grid = op_data.get("grid", [])
-                cell_size = op_data.get("cell_size", 8)
-                font = self._get_font("regular")
-                if grid:
-                    sudoku_size = 9 * cell_size + self.SPACING_SMALL
-                    sudoku_x = (width - sudoku_size) // 2
-                    sudoku_y = y + self.SPACING_SMALL
-                    self._draw_sudoku_grid(
-                        draw, sudoku_x, sudoku_y, grid, cell_size, font
-                    )
-                    y += self.SPACING_SMALL + sudoku_size + self.SPACING_MEDIUM
+
+
+
+
             elif op_type == "icon":
                 icon_type = op_data.get("type", "sun")
                 size = op_data.get("size", 32)
@@ -915,27 +869,8 @@ class PrinterDriver:
                 icon_y = y + self.SPACING_SMALL
                 self._draw_icon(draw, icon_x, icon_y, icon_type, size)
                 y += self.SPACING_SMALL + size + self.SPACING_SMALL
-            elif op_type == "weather_forecast":
-                forecast = op_data.get("forecast", [])
-                self._draw_weather_forecast(draw, 0, y, width, forecast)
-                # Day height is 114px (as set in _draw_weather_forecast, updated for 24px icon)
-                y += 114 + self.SPACING_MEDIUM
-            elif op_type == "hourly_forecast":
-                hourly_forecast = op_data.get("hourly_forecast", [])
-                self._draw_hourly_forecast(draw, 0, y, width, hourly_forecast)
-                # Calculate actual height: 4 hours per row, 86px entry height, 10px row spacing
-                hours_per_row = 4
-                entry_height = 86
-                row_spacing = 10
-                num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
-                # Total height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
-                if num_rows > 0:
-                    total_height = (num_rows * entry_height) + (
-                        (num_rows - 1) * row_spacing
-                    )
-                else:
-                    total_height = 0
-                y += total_height + self.SPACING_MEDIUM
+
+
             elif op_type == "progress_bar":
                 value = op_data.get("value", 0)
                 max_value = op_data.get("max_value", 100)
@@ -1098,6 +1033,31 @@ class PrinterDriver:
                     chart_x,
                     chart_y,
                     chart_width,
+                    bars,
+                    bar_height,
+                    self._get_font("regular"),
+                )
+                y += len(bars) * (bar_height + 4) + self.SPACING_MEDIUM
+            elif op_type == "image":
+                image = op_data.get("image")
+                if image:
+                    # Resize if wider than paper
+                    if image.width > self.PRINTER_WIDTH_DOTS:
+                        ratio = self.PRINTER_WIDTH_DOTS / image.width
+                        new_height = int(image.height * ratio)
+                        image = image.resize((self.PRINTER_WIDTH_DOTS, new_height), Image.Resampling.LANCZOS)
+                    
+                    # Convert to binary if needed (basic thresholding)
+                    if image.mode != "1":
+                        image = image.convert("1")
+
+                    img_x = (width - image.width) // 2
+                    img_y = y + self.SPACING_SMALL
+                    
+                    # Paste onto the canvas
+                    full_img.paste(image, (img_x, img_y))
+                    
+                    y += image.height + self.SPACING_MEDIUM
                     bar_height,
                     bars,
                     self._get_font("regular_sm"),
@@ -1211,340 +1171,7 @@ class PrinterDriver:
 
         return img
 
-    def _draw_moon_phase(
-        self, draw: ImageDraw.Draw, x: int, y: int, size: int, phase: float
-    ):
-        """Draw a moon phase graphic with smooth terminator and surface detail.
 
-        Args:
-            draw: ImageDraw object
-            x, y: Top-left corner of bounding box
-            size: Diameter of moon in pixels
-            phase: Moon phase value (0-28 day cycle)
-                   0/28 = New Moon (dark)
-                   7 = First Quarter (right half lit)
-                   14 = Full Moon (fully lit)
-                   21 = Last Quarter (left half lit)
-        """
-        # Normalize phase to 0-1 (0 = new, 0.5 = full, 1 = new)
-        phase_normalized = (phase % 28) / 28.0
-
-        # Calculate illumination (0 = new moon, 1 = full moon)
-        # illumination follows a cosine curve
-        illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2
-
-        center_x = x + size // 2
-        center_y = y + size // 2
-        radius = size // 2
-        inner_radius = radius - 2  # Account for outline
-
-        # Draw the moon outline (black circle)
-        draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
-
-        # Handle new moon (completely dark)
-        if illumination < 0.01:
-            # Just draw the outline, leave interior dark
-            return
-
-        # Fill the whole moon white first (lit portion)
-        draw.ellipse([x + 2, y + 2, x + size - 2, y + size - 2], fill=1)
-
-        # Calculate terminator position using proper geometry
-        # The terminator is a vertical line that moves across the moon
-        # At new moon: terminator at right edge (illumination = 0)
-        # At full moon: terminator at left edge (illumination = 1)
-
-        # Terminator X position: moves from right edge to left edge as illumination increases
-        # At illumination=0 (new): terminator_x = right edge
-        # At illumination=1 (full): terminator_x = left edge
-        terminator_x = center_x - (illumination * 2 - 1) * inner_radius
-
-        # Draw shadow efficiently using pixel-by-pixel for smooth terminator
-        if phase_normalized < 0.5:
-            # Waxing: right side illuminated, left side dark
-            # Shadow is on the left side (px < terminator_x)
-            for py in range(y + 2, y + size - 2):
-                for px in range(x + 2, min(int(terminator_x) + 1, x + size - 2)):
-                    dx = px - center_x
-                    dy = py - center_y
-                    dist_sq = dx * dx + dy * dy
-
-                    # Check if point is within moon circle and in shadow
-                    if dist_sq <= inner_radius * inner_radius and px < terminator_x:
-                        draw.point((px, py), fill=0)
-        else:
-            # Waning: left side illuminated, right side dark
-            # Shadow is on the right side (px > terminator_x)
-            for py in range(y + 2, y + size - 2):
-                for px in range(max(int(terminator_x), x + 2), x + size - 2):
-                    dx = px - center_x
-                    dy = py - center_y
-                    dist_sq = dx * dx + dy * dy
-
-                    # Check if point is within moon circle and in shadow
-                    if dist_sq <= inner_radius * inner_radius and px > terminator_x:
-                        draw.point((px, py), fill=0)
-
-        # Add subtle surface texture (craters) for realism
-        # Only add texture to the lit portion
-        random.seed(int(phase * 100))  # Deterministic based on phase
-
-        num_craters = max(3, size // 20)  # Scale with moon size
-        for _ in range(num_craters):
-            # Random position within moon circle
-            angle = random.uniform(0, 2 * math.pi)
-            dist = random.uniform(0, inner_radius * 0.7)  # Keep craters away from edge
-            crater_x = int(center_x + dist * math.cos(angle))
-            crater_y = int(center_y + dist * math.sin(angle))
-
-            # Check if crater is within moon bounds
-            dx = crater_x - center_x
-            dy = crater_y - center_y
-            if dx * dx + dy * dy > inner_radius * inner_radius:
-                continue
-
-            # Only draw crater if it's in the lit portion
-            if phase_normalized < 0.5:
-                # Waxing: right side lit (crater_x > terminator_x)
-                if crater_x > terminator_x:
-                    crater_size = random.randint(1, max(1, size // 30))
-                    draw.ellipse(
-                        [
-                            crater_x - crater_size,
-                            crater_y - crater_size,
-                            crater_x + crater_size,
-                            crater_y + crater_size,
-                        ],
-                        fill=0,
-                        outline=1,
-                        width=1,
-                    )
-            else:
-                # Waning: left side lit (crater_x < terminator_x)
-                if crater_x < terminator_x:
-                    crater_size = random.randint(1, max(1, size // 30))
-                    draw.ellipse(
-                        [
-                            crater_x - crater_size,
-                            crater_y - crater_size,
-                            crater_x + crater_size,
-                            crater_y + crater_size,
-                        ],
-                        fill=0,
-                        outline=1,
-                        width=1,
-                    )
-
-        # Redraw outline to ensure clean edges
-        draw.ellipse([x, y, x + size, y + size], outline=0, width=2)
-
-    def _draw_maze(
-        self,
-        draw: ImageDraw.Draw,
-        x: int,
-        y: int,
-        grid: List[List[int]],
-        cell_size: int,
-    ):
-        """Draw a maze as a bitmap.
-
-        Args:
-            draw: ImageDraw object
-            x, y: Top-left corner of maze
-            grid: 2D list where 1 = wall, 0 = path
-            cell_size: Size of each cell in pixels
-        """
-        rows = len(grid)
-        cols = len(grid[0]) if grid else 0
-
-        # Draw each cell
-        for row_idx, row in enumerate(grid):
-            for col_idx, cell in enumerate(row):
-                cell_x = x + col_idx * cell_size
-                cell_y = y + row_idx * cell_size
-
-                if cell == 1:
-                    # Wall - draw 50% grey checkerboard pattern
-                    for py in range(cell_size):
-                        for px in range(cell_size):
-                            # Checkerboard: black if (px + py) is even
-                            if (px + py) % 2 == 0:
-                                draw.point((cell_x + px, cell_y + py), fill=0)  # Black
-                            else:
-                                draw.point((cell_x + px, cell_y + py), fill=1)  # White
-                else:
-                    # Path - draw white rectangle (or leave blank)
-                    draw.rectangle(
-                        [
-                            cell_x,
-                            cell_y,
-                            cell_x + cell_size - 1,
-                            cell_y + cell_size - 1,
-                        ],
-                        fill=1,  # White
-                        outline=None,
-                    )
-
-        # Draw entrance marker (top center)
-        if rows > 0 and cols > 1:
-            entrance_col = 1  # Usually second column
-            entrance_x = x + entrance_col * cell_size
-            entrance_y = y
-            # Draw arrow pointing down
-            draw.line(
-                [
-                    entrance_x + cell_size // 2,
-                    entrance_y,
-                    entrance_x + cell_size // 2,
-                    entrance_y + cell_size // 2,
-                ],
-                fill=0,
-                width=2,
-            )
-            # Arrow head
-            arrow_size = 3
-            arrow_x = entrance_x + cell_size // 2
-            arrow_y = entrance_y + cell_size // 2
-            draw.line(
-                [arrow_x, arrow_y, arrow_x - arrow_size, arrow_y - arrow_size],
-                fill=0,
-                width=2,
-            )
-            draw.line(
-                [arrow_x, arrow_y, arrow_x + arrow_size, arrow_y - arrow_size],
-                fill=0,
-                width=2,
-            )
-
-        # Draw exit marker (bottom)
-        if rows > 0 and cols > 1:
-            exit_col = cols - 2  # Usually second-to-last column
-            exit_x = x + exit_col * cell_size
-            exit_y = y + (rows - 1) * cell_size
-            # Draw arrow pointing down
-            arrow_x = exit_x + cell_size // 2
-            arrow_y = exit_y + cell_size - cell_size // 2
-            draw.line(
-                [arrow_x, arrow_y - cell_size // 2, arrow_x, arrow_y], fill=0, width=2
-            )
-            # Arrow head pointing down
-            draw.line(
-                [arrow_x, arrow_y, arrow_x - arrow_size, arrow_y + arrow_size],
-                fill=0,
-                width=2,
-            )
-            draw.line(
-                [arrow_x, arrow_y, arrow_x + arrow_size, arrow_y + arrow_size],
-                fill=0,
-                width=2,
-            )
-
-    def _draw_sudoku_grid(
-        self,
-        draw: ImageDraw.Draw,
-        x: int,
-        y: int,
-        grid: List[List[int]],
-        cell_size: int,
-        font,
-    ):
-        """Draw a Sudoku grid as a bitmap.
-
-        Args:
-            draw: ImageDraw object
-            x, y: Top-left corner of grid
-            grid: 9x9 grid where 0 = empty, 1-9 = number
-            cell_size: Size of each cell in pixels
-            font: Font for drawing numbers
-        """
-        border_width = 2  # Thick border for outer edges
-        thin_width = 1  # Thin border for inner cells
-
-        total_size = 9 * cell_size + 2 * border_width
-
-        # Draw outer border
-        draw.rectangle(
-            [x, y, x + total_size, y + total_size], outline=0, width=border_width
-        )
-
-        # Draw grid lines and numbers
-        for row in range(9):
-            for col in range(9):
-                cell_x = x + border_width + col * cell_size
-                cell_y = y + border_width + row * cell_size
-
-                # Determine border width (thick for 3x3 boundaries)
-                top_width = border_width if row % 3 == 0 else thin_width
-                left_width = border_width if col % 3 == 0 else thin_width
-                bottom_width = (
-                    border_width
-                    if row == 8
-                    else (border_width if (row + 1) % 3 == 0 else thin_width)
-                )
-                right_width = (
-                    border_width
-                    if col == 8
-                    else (border_width if (col + 1) % 3 == 0 else thin_width)
-                )
-
-                # Draw cell borders
-                # Top
-                if row == 0 or row % 3 == 0:
-                    draw.line(
-                        [cell_x, cell_y, cell_x + cell_size, cell_y],
-                        fill=0,
-                        width=top_width,
-                    )
-                # Left
-                if col == 0 or col % 3 == 0:
-                    draw.line(
-                        [cell_x, cell_y, cell_x, cell_y + cell_size],
-                        fill=0,
-                        width=left_width,
-                    )
-                # Bottom
-                draw.line(
-                    [
-                        cell_x,
-                        cell_y + cell_size,
-                        cell_x + cell_size,
-                        cell_y + cell_size,
-                    ],
-                    fill=0,
-                    width=bottom_width,
-                )
-                # Right
-                draw.line(
-                    [
-                        cell_x + cell_size,
-                        cell_y,
-                        cell_x + cell_size,
-                        cell_y + cell_size,
-                    ],
-                    fill=0,
-                    width=right_width,
-                )
-
-                # Draw number if present
-                value = grid[row][col]
-                if value != 0:
-                    num_str = str(value)
-                    # Center text in cell
-                    if font:
-                        bbox = font.getbbox(num_str)
-                        text_width = bbox[2] - bbox[0] if bbox else cell_size // 2
-                        text_height = bbox[3] - bbox[1] if bbox else cell_size // 2
-                    else:
-                        text_width = cell_size // 2
-                        text_height = cell_size // 2
-
-                    text_x = cell_x + (cell_size - text_width) // 2
-                    text_y = cell_y + (cell_size - text_height) // 2
-
-                    if font:
-                        draw.text((text_x, text_y), num_str, font=font, fill=0)
-                    else:
-                        draw.text((text_x, text_y), num_str, fill=0)
 
     def _draw_icon(
         self, draw: ImageDraw.Draw, x: int, y: int, icon_type: str, size: int
@@ -1661,412 +1288,7 @@ class PrinterDriver:
         # PNG file doesn't exist - skip (no programmatic fallback)
         return
 
-    def _draw_weather_forecast(
-        self, draw: ImageDraw.Draw, x: int, y: int, total_width: int, forecast: list
-    ):
-        """Draw a 7-day weather forecast with pill-shaped containers.
 
-        Args:
-            draw: ImageDraw object
-            x, y: Top-left corner
-            total_width: Total width available
-            forecast: List of forecast dicts with day, date, high, low, condition, precipitation
-        """
-        if not forecast:
-            return
-
-        # Map conditions to icon types based on WMO weather codes (matches weather module logic)
-        def get_icon_type(condition: str) -> str:
-            condition_lower = condition.lower() if condition else ""
-
-            # Clear sky (code 0)
-            if condition_lower == "clear":
-                return "sun"  # Maps to sun.png
-
-            # Mainly clear (code 1) or Partly cloudy (code 2)
-            elif (
-                condition_lower == "mainly clear" or condition_lower == "partly cloudy"
-            ):
-                return "cloud-sun"  # Maps to cloud-sun.png
-
-            # Overcast (code 3)
-            elif condition_lower == "overcast":
-                return "cloud"  # Maps to cloud.png
-
-            # Fog (codes 45, 48)
-            elif condition_lower == "fog" or "mist" in condition_lower:
-                return "cloud-fog"  # Maps to cloud-fog.png
-
-            # Thunderstorm (codes 95, 96, 99) - check FIRST to avoid false matches
-            if (
-                "thunderstorm" in condition_lower
-                or "thunder" in condition_lower
-                or "lightning" in condition_lower
-            ):
-                return "storm"  # Maps to cloud-lightning.png
-
-            # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
-            elif "snow" in condition_lower:
-                return (
-                    "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
-                )
-
-            # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
-            elif (
-                "rain" in condition_lower
-                or "drizzle" in condition_lower
-                or "showers" in condition_lower
-            ):
-                return "rain"  # Maps to cloud-rain.png
-
-            # Default fallback
-            else:
-                return "cloud"  # Maps to cloud.png
-
-        num_days = min(len(forecast), 7)
-        # Horizontal layout: all 7 days in one row
-        col_width = total_width // num_days
-        icon_size = 24  # Increased size, matches 24-hour forecast
-        day_height = 114  # Recalculated height to accommodate 24px icon (was 110px for 20px icon)
-        divider_width = 1  # Width of vertical divider lines
-
-        # Get fonts
-        font_sm = self._get_font("regular_sm")
-        font_md = self._get_font("regular")  # For temps
-        font_lg = self._get_font("bold")  # For high temp
-
-        for i, day_data in enumerate(forecast[:7]):
-            # Calculate column position
-            col_x = x + i * col_width
-            col_center = col_x + col_width // 2
-            col_right = col_x + col_width
-            day_top = y
-            day_bottom = y + day_height  # Full height of the forecast section
-
-            # Get data
-            day_label = day_data.get("day", "--")
-            date_label = day_data.get("date", "")
-            precip = day_data.get("precipitation")
-            # Always show precipitation (even if 0%) for consistent alignment
-            precip_value = precip if precip is not None else 0
-
-            # Count elements to space: High, Low, Icon, Precip (always), Day/Date
-            num_elements = 5
-
-            # Calculate spacing between elements - use significantly more spacing
-            available_height = day_height - 16  # Leave 8px top and bottom padding
-            element_spacing = 12  # Fixed larger spacing between elements
-
-            current_y = day_top + 8
-
-            # 1. High temp (bold, top)
-            high = day_data.get("high", "--")
-            high_str = f"{high}°" if high != "--" else "--"
-            if font_lg:
-                bbox = font_lg.getbbox(high_str)
-                text_w = bbox[2] - bbox[0] if bbox else 0
-                text_x = col_center - text_w // 2
-                draw.text((text_x, current_y), high_str, font=font_lg, fill=0)
-                current_y = current_y + (bbox[3] - bbox[1] if bbox else 16)
-            else:
-                current_y = current_y + 16
-
-            current_y += element_spacing
-
-            # 2. Low temp (medium)
-            low = day_data.get("low", "--")
-            low_str = f"{low}°" if low != "--" else "--"
-            if font_md:
-                bbox = font_md.getbbox(low_str)
-                text_w = bbox[2] - bbox[0] if bbox else 0
-                text_x = col_center - text_w // 2
-                draw.text((text_x, current_y), low_str, font=font_md, fill=0)
-                current_y = current_y + (bbox[3] - bbox[1] if bbox else 14)
-            else:
-                current_y = current_y + 14
-
-            current_y += element_spacing
-
-            # 3. Icon
-            icon_x = col_center - icon_size // 2
-            icon_y = current_y
-            icon_type = get_icon_type(day_data.get("condition", ""))
-            self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
-            current_y = icon_y + icon_size
-
-            current_y += element_spacing
-
-            # 4. Precipitation probability (always show, even if 0%)
-            precip_str = f"{precip_value}%"
-            if font_sm:
-                bbox = font_sm.getbbox(precip_str)
-                text_w = bbox[2] - bbox[0] if bbox else 0
-                text_x = col_center - text_w // 2
-                draw.text((text_x, current_y), precip_str, font=font_sm, fill=0)
-                current_y = current_y + (bbox[3] - bbox[1] if bbox else 10)
-            else:
-                current_y = current_y + 10
-
-            current_y += element_spacing
-
-            # 5. Day/Date label (bottom)
-            actual_bottom = day_bottom  # Track actual bottom of content
-            if font_sm:
-                # Day name
-                day_bbox = font_sm.getbbox(day_label)
-                day_text_w = day_bbox[2] - day_bbox[0] if day_bbox else 0
-                day_text_x = col_center - day_text_w // 2
-                draw.text((day_text_x, current_y), day_label, font=font_sm, fill=0)
-
-                # Date below day (if available)
-                if date_label:
-                    date_bbox = font_sm.getbbox(date_label)
-                    date_text_w = date_bbox[2] - date_bbox[0] if date_bbox else 0
-                    date_text_x = col_center - date_text_w // 2
-                    date_y = (
-                        current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10) + 2
-                    )
-                    draw.text((date_text_x, date_y), date_label, font=font_sm, fill=0)
-                    # Update actual bottom to include date
-                    actual_bottom = max(
-                        actual_bottom,
-                        date_y + (date_bbox[3] - date_bbox[1] if date_bbox else 10),
-                    )
-                else:
-                    # Update actual bottom to include day label
-                    actual_bottom = max(
-                        actual_bottom,
-                        current_y + (day_bbox[3] - day_bbox[1] if day_bbox else 10),
-                    )
-
-            # Draw vertical divider lines - full height for all columns
-            # Use actual_bottom to ensure lines extend to the very bottom of content
-            line_bottom = max(day_bottom, actual_bottom)
-
-            # Right edge (for all columns except last)
-            if i < num_days - 1:
-                draw.line(
-                    [
-                        (col_right - divider_width // 2, day_top),
-                        (col_right - divider_width // 2, line_bottom),
-                    ],
-                    fill=0,
-                    width=divider_width,
-                )
-            # Left edge for first column
-            if i == 0:
-                draw.line(
-                    [(col_x, day_top), (col_x, line_bottom)],
-                    fill=0,
-                    width=divider_width,
-                )
-            # Right edge for last column (to complete the grid)
-            if i == num_days - 1:
-                draw.line(
-                    [
-                        (col_right - divider_width // 2, day_top),
-                        (col_right - divider_width // 2, line_bottom),
-                    ],
-                    fill=0,
-                    width=divider_width,
-                )
-
-    def _draw_hourly_forecast(
-        self,
-        draw: ImageDraw.Draw,
-        x: int,
-        y: int,
-        total_width: int,
-        hourly_forecast: list,
-    ):
-        """Draw a 24-hour hourly weather forecast in horizontal card style.
-
-        Args:
-            draw: ImageDraw object
-            x, y: Top-left corner
-            total_width: Total width available
-            hourly_forecast: List of dicts with keys: time, temperature, condition, precipitation
-        """
-        if not hourly_forecast:
-            return
-
-        # Map conditions to icon types based on WMO weather codes (matches weather module logic)
-        def get_icon_type(condition: str) -> str:
-            condition_lower = condition.lower() if condition else ""
-
-            # Clear sky (code 0)
-            if condition_lower == "clear":
-                return "sun"  # Maps to sun.png
-
-            # Mainly clear (code 1) or Partly cloudy (code 2)
-            elif (
-                condition_lower == "mainly clear" or condition_lower == "partly cloudy"
-            ):
-                return "cloud-sun"  # Maps to cloud-sun.png
-
-            # Overcast (code 3)
-            elif condition_lower == "overcast":
-                return "cloud"  # Maps to cloud.png
-
-            # Fog (codes 45, 48)
-            elif condition_lower == "fog" or "mist" in condition_lower:
-                return "cloud-fog"  # Maps to cloud-fog.png
-
-            # Thunderstorm (codes 95, 96, 99) - check FIRST to avoid false matches
-            if (
-                "thunderstorm" in condition_lower
-                or "thunder" in condition_lower
-                or "lightning" in condition_lower
-            ):
-                return "storm"  # Maps to cloud-lightning.png
-
-            # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
-            elif "snow" in condition_lower:
-                return (
-                    "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
-                )
-
-            # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
-            elif (
-                "rain" in condition_lower
-                or "drizzle" in condition_lower
-                or "showers" in condition_lower
-            ):
-                return "rain"  # Maps to cloud-rain.png
-
-            # Default fallback
-            else:
-                return "cloud"  # Maps to cloud.png
-
-        # Horizontal layout - show 4 hours per row for much better readability
-        hours_per_row = 4
-        num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
-        # Calculate column width with proper margins to avoid cutoff
-        # Leave 8px left margin + 8px right margin = 16px total margin
-        col_width = (
-            total_width - 16 - (hours_per_row - 1) * 5
-        ) // hours_per_row  # Account for spacing between columns
-        hour_spacing = 5  # Horizontal spacing between hours
-        icon_size = 24  # Increased size, matches 7-day forecast
-        entry_height = (
-            86  # Recalculated height to accommodate 24px icon (was 80px for 18px icon)
-        )
-        row_spacing = 10  # Vertical spacing between rows
-
-        # Get fonts
-        font_sm = self._get_font("regular_sm")
-        font_md = self._get_font("regular")  # For temperature
-
-        # Draw grid lines first (behind content)
-        grid_line_width = 1
-
-        # Calculate total forecast height
-        total_forecast_height = (num_rows * entry_height) + (
-            (num_rows - 1) * row_spacing
-        )
-
-        # Calculate actual column positions for grid
-        actual_col_positions = []
-        left_margin = 8
-        right_margin = 8
-        for col in range(hours_per_row):
-            col_x = x + col * (col_width + hour_spacing) + left_margin
-            actual_col_positions.append(col_x)
-        # Add right edge - calculate properly to avoid cutoff
-        # Use the actual last column position + its width, but ensure it doesn't exceed total_width
-        if actual_col_positions:
-            last_col_x = actual_col_positions[-1] + col_width
-            # Ensure we don't exceed the available width (account for right margin)
-            last_col_x = min(last_col_x, x + total_width - right_margin)
-            actual_col_positions.append(last_col_x)
-
-        # Calculate leftmost and rightmost positions for grid - ensure they're within bounds
-        leftmost_x = (
-            actual_col_positions[0] if actual_col_positions else x + left_margin
-        )
-        rightmost_x = min(
-            x + total_width - right_margin,
-            (
-                actual_col_positions[-1]
-                if actual_col_positions
-                else x + total_width - right_margin
-            ),
-        )
-
-        # Calculate bottom position for vertical lines (should match bottom horizontal line)
-        bottom_y = y + total_forecast_height
-
-        # Draw horizontal grid lines (between rows) - start at leftmost vertical line
-        for row in range(num_rows + 1):
-            line_y = y + row * (entry_height + row_spacing)
-            draw.line(
-                [(leftmost_x, line_y), (rightmost_x, line_y)],
-                fill=0,
-                width=grid_line_width,
-            )
-
-        # Draw vertical grid lines (between hours) - extend to bottom horizontal line
-        for col_x in actual_col_positions:
-            # Only draw if within bounds - ensure we don't exceed total_width
-            if col_x < x + total_width:
-                draw.line(
-                    [(col_x, y), (col_x, bottom_y)], fill=0, width=grid_line_width
-                )
-
-        # Draw content on top of grid
-        for row in range(num_rows):
-            row_y = y + row * (entry_height + row_spacing)
-            start_idx = row * hours_per_row
-            end_idx = min(start_idx + hours_per_row, len(hourly_forecast))
-
-            for col in range(start_idx, end_idx):
-                hour_data = hourly_forecast[col]
-                col_idx = col - start_idx
-                # Calculate position with spacing
-                col_x = x + col_idx * (col_width + hour_spacing) + 8  # 8px left margin
-                col_center = col_x + col_width // 2
-
-                # Time (top of grid cell)
-                time_str = hour_data.get("time", "--")
-                time_y = row_y + 2
-                if font_sm:
-                    bbox = font_sm.getbbox(time_str)
-                    text_w = bbox[2] - bbox[0] if bbox else 0
-                    text_x = int(col_center - text_w // 2)
-                    draw.text((text_x, time_y), time_str, font=font_sm, fill=0)
-                    time_height = bbox[3] - bbox[1] if bbox else 10
-                else:
-                    time_height = 10
-
-                # Icon (below time)
-                icon_y = time_y + time_height + 8
-                icon_x = int(col_center - icon_size // 2)
-                icon_type = get_icon_type(hour_data.get("condition", ""))
-                self._draw_icon(draw, icon_x, icon_y, icon_type, icon_size)
-
-                # Temperature (below icon, prominent)
-                temp = hour_data.get("temperature", "--")
-                temp_str = f"{temp}°" if temp != "--" else "--"
-                temp_y = icon_y + icon_size + 8
-                if font_md:
-                    bbox = font_md.getbbox(temp_str)
-                    text_w = bbox[2] - bbox[0] if bbox else 0
-                    text_x = int(col_center - text_w // 2)
-                    draw.text((text_x, temp_y), temp_str, font=font_md, fill=0)
-                    temp_height = bbox[3] - bbox[1] if bbox else 12
-                else:
-                    temp_height = 12
-
-                # Precipitation probability (below temp, always show)
-                precip = hour_data.get("precipitation")
-                precip_value = precip if precip is not None else 0
-                precip_str = f"{precip_value}%"
-                precip_y = temp_y + temp_height + 8
-                if font_sm:
-                    bbox = font_sm.getbbox(precip_str)
-                    text_w = bbox[2] - bbox[0] if bbox else 0
-                    text_x = int(col_center - text_w // 2)
-                    draw.text((text_x, precip_y), precip_str, font=font_sm, fill=0)
 
     def _draw_progress_bar(
         self,
@@ -2628,230 +1850,7 @@ class PrinterDriver:
                 value_str = f"{value:.0f}"
                 draw.text((bar_x + bar_width + 4, bar_y), value_str, font=font, fill=0)
 
-    def _draw_sun_path(
-        self,
-        draw: ImageDraw.Draw,
-        x: int,
-        y: int,
-        width: int,
-        height: int,
-        sun_path: list,
-        sunrise: datetime,
-        sunset: datetime,
-        current_time: datetime,
-        current_altitude: float,
-        sunrise_time: str,
-        sunset_time: str,
-        day_length: str,
-        font,
-        font_sm,
-        font_caption,
-    ):
-        """Draw a sun path curve visualization.
 
-        Args:
-            draw: ImageDraw object
-            x, y: Top-left corner
-            width: Drawing width
-            height: Drawing height (curve area)
-            sun_path: List of (datetime, altitude) tuples
-            sunrise: Sunrise datetime
-            sunset: Sunset datetime
-            current_time: Current datetime
-            current_altitude: Current sun altitude in degrees
-            sunrise_time: Formatted sunrise time string
-            sunset_time: Formatted sunset time string
-            day_length: Day length string (HH:MM:SS)
-            font: Font for labels
-            font_sm: Small font for captions
-            font_caption: Caption font
-        """
-        # Calculate drawing area
-        curve_height = height - 60  # Leave space for labels and times
-        curve_y = y + 20  # Start below title
-        curve_bottom = curve_y + curve_height - 20  # Bottom of curve area
-        horizon_y = (
-            curve_y + (curve_height - 20) // 2
-        )  # Horizon line in middle of curve area
-
-        # Find min/max altitude for scaling
-        altitudes = [alt for _, alt in sun_path]
-        min_alt = min(altitudes) if altitudes else -90
-        max_alt = max(altitudes) if altitudes else 90
-
-        # Normalize altitude range to show full sine wave including night
-        # Use the actual min/max from the data to show complete day/night cycle
-        alt_range = max(max_alt - min_alt, 10)  # At least 10 degrees range
-        alt_min = min_alt  # Use actual minimum (can be -90 at night)
-        alt_max = max_alt  # Use actual maximum (can be 90 at zenith)
-
-        # Draw title
-        if font:
-            draw.text((x, y), "SUN", font=font, fill=0)
-
-        # Draw horizon line
-        horizon_x_start = x + 10
-        horizon_x_end = x + width - 10
-        draw.line(
-            [(horizon_x_start, horizon_y), (horizon_x_end, horizon_y)], fill=0, width=1
-        )
-
-        # Draw sun path curve
-        curve_width = horizon_x_end - horizon_x_start
-        points = []
-        current_point_idx = -1
-
-        # Find time range for normalization
-        if sun_path:
-            first_time = sun_path[0][0]
-            last_time = sun_path[-1][0]
-            time_range_seconds = (last_time - first_time).total_seconds()
-        else:
-            time_range_seconds = 24 * 3600  # Fallback to 24 hours
-
-        # Find current time index
-        for i, (dt, alt) in enumerate(sun_path):
-            # Normalize time to 0-1 based on actual time range
-            if time_range_seconds > 0:
-                time_offset = (dt - first_time).total_seconds()
-                time_of_day = time_offset / time_range_seconds
-            else:
-                # Fallback: use hour/minute if range is invalid
-                time_of_day = (dt.hour * 60 + dt.minute) / (24 * 60)
-            curve_x = horizon_x_start + int(time_of_day * curve_width)
-
-            # Normalize altitude to curve height
-            # Altitude: -90 (below) to 90 (zenith)
-            # Y position: curve_bottom (min altitude/night) to curve_y (max altitude/day)
-            # Horizon (0 altitude) should be at horizon_y (middle)
-            if alt_max > alt_min:
-                normalized_alt = (alt - alt_min) / (alt_max - alt_min)
-            else:
-                normalized_alt = 0.5
-            # Map normalized altitude to full curve height (from top to bottom)
-            curve_y_pos = curve_y + int(
-                (1.0 - normalized_alt) * (curve_bottom - curve_y)
-            )
-            points.append((curve_x, curve_y_pos))
-
-            # Check if this is the current time (within 15 minutes)
-            if abs((dt - current_time).total_seconds()) < 15 * 60:
-                current_point_idx = i
-
-        # Draw the full 24-hour curve path
-        if len(points) > 1:
-            # Draw the complete curve (full sine wave including night)
-            # Draw past portion (solid) - from start to current time
-            if current_point_idx > 0:
-                past_points = points[: current_point_idx + 1]
-                for i in range(len(past_points) - 1):
-                    draw.line([past_points[i], past_points[i + 1]], fill=0, width=2)
-
-            # Draw future portion (dashed) - from current time to end
-            if current_point_idx < len(points) - 1:
-                future_start = max(0, current_point_idx)
-                future_points = points[future_start:]
-                # Draw as dashed line
-                for i in range(len(future_points) - 1):
-                    if i % 2 == 0:  # Draw every other segment for dashed effect
-                        draw.line(
-                            [future_points[i], future_points[i + 1]], fill=0, width=1
-                        )
-
-        # Draw sunrise marker at actual sunrise time
-        if sun_path and time_range_seconds > 0:
-            sunrise_offset = (sunrise - first_time).total_seconds()
-            sunrise_normalized = sunrise_offset / time_range_seconds
-            sunrise_x = horizon_x_start + int(sunrise_normalized * curve_width)
-        else:
-            sunrise_x = horizon_x_start
-        sunrise_marker_y = horizon_y
-        draw.ellipse(
-            [sunrise_x - 3, sunrise_marker_y - 3, sunrise_x + 3, sunrise_marker_y + 3],
-            outline=0,
-            width=1,
-            fill=1,
-        )
-
-        # Draw sunset marker at actual sunset time
-        if sun_path and time_range_seconds > 0:
-            sunset_offset = (sunset - first_time).total_seconds()
-            sunset_normalized = sunset_offset / time_range_seconds
-            sunset_x = horizon_x_start + int(sunset_normalized * curve_width)
-        else:
-            sunset_x = horizon_x_end
-        sunset_marker_y = horizon_y
-        draw.ellipse(
-            [sunset_x - 3, sunset_marker_y - 3, sunset_x + 3, sunset_marker_y + 3],
-            outline=0,
-            width=1,
-            fill=1,
-        )
-
-        # Draw current sun position marker
-        if current_point_idx >= 0 and current_point_idx < len(points):
-            current_x, current_y = points[current_point_idx]
-            # Draw larger marker with sun icon
-            marker_size = 8
-            draw.ellipse(
-                [
-                    current_x - marker_size,
-                    current_y - marker_size,
-                    current_x + marker_size,
-                    current_y + marker_size,
-                ],
-                outline=0,
-                width=2,
-                fill=1,
-            )
-            # Draw simple sun rays (4 lines)
-            ray_length = 4
-            for angle in [0, 45, 90, 135]:
-                rad = math.radians(angle)
-                end_x = current_x + int(ray_length * math.cos(rad))
-                end_y = current_y + int(ray_length * math.sin(rad))
-                draw.line([(current_x, current_y), (end_x, end_y)], fill=0, width=1)
-
-        # Draw sunrise time (bottom left)
-        if font and sunrise_time:
-            draw.text((x, horizon_y + 25), sunrise_time, font=font, fill=0)
-            if font_caption:
-                draw.text((x, horizon_y + 45), "Sunrise", font=font_caption, fill=0)
-
-        # Draw sunset time (bottom right)
-        if font and sunset_time:
-            if font:
-                text_bbox = draw.textbbox((0, 0), sunset_time, font=font)
-                text_width = text_bbox[2] - text_bbox[0]
-            sunset_text_x = x + width - text_width
-            draw.text((sunset_text_x, horizon_y + 25), sunset_time, font=font, fill=0)
-            if font_caption:
-                caption_bbox = draw.textbbox((0, 0), "Sunset", font=font_caption)
-                caption_width = caption_bbox[2] - caption_bbox[0]
-                draw.text(
-                    (x + width - caption_width, horizon_y + 45),
-                    "Sunset",
-                    font=font_caption,
-                    fill=0,
-                )
-
-        # Draw day length (centered, inline with sunrise/sunset times)
-        if font and day_length:
-            duration_text = day_length
-            text_bbox = draw.textbbox((0, 0), duration_text, font=font)
-            text_width = text_bbox[2] - text_bbox[0]
-            duration_x = x + (width - text_width) // 2
-            draw.text((duration_x, horizon_y + 25), duration_text, font=font, fill=0)
-            if font_caption:
-                caption_bbox = draw.textbbox((0, 0), "Day Length", font=font_caption)
-                caption_width = caption_bbox[2] - caption_bbox[0]
-                caption_x = x + (width - caption_width) // 2
-                draw.text(
-                    (caption_x, horizon_y + 45),
-                    "Day Length",
-                    font=font_caption,
-                    fill=0,
-                )
 
     def _generate_qr_image(
         self, data: str, size: int, error_correction: str, fixed_size: bool
@@ -3305,106 +2304,9 @@ class PrinterDriver:
         line = "━" * self.width
         self.print_text(line, "bold")
 
-    def print_moon_phase(self, phase: float, size: int = 60):
-        """Print a moon phase graphic.
 
-        Args:
-            phase: Moon phase value (0-28 day cycle)
-            size: Diameter of moon in pixels (default 60)
-        """
-        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
-            self.flush_buffer()
-        self.print_buffer.append(
-            (
-                "moon",
-                {
-                    "phase": phase,
-                    "size": size,
-                },
-            )
-        )
 
-    def print_sun_path(
-        self,
-        sun_path: list,
-        sunrise: datetime,
-        sunset: datetime,
-        current_time: datetime,
-        current_altitude: float,
-        sunrise_time: str,
-        sunset_time: str,
-        day_length: str,
-        height: int = 120,
-    ):
-        """Print a sun path curve visualization.
 
-        Args:
-            sun_path: List of (datetime, altitude) tuples
-            sunrise: Sunrise datetime
-            sunset: Sunset datetime
-            current_time: Current datetime
-            current_altitude: Current sun altitude in degrees
-            sunrise_time: Formatted sunrise time string
-            sunset_time: Formatted sunset time string
-            day_length: Day length string (HH:MM:SS)
-            height: Height of the visualization in pixels (default 120)
-        """
-        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
-            self.flush_buffer()
-        self.print_buffer.append(
-            (
-                "sun_path",
-                {
-                    "sun_path": sun_path,
-                    "sunrise": sunrise,
-                    "sunset": sunset,
-                    "current_time": current_time,
-                    "current_altitude": current_altitude,
-                    "sunrise_time": sunrise_time,
-                    "sunset_time": sunset_time,
-                    "day_length": day_length,
-                    "height": height,
-                },
-            )
-        )
-
-    def print_maze(self, grid: List[List[int]], cell_size: int = 8):
-        """Print a maze as a bitmap graphic.
-
-        Args:
-            grid: 2D list where 1 = wall, 0 = path
-            cell_size: Size of each cell in pixels (default 8)
-        """
-        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
-            self.flush_buffer()
-        self.print_buffer.append(
-            (
-                "maze",
-                {
-                    "grid": grid,
-                    "cell_size": cell_size,
-                },
-            )
-        )
-
-    def print_sudoku(self, grid: List[List[int]], cell_size: int = 16):
-        """Print a Sudoku grid as a bitmap graphic.
-
-        Args:
-            grid: 9x9 grid where 0 = empty, 1-9 = number
-            cell_size: Size of each cell in pixels (default 16)
-        """
-        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
-            self.flush_buffer()
-        self.print_buffer.append(
-            (
-                "sudoku",
-                {
-                    "grid": grid,
-                    "cell_size": cell_size,
-                },
-            )
-        )
 
     def print_icon(self, icon_type: str, size: int = 32):
         """Print a weather/status icon.
@@ -3425,39 +2327,7 @@ class PrinterDriver:
             )
         )
 
-    def print_weather_forecast(self, forecast: list):
-        """Print a 7-day weather forecast with icons.
 
-        Args:
-            forecast: List of dicts with keys: day, high, low, condition
-        """
-        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
-            self.flush_buffer()
-        self.print_buffer.append(
-            (
-                "weather_forecast",
-                {
-                    "forecast": forecast,
-                },
-            )
-        )
-
-    def print_hourly_forecast(self, hourly_forecast: list):
-        """Print a 24-hour hourly weather forecast with icons.
-
-        Args:
-            hourly_forecast: List of dicts with keys: time, temperature, condition
-        """
-        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
-            self.flush_buffer()
-        self.print_buffer.append(
-            (
-                "hourly_forecast",
-                {
-                    "hourly_forecast": hourly_forecast,
-                },
-            )
-        )
 
     def print_progress_bar(
         self,
@@ -3657,6 +2527,32 @@ class PrinterDriver:
                     "bars": bars,
                     "bar_height": bar_height,
                     "width": width,
+                },
+            )
+        )
+
+    def print_image(self, image: Image.Image):
+        """Print a generic PIL Image.
+
+        The image will be:
+        1. Resized to fit the paper width if too wide (maintaining aspect ratio).
+        2. Centered horizontally.
+        3. Converted to 1-bit monochrome if not already.
+
+        Args:
+            image: PIL Image object
+        """
+        if not image:
+            return
+            
+        if len(self.print_buffer) >= self.MAX_BUFFER_SIZE:
+            self.flush_buffer()
+            
+        self.print_buffer.append(
+            (
+                "image",
+                {
+                    "image": image,
                 },
             )
         )

@@ -1,29 +1,16 @@
+import os
 import requests
 from datetime import datetime
 from typing import Dict, Any, Optional
+from PIL import Image, ImageDraw
+
 import app.config
 from app.drivers.printer_mock import PrinterDriver
 from app.module_registry import register_module
 
 
 def get_weather_condition(code: int) -> str:
-    """Maps WMO Weather Codes to text per official WMO interpretation codes.
-    
-    WMO Weather Code reference:
-    0: Clear sky
-    1, 2, 3: Mainly clear, partly cloudy, and overcast
-    45, 48: Fog and depositing rime fog
-    51, 53, 55: Drizzle: Light, moderate, and dense intensity
-    56, 57: Freezing Drizzle: Light and dense intensity
-    61, 63, 65: Rain: Slight, moderate and heavy intensity
-    66, 67: Freezing Rain: Light and heavy intensity
-    71, 73, 75: Snow fall: Slight, moderate, and heavy intensity
-    77: Snow grains
-    80, 81, 82: Rain showers: Slight, moderate, and violent
-    85, 86: Snow showers slight and heavy
-    95: Thunderstorm: Slight or moderate
-    96, 99: Thunderstorm with slight and heavy hail
-    """
+    """Maps WMO Weather Codes to text per official WMO interpretation codes."""
     if code == 0:
         return "Clear"
     if code == 1:
@@ -34,58 +21,38 @@ def get_weather_condition(code: int) -> str:
         return "Overcast"
     if code in [45, 48]:
         return "Fog"
-    if code in [51, 53, 55]:  # Drizzle
+    if code in [51, 53, 55]:
         return "Drizzle"
-    if code in [56, 57]:  # Freezing Drizzle
+    if code in [56, 57]:
         return "Freezing Drizzle"
-    if code in [61, 63, 65]:  # Rain
+    if code in [61, 63, 65]:
         return "Rain"
-    if code in [66, 67]:  # Freezing Rain
+    if code in [66, 67]:
         return "Freezing Rain"
-    if code in [71, 73, 75]:  # Snow fall
+    if code in [71, 73, 75]:
         return "Snow"
-    if code == 77:  # Snow grains
+    if code == 77:
         return "Snow Grains"
-    if code in [80, 81, 82]:  # Rain showers
+    if code in [80, 81, 82]:
         return "Rain Showers"
-    if code in [85, 86]:  # Snow showers
+    if code in [85, 86]:
         return "Snow Showers"
-    if code == 95:  # Thunderstorm
+    if code == 95:
         return "Thunderstorm"
-    if code in [96, 99]:  # Thunderstorm with hail
+    if code in [96, 99]:
         return "Thunderstorm Hail"
     return "Unknown"
 
 
 def get_weather_condition_openweather(code: int) -> str:
     """Maps OpenWeather condition codes to text."""
-    # See https://openweathermap.org/weather-conditions
     if code in [800]:
         return "Clear"
     if code in [801, 802]:
         return "Cloudy"
     if code in [803, 804]:
         return "Overcast"
-    if code in [
-        300,
-        301,
-        302,
-        310,
-        311,
-        312,
-        313,
-        314,
-        321,
-        500,
-        501,
-        502,
-        503,
-        504,
-        520,
-        521,
-        522,
-        531,
-    ]:
+    if code in [300, 301, 302, 310, 311, 312, 313, 314, 321, 500, 501, 502, 503, 504, 520, 521, 522, 531]:
         return "Rain"
     if code in [200, 201, 202, 210, 211, 212, 221, 230, 231, 232]:
         return "Storm"
@@ -97,12 +64,7 @@ def get_weather_condition_openweather(code: int) -> str:
 
 
 def get_weather(config: Optional[Dict[str, Any]] = None):
-    """
-    Fetches weather from OpenWeather API (if API key provided) or Open-Meteo (free, no key).
-    Uses module config location if provided, otherwise falls back to global settings.
-    Returns current weather, 7-day forecast, and 24-hour forecast.
-    """
-    # Get location from config or fall back to global settings
+    """Fetches weather from OpenWeather API or Open-Meteo."""
     if config:
         latitude = config.get("latitude") or app.config.settings.latitude
         longitude = config.get("longitude") or app.config.settings.longitude
@@ -116,14 +78,11 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         city_name = app.config.settings.city_name
         api_key = None
 
-    # Default forecast structure
     empty_forecast = [{"day": "--", "high": "--", "low": "--", "condition": "Unknown", "icon": "cloud"} for _ in range(7)]
     empty_hourly = []
 
-    # If OpenWeather API key is provided, use OpenWeather API
     if api_key:
         try:
-            # Current weather
             url = "https://api.openweathermap.org/data/2.5/weather"
             params = {
                 "lat": latitude,
@@ -131,7 +90,6 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                 "appid": api_key,
                 "units": "imperial",
             }
-
             resp = requests.get(url, params=params, timeout=10)
             data = resp.json()
 
@@ -143,7 +101,6 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                 low = int(data["main"]["temp_min"])
                 city = data.get("name", city_name)
 
-                # Try to get forecast from OpenWeather 5-day/3-hour forecast
                 forecast = []
                 try:
                     forecast_url = "https://api.openweathermap.org/data/2.5/forecast"
@@ -151,14 +108,11 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                     forecast_data = forecast_resp.json()
                     
                     if forecast_resp.status_code == 200:
-                        # Group by day and get daily highs/lows
-                        # Skip today - get forecast starting from tomorrow
                         today_key = datetime.now().strftime("%Y-%m-%d")
                         days_seen = {}
                         for item in forecast_data.get("list", []):
                             dt = datetime.fromtimestamp(item["dt"])
                             day_key = dt.strftime("%Y-%m-%d")
-                            # Skip today - we show it separately in current conditions
                             if day_key == today_key:
                                 continue
                             if day_key not in days_seen:
@@ -171,14 +125,10 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                             else:
                                 days_seen[day_key]["high"] = max(days_seen[day_key]["high"], int(item["main"]["temp_max"]))
                                 days_seen[day_key]["low"] = min(days_seen[day_key]["low"], int(item["main"]["temp_min"]))
-                        
-                        # Get next 7 days (skip today)
                         forecast = list(days_seen.values())[:7]
                 except Exception:
                     pass
 
-                # For OpenWeather, we only get daily forecast from the API
-                # We'll need to use Open-Meteo for hourly forecast
                 return {
                     "current": current_temp,
                     "condition": condition,
@@ -186,17 +136,13 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                     "low": low,
                     "city": city,
                     "forecast": forecast if forecast else empty_forecast,
-                    "hourly_forecast": [],  # OpenWeather doesn't provide hourly in free tier
+                    "hourly_forecast": [],
                 }
         except Exception:
-            # Fall through to Open-Meteo if OpenWeather fails
             pass
 
-    # Use Open-Meteo (free, no key required)
     try:
         url = "https://api.open-meteo.com/v1/forecast"
-        
-        # Fetch both daily and hourly forecasts in a single request
         params = {
             "latitude": latitude,
             "longitude": longitude,
@@ -205,19 +151,17 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             "hourly": "weathercode,temperature_2m,precipitation_probability",
             "timezone": timezone,
             "temperature_unit": "fahrenheit",
-            "forecast_days": 8,  # Request 8 days so we get 7 after skipping today (index 0)
-            "forecast_hours": 24,  # Request 24 hours for hourly forecast
+            "forecast_days": 8,
+            "forecast_hours": 24,
         }
         
         resp = requests.get(url, params=params, timeout=10)
-        resp.raise_for_status()  # Raise exception for bad status codes
         data = resp.json()
         
         current = data.get("current_weather", {})
         daily = data.get("daily", {})
         hourly = data.get("hourly", {})
         
-        # Build 7-day forecast (include today, then next 6 days)
         forecast = []
         daily_times = daily.get("time", [])
         daily_max = daily.get("temperature_2m_max", [])
@@ -225,42 +169,24 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         daily_weathercode = daily.get("weathercode", [])
         daily_precip_prob = daily.get("precipitation_probability_max", [])
         
-        # Get today's date for comparison
         today = datetime.now().date()
         
-        # Start from index 0 to include today, then next 6 days (indices 0-6)
         for i in range(min(len(daily_times), 7)):
             try:
-                # Parse ISO8601 date (format: "2022-07-01")
-                date_str = daily_times[i]
-                dt = datetime.strptime(date_str, "%Y-%m-%d")
+                dt = datetime.strptime(daily_times[i], "%Y-%m-%d")
                 date_obj = dt.date()
-                
-                # Get weather code (WMO code) - defaults to 0 (Clear sky) if missing
                 weather_code = daily_weathercode[i] if i < len(daily_weathercode) else 0
                 condition = get_weather_condition(weather_code)
-                
-                # Get temperatures (convert to int, handle missing data)
                 high = int(daily_max[i]) if i < len(daily_max) else None
                 low = int(daily_min[i]) if i < len(daily_min) else None
-                
-                # Get precipitation probability
                 precip_prob = int(daily_precip_prob[i]) if i < len(daily_precip_prob) and daily_precip_prob[i] is not None else None
                 
-                # Format day label: "Today" for today, otherwise "Mon 1/19" format
-                # Remove leading zeros from dates for cleaner display
                 if date_obj == today:
                     day_label = "Today"
-                    # Format date without leading zeros: "1/19" instead of "01/19"
-                    month = str(dt.month)
-                    day = str(dt.day)
-                    date_label = f"{month}/{day}"
+                    date_label = f"{dt.month}/{dt.day}"
                 else:
-                    day_label = dt.strftime("%a")  # Day abbreviation (Mon, Tue, etc.)
-                    # Format date without leading zeros: "1/20" instead of "01/20"
-                    month = str(dt.month)
-                    day = str(dt.day)
-                    date_label = f"{month}/{day}"
+                    day_label = dt.strftime("%a")
+                    date_label = f"{dt.month}/{dt.day}"
                 
                 forecast.append({
                     "day": day_label,
@@ -270,58 +196,46 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                     "condition": condition,
                     "precipitation": precip_prob,
                 })
-            except (ValueError, IndexError, TypeError) as e:
-                # Skip invalid entries but continue processing
+            except (ValueError, IndexError, TypeError):
                 continue
         
-        # Get today's high/low from index 0 (if available)
-        today_high = int(daily_max[0]) if daily_max and len(daily_max) > 0 else None
-        today_low = int(daily_min[0]) if daily_min and len(daily_min) > 0 else None
+        today_high = int(daily_max[0]) if daily_max else None
+        today_low = int(daily_min[0]) if daily_min else None
         
-        # Build hourly forecast (next 24 hours)
         hourly_forecast = []
-        
-        # Get current time for filtering
         current_time = datetime.now()
         current_hour = current_time.replace(minute=0, second=0, microsecond=0)
         
         for i in range(len(hourly.get("time", []))):
             time_str = hourly["time"][i]
-            # Parse ISO8601 time (format: "2022-07-01T00:00" or "2022-07-01T00:00:00")
-            # Remove timezone suffix if present (e.g., "+00:00" or "Z")
             time_str_clean = time_str.split("+")[0].split("Z")[0]
             
             try:
-                if len(time_str_clean) == 16:  # "2022-07-01T00:00"
+                if len(time_str_clean) == 16:
                     dt = datetime.strptime(time_str_clean, "%Y-%m-%dT%H:%M")
-                elif len(time_str_clean) >= 19:  # "2022-07-01T00:00:00"
+                elif len(time_str_clean) >= 19:
                     dt = datetime.strptime(time_str_clean[:19], "%Y-%m-%dT%H:%M:%S")
                 else:
                     continue
             except Exception:
                 continue
             
-            # Skip past hours (keep current hour and future hours)
             if dt < current_hour:
                 continue
             
             weather_code = hourly["weathercode"][i] if "weathercode" in hourly else 0
             condition = get_weather_condition(weather_code)
             temp = int(hourly["temperature_2m"][i]) if "temperature_2m" in hourly else 0
-            
-            # Get precipitation probability
             hourly_precip_prob = hourly.get("precipitation_probability", [])
             precip_prob = int(hourly_precip_prob[i]) if i < len(hourly_precip_prob) and hourly_precip_prob[i] is not None else None
             
-            # Format time for display
-            # Show "Now" for current hour, otherwise 12-hour format with AM/PM
             current_hour_dt = datetime.now().replace(minute=0, second=0, microsecond=0)
             if dt == current_hour_dt:
                 time_display = "Now"
             else:
-                time_display = dt.strftime("%I %p")  # "11 AM", "2 PM" format
+                time_display = dt.strftime("%I %p")
                 if time_display.startswith("0"):
-                    time_display = time_display[1:]  # Remove leading zero from hour
+                    time_display = time_display[1:]
             
             hourly_forecast.append({
                 "time": time_display,
@@ -331,7 +245,6 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                 "precipitation": precip_prob,
             })
             
-            # Limit to 24 hours
             if len(hourly_forecast) >= 24:
                 break
         
@@ -345,15 +258,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             "hourly_forecast": hourly_forecast,
         }
 
-    except Exception as e:
-        # Log error for debugging
-        import logging
-        try:
-            logging.error(f"Weather API error: {e}")
-        except:
-            pass  # Ignore logging errors
-        
-        # Return error response with both forecast types
+    except Exception:
         return {
             "current": "--",
             "condition": "Unavailable",
@@ -366,51 +271,271 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
 
 
 def _get_icon_type(condition: str) -> str:
-    """Map weather condition to icon type based on WMO weather codes.
-    
-    Maps to Phosphor PNG icons with improved specificity:
-    - Clear (0) → sun
-    - Mainly Clear (1) → cloud-sun
-    - Partly Cloudy (2) → cloud-sun
-    - Overcast (3) → cloud
-    - Fog (45, 48) → cloud-fog
-    - Drizzle/Freezing Drizzle/Rain/Freezing Rain/Rain Showers (51-82) → cloud-rain
-    - Snow/Snow Grains/Snow Showers (71-86) → snowflake (more specific than cloud-snow)
-    - Thunderstorm/Thunderstorm Hail (95-99) → cloud-lightning
-    """
+    """Map weather condition to icon type."""
     condition_lower = condition.lower()
-    
-    # Thunderstorm (codes 95, 96, 99) - check FIRST to avoid false matches
     if "thunderstorm" in condition_lower or "thunder" in condition_lower or "lightning" in condition_lower:
-        return "storm"  # Maps to cloud-lightning.png
-    
-    # Snow-related (codes 71, 73, 75, 77, 85, 86) - check before rain
+        return "storm"
     elif "snow" in condition_lower:
-        return "snowflake"  # Maps to snowflake.png (more specific than cloud-snow)
-    
-    # Rain-related (codes 51-67, 80-82): Drizzle, Freezing Drizzle, Rain, Freezing Rain, Rain Showers
+        return "snowflake"
     elif "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
-        return "rain"  # Maps to cloud-rain.png
-    
-    # Clear sky (code 0)
+        return "rain"
     elif condition_lower == "clear":
-        return "sun"  # Maps to sun.png
-    
-    # Mainly clear (code 1) or Partly cloudy (code 2)
-    elif condition_lower == "mainly clear" or condition_lower == "partly cloudy":
-        return "cloud-sun"  # Maps to cloud-sun.png
-    
-    # Overcast (code 3)
+        return "sun"
+    elif condition_lower in ["mainly clear", "partly cloudy"]:
+        return "cloud-sun"
     elif condition_lower == "overcast":
-        return "cloud"  # Maps to cloud.png
-    
-    # Fog (codes 45, 48)
+        return "cloud"
     elif condition_lower == "fog" or "mist" in condition_lower:
-        return "cloud-fog"  # Maps to cloud-fog.png
-    
-    # Default fallback
+        return "cloud-fog"
     else:
-        return "cloud"  # Maps to cloud.png
+        return "cloud"
+
+
+def draw_icon_on_image(draw: ImageDraw.Draw, x: int, y: int, icon_type: str, size: int):
+    """Draw a weather icon onto a PIL ImageDraw context."""
+    icon_aliases = {
+        "clear": "sun",
+        "rain": "cloud-rain",
+        "snow": "cloud-snow",
+        "snowflake": "snowflake",
+        "storm": "cloud-lightning",
+        "cloud-fog": "cloud-fog",
+        "fog": "cloud-fog",
+        "mist": "cloud-fog",
+        "cloud-sun": "cloud-sun",
+        "cloud": "cloud",
+        "sun": "sun",
+    }
+    
+    file_name = icon_aliases.get(icon_type.lower(), icon_type.lower())
+    
+    # Path logic to find icons folder
+    # app/modules/weather.py -> app/modules -> app -> project_root
+    app_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    project_root = os.path.dirname(app_dir)
+    icon_path = os.path.join(project_root, "icons", "regular", f"{file_name}.png")
+    
+    if os.path.exists(icon_path):
+        try:
+            icon_img = Image.open(icon_path)
+            if icon_img.size != (size, size):
+                icon_img = icon_img.resize((size, size), Image.NEAREST)
+            if icon_img.mode != "1":
+                icon_img = icon_img.convert("1")
+                
+            width, height = icon_img.size
+            pixels = icon_img.load()
+            for py in range(height):
+                for px in range(width):
+                    if pixels[px, py] == 0:
+                        draw.point((x + px, y + py), fill=0)
+        except Exception:
+            pass
+
+
+def draw_weather_forecast_image(forecast: list, total_width: int, fonts: Dict[str, Any]) -> Image.Image:
+    """Draw 7-day forecast as an image."""
+    if not forecast:
+        return None
+        
+    num_days = min(len(forecast), 7)
+    col_width = total_width // num_days
+    icon_size = 24
+    day_height = 114
+    divider_width = 1
+    
+    # Create white image
+    image = Image.new("1", (total_width, day_height), 1)
+    draw = ImageDraw.Draw(image)
+    
+    font_sm = fonts.get("regular_sm")
+    font_md = fonts.get("regular")
+    font_lg = fonts.get("bold")
+    
+    for i, day_data in enumerate(forecast[:7]):
+        col_x = i * col_width
+        col_center = col_x + col_width // 2
+        col_right = col_x + col_width
+        day_top = 0
+        day_bottom = day_height
+        
+        # Data
+        day_label = day_data.get("day", "--")
+        date_label = day_data.get("date", "")
+        precip = day_data.get("precipitation")
+        precip_value = precip if precip is not None else 0
+        
+        element_spacing = 12
+        current_y = day_top + 8
+        
+        # 1. High Temp
+        high = day_data.get("high", "--")
+        high_str = f"{high}°" if high != "--" else "--"
+        if font_lg:
+            bbox = font_lg.getbbox(high_str)
+            text_w = bbox[2] - bbox[0]
+            text_x = col_center - text_w // 2
+            draw.text((text_x, current_y), high_str, font=font_lg, fill=0)
+            current_y += (bbox[3] - bbox[1])
+        else:
+            current_y += 16
+        current_y += element_spacing
+        
+        # 2. Low Temp
+        low = day_data.get("low", "--")
+        low_str = f"{low}°" if low != "--" else "--"
+        if font_md:
+            bbox = font_md.getbbox(low_str)
+            text_w = bbox[2] - bbox[0]
+            text_x = col_center - text_w // 2
+            draw.text((text_x, current_y), low_str, font=font_md, fill=0)
+            current_y += (bbox[3] - bbox[1])
+        else:
+            current_y += 14
+        current_y += element_spacing
+        
+        # 3. Icon
+        icon_x = col_center - icon_size // 2
+        icon_type = _get_icon_type(day_data.get("condition", ""))
+        draw_icon_on_image(draw, icon_x, current_y, icon_type, icon_size)
+        current_y += icon_size + element_spacing
+        
+        # 4. Precipitation
+        precip_str = f"{precip_value}%"
+        if font_sm:
+            bbox = font_sm.getbbox(precip_str)
+            text_w = bbox[2] - bbox[0]
+            text_x = col_center - text_w // 2
+            draw.text((text_x, current_y), precip_str, font=font_sm, fill=0)
+            current_y += (bbox[3] - bbox[1])
+        else:
+            current_y += 10
+        current_y += element_spacing
+        
+        # 5. Day/Date
+        if font_sm:
+            day_bbox = font_sm.getbbox(day_label)
+            day_text_w = day_bbox[2] - day_bbox[0]
+            day_text_x = col_center - day_text_w // 2
+            draw.text((day_text_x, current_y), day_label, font=font_sm, fill=0)
+            
+            if date_label:
+                date_bbox = font_sm.getbbox(date_label)
+                date_text_w = date_bbox[2] - date_bbox[0]
+                date_text_x = col_center - date_text_w // 2
+                date_y = current_y + (day_bbox[3] - day_bbox[1]) + 2
+                draw.text((date_text_x, date_y), date_label, font=font_sm, fill=0)
+        
+        # Dividers
+        if i < num_days - 1:
+            draw.line([(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, day_bottom)], fill=0, width=divider_width)
+        if i == 0:
+            draw.line([(col_x, day_top), (col_x, day_bottom)], fill=0, width=divider_width)
+        if i == num_days - 1:
+            draw.line([(col_right - divider_width // 2, day_top), (col_right - divider_width // 2, day_bottom)], fill=0, width=divider_width)
+            
+    return image
+
+
+def draw_hourly_forecast_image(hourly_forecast: list, total_width: int, fonts: Dict[str, Any]) -> Image.Image:
+    """Draw 24-hour forecast as an image."""
+    if not hourly_forecast:
+        return None
+        
+    hours_per_row = 4
+    num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
+    col_width = (total_width - 16 - (hours_per_row - 1) * 5) // hours_per_row
+    
+    hour_spacing = 5
+    icon_size = 24
+    entry_height = 86
+    row_spacing = 10
+    total_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing) if num_rows > 0 else 0
+    
+    if total_height == 0:
+        return None
+        
+    image = Image.new("1", (total_width, total_height), 1)
+    draw = ImageDraw.Draw(image)
+    
+    font_sm = fonts.get("regular_sm")
+    font_md = fonts.get("regular")
+    
+    # Grid Logic
+    left_margin = 8
+    actual_col_positions = []
+    for col in range(hours_per_row):
+        col_x = col * (col_width + hour_spacing) + left_margin
+        actual_col_positions.append(col_x)
+        
+    leftmost_x = actual_col_positions[0]
+    rightmost_x = min(total_width - 8, actual_col_positions[-1] + col_width)
+    
+    # Horizontal grid lines
+    for row in range(num_rows + 1):
+        line_y = row * (entry_height + row_spacing)
+        draw.line([(leftmost_x, line_y), (rightmost_x, line_y)], fill=0, width=1)
+        
+    # Vertical grid lines
+    for col_x in actual_col_positions:
+        draw.line([(col_x, 0), (col_x, total_height)], fill=0, width=1)
+    draw.line([(rightmost_x, 0), (rightmost_x, total_height)], fill=0, width=1)
+    
+    # Content
+    for row in range(num_rows):
+        row_y = row * (entry_height + row_spacing) 
+        start_idx = row * hours_per_row
+        end_idx = min(start_idx + hours_per_row, len(hourly_forecast))
+        
+        for col in range(start_idx, end_idx):
+            hour_data = hourly_forecast[col]
+            col_idx = col - start_idx
+            col_x = col_idx * (col_width + hour_spacing) + left_margin
+            col_center = col_x + col_width // 2
+            
+            # Time
+            time_str = hour_data.get("time", "--")
+            time_y = row_y + 2
+            if font_sm:
+                bbox = font_sm.getbbox(time_str)
+                text_w = bbox[2] - bbox[0]
+                text_x = col_center - text_w // 2
+                draw.text((text_x, time_y), time_str, font=font_sm, fill=0)
+                time_height = bbox[3] - bbox[1]
+            else:
+                time_height = 10
+                
+            # Icon
+            icon_y = time_y + time_height + 8
+            icon_x = col_center - icon_size // 2
+            icon_type = _get_icon_type(hour_data.get("condition", ""))
+            draw_icon_on_image(draw, icon_x, icon_y, icon_type, icon_size)
+            
+            # Temp
+            temp = hour_data.get("temperature", "--")
+            temp_str = f"{temp}°" if temp != "--" else "--"
+            temp_y = icon_y + icon_size + 8
+            if font_md:
+                bbox = font_md.getbbox(temp_str)
+                text_w = bbox[2] - bbox[0]
+                text_x = col_center - text_w // 2
+                draw.text((text_x, temp_y), temp_str, font=font_md, fill=0)
+                temp_height = bbox[3] - bbox[1]
+            else:
+                temp_height = 12
+                
+            # Precip
+            precip = hour_data.get("precipitation")
+            precip_value = precip if precip is not None else 0
+            precip_str = f"{precip_value}%"
+            precip_y = temp_y + temp_height + 8
+            if font_sm:
+                bbox = font_sm.getbbox(precip_str)
+                text_w = bbox[2] - bbox[0]
+                text_x = col_center - text_w // 2
+                draw.text((text_x, precip_y), precip_str, font=font_sm, fill=0)
+
+    return image
 
 
 @register_module(
@@ -435,9 +560,15 @@ def format_weather_receipt(
     # Location
     printer.print_subheader(weather['city'].upper())
     
-    # Weather icon - large for current conditions
+    # Weather icon and current conditions (Text-based for now, simple icon below)
     icon_type = _get_icon_type(weather['condition'])
-    printer.print_icon(icon_type, size=64)
+    
+    # Generate generic icon image for current conditions
+    icon_size = 64
+    icon_image = Image.new("1", (icon_size, icon_size), 1)
+    icon_draw = ImageDraw.Draw(icon_image)
+    draw_icon_on_image(icon_draw, 0, 0, icon_type, icon_size)
+    printer.print_image(icon_image)
     
     # Current temperature - big and bold
     printer.print_bold(f"{weather['current']}°F")
@@ -447,14 +578,26 @@ def format_weather_receipt(
     printer.print_body(f"High {weather['high']}°F  ·  Low {weather['low']}°F")
     printer.print_line()
     
+    # Get fonts from printer for image generation
+    # Note: Accessing internal _get_font is acceptable for system fonts
+    fonts = {
+        "regular_sm": getattr(printer, "_get_font", lambda s: None)("regular_sm"),
+        "regular": getattr(printer, "_get_font", lambda s: None)("regular"),
+        "bold": getattr(printer, "_get_font", lambda s: None)("bold"),
+    }
+    printer_width = getattr(printer, 'PRINTER_WIDTH_DOTS', 384)
+    
     # 24-Hour Forecast
     hourly_forecast = weather.get('hourly_forecast', [])
     if hourly_forecast:
         printer.print_subheader("24-HOUR FORECAST")
         printer.print_line()
         
-        # Print hourly forecast
-        printer.print_hourly_forecast(hourly_forecast)
+        # Turn generic forecast data into an image
+        hourly_image = draw_hourly_forecast_image(hourly_forecast, printer_width, fonts)
+        if hourly_image:
+            printer.print_image(hourly_image)
+            
         printer.print_line()
     
     # 7-Day Forecast
@@ -463,6 +606,9 @@ def format_weather_receipt(
         printer.print_subheader("7-DAY FORECAST")
         printer.print_line()
         
-        # Print forecast as a visual row with icons
-        printer.print_weather_forecast(forecast)
+        # Turn generic forecast data into an image
+        daily_image = draw_weather_forecast_image(forecast, printer_width, fonts)
+        if daily_image:
+            printer.print_image(daily_image)
+            
         printer.print_line()

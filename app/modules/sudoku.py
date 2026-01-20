@@ -1,5 +1,6 @@
 import random
-from typing import Dict, Any
+from typing import Dict, Any, List
+from PIL import Image, ImageDraw
 from app.module_registry import register_module
 
 
@@ -100,6 +101,90 @@ def generate_puzzle(difficulty="medium"):
     return gen.grid
 
 
+def draw_sudoku_image(grid: List[List[int]], cell_size: int, font) -> Image.Image:
+    """Draw a Sudoku grid as a bitmap image.
+
+    Args:
+        grid: 9x9 grid where 0 = empty, 1-9 = number
+        cell_size: Size of each cell in pixels
+        font: Font for drawing numbers
+    """
+    border_width = 2  # Thick border for outer edges
+    thin_width = 1  # Thin border for inner cells
+
+    total_size = 9 * cell_size + 2 * border_width
+    
+    # Create white image (1-bit monochrome)
+    image = Image.new("1", (total_size, total_size), 1)
+    draw = ImageDraw.Draw(image)
+
+    # Draw outer border
+    draw.rectangle(
+        [0, 0, total_size - 1, total_size - 1], outline=0, width=border_width
+    )
+
+    # Draw grid lines and numbers
+    for row in range(9):
+        for col in range(9):
+            cell_x = border_width + col * cell_size
+            cell_y = border_width + row * cell_size
+
+            # Determine boundary widths (thick for 3x3 boundaries)
+            top_width = border_width if row % 3 == 0 else thin_width
+            left_width = border_width if col % 3 == 0 else thin_width
+            
+            # Draw cell borders
+            # Top
+            if row % 3 == 0 and row > 0:
+                 draw.line(
+                    [cell_x, cell_y, cell_x + cell_size, cell_y],
+                    fill=0,
+                    width=top_width,
+                )
+            # Left
+            if col % 3 == 0 and col > 0:
+                draw.line(
+                    [cell_x, cell_y, cell_x, cell_y + cell_size],
+                    fill=0,
+                    width=left_width,
+                )
+            # Right (always draw thin, thick handled by next col's left or outer border)
+            draw.line(
+                [cell_x + cell_size, cell_y, cell_x + cell_size, cell_y + cell_size],
+                fill=0,
+                width=thin_width,
+            )
+            # Bottom (always draw thin, thick handled by next row's top or outer border)
+            draw.line(
+                [cell_x, cell_y + cell_size, cell_x + cell_size, cell_y + cell_size],
+                fill=0,
+                width=thin_width,
+            )
+
+            # Draw number if present
+            value = grid[row][col]
+            if value != 0:
+                num_str = str(value)
+                # Center text in cell
+                if font:
+                    bbox = font.getbbox(num_str)
+                    text_width = bbox[2] - bbox[0]
+                    text_height = bbox[3] - bbox[1]
+                else:
+                    text_width = cell_size // 2
+                    text_height = cell_size // 2
+
+                text_x = cell_x + (cell_size - text_width) // 2
+                text_y = cell_y + (cell_size - text_height) // 2
+
+                if font:
+                    draw.text((text_x, text_y), num_str, font=font, fill=0)
+                else:
+                    draw.text((text_x, text_y), num_str, fill=0)
+
+    return image
+
+
 @register_module(
     type_id="games",
     label="Sudoku",
@@ -131,7 +216,13 @@ def format_sudoku_receipt(
     # Render grid as full width (384 dots - 4px borders) / 9 cells = ~42px per cell
     printer_width_dots = getattr(printer, 'PRINTER_WIDTH_DOTS', 384)
     cell_size = (printer_width_dots - 4) // 9  # -4 for 2px borders on each side
-    printer.print_sudoku(grid, cell_size=cell_size)
+    
+    # Get bold font for numbers (if available)
+    font = getattr(printer, "_get_font", lambda s: None)("bold")
+
+    # Generate image and print
+    sudoku_image = draw_sudoku_image(grid, cell_size, font)
+    printer.print_image(sudoku_image)
     
     printer.print_line()
     printer.print_caption("Good luck!")
