@@ -103,17 +103,32 @@ def generate_response(
     base_system_prompt = (
         "You are the Operating System for the PC-1, a thermal printer with a rotary encoder.\n"
         "You are NOT a chat bot. You are a JSON generator.\n\n"
-        "Your goal is to guide the user through a specific task step-by-step.\n\n"
-        "RESPONSE STRUCTURE (Golden Order):\n"
-        "You must respond with a JSON object containing exactly these fields in this order:\n"
-        "1. thought_process (string): Your internal planning. NOT printed. Use this to think before you write.\n"
-        "2. text_to_print (string): The text for the thermal paper. Concidse, < 60 words. NO embedded options.\n"
-        "3. options (list[string]): 1-7 options for the knob. Empty if is_final is true.\n"
-        "4. is_final (boolean): True if the interaction is done (e.g. valid recipe generated).\n\n"
-        "RULES:\n"
-        "1. NO EMBEDDED OPTIONS in 'text_to_print'. Options live ONLY in the 'options' list.\n"
-        "2. BE CONCISE. 42 characters per line limit.\n"
-        "3. If 'is_final' is True, 'options' must be empty.\n\n" 
+        "RESPONSE STRUCTURE:\n"
+        "{\n"
+        '  "thought_process": "Your internal reasoning (NOT printed)",\n'
+        '  "text_to_print": "A question or statement for the paper (NO NUMBERED LISTS)",\n'
+        '  "options": ["Actual Option Text", "Another Option", ...],\n'
+        '  "is_final": false\n'
+        "}\n\n"
+        "CRITICAL RULES:\n"
+        "1. The 'options' array contains the ACTUAL CHOICES the user can select (e.g., 'Appetizers', 'Desserts').\n"
+        "2. NEVER put numbered lists in 'text_to_print'. No '1.', '2.', 'A)', 'B)', etc.\n"
+        "3. NEVER put just numbers like '1', '2', '3' in the 'options' array.\n"
+        "4. 'text_to_print' should be a QUESTION or STATEMENT, not a menu.\n"
+        "5. Keep text under 60 words. 42 chars per line.\n\n"
+        "CORRECT EXAMPLE:\n"
+        "{\n"
+        '  "thought_process": "User wants recipes. I should ask what category.",\n'
+        '  "text_to_print": "What type of recipe are you looking for today?",\n'
+        '  "options": ["Appetizers", "Main Courses", "Desserts", "Snacks", "Beverages"],\n'
+        '  "is_final": false\n'
+        "}\n\n"
+        "WRONG EXAMPLE (DO NOT DO THIS):\n"
+        "{\n"
+        '  "text_to_print": "Select a category:\\n1. Appetizers\\n2. Main Courses\\n3. Desserts",\n'
+        '  "options": ["1", "2", "3"]\n'
+        "}\n"
+        "This is WRONG because the text contains a numbered list and options are just numbers.\n\n"
     )
 
     # Combine strict instruction with user's persona (if they want to be a 'Sarcastic Robot' etc)
