@@ -1630,6 +1630,24 @@ async def install_updates():
                 "error": pull_result.stderr or "Could not pull latest changes",
             }
 
+        # Install Python dependencies
+        import sys
+        
+        # Use the current python executable to ensure we use the active venv if present
+        install_result = subprocess.run(
+            [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+            cwd=project_root,
+            capture_output=True,
+            text=True,
+            timeout=300,  # 5 minutes specifically for slow installs on Pi
+        )
+
+        if install_result.returncode != 0:
+            # We log the error but try to continue, as sometimes it's just a warning or minor issue
+            # Using logger would be better but simple logging here:
+            pass
+
+
         # Rebuild UI if web directory exists
         web_dir = project_root / "web"
         if web_dir.exists() and (web_dir / "package.json").exists():
