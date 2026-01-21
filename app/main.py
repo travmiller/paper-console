@@ -244,6 +244,9 @@ async def handle_selection_async(dial_position: int):
     from app.selection_mode import handle_selection
 
     def _do_selection():
+        # Tactile feedback - blip on button press
+        if hasattr(printer, "blip"):
+            printer.blip()
         handle_selection(dial_position)
 
     try:
@@ -2430,9 +2433,9 @@ async def execute_module_action(module_id: str, action: str):
     
     # Handle AI module reset action
     if module.type == "ai" and action == "reset":
-        from app.modules.ai import clear_history
-        clear_history(module_id)
-        return {"message": "Conversation reset successfully", "action": action}
+        from app.modules.ai import clear_state
+        clear_state(module_id)
+        return {"message": "AI state reset successfully", "action": action}
     
     # Add other module actions here as needed
     
