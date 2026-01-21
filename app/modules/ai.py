@@ -110,6 +110,10 @@ def generate_response(
         '  "options": ["Option 1", "Option 2", ... max 7 options]\n'
         "}\n"
         "The 'options' should be suggested follow-up actions or topics for the user.\n"
+        "CRITICAL INSTRUCTION: If the user asks for content (like a recipe, story, fact, etc.), provide the FULL CONTENT in 'response_text'. \n"
+        "Do not just ask clarifying questions unless absolutely necessary. \n"
+        "For example, if asked for a dinner idea, suggest a specific dish AND its recipe (or a brief summary of it), then use options for 'Different Idea', 'More Details', or related topics.\n"
+        "DO NOT list the options in the 'response_text'. They will be displayed automatically by the UI as a menu.\n"
         "Keep the text formatted nicely for a 42-column display."
     )
     messages[0]["content"] += json_instruction
@@ -148,13 +152,14 @@ def reset_to_initial(printer, config: Dict[str, Any], module_id: str):
     # Limit to 7
     initial_prompts = initial_prompts[:7]
     
-    print_ai_menu(printer, "How can I help you?", initial_prompts)
-    
     # Enter selection mode for initial prompts
     enter_selection_mode(
         lambda pos: handle_selection(pos, printer, config, module_id, initial_prompts),
         module_id
     )
+
+    print_ai_menu(printer, "How can I help you?", initial_prompts)
+
 
 
 # --- Interaction Loop ---
@@ -218,15 +223,8 @@ def handle_selection(
     # Valid selection
     selected_text = current_options[dial_position - 1]
     
-    # 1. Print "Thinking..." feedback
-    if hasattr(printer, "reset_buffer"):
-        printer.reset_buffer()
-    printer.print_header("AI ASSISTANT", icon="cpu")
-    printer.print_body(f"You selected: {selected_text}")
-    printer.feed(1)
-    printer.print_body("Thinking...")
-    if hasattr(printer, "flush_buffer"):
-        printer.flush_buffer()
+    # Valid selection
+    selected_text = current_options[dial_position - 1]
     
     # 2. Call API
     api_key = config.get("openai_api_key")
@@ -255,17 +253,15 @@ def handle_selection(
     
     save_history(module_id, history)
     
-    # 4. Print Result & New Menu
-    print_ai_menu(printer, response_text, new_options)
-    
-    # 5. Re-enter selection mode with NEW options
-    # We must exit first to clear the old callback, then enter new
-    # Actually `enter_selection_mode` overwrites the global, so it's fine.
-    # Use recursion-like callback structure
+    # 4. Re-enter selection mode with NEW options
     enter_selection_mode(
         lambda pos: handle_selection(pos, printer, config, module_id, new_options),
         module_id
     )
+
+    # 5. Print Result & New Menu
+    print_ai_menu(printer, response_text, new_options)
+
 
 
 # --- Module Entry Point ---
@@ -369,9 +365,10 @@ def format_ai_utility(
         response_text = result.get("response_text", "Resumed.")
         new_options = result.get("options", [])
         
-        print_ai_menu(printer, response_text, new_options)
-        
         enter_selection_mode(
             lambda pos: handle_selection(pos, printer, config, module_id, new_options),
             module_id
         )
+
+        print_ai_menu(printer, response_text, new_options)
+
