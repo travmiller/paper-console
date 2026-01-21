@@ -98,9 +98,25 @@ class CalendarConfig(BaseModel):
     days_to_show: int = 2  # 1=Today, 2=Today+Tomorrow
 
 
+
+class AIConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    openai_api_key: Optional[str] = None
+    model: str = "gpt-4o-mini"
+    system_prompt: str = "You are a helpful assistant for a paper-based console."
+    initial_prompts: List[str] = [
+        "Tell me a joke",
+        "Give me a fun fact",
+        "Play a text adventure game",
+        "Write a poem",
+        "Give me some advice",
+    ]
+
+
 class EmptyConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
     pass
+
 
 
 class ModuleInstance(BaseModel):
@@ -147,7 +163,9 @@ DEFAULT_QUOTES_ID = "default-quotes-001"
 DEFAULT_HISTORY_ID = "default-history-001"
 DEFAULT_TEXT_ID = "default-text-001"
 DEFAULT_CHECKLIST_ID = "default-checklist-001"
+DEFAULT_CHECKLIST_ID = "default-checklist-001"
 DEFAULT_SYSTEM_MONITOR_ID = "default-system-monitor-001"
+DEFAULT_AI_ID = "default-ai-001"
 
 
 def _default_modules() -> Dict[str, ModuleInstance]:
@@ -205,6 +223,12 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             id=DEFAULT_SYSTEM_MONITOR_ID,
             type="system_monitor",
             name="System Monitor",
+            config={},
+        ),
+        DEFAULT_AI_ID: ModuleInstance(
+            id=DEFAULT_AI_ID,
+            type="ai",
+            name="AI Assistant",
             config={},
         ),
     }
