@@ -29,6 +29,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
               uiSchema={uiSchema}
               formData={config}
               onChange={handleSchemaChange}
+              moduleId={module.id}
           />
       );
   }

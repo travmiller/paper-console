@@ -2416,6 +2416,29 @@ async def delete_module(module_id: str, background_tasks: BackgroundTasks):
     return {"message": "Module deleted"}
 
 
+@app.post("/api/modules/{module_id}/actions/{action}")
+async def execute_module_action(module_id: str, action: str):
+    """
+    Execute a module-specific action (e.g., reset conversation for AI).
+    
+    Supported actions depend on the module type.
+    """
+    if module_id not in settings.modules:
+        raise HTTPException(status_code=404, detail="Module not found")
+    
+    module = settings.modules[module_id]
+    
+    # Handle AI module reset action
+    if module.type == "ai" and action == "reset":
+        from app.modules.ai import clear_history
+        clear_history(module_id)
+        return {"message": "Conversation reset successfully", "action": action}
+    
+    # Add other module actions here as needed
+    
+    raise HTTPException(status_code=400, detail=f"Unknown action '{action}' for module type '{module.type}'")
+
+
 @app.post("/api/channels/{position}/modules")
 async def assign_module_to_channel(
     position: int,

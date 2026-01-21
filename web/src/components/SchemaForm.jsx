@@ -5,13 +5,14 @@ import KeyValueList from './widgets/KeyValueList';
 import Checklist from './widgets/Checklist';
 import PresetSelect from './widgets/PresetSelect';
 import WebhookTest from './widgets/WebhookTest';
+import ActionButton from './widgets/ActionButton';
 
 /**
  * A lightweight JSON Schema form renderer.
  * Supports: string, number, boolean, object, array.
  * Supports ui:widget: "textarea", "location-search".
  */
-const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange }) => {
+const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange, moduleId }) => {
   if (!schema) return null;
 
   const handleChange = (path, value) => {
@@ -44,12 +45,13 @@ const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange }) => {
         path={[]} 
         rootValue={formData}
         onRootChange={onChange}
+        moduleId={moduleId}
       />
     </div>
   );
 };
 
-const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required, compact, rootValue, onRootChange }) => {
+const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required, compact, rootValue, onRootChange, moduleId }) => {
     const type = schema.type;
     const title = schema.title || label;
     const description = schema.description;
@@ -105,6 +107,16 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
             <div className="mb-4">
                 <WebhookTest formData={rootValue} />
             </div>
+        );
+    }
+    
+    if (widget === 'action-button') {
+        return (
+            <ActionButton
+                schema={schema}
+                uiSchema={uiSchema}
+                moduleId={moduleId}
+            />
         );
     }
 

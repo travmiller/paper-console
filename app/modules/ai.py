@@ -215,13 +215,14 @@ def handle_selection(
 ):
     """Handle user selection from the menu."""
     
-    # 8 is always Exit/Reset
+    # 8 is always Exit AND Reset
     if dial_position == 8:
+        clear_history(module_id)  # Reset conversation for next time
         exit_selection_mode()
         if hasattr(printer, "reset_buffer"):
             printer.reset_buffer()
         printer.print_header("AI ASSISTANT", icon="cpu")
-        printer.print_body("Goodbye!")
+        printer.print_body("Conversation reset. See you next time!")
         printer.print_line()
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
@@ -334,13 +335,22 @@ def handle_selection(
                 "maxItems": 7
             },
             "reset_chat": {
-                "type": "boolean",
-                "title": "Reset Conversation",
-                "description": "Start a fresh conversation next time.",
-                "default": False
+                "type": "null",
+                "title": "Reset Conversation"
             }
         },
         "required": ["openai_api_key"]
+    },
+    ui_schema={
+        "reset_chat": {
+            "ui:widget": "action-button",
+            "ui:options": {
+                "action": "reset",
+                "label": "Reset Conversation",
+                "confirmMessage": "This will clear all conversation history. Continue?",
+                "style": "danger"
+            }
+        }
     },
 )
 def format_ai_utility(
