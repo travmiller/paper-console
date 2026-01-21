@@ -114,7 +114,23 @@ def generate_response(
         "Do not just ask clarifying questions unless absolutely necessary. \n"
         "For example, if asked for a dinner idea, suggest a specific dish AND its recipe (or a brief summary of it), then use options for 'Different Idea', 'More Details', or related topics.\n"
         "DO NOT list the options in the 'response_text'. They will be displayed automatically by the UI as a menu.\n"
-        "Keep the text formatted nicely for a 42-column display."
+        "If you are providing a direct answer (like a recipe or fact) that concludes the immediate interaction, you may return an empty list [] for 'options'. The system will provide default continuation options (Start Over, Tell me more).\n"
+        "Keep the text formatted nicely for a 42-column display.\n\n"
+        "EXAMPLE of CORRECT response (Options):\n"
+        "{\n"
+        '  "response_text": "Spaghetti Carbonara:\\n1. Boil pasta.\\n2. Fry guanciale.\\n3. Mix eggs and cheese.\\n4. Combine all.",\n'
+        '  "options": ["Vegetarian Version", "Wine Pairing", "Dessert Ideas"]\n'
+        "}\n\n"
+        "EXAMPLE of CORRECT response (Final/Direct Answer):\n"
+        "{\n"
+        '  "response_text": "The capital of France is Paris.",\n'
+        '  "options": []\n'
+        "}\n\n"
+        "EXAMPLE of WRONG response (Do NOT do this):\n"
+        "{\n"
+        '  "response_text": "Here is a recipe... What would you like next?\\n1. Vegeterian Version\\n2. Wine Pairing",\n'
+        '  "options": ["Vegetarian Version", "Wine Pairing"]\n'
+        "}"
     )
     messages[0]["content"] += json_instruction
     
@@ -159,7 +175,6 @@ def reset_to_initial(printer, config: Dict[str, Any], module_id: str):
     )
 
     print_ai_menu(printer, "How can I help you?", initial_prompts)
-
 
 
 # --- Interaction Loop ---
@@ -223,9 +238,11 @@ def handle_selection(
     # Valid selection
     selected_text = current_options[dial_position - 1]
     
-    # Valid selection
-    selected_text = current_options[dial_position - 1]
-    
+    # Handle "Start Over" special case
+    if selected_text == "Start Over":
+        reset_to_initial(printer, config, module_id)
+        return
+
     # 2. Call API
     api_key = config.get("openai_api_key")
     if not api_key:
@@ -243,6 +260,10 @@ def handle_selection(
     
     response_text = result.get("response_text", "Error: No response")
     new_options = result.get("options", [])
+
+    # If options are empty, inject defaults
+    if not new_options:
+        new_options = ["Tell me more", "Start Over"]
     
     # Limit options
     new_options = new_options[:7]
