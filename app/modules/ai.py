@@ -292,11 +292,7 @@ def handle_selection(
 
     # 5. Print Result
     print_ai_menu(printer, text_to_print, new_options)
-        module_id
-    )
 
-    # 5. Print Result & New Menu
-    print_ai_menu(printer, response_text, new_options)
 
 
 
