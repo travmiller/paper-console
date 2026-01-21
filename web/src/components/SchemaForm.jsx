@@ -284,9 +284,35 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
     return (
         <div className={compact ? "mb-0" : "mb-2"}>
             {title && (
-                <label className={compact ? commonClasses.labelSmall : commonClasses.label}>
-                    {title} {required && <span className="text-red-500 ml-1" title="Required">*</span>}
-                </label>
+                <div className="flex justify-between items-center mb-1">
+                    <label className={compact ? commonClasses.labelSmall : commonClasses.label}>
+                        {title} {required && <span className="text-red-500 ml-1" title="Required">*</span>}
+                    </label>
+                    {uiSchema?.['ui:randomExample'] && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const examples = uiSchema['ui:randomExample'];
+                                if (Array.isArray(examples) && examples.length > 0) {
+                                    // Filter out current value to ensure a change if possible
+                                    const available = examples.filter(ex => ex !== value);
+                                    if (available.length === 0) {
+                                        // If only one option or all match, just pick random from full list
+                                        const random = examples[Math.floor(Math.random() * examples.length)];
+                                        onChange(random);
+                                    } else {
+                                        const random = available[Math.floor(Math.random() * available.length)];
+                                        onChange(random);
+                                    }
+                                }
+                            }}
+                            className="text-xs text-zinc-400 hover:text-black hover:underline cursor-pointer transition-colors"
+                            title="Insert random example"
+                        >
+                            Generate Example
+                        </button>
+                    )}
+                </div>
             )}
             {schema.enum ? (
                 <select

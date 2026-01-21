@@ -364,11 +364,6 @@ def handle_content_selection(
                 "type": "string",
                 "title": "Prompt",
                 "description": "The system instruction for the AI."
-            },
-            "load_example": {
-                "type": "string", 
-                "title": "Load Example",
-                "enum": list(PROMPT_PRESETS.keys())
             }
         },
         "required": ["openai_api_key", "prompt"]
@@ -378,13 +373,8 @@ def handle_content_selection(
             "ui:widget": "textarea",
             "ui:options": {
                 "rows": 5
-            }
-        },
-        "load_example": {
-            "ui:widget": "preset-select",
-            "ui:options": {
-                "presets": PROMPT_PRESETS
-            }
+            },
+            "ui:randomExample": [p["values"]["prompt"] for p in PROMPT_PRESETS.values()]
         }
     },
 )
