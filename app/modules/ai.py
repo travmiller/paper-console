@@ -81,7 +81,7 @@ def get_openai_client(api_key: str):
 def generate_response(
     api_key: str,
     model: str,
-    system_prompt: str, # This might be overridden or appended to the strict system prompt
+    system_prompt: str, # This might be overridden or appended to the strict system prompt.
     history: List[Dict[str, str]],
     user_input: str
 ):
