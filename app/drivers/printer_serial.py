@@ -71,7 +71,7 @@ class PrinterDriver:
         self.width = width
         self.ser = None
         # Buffer for print operations (prints are always inverted/reversed)
-        # Each item is a tuple: ('text', line) or ('feed', count) or ('qr', data)
+        # Each item is a tuple: ('text', line) or ('feed', count) or ('qr', data).
         self.print_buffer = []
         # Line tracking for max print length
         self.lines_printed = 0
