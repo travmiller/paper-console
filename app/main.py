@@ -2431,12 +2431,6 @@ async def execute_module_action(module_id: str, action: str, background_tasks: B
     
     module = settings.modules[module_id]
     
-    # Handle AI module reset action
-    if module.type == "ai" and action == "reset":
-        from app.modules.ai import clear_state
-        clear_state(module_id)
-        return {"message": "AI state reset successfully", "action": action}
-    
     # Handle AI module load_defaults action
     if module.type == "ai" and action == "load_defaults":
         from app.modules.ai import DEFAULT_AI_MODES

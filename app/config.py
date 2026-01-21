@@ -99,20 +99,6 @@ class CalendarConfig(BaseModel):
 
 
 
-class AIConfig(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    openai_api_key: Optional[str] = None
-    model: str = "gpt-4o-mini"
-    system_prompt: str = "You are a helpful assistant for a paper-based console."
-    initial_prompts: List[str] = [
-        "Tell me a joke",
-        "Give me a fun fact",
-        "Play a text adventure game",
-        "Write a poem",
-        "Give me some advice",
-    ]
-
-
 class EmptyConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
     pass
