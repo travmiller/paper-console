@@ -29,58 +29,108 @@ except ImportError:
 # --- Default AI Modes ---
 
 # --- AI Presets ---
+# --- AI Presets ---
+# --- AI Presets ---
 PROMPT_PRESETS = {
-    "recipe": {
-        "label": "Instant Recipe",
-        "values": {
-            "prompt": (
-                "You are a Michelin star chef. "
-                "Based on the time of day and weather, suggest ONE perfect dish. "
-                "Format: Title, Ingredients (bullet points), 3-step instructions. "
-                "Keep it under 100 words."
-            )
-        }
-    },
-    "story": {
-        "label": "Micro-Story",
-        "values": {
-            "prompt": (
-                "You are a master of flash fiction. "
-                "Write a compelling story in exactly 3 sentences. "
-                "Theme: Use the current weather as a mood setter."
-            )
-        }
-    },
-    "coach": {
-        "label": "Life Coach",
-        "values": {
-            "prompt": (
-                "You are a stoic philosopher. "
-                "Give the user a single, hard-hitting piece of advice for their day. "
-                "Be direct, not fluffy."
-            )
-        }
-    },
-    "roast": {
-        "label": "Roast Me",
-        "values": {
-            "prompt": (
-                "You are a snarky comedian. "
-                "Roast the user for owning a 'Paper Console' in the current year. "
-                "Be funny but not mean."
-            )
-        }
-    },
-    "explain": {
-        "label": "Explain It",
-        "values": {
-            "prompt": (
-                "You are a science communicator like Carl Sagan. "
-                "Explain a random complex topic (Quantum Physics, Black Holes, Mycology) "
-                "simply and beautifully in 50 words."
-            )
-        }
-    }
+    "recipe": {"values": {"prompt": "You are a specialized chef. Suggest ONE unique, seasonal dish based on the current weather. Format: 'Dish Name', 'Ingredients' (bullet points), '3-Step Method'. Keep it under 100 words."}},
+    "story_micro": {"values": {"prompt": "Write a 3-sentence micro-fiction story. The genre should be random (Sci-Fi, Noir, Fantasy, or Horror). Make it twisty."}},
+    "haiku": {"values": {"prompt": "Write a haiku about the current weather or time of day. Strictly 5-7-5 syllables."}},
+    "joke": {"values": {"prompt": "Tell a clean but clever stand-up comedy joke. No puns. Setup and punchline."}},
+    "fact_science": {"values": {"prompt": "Give me one mind-blowing scientific fact that most people don't know. Keep it under 40 words."}},
+    "stoic": {"values": {"prompt": "You are Marcus Aurelius. Give me one piece of stoic advice for navigating the modern world today. Be brief and powerful."}},
+    "roast": {"values": {"prompt": "You are a snarky robot. Lightly roast the human for checking a paper printer for entertainment. Be funny, not mean."}},
+    "word": {"values": {"prompt": "You are a lexicographer. Give me a 'Word of the Day'. Choose an obscure, beautiful, or useful word. Provide definition and one example sentence."}},
+    "idea_startup": {"values": {"prompt": "Generate a random startup idea or invention that is slightly absurd but potentially useful. Describe it in 2 sentences."}},
+    "riddle": {"values": {"prompt": "Give me a challenging riddle. Do NOT reveal the answer. Just the riddle."}},
+    "coach_hype": {"values": {"prompt": "You are a high-energy life coach. Shout (use CAPS) a 1-sentence motivation to get me moving right now."}},
+    "oblique": {"values": {"prompt": "Give me an 'Oblique Strategy' style creative prompt to break a mental block. Abstract and artistic."}},
+    "history": {"values": {"prompt": "Tell me something significant that happened on this day in history. If nothing major, choose a funny minor event."}},
+    "explain_5": {"values": {"prompt": "Explain a complex concept (Entropy, Relativity, Mycology) as if I were a 5-year-old. Maximum 50 words."}},
+    "poem_free": {"values": {"prompt": "Write a short, free-verse poem about technology and nature colliding. Maximum 6 lines."}},
+    "decision_coin": {"values": {"prompt": "I am indecisive. Flip a coin for me, but elaborate. 'Heads: Do the bold thing. Tails: Play it safe.' Make it thematic."}},
+    "horoscope": {"values": {"prompt": "Write a generic but convincing horoscope for 'The User' for today. Mystical and vague but encouraging."}},
+    "etymology": {"values": {"prompt": "Choose a common word and explain its surprising ancient origin (etymology). Keep it brief."}},
+    "challenge_tiny": {"values": {"prompt": "Give me a tiny real-world challenge to complete in the next hour (e.g., 'Drink water', 'Text an old friend', 'Stretch'). detailed but tiny."}},
+    "alien": {"values": {"prompt": "You are an alien anthropologist observing humans. Describe one mundane human activity as if it were a bizarre ritual."}},
+    "fact_animal": {"values": {"prompt": "Tell me a weird, specific, and true fact about an animal (e.g., wombat poop, octopus brains)."}},
+    "prompt_art": {"values": {"prompt": "Describe a surreal image in vivid detail that I should draw or imagine. Focus on lighting and texture."}},
+    "debate": {"values": {"prompt": "Pick a harmless, low-stakes debate topic (e.g., 'Is a hotdog a sandwich?') and give a passionate 1-sentence ruling."}},
+    "compliment": {"values": {"prompt": "Give me a deeply specific and slightly odd compliment that would make someone's day."}},
+    "scifi_tech": {"values": {"prompt": "Invent a fictional Sci-Fi gadget from the year 3000. Name it and describe its function in one sentence."}},
+    "movie_plot": {"values": {"prompt": "Pitch a movie plot for a film that doesn't exist. Genre: Random. Logline only."}},
+    "nature_obs": {"values": {"prompt": "Describe a small natural phenomenon (a leaf falling, rain on glass) with extreme poetic detail."}},
+    "urban_legend": {"values": {"prompt": "Invent a fake urban legend about the room I am currently sitting in. Make it spooky."}},
+    "advice_bad": {"values": {"prompt": "Give me some 'terrible' advice that is technically true but practically useless."}},
+    "forecast_fake": {"values": {"prompt": "Give me a weather forecast for a fictional location (e.g., Narnia, Mars, Middle Earth)."}},
+    "cocktail": {"values": {"prompt": "Invent a cocktail recipe named after a philosophical concept. List ingredients and mood."}},
+    "superpower": {"values": {"prompt": "Assign me a useless superpower (e.g., 'You can turn invisible but only when no one is looking')."}},
+    "band_name": {"values": {"prompt": "Generate 3 cool band names based on random household objects."}},
+    "haiku_tech": {"values": {"prompt": "Write a haiku about a computer crashing or a printer jamming."}},
+    "fortune_cookie": {"values": {"prompt": "Write a fortune cookie message that is suspiciously specific."}},
+    "conspiracy": {"values": {"prompt": "Invent a harmless conspiracy theory about pigeons or clouds."}},
+    "book_title": {"values": {"prompt": "Generate a title and subtitle for a self-help book written by a cat."}},
+    "meditation": {"values": {"prompt": "Guide me through a 10-second micro-meditation. Focus on breath."}},
+    "joke_dad": {"values": {"prompt": "Tell the grandest, most groan-worthy Dad Joke you know."}},
+    "myth_modern": {"values": {"prompt": "Write a myth explaining why Wi-Fi signals sometimes drop."}},
+    "recipe_chaos": {"values": {"prompt": "Suggest a 'chaos meal' made of random pantry ingredients. Make it sound gourmet."}},
+    "slogan": {"values": {"prompt": "Write a catchy slogan for a product that shouldn't exist (e.g., 'Dehydrated Water')."}},
+    "news_fake": {"values": {"prompt": "Write a breaking news headline from a parallel dimension."}},
+    "review_life": {"values": {"prompt": "Write a 5-star review for 'Being Alive Today'."}},
+    "pun_war": {"values": {"prompt": "Give me three puns about time travel."}},
+    "bio_fake": {"values": {"prompt": "Write a short bio for a fictional alter-ego of the user who is a famous explorer."}},
+    "travel_guide": {"values": {"prompt": "Describe a hidden gem travel destination that is actually microscopic (e.g., a moss forest)."}},
+    "quest": {"values": {"prompt": "Assign me a real-life RPG quest (e.g., 'Find a red object and photograph it'). Reward: +10 XP."}},
+    "monologue": {"values": {"prompt": "Write a 2-line internal monologue of a houseplant."}},
+    "dialogue": {"values": {"prompt": "Write a 2-line dialogue between a toaster and a fridge."}},
+    "song_lyric": {"values": {"prompt": "Write a chorus for a blues song about low battery anxiety."}},
+    "limerick": {"values": {"prompt": "Write a limerick about a robot who wants to be a chef."}},
+    "name_gen": {"values": {"prompt": "Generate a fantasy name for a pet dragon based on sound (e.g., 'Kralkatorrik')."}},
+    "color": {"values": {"prompt": "Invent a new color name and describe what it looks like (e.g., 'Glimmer-gloom')."}},
+    "law_weird": {"values": {"prompt": "Cite a fake but plausible archaic law from the 1800s."}},
+    "sport_future": {"values": {"prompt": "Describe a sport played in zero gravity. Name it and one rule."}},
+    "gift_idea": {"values": {"prompt": "Suggest a terrible gift idea for a nemesis."}},
+    "excuse": {"values": {"prompt": "Generate a sophisticated excuse for being late to a meeting."}},
+    "insult_shakes": {"values": {"prompt": "Generate a Shakespearean insult. Combine 3 words."}},
+    "motto": {"values": {"prompt": "Generate a Latin motto for a lazy person, with translation."}},
+    "stat_fake": {"values": {"prompt": "Make up a statistic about socks disappearing in the laundry. Sound authoritative."}},
+    "review_movie": {"values": {"prompt": "Review a classic movie (e.g., Titanic) in one sentence, missing the point entirely."}},
+    "haiku_coding": {"values": {"prompt": "Write a haiku about searching for a missing semicolon."}},
+    "affirmation": {"values": {"prompt": "Give me an affirmation for a stressed programmer."}},
+    "shower_thought": {"values": {"prompt": "Generate a profound 'Shower Thought' about daily life."}},
+    "analogy": {"values": {"prompt": "Make a confusing analogy to explain 'The Cloud'."}},
+    "proverb": {"values": {"prompt": "Invent a wise-sounding proverb that actually means nothing."}},
+    "question_deep": {"values": {"prompt": "Ask me a deep philosophical question to ponder while drinking coffee."}},
+    "fact_history": {"values": {"prompt": "Tell me a weird historical fact about a famous figure (e.g., Napoleon, Lincoln)."}},
+    "writing_prompt": {"values": {"prompt": "Give me a writing prompt involving a key, a map, and a clock."}},
+    "villain": {"values": {"prompt": "Create a motive for a supervillain that is surprisingly relatable."}},
+    "hero": {"values": {"prompt": "Create a superhero whose power is extremely inconvenient."}},
+    "planet": {"values": {"prompt": "Describe the weather on a fictional planet in the Andromeda galaxy."}},
+    "monster": {"values": {"prompt": "Describe a 'closet monster' that is actually helpful and friendly."}},
+    "time_capsule": {"values": {"prompt": "List 3 items to put in a time capsule to confuse future archaeologists."}},
+    "bucket_list": {"values": {"prompt": "Suggest one adventurous item to add to a bucket list."}},
+    "conversation": {"values": {"prompt": "Suggest a weird conversation starter for a dinner party."}},
+    "playlist": {"values": {"prompt": "Suggest a title for a playlist for driving at 2 AM."}},
+    "emoji": {"values": {"prompt": "Suggest a new emoji that doesn't exist but should. Describe it."}},
+    "app_idea": {"values": {"prompt": "Pitch an app that does something incredibly specific and useless."}},
+    "pet_peeve": {"values": {"prompt": "Rant briefly about a minor modern annoyance (e.g., slow walking people)."}},
+    "gratitude": {"values": {"prompt": "Prompt me to be grateful for one small, overlooked thing (e.g., zippers)."}},
+    "memory": {"values": {"prompt": "Ask me to recall a specific positive memory from childhood."}},
+    "texture": {"values": {"prompt": "Describe the texture of a cloud if you could touch it."}},
+    "taste": {"values": {"prompt": "Describe the taste of the color blue."}},
+    "dream": {"values": {"prompt": "Interpret a dream about flying (pretend to be a dream analyst)."}},
+    "tarot": {"values": {"prompt": "Draw a random Tarot card (simulated) and give a one-line meaning."}},
+    "spirit_animal": {"values": {"prompt": "Assign me a Spirit Animal based on the vibe of 'chaos'. Explain why."}},
+    "aura": {"values": {"prompt": "Describe the color of my 'digital aura' right now."}},
+    "magic_spell": {"values": {"prompt": "Write a magic spell incantation to fix a buggy printer."}},
+    "potion": {"values": {"prompt": "List ingredients for a potion of 'Infinite Focus'."}},
+    "dnd_hook": {"values": {"prompt": "Give me a one-sentence plot hook for a D&D campaign."}},
+    "npc": {"values": {"prompt": "Describe a quirky NPC shopkeeper. Name and one trait."}},
+    "loot": {"values": {"prompt": "Describe a magical item found in a chest. It is cursed."}},
+    "cyberpunk": {"values": {"prompt": "Describe a street scene in a Cyberpunk city. Neon and rain."}},
+    "steampunk": {"values": {"prompt": "Describe a brass gadget found in a Steampunk workshop."}},
+    "solarpunk": {"values": {"prompt": "Describe a futuristic city integrated with nature."}},
+    "horror_micro": {"values": {"prompt": "Write a 2-sentence horror story about a mirror."}},
+    "noir_intro": {"values": {"prompt": "Write the opening line of a hard-boiled detective novel set in a grocery store."}}
 }
 
 
