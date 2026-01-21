@@ -50,8 +50,15 @@ const ActionButton = ({
             });
             
             if (response.ok) {
+                const data = await response.json();
                 setStatus('success');
-                setTimeout(() => setStatus(null), 2000);
+                
+                // Reload the page if action requires it
+                if (data.reload) {
+                    setTimeout(() => window.location.reload(), 500);
+                } else {
+                    setTimeout(() => setStatus(null), 2000);
+                }
             } else {
                 setStatus('error');
             }
@@ -69,6 +76,8 @@ const ActionButton = ({
         buttonClass = 'px-4 py-2 rounded-lg font-medium bg-red-600 text-white hover:bg-red-700 transition-colors disabled:opacity-50';
     } else if (style === 'ghost') {
         buttonClass = commonClasses.buttonGhost;
+    } else if (style === 'link') {
+        buttonClass = 'text-blue-600 hover:text-blue-800 underline text-sm font-medium disabled:opacity-50';
     }
     
     return (

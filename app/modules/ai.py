@@ -438,6 +438,10 @@ def handle_content_selection(
                     "required": ["label", "prompt"]
                 }
             },
+            "load_defaults": {
+                "type": "null",
+                "title": "Load Default Modes"
+            },
             "reset_state": {
                 "type": "null",
                 "title": "Reset"
@@ -457,6 +461,14 @@ def handle_content_selection(
                         "rows": 3
                     }
                 }
+            }
+        },
+        "load_defaults": {
+            "ui:widget": "action-button",
+            "ui:options": {
+                "action": "load_defaults",
+                "label": "Load Default Modes",
+                "style": "link"
             }
         },
         "reset_state": {

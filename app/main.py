@@ -2437,6 +2437,14 @@ async def execute_module_action(module_id: str, action: str):
         clear_state(module_id)
         return {"message": "AI state reset successfully", "action": action}
     
+    # Handle AI module load_defaults action
+    if module.type == "ai" and action == "load_defaults":
+        from app.modules.ai import DEFAULT_AI_MODES
+        # Update the module config with default modes
+        module.config["ai_modes"] = DEFAULT_AI_MODES
+        background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
+        return {"message": "Default modes loaded", "action": action, "reload": True}
+    
     # Add other module actions here as needed
     
     raise HTTPException(status_code=400, detail=f"Unknown action '{action}' for module type '{module.type}'")
