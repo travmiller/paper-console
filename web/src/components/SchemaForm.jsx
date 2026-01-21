@@ -159,6 +159,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                                 compact={isCompactItem}
                                 rootValue={rootValue}
                                 onRootChange={onRootChange}
+                                moduleId={moduleId}
                             />
                         </div>
                     );
