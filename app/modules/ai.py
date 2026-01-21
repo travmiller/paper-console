@@ -115,7 +115,9 @@ def generate_response(
         "2. NEVER put numbered lists in 'text_to_print'. No '1.', '2.', 'A)', 'B)', etc.\n"
         "3. NEVER put just numbers like '1', '2', '3' in the 'options' array.\n"
         "4. 'text_to_print' should be a QUESTION or STATEMENT, not a menu.\n"
-        "5. Keep text under 60 words. 42 chars per line.\n\n"
+        "5. Keep text under 60 words. 42 chars per line.\n"
+        "6. Ask AT MOST 2 clarifying questions, then provide the answer. Don't over-clarify.\n"
+        "7. When is_final is true, 'text_to_print' MUST contain the ACTUAL CONTENT (the recipe, joke, fact, etc.), not a statement like 'Here is your recipe'. Print the recipe itself!\n\n"
         "CORRECT EXAMPLE:\n"
         "{\n"
         '  "thought_process": "User wants recipes. I should ask what category.",\n'
