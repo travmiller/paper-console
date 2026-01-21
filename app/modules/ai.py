@@ -81,58 +81,45 @@ def get_openai_client(api_key: str):
 def generate_response(
     api_key: str,
     model: str,
-    system_prompt: str,
+    system_prompt: str, # This might be overridden or appended to the strict system prompt
     history: List[Dict[str, str]],
     user_input: str
 ):
     """
-    Generate a response from the AI.
-    
-    We ask the AI to return a JSON object with:
-    - response_text: The main text to print.
-    - options: A list of 1-7 short strings for the next choices.
+    Generate a formatted response from the AI using the 'Golden Order' schema.
     """
     client = get_openai_client(api_key)
     if not client:
         return {
-            "response_text": "Error: OpenAI library not installed.",
-            "options": ["Exit"]
+            "text_to_print": "Error: OpenAI library not installed.",
+            "options": ["Exit"],
+            "is_final": True
         }
 
-    # Prepare messages
-    messages = [{"role": "system", "content": system_prompt}]
+    # The "Device Driver" System Prompt - Hardcoded / Base
+    # We append the user's custom 'persona' to the end of the strict instructions if needed,
+    # or just use the strict instructions as the core.
     
-    # Add instructions for JSON format
-    json_instruction = (
-        "\n\nIMPORTANT: You must respond in valid JSON format with the following structure:\n"
-        "{\n"
-        '  "response_text": "Your response here (keep it concise for thermal printer)",\n'
-        '  "options": ["Option 1", "Option 2", ... max 7 options]\n'
-        "}\n"
-        "The 'options' should be suggested follow-up actions or topics for the user.\n"
-        "CRITICAL INSTRUCTION: If the user asks for content (like a recipe, story, fact, etc.), provide the FULL CONTENT in 'response_text'. \n"
-        "Do not just ask clarifying questions unless absolutely necessary. \n"
-        "For example, if asked for a dinner idea, suggest a specific dish AND its recipe (or a brief summary of it), then use options for 'Different Idea', 'More Details', or related topics.\n"
-        "DO NOT list the options in the 'response_text'. They will be displayed automatically by the UI as a menu.\n"
-        "If you are providing a direct answer (like a recipe or fact) that concludes the immediate interaction, you may return an empty list [] for 'options'. The system will provide default continuation options (Start Over, Tell me more).\n"
-        "Keep the text formatted nicely for a 42-column display.\n\n"
-        "EXAMPLE of CORRECT response (Options):\n"
-        "{\n"
-        '  "response_text": "Spaghetti Carbonara:\\n1. Boil pasta.\\n2. Fry guanciale.\\n3. Mix eggs and cheese.\\n4. Combine all.",\n'
-        '  "options": ["Vegetarian Version", "Wine Pairing", "Dessert Ideas"]\n'
-        "}\n\n"
-        "EXAMPLE of CORRECT response (Final/Direct Answer):\n"
-        "{\n"
-        '  "response_text": "The capital of France is Paris.",\n'
-        '  "options": []\n'
-        "}\n\n"
-        "EXAMPLE of WRONG response (Do NOT do this):\n"
-        "{\n"
-        '  "response_text": "Here is a recipe... What would you like next?\\n1. Vegeterian Version\\n2. Wine Pairing",\n'
-        '  "options": ["Vegetarian Version", "Wine Pairing"]\n'
-        "}"
+    base_system_prompt = (
+        "You are the Operating System for the PC-1, a thermal printer with a rotary encoder.\n"
+        "You are NOT a chat bot. You are a JSON generator.\n\n"
+        "Your goal is to guide the user through a specific task step-by-step.\n\n"
+        "RESPONSE STRUCTURE (Golden Order):\n"
+        "You must respond with a JSON object containing exactly these fields in this order:\n"
+        "1. thought_process (string): Your internal planning. NOT printed. Use this to think before you write.\n"
+        "2. text_to_print (string): The text for the thermal paper. Concidse, < 60 words. NO embedded options.\n"
+        "3. options (list[string]): 1-7 options for the knob. Empty if is_final is true.\n"
+        "4. is_final (boolean): True if the interaction is done (e.g. valid recipe generated).\n\n"
+        "RULES:\n"
+        "1. NO EMBEDDED OPTIONS in 'text_to_print'. Options live ONLY in the 'options' list.\n"
+        "2. BE CONCISE. 42 characters per line limit.\n"
+        "3. If 'is_final' is True, 'options' must be empty.\n\n" 
     )
-    messages[0]["content"] += json_instruction
+
+    # Combine strict instruction with user's persona (if they want to be a 'Sarcastic Robot' etc)
+    full_system_prompt = base_system_prompt + f"\nUser Persona Config: {system_prompt}"
+
+    messages = [{"role": "system", "content": full_system_prompt}]
     
     # Add history
     messages.extend(history)
@@ -141,6 +128,9 @@ def generate_response(
     messages.append({"role": "user", "content": user_input})
 
     try:
+        # We can simulate structured output with response_format="json_object" 
+        # since the library might be old. If user has updated lib we could use .parse()
+        # but let's stick to standard chat completion with json_object for compatibility.
         completion = client.chat.completions.create(
             model=model,
             messages=messages,
@@ -148,13 +138,23 @@ def generate_response(
         )
         
         content = completion.choices[0].message.content
-        return json.loads(content)
+        data = json.loads(content)
+        
+        # Normalize fields if AI hallucinates key names slightly (robustness)
+        # We expect: thought_process, text_to_print, options, is_final
+        return {
+            "thought_process": data.get("thought_process", ""),
+            "text_to_print": data.get("text_to_print") or data.get("response_text", "Error parsing output."),
+            "options": data.get("options", []) or data.get("knob_options", []),
+            "is_final": data.get("is_final", False)
+        }
         
     except Exception as e:
         logger.error(f"OpenAI API Error: {e}")
         return {
-            "response_text": f"Error communicating with AI: {str(e)}",
-            "options": ["Retry", "Exit"]
+            "text_to_print": f"Error: {str(e)}",
+            "options": ["Retry", "Exit"],
+            "is_final": True
         }
 
 
@@ -188,15 +188,17 @@ def print_ai_menu(printer, text: str, options: List[str]):
     printer.print_body(text)
     printer.print_line()
     
-    if not options:
-        printer.print_caption("No options available.")
-    else:
+    # Only print options headers if we have options
+    if options:
         printer.print_subheader("OPTIONS")
         for i, opt in enumerate(options, 1):
             if i > 7: break
             printer.print_body(f"[{i}] {opt}")
             
     printer.feed(1)
+    
+    # Only show Exit/Reset if meaningful? Or always?
+    # Always good to have an escape hatch.
     printer.print_caption("[8] Exit / Reset")
     printer.print_line()
     
@@ -215,11 +217,7 @@ def handle_selection(
     
     # 8 is always Exit/Reset
     if dial_position == 8:
-        # Check if we were already at root/initial. If so, exit mode.
-        # Otherwise, offer to go back to root or exit completely.
-        # For simplicity, let's just exit selection mode.
         exit_selection_mode()
-        
         if hasattr(printer, "reset_buffer"):
             printer.reset_buffer()
         printer.print_header("AI ASSISTANT", icon="cpu")
@@ -246,9 +244,7 @@ def handle_selection(
     # 2. Call API
     api_key = config.get("openai_api_key")
     if not api_key:
-        # Fallback to config.py settings if available
-        # But here we assume config passed in is the merged config
-        pass
+        pass # Should handle error
 
     model = config.get("model", "gpt-4o-mini")
     system_prompt = config.get("system_prompt", "You are a helpful assistant.")
@@ -258,25 +254,44 @@ def handle_selection(
     # Generate response
     result = generate_response(api_key, model, system_prompt, history, selected_text)
     
-    response_text = result.get("response_text", "Error: No response")
+    thought = result.get("thought_process", "")
+    text_to_print = result.get("text_to_print", "Error")
     new_options = result.get("options", [])
-
-    # If options are empty, inject defaults
-    if not new_options:
-        new_options = ["Tell me more", "Start Over"]
+    is_final = result.get("is_final", False)
     
-    # Limit options
+    # Log thoughts for debugging (or could print to console)
+    logger.info(f"[AI Thought]: {thought}")
+
+    # Inject defaults if empty and NOT final
+    if not new_options and not is_final:
+        new_options = ["Continue", "Start Over"]
+    
+    # If final, maybe just "Start Over"?
+    if is_final and not new_options:
+        new_options = ["Start Over"]
+    
     new_options = new_options[:7]
     
     # 3. Update History
     history.append({"role": "user", "content": selected_text})
-    history.append({"role": "assistant", "content": response_text}) # Should really store the JSON or just text? Text is standard.
+    # We save only the printed text to history to keep context clean? 
+    # Or strict adherence? Let's save the 'text_to_print' as assistant response.
+    history.append({"role": "assistant", "content": text_to_print})
     
     save_history(module_id, history)
     
-    # 4. Re-enter selection mode with NEW options
+    # 4. Re-enter selection mode logic
+    # Even if is_final is True, we might want to let them "Start Over" or read it.
+    # The interaction loop continues until explicit exit usually.
+    # So we ALWAYS enter selection mode for the next set of options (even if it's just 'Start Over')
+    
     enter_selection_mode(
         lambda pos: handle_selection(pos, printer, config, module_id, new_options),
+        module_id
+    )
+
+    # 5. Print Result
+    print_ai_menu(printer, text_to_print, new_options)
         module_id
     )
 
