@@ -19,13 +19,20 @@ const PresetSelect = ({ value, onChange, presets = {}, onPresetSelect }) => {
     // If a preset is selected and we have a callback, apply its values
     if (presetKey && presets[presetKey] && onPresetSelect) {
       const preset = presets[presetKey];
-      onPresetSelect({
-        url: preset.url || '',
-        method: preset.method || 'GET',
-        headers: preset.headers || {},
-        body: preset.body || '',
-        json_path: preset.json_path || ''
-      });
+      
+      // If the preset has a 'values' property, use that.
+      // Otherwise, use the whole preset object (excluding meta properties like label).
+      let valuesToApply = {};
+      
+      if (preset.values) {
+        valuesToApply = preset.values;
+      } else {
+        // Exclude UI-only properties
+        const { label, ...rest } = preset;
+        valuesToApply = rest;
+      }
+      
+      onPresetSelect(valuesToApply);
     }
   };
 

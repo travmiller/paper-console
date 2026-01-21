@@ -28,49 +28,60 @@ except ImportError:
 
 # --- Default AI Modes ---
 
-DEFAULT_AI_MODES = [
-    {
+# --- AI Presets ---
+PROMPT_PRESETS = {
+    "recipe": {
         "label": "Instant Recipe",
-        "prompt": (
-            "You are a Michelin star chef. "
-            "Based on the time of day and weather, suggest ONE perfect dish. "
-            "Format: Title, Ingredients (bullet points), 3-step instructions. "
-            "Keep it under 100 words."
-        )
+        "values": {
+            "prompt": (
+                "You are a Michelin star chef. "
+                "Based on the time of day and weather, suggest ONE perfect dish. "
+                "Format: Title, Ingredients (bullet points), 3-step instructions. "
+                "Keep it under 100 words."
+            )
+        }
     },
-    {
+    "story": {
         "label": "Micro-Story",
-        "prompt": (
-            "You are a master of flash fiction. "
-            "Write a compelling story in exactly 3 sentences. "
-            "Theme: Use the current weather as a mood setter."
-        )
+        "values": {
+            "prompt": (
+                "You are a master of flash fiction. "
+                "Write a compelling story in exactly 3 sentences. "
+                "Theme: Use the current weather as a mood setter."
+            )
+        }
     },
-    {
+    "coach": {
         "label": "Life Coach",
-        "prompt": (
-            "You are a stoic philosopher. "
-            "Give the user a single, hard-hitting piece of advice for their day. "
-            "Be direct, not fluffy."
-        )
+        "values": {
+            "prompt": (
+                "You are a stoic philosopher. "
+                "Give the user a single, hard-hitting piece of advice for their day. "
+                "Be direct, not fluffy."
+            )
+        }
     },
-    {
+    "roast": {
         "label": "Roast Me",
-        "prompt": (
-            "You are a snarky comedian. "
-            "Roast the user for owning a 'Paper Console' in the current year. "
-            "Be funny but not mean."
-        )
+        "values": {
+            "prompt": (
+                "You are a snarky comedian. "
+                "Roast the user for owning a 'Paper Console' in the current year. "
+                "Be funny but not mean."
+            )
+        }
     },
-    {
+    "explain": {
         "label": "Explain It",
-        "prompt": (
-            "You are a science communicator like Carl Sagan. "
-            "Explain a random complex topic (Quantum Physics, Black Holes, Mycology) "
-            "simply and beautifully in 50 words."
-        )
+        "values": {
+            "prompt": (
+                "You are a science communicator like Carl Sagan. "
+                "Explain a random complex topic (Quantum Physics, Black Holes, Mycology) "
+                "simply and beautifully in 50 words."
+            )
+        }
     }
-]
+}
 
 
 # --- Context Gathering ---
@@ -267,86 +278,21 @@ def print_content(printer, mode_label: str, content: str):
         printer.flush_buffer()
 
 
-def print_mode_menu(printer, modes: List[Dict[str, str]]):
-    """Print the mode selection menu."""
-    if hasattr(printer, "reset_buffer"):
-        printer.reset_buffer()
-        
-    printer.print_header("AI ASSISTANT", icon="cpu")
-    printer.print_body("Choose a mode:")
-    printer.print_line()
-    
-    printer.print_subheader("MODES")
-    for i, mode in enumerate(modes[:7], 1):
-        printer.print_body(f"[{i}] {mode['label']}")
-    
-    printer.feed(1)
-    printer.print_caption("[8] Exit")
-    printer.print_line()
-    
-    if hasattr(printer, "flush_buffer"):
-        printer.flush_buffer()
+
+
 
 
 # --- Selection Handlers ---
-
-def handle_mode_selection(
-    dial_position: int,
-    printer,
-    config: Dict[str, Any],
-    module_id: str,
-    modes: List[Dict[str, str]]
-):
-    """Handle mode selection from the main menu."""
-    
-    # Exit
-    if dial_position == 8:
-        exit_selection_mode()
-        if hasattr(printer, "reset_buffer"):
-            printer.reset_buffer()
-        printer.print_header("AI ASSISTANT", icon="cpu")
-        printer.print_body("See you next time!")
-        printer.print_line()
-        if hasattr(printer, "flush_buffer"):
-            printer.flush_buffer()
-        return
-    
-    # Invalid selection
-    if dial_position < 1 or dial_position > len(modes):
-        print_mode_menu(printer, modes)
-        return
-    
-    # Valid mode selection - generate content!
-    selected_mode = modes[dial_position - 1]
-    
-    # Save current mode in state for "Try Another"
-    save_state(module_id, {"current_mode": selected_mode})
-    
-    # Generate and print content
-    api_key = config.get("openai_api_key")
-    model = config.get("model", "gpt-4o-mini")
-    context = build_context_string()
-    
-    result = generate_content(api_key, model, selected_mode["prompt"], context)
-    
-    # Enter content view mode
-    enter_selection_mode(
-        lambda pos: handle_content_selection(pos, printer, config, module_id, modes, selected_mode),
-        module_id
-    )
-    
-    print_content(printer, selected_mode["label"], result["content"])
-
 
 def handle_content_selection(
     dial_position: int,
     printer,
     config: Dict[str, Any],
     module_id: str,
-    modes: List[Dict[str, str]],
-    current_mode: Dict[str, str]
+    prompt: str,
+    module_name: str
 ):
-    """Handle selection after content is shown (Try Another / Something Different)."""
+    """Handle selection after content is shown (Reroll / Exit)."""
     
     # Exit
     if dial_position == 8:
@@ -354,42 +300,40 @@ def handle_content_selection(
         exit_selection_mode()
         if hasattr(printer, "reset_buffer"):
             printer.reset_buffer()
-        printer.print_header("AI ASSISTANT", icon="cpu")
+        printer.print_header(module_name.upper(), icon="cpu")
         printer.print_body("See you next time!")
         printer.print_line()
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
         return
     
-    # [1] Try Another - reroll same mode
+    # [1] Reroll
     if dial_position == 1:
         api_key = config.get("openai_api_key")
         model = config.get("model", "gpt-4o-mini")
         context = build_context_string()
         
-        result = generate_content(api_key, model, current_mode["prompt"], context)
+        result = generate_content(api_key, model, prompt, context)
         
         # Stay in content mode
         enter_selection_mode(
-            lambda pos: handle_content_selection(pos, printer, config, module_id, modes, current_mode),
+            lambda pos: handle_content_selection(pos, printer, config, module_id, prompt, module_name),
             module_id
         )
         
-        print_content(printer, current_mode["label"], result["content"])
+        print_content(printer, module_name, result["content"])
         return
     
-    # [2] Something Different - back to mode menu
+    # [2] Back to Menu - NOT APPLICABLE (Just Exit)
     if dial_position == 2:
+        # Treat as exit for now in single-prompt mode, or maybe loop back?
+        # Let's just exit.
         clear_state(module_id)
-        enter_selection_mode(
-            lambda pos: handle_mode_selection(pos, printer, config, module_id, modes),
-            module_id
-        )
-        print_mode_menu(printer, modes)
+        exit_selection_mode()
         return
-    
+
     # Invalid - reprint current view
-    print_content(printer, current_mode["label"], "Select an option above.")
+    print_content(printer, module_name, "Select [1] to Reroll or [8] to Exit.")
 
 
 # --- Module Entry Point ---
@@ -416,53 +360,30 @@ def handle_content_selection(
                 "default": "gpt-4o-mini",
                 "enum": ["gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"]
             },
-            "ai_modes": {
-                "type": "array",
-                "title": "AI Modes",
-                "description": "Customize the available AI modes (max 7).",
-                "maxItems": 7,
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "label": {
-                            "type": "string",
-                            "title": "Label"
-                        },
-                        "prompt": {
-                            "type": "string",
-                            "title": "Prompt"
-                        }
-                    },
-                    "required": ["label", "prompt"]
-                }
+            "prompt": {
+                "type": "string",
+                "title": "Prompt",
+                "description": "The system instruction for the AI."
             },
-            "load_defaults": {
-                "type": "null",
-                "title": "Load Examples"
+            "load_example": {
+                "type": "string", 
+                "title": "Load Example",
+                "enum": list(PROMPT_PRESETS.keys())
             }
         },
-        "required": ["openai_api_key"]
+        "required": ["openai_api_key", "prompt"]
     },
     ui_schema={
-        "ai_modes": {
-            "items": {
-                "ui:options": {
-                    "layout": "stacked"
-                },
-                "prompt": {
-                    "ui:widget": "textarea",
-                    "ui:options": {
-                        "rows": 3
-                    }
-                }
+        "prompt": {
+            "ui:widget": "textarea",
+            "ui:options": {
+                "rows": 5
             }
         },
-        "load_defaults": {
-            "ui:widget": "action-button",
+        "load_example": {
+            "ui:widget": "preset-select",
             "ui:options": {
-                "action": "load_defaults",
-                "label": "Load Examples",
-                "style": "link"
+                "presets": PROMPT_PRESETS
             }
         }
     },
@@ -487,29 +408,28 @@ def format_ai_utility(
         printer.print_line()
         return
 
-    # Get modes from config or use defaults
-    modes = config.get("ai_modes") or DEFAULT_AI_MODES
-    modes = modes[:7]  # Limit to 7
+    # Get prompt from config
+    prompt = config.get("prompt")
+    if not prompt:
+        # Fallback if unconfigured?
+        prompt = "You are a helpful assistant. Provide a random interesting fact."
     
     # Check if we have a saved state (resuming)
     state = load_state(module_id)
-    current_mode = state.get("current_mode")
+    # We don't really need state for resuming to a mode anymore, 
+    # but we can check if we were "active".
+    # For now, just generate fresh.
     
-    if current_mode:
-        # Resume with the current mode - offer Try Another
-        enter_selection_mode(
-            lambda pos: handle_content_selection(pos, printer, config, module_id, modes, current_mode),
-            module_id
-        )
-        # Generate fresh content for resume
-        context = build_context_string()
-        model = config.get("model", "gpt-4o-mini")
-        result = generate_content(api_key, model, current_mode["prompt"], context)
-        print_content(printer, current_mode["label"], result["content"])
-    else:
-        # Fresh start - show mode menu
-        enter_selection_mode(
-            lambda pos: handle_mode_selection(pos, printer, config, module_id, modes),
-            module_id
-        )
-        print_mode_menu(printer, modes)
+    # Generate content
+    context = build_context_string()
+    model = config.get("model", "gpt-4o-mini")
+    
+    result = generate_content(api_key, model, prompt, context)
+    
+    # Enter content view mode
+    enter_selection_mode(
+        lambda pos: handle_content_selection(pos, printer, config, module_id, prompt, module_name or "AI"),
+        module_id
+    )
+    
+    print_content(printer, module_name or "AI Assistant", result["content"])

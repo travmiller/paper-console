@@ -248,9 +248,9 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                     <button 
                         type="button"
                         onClick={handleAdd}
-                        className={`${commonClasses.buttonGhost} text-xs w-full py-2 border-dashed border-2 border-zinc-200 hover:border-gray-400`}
+                        className="w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs font-bold tracking-wider cursor-pointer"
                     >
-                        + Add Item
+                        + {uiSchema?.['ui:addLabel'] || 'Add Item'}
                     </button>
                 )}
                 {schema.maxItems && items.length >= schema.maxItems && (
