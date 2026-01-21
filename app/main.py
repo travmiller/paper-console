@@ -2420,7 +2420,7 @@ async def delete_module(module_id: str, background_tasks: BackgroundTasks):
 
 
 @app.post("/api/modules/{module_id}/actions/{action}")
-async def execute_module_action(module_id: str, action: str):
+async def execute_module_action(module_id: str, action: str, background_tasks: BackgroundTasks):
     """
     Execute a module-specific action (e.g., reset conversation for AI).
     

@@ -441,10 +441,6 @@ def handle_content_selection(
             "load_defaults": {
                 "type": "null",
                 "title": "Load Default Modes"
-            },
-            "reset_state": {
-                "type": "null",
-                "title": "Reset"
             }
         },
         "required": ["openai_api_key"]
@@ -469,15 +465,6 @@ def handle_content_selection(
                 "action": "load_defaults",
                 "label": "Load Default Modes",
                 "style": "link"
-            }
-        },
-        "reset_state": {
-            "ui:widget": "action-button",
-            "ui:options": {
-                "action": "reset",
-                "label": "Reset State",
-                "confirmMessage": "Reset AI module state?",
-                "style": "danger"
             }
         }
     },
