@@ -274,6 +274,10 @@ async def print_setup_instructions():
     Runs blocking printer operations in a thread pool to avoid blocking the event loop.
     """
     from concurrent.futures import ThreadPoolExecutor
+    from app.selection_mode import exit_selection_mode
+
+    # Cancel any active interactive mode
+    exit_selection_mode()
 
     try:
         # Run blocking printer operations in thread pool to avoid blocking event loop
@@ -300,6 +304,10 @@ async def check_first_boot():
     logger = logging.getLogger(__name__)
     marker_path = _get_welcome_marker_path()
     from concurrent.futures import ThreadPoolExecutor
+    from app.selection_mode import exit_selection_mode
+
+    # Cancel any active interactive mode
+    exit_selection_mode()
 
     # Wait for printer to be ready (applies to all boots)
     await asyncio.sleep(2)
@@ -507,6 +515,9 @@ async def manual_ap_mode_trigger():
     logger = logging.getLogger(__name__)
     logger.info("Manual AP mode trigger initiated")
 
+    from app.selection_mode import exit_selection_mode
+    exit_selection_mode()
+
     # Print instructions BEFORE switching network mode
     await print_setup_instructions()
 
@@ -528,6 +539,9 @@ async def factory_reset_trigger():
     """
     import subprocess
     from concurrent.futures import ThreadPoolExecutor
+    from app.selection_mode import exit_selection_mode
+
+    exit_selection_mode()
 
     def _print_reset_message():
         # Reset printer buffer
@@ -2630,6 +2644,10 @@ async def trigger_channel(position: int):
     global print_in_progress
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
+    from app.selection_mode import exit_selection_mode
+
+    # Cancel any active interactive mode when a new channel is triggered
+    exit_selection_mode()
 
     def _do_print():
         """Synchronous function that does the actual printing work."""
@@ -2914,6 +2932,10 @@ async def print_module_direct(module_id: str):
     global print_in_progress
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
+    from app.selection_mode import exit_selection_mode
+
+    # Cancel any active interactive mode
+    exit_selection_mode()
 
     def _do_print():
         """Synchronous function that does the actual printing work."""

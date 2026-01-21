@@ -81,6 +81,25 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
             logger.warning("Missing email_user or email_password in config")
             return []
 
+        # Provider Mapping
+        service = config.get("email_service", "Custom")
+        if service == "Gmail":
+            config["email_host"] = "imap.gmail.com"
+            config["email_port"] = 993
+        elif service == "Outlook":
+            config["email_host"] = "outlook.office365.com"
+            config["email_port"] = 993
+        elif service == "Yahoo":
+            config["email_host"] = "imap.mail.yahoo.com"
+            config["email_port"] = 993
+        elif service == "iCloud":
+            config["email_host"] = "imap.mail.me.com"
+            config["email_port"] = 993
+        
+        # Default fallback for old configs or Custom without host
+        if not config.get("email_host"):
+             config["email_host"] = "imap.gmail.com"
+
         email_config = EmailConfig(**config)
     except Exception as e:
         logger.error(f"Invalid email configuration: {e}")
@@ -223,15 +242,30 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
     config_schema={
         "type": "object",
         "properties": {
-            "email_host": {"type": "string", "title": "IMAP Host", "default": "imap.gmail.com"},
-            "email_port": {"type": "integer", "title": "IMAP Port", "default": 993},
+            "email_service": {
+                "type": "string", 
+                "title": "Service Provider", 
+                "default": "Gmail",
+                "enum": ["Gmail", "Outlook", "Yahoo", "iCloud", "Custom"]
+            },
             "email_user": {"type": "string", "title": "Email Address"},
             "email_password": {"type": "string", "title": "Password / App Password"},
+            "email_host": {"type": "string", "title": "IMAP Host", "default": "imap.gmail.com"},
+            "email_port": {"type": "integer", "title": "IMAP Port", "default": 993},
             "email_use_ssl": {"type": "boolean", "title": "Use SSL", "default": True}
         }
     },
     ui_schema={
-        "email_password": {"ui:widget": "password"}
+        "email_password": {"ui:widget": "password"},
+        "email_host": {
+            "ui:showWhen": {"field": "email_service", "value": "Custom"}
+        },
+        "email_port": {
+            "ui:showWhen": {"field": "email_service", "value": "Custom"}
+        },
+        "email_use_ssl": {
+            "ui:showWhen": {"field": "email_service", "value": "Custom"}
+        }
     }
 )
 def format_email_receipt(
@@ -269,10 +303,15 @@ def format_email_receipt(
         
         # Subject in bold - pass directly, printer will handle wrapping
         printer.print_bold(msg['subject'])
-            
-        printer.print_line()
+        
+        # Small whitespace between header and body
+        printer.print_text("")
 
         # Body in regular text - pass with newlines preserved, printer will handle wrapping
         printer.print_body(msg["body"])
 
-        printer.print_line()
+        # Add separator line ONLY if this is not the last message
+        if i < len(messages) - 1:
+            printer.print_text("") # Spacing before line
+            printer.print_line()
+            printer.print_text("") # Spacing after line

@@ -311,7 +311,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 />
             ) : (
                 <input
-                    type={type === 'number' || type === 'integer' ? 'number' : 'text'}
+                    type={widget === 'password' ? 'password' : (type === 'number' || type === 'integer' ? 'number' : 'text')}
                     value={value ?? ''}
                     onChange={(e) => {
                         const val = e.target.value;
