@@ -198,6 +198,10 @@ def reset_to_initial(printer, config: Dict[str, Any], module_id: str):
 
 def print_ai_menu(printer, text: str, options: List[str]):
     """Print the AI's response and the numbered options."""
+    # Tactile feedback - blip sound
+    if hasattr(printer, "blip"):
+        printer.blip()
+    
     if hasattr(printer, "reset_buffer"):
         printer.reset_buffer()
         
