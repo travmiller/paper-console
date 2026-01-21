@@ -426,13 +426,11 @@ def handle_content_selection(
                     "properties": {
                         "label": {
                             "type": "string",
-                            "title": "Label",
-                            "description": "Display name for this mode"
+                            "title": "Label"
                         },
                         "prompt": {
                             "type": "string",
-                            "title": "Prompt",
-                            "description": "Instructions for the AI"
+                            "title": "Prompt"
                         }
                     },
                     "required": ["label", "prompt"]
@@ -440,7 +438,7 @@ def handle_content_selection(
             },
             "load_defaults": {
                 "type": "null",
-                "title": "Load Default Modes"
+                "title": "Load Examples"
             }
         },
         "required": ["openai_api_key"]
@@ -463,7 +461,7 @@ def handle_content_selection(
             "ui:widget": "action-button",
             "ui:options": {
                 "action": "load_defaults",
-                "label": "Load Default Modes",
+                "label": "Load Examples",
                 "style": "link"
             }
         }

@@ -34,7 +34,7 @@ class EmailConfig(BaseModel):
     email_user: Optional[str] = None
     email_password: Optional[str] = None
     polling_interval: int = 30  # Default to 30 seconds
-    auto_print_new: bool = True  # Whether to automatically print new emails
+    auto_print_new: bool = False  # Whether to automatically print new emails
 
 
 class TextConfig(BaseModel):

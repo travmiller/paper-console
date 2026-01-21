@@ -252,7 +252,8 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
             "email_password": {"type": "string", "title": "Password / App Password"},
             "email_host": {"type": "string", "title": "IMAP Host", "default": "imap.gmail.com"},
             "email_port": {"type": "integer", "title": "IMAP Port", "default": 993},
-            "email_use_ssl": {"type": "boolean", "title": "Use SSL", "default": True}
+            "email_use_ssl": {"type": "boolean", "title": "Use SSL", "default": True},
+            "auto_print_new": {"type": "boolean", "title": "Auto Print New Emails", "default": False}
         }
     },
     ui_schema={
