@@ -298,7 +298,8 @@ def handle_selection(
                 "type": "array",
                 "title": "Initial Options",
                 "items": {"type": "string"},
-                "description": "The list of options shown when you start the module."
+                "description": "The list of options shown when you start the module (max 7).",
+                "maxItems": 7
             },
             "reset_chat": {
                 "type": "boolean",

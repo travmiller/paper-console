@@ -199,6 +199,11 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 <div className="space-y-2">
                     {items.map((item, index) => (
                         <div key={index} className="flex gap-2 items-center p-3 border border-zinc-200 rounded-lg bg-white relative group">
+                             {/* Item Number Indicator */}
+                             <div className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center text-xs font-mono font-bold text-zinc-500">
+                                {index + 1}
+                             </div>
+                             
                              <div className="flex-1">
                                 <SchemaField 
                                     schema={itemSchema}
@@ -225,13 +230,20 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                     ))}
                 </div>
                 
-                <button 
-                    type="button"
-                    onClick={handleAdd}
-                    className={`${commonClasses.buttonGhost} text-xs w-full py-2 border-dashed border-2 border-zinc-200 hover:border-gray-400`}
-                >
-                    + Add Item
-                </button>
+                {(!schema.maxItems || items.length < schema.maxItems) && (
+                    <button 
+                        type="button"
+                        onClick={handleAdd}
+                        className={`${commonClasses.buttonGhost} text-xs w-full py-2 border-dashed border-2 border-zinc-200 hover:border-gray-400`}
+                    >
+                        + Add Item
+                    </button>
+                )}
+                {schema.maxItems && items.length >= schema.maxItems && (
+                    <div className="text-center text-xs text-zinc-400 py-2">
+                        Maximum limit of {schema.maxItems} reached
+                    </div>
+                )}
             </div>
         );
     }
