@@ -219,13 +219,11 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                              <div className="flex-1">
                                 <SchemaField 
                                     schema={itemSchema}
-                                    uiSchema={{
-                                        ...itemUiSchema,
-                                        'ui:options': { ...itemUiSchema['ui:options'], layout: 'compact' }
-                                    }}
+                                    uiSchema={itemUiSchema}
                                     value={item}
                                     onChange={(val) => handleChangeItem(index, val)}
                                     path={[...path, index]}
+                                    moduleId={moduleId}
                                 />
                              </div>
                              <button 

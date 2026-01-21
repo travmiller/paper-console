@@ -257,8 +257,8 @@ def print_content(printer, mode_label: str, content: str):
     
     # Simple reroll options
     printer.print_subheader("OPTIONS")
-    printer.print_body("[1] Try Another")
-    printer.print_body("[2] Something Different")
+    printer.print_body("[1] Reroll")
+    printer.print_body("[2] Back to Menu")
     printer.feed(1)
     printer.print_caption("[8] Exit")
     printer.print_line()
@@ -448,8 +448,14 @@ def handle_content_selection(
     ui_schema={
         "ai_modes": {
             "items": {
+                "ui:options": {
+                    "layout": "stacked"
+                },
                 "prompt": {
-                    "ui:widget": "textarea"
+                    "ui:widget": "textarea",
+                    "ui:options": {
+                        "rows": 3
+                    }
                 }
             }
         },
