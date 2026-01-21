@@ -316,10 +316,12 @@ def print_content(printer, mode_label: str, content: str):
     printer.print_body(content)
     printer.print_line()
     
-    # Simple reroll options
+    # Options
     printer.print_subheader("OPTIONS")
-    printer.print_body("[1] Reroll")
-    printer.print_body("[2] Back to Menu")
+    printer.print_caption("[1] Another")
+    printer.print_caption("[2] Elaborate")
+    printer.print_caption("[3] Twist")
+    
     printer.feed(1)
     printer.print_caption("[8] Exit")
     printer.print_line()
@@ -340,9 +342,10 @@ def handle_content_selection(
     config: Dict[str, Any],
     module_id: str,
     prompt: str,
-    module_name: str
+    module_name: str,
+    previous_content: str = None
 ):
-    """Handle selection after content is shown (Reroll / Exit)."""
+    """Handle selection after content is shown (Another / Elaborate / Twist)."""
     
     # Exit
     if dial_position == 8:
@@ -357,33 +360,56 @@ def handle_content_selection(
             printer.flush_buffer()
         return
     
-    # [1] Reroll
+    api_key = config.get("openai_api_key")
+    model = config.get("model", "gpt-4o-mini")
+    context = build_context_string()
+
+    new_prompt = None
+    
+    # [1] Another - Reroll
     if dial_position == 1:
-        api_key = config.get("openai_api_key")
-        model = config.get("model", "gpt-4o-mini")
-        context = build_context_string()
+        new_prompt = prompt
         
-        result = generate_content(api_key, model, prompt, context)
+    # [2] Elaborate
+    elif dial_position == 2 and previous_content:
+        new_prompt = (
+            f"Regarding this previous output:\n'{previous_content}'\n\n"
+            f"The original instruction was: {prompt}\n\n"
+            "Please elaborate on this output. Provide more details, background, or explanation. "
+            "Keep it distinct from the original but clearly related."
+        )
+
+    # [3] Twist
+    elif dial_position == 3 and previous_content:
+        new_prompt = (
+            f"Regarding this previous output:\n'{previous_content}'\n\n"
+            "Rewrite this concept with a bizarre, surreal, or funny plot twist. "
+            "Subvert expectations completely."
+        )
+
+    if new_prompt:
+        # Generate
+        result = generate_content(api_key, model, new_prompt, context)
         
+        if not result["success"]:
+            print_content(printer, module_name, result["content"])
+            return
+
+        content_to_show = result["content"]
+
         # Stay in content mode
         enter_selection_mode(
-            lambda pos: handle_content_selection(pos, printer, config, module_id, prompt, module_name),
+            lambda pos: handle_content_selection(
+                pos, printer, config, module_id, prompt, module_name, previous_content=content_to_show
+            ),
             module_id
         )
         
-        print_content(printer, module_name, result["content"])
-        return
-    
-    # [2] Back to Menu - NOT APPLICABLE (Just Exit)
-    if dial_position == 2:
-        # Treat as exit for now in single-prompt mode, or maybe loop back?
-        # Let's just exit.
-        clear_state(module_id)
-        exit_selection_mode()
+        print_content(printer, module_name, content_to_show)
         return
 
     # Invalid - reprint current view
-    print_content(printer, module_name, "Select [1] to Reroll or [8] to Exit.")
+    print_content(printer, module_name, previous_content or "Select [1], [2], [3] or [8]")
 
 
 # --- Module Entry Point ---
@@ -468,7 +494,9 @@ def format_ai_utility(
     
     # Enter content view mode
     enter_selection_mode(
-        lambda pos: handle_content_selection(pos, printer, config, module_id, prompt, module_name or "AI"),
+        lambda pos: handle_content_selection(
+            pos, printer, config, module_id, prompt, module_name or "AI", previous_content=result["content"]
+        ),
         module_id
     )
     
