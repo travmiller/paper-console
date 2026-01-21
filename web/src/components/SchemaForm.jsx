@@ -12,7 +12,7 @@ import ActionButton from './widgets/ActionButton';
  * Supports: string, number, boolean, object, array.
  * Supports ui:widget: "textarea", "location-search".
  */
-const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange, moduleId }) => {
+const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange, moduleId, onActionComplete }) => {
   if (!schema) return null;
 
   const handleChange = (path, value) => {
@@ -46,12 +46,13 @@ const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange, moduleId }
         rootValue={formData}
         onRootChange={onChange}
         moduleId={moduleId}
+        onActionComplete={onActionComplete}
       />
     </div>
   );
 };
 
-const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required, compact, rootValue, onRootChange, moduleId }) => {
+const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required, compact, rootValue, onRootChange, moduleId, onActionComplete }) => {
     const type = schema.type;
     const title = schema.title || label;
     const description = schema.description;
@@ -116,6 +117,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 schema={schema}
                 uiSchema={uiSchema}
                 moduleId={moduleId}
+                onActionComplete={onActionComplete}
             />
         );
     }
@@ -160,6 +162,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                                 rootValue={rootValue}
                                 onRootChange={onRootChange}
                                 moduleId={moduleId}
+                                onActionComplete={onActionComplete}
                             />
                         </div>
                     );

@@ -17,7 +17,8 @@ const ActionButton = ({
     onChange, 
     schema, 
     uiSchema = {},
-    moduleId 
+    moduleId,
+    onActionComplete
 }) => {
     const [loading, setLoading] = useState(false);
     const [status, setStatus] = useState(null); // 'success' | 'error' | null
@@ -53,9 +54,9 @@ const ActionButton = ({
                 const data = await response.json();
                 setStatus('success');
                 
-                // Reload the page if action requires it
-                if (data.reload) {
-                    setTimeout(() => window.location.reload(), 500);
+                // Call the completion callback if provided (to refresh data)
+                if (data.reload && onActionComplete) {
+                    setTimeout(() => onActionComplete(), 300);
                 } else {
                     setTimeout(() => setStatus(null), 2000);
                 }

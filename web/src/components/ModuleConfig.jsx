@@ -4,7 +4,7 @@ import JsonTextarea from './JsonTextarea';
 import { commonClasses } from '../design-tokens';
 import { useModuleTypes } from '../hooks/useModuleTypes';
 
-const ModuleConfig = ({ module, updateConfig }) => {
+const ModuleConfig = ({ module, updateConfig, onRefresh }) => {
   const { moduleTypes, loading } = useModuleTypes();
   const config = module.config || {};
   
@@ -30,6 +30,7 @@ const ModuleConfig = ({ module, updateConfig }) => {
               formData={config}
               onChange={handleSchemaChange}
               moduleId={module.id}
+              onActionComplete={onRefresh}
           />
       );
   }

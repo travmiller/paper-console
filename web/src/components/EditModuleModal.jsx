@@ -69,6 +69,19 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
                   : prev,
               );
             }}
+            onRefresh={async () => {
+              // Fetch fresh settings and update the module state
+              try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                const freshModule = data.modules?.[moduleId];
+                if (freshModule) {
+                  setModule(freshModule);
+                }
+              } catch (e) {
+                console.error('Failed to refresh module:', e);
+              }
+            }}
           />
         )}
 
