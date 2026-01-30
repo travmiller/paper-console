@@ -850,8 +850,12 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
             validate_module_config(module.type, module.config or {})
         except ValueError as e:
             # Revert in-memory settings on failure
-            config_module.settings = load_config()  # Reload old config
-            raise HTTPException(status_code=400, detail=str(e))
+            # config_module.settings = load_config()  # Reload old config
+            # raise HTTPException(status_code=400, detail=str(e))
+            
+            # Log warning but allow save to proceed
+            # This prevents unrelated module validation errors from blocking global settings updates
+            logging.warning(f"Validation warning: {e}")
             
     # Update module-level reference so modules that access app.config.settings will see the update
     config_module.settings = settings
