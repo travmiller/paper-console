@@ -56,24 +56,23 @@ except ImportError:
 
 SYSTEM_PROMPT = """You are a helpful AI assistant connected to a thermal receipt printer (PC-1 Paper Console).
 
-IMPORTANT: When the user wants to PRINT something, you must respond with a JSON object:
-{"print": true, "content": "The content to print", "title": "Short title"}
+ALWAYS respond with JSON in this exact format:
 
-Examples of print requests:
-- "print a pasta recipe" → Generate a pasta recipe and return JSON to print it
-- "print that" or "print the above" → Return JSON with the last thing you discussed
-- "can you print me a haiku about coffee" → Generate haiku and return JSON to print it
-- "I want to print a shopping list for tacos" → Generate list and return JSON to print it
+For normal conversation:
+{"print": false, "message": "Your response here"}
 
-For normal conversation (no printing), just respond normally with plain text.
+When the user wants to print something:
+{"print": true, "content": "Content to print", "title": "Short Title"}
 
-Guidelines for printed content:
-- Keep content concise (thermal printer is narrow, ~32 chars wide)
-- Use simple formatting: short paragraphs, bullet points
-- No markdown headers or complex formatting
-- Title should be 2-4 words max
+RULES:
+- ALWAYS respond with valid JSON, nothing else
+- When user says "print" something, set print: true and put printable content in "content"
+- For normal chat, set print: false and put your response in "message"
+- For printed content: keep it concise (~32 chars wide), use - for bullets, no markdown
 
-You're running on a small home device. Be warm, helpful, and conversational."""
+Examples:
+User: "tell me a joke" → {"print": false, "message": "Why did the chicken cross the road? To get to the other side!"}
+User: "print a haiku" → {"print": true, "content": "An old silent pond\\nA frog jumps into the pond\\nSplash! Silence again", "title": "Haiku"}"""
 
 MAX_HISTORY_LENGTH = 20  # Keep last N messages per user
 
@@ -208,29 +207,39 @@ class TelegramBotService:
             logger.error(f"AI API error: {e}", exc_info=True)
             return f"Sorry, I encountered an error: {str(e)}"
     
-    def _parse_print_response(self, response: str) -> Optional[Dict[str, Any]]:
+    def _parse_ai_response(self, response: str) -> Dict[str, Any]:
         """
-        Try to parse a print instruction from AI response.
+        Parse AI JSON response.
         
-        Returns dict with 'content' and 'title' if print requested, None otherwise.
+        Returns dict with:
+        - 'print': bool - whether to print
+        - 'message': str - chat message (when print=False)
+        - 'content': str - print content (when print=True)
+        - 'title': str - print title (when print=True)
         """
         response = response.strip()
         
-        # Check if response looks like JSON
-        if not (response.startswith('{') and response.endswith('}')):
-            return None
-        
         try:
             data = json.loads(response)
-            if data.get('print') and data.get('content'):
+            
+            if data.get('print'):
                 return {
-                    'content': data['content'],
-                    'title': data.get('title', 'TELEGRAM')[:30]  # Limit title length
+                    'print': True,
+                    'content': data.get('content', ''),
+                    'title': data.get('title', 'TELEGRAM')[:30]
                 }
+            else:
+                return {
+                    'print': False,
+                    'message': data.get('message', response)
+                }
+                
         except json.JSONDecodeError:
-            pass
-        
-        return None
+            # Fallback: treat as plain text message
+            return {
+                'print': False,
+                'message': response
+            }
     
     def _is_user_authorized(self, user_id: int) -> bool:
         """Check if a user is authorized to use the bot."""
@@ -309,16 +318,16 @@ class TelegramBotService:
         # Call AI
         response = await asyncio.to_thread(self._call_ai_sync, user_id, message)
         
-        # Check if AI wants to print something
-        print_data = self._parse_print_response(response)
+        # Parse the JSON response
+        parsed = self._parse_ai_response(response)
         
-        if print_data:
-            # AI returned a print instruction
-            await update.message.reply_text(f"🖨️ Printing: {print_data['title']}...")
+        if parsed['print']:
+            # AI wants to print something
+            await update.message.reply_text(f"🖨️ Printing: {parsed['title']}...")
             
             # Print in background thread
             success = await asyncio.to_thread(
-                self._print_sync, print_data['content'], print_data['title']
+                self._print_sync, parsed['content'], parsed['title']
             )
             
             if success:
@@ -326,8 +335,8 @@ class TelegramBotService:
             else:
                 await update.message.reply_text("❌ Print failed. Check printer connection.")
         else:
-            # Normal conversation - just send the response
-            await update.message.reply_text(response)
+            # Normal conversation
+            await update.message.reply_text(parsed['message'])
     
     def _call_ai_sync(self, user_id: int, message: str) -> str:
         """Synchronous wrapper for AI call (for thread pool)."""
