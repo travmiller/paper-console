@@ -22,6 +22,7 @@ logging.basicConfig(
         logging.StreamHandler(),  # Console output
     ],
 )
+logger = logging.getLogger(__name__)
 from app.config import (
     settings,
     Settings,
@@ -286,7 +287,6 @@ async def print_setup_instructions():
         with ThreadPoolExecutor() as executor:
             await loop.run_in_executor(executor, print_setup_instructions_sync)
     except Exception as e:
-        logger = logging.getLogger(__name__)
         logger.error(f"Error in print_setup_instructions: {e}", exc_info=True)
 
 
@@ -302,7 +302,6 @@ async def check_first_boot():
     """Check if this is first boot and print welcome message.
     Runs blocking printer operations in a thread pool to avoid blocking the event loop.
     """
-    logger = logging.getLogger(__name__)
     marker_path = _get_welcome_marker_path()
     from concurrent.futures import ThreadPoolExecutor
     from app.selection_mode import exit_selection_mode
@@ -513,7 +512,6 @@ async def periodic_wifi_recovery():
 
 async def manual_ap_mode_trigger():
     """Manually trigger AP mode (e.g. via button hold 5-15 seconds)."""
-    logger = logging.getLogger(__name__)
     logger.info("Manual AP mode trigger initiated")
 
     from app.selection_mode import exit_selection_mode
