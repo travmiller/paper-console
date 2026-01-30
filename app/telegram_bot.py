@@ -13,6 +13,7 @@ Features:
 """
 
 import asyncio
+import json
 import logging
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, field
@@ -32,6 +33,9 @@ try:
     HAS_TELEGRAM = True
 except ImportError:
     HAS_TELEGRAM = False
+    # Provide placeholder types for annotations when library not installed
+    Update = Any
+    ContextTypes = Any
     logger.warning("python-telegram-bot not installed. Telegram bot will not function.")
 
 # Try to import AI libraries
@@ -50,29 +54,26 @@ except ImportError:
 
 # --- Constants ---
 
-PRINT_TRIGGERS = [
-    "print that",
-    "print this",
-    "print it",
-    "/print",
-    "print the above",
-    "print last response",
-]
+SYSTEM_PROMPT = """You are a helpful AI assistant connected to a thermal receipt printer (PC-1 Paper Console).
 
-SYSTEM_PROMPT = """You are a helpful AI assistant connected to a thermal receipt printer (PC-1 Paper Console). You have natural conversations with the user.
+IMPORTANT: When the user wants to PRINT something, you must respond with a JSON object:
+{"print": true, "content": "The content to print", "title": "Short title"}
 
-When the user asks you to print something, they'll say things like "print that" or "/print". You don't need to handle printing logic - just have a helpful conversation.
+Examples of print requests:
+- "print a pasta recipe" → Generate a pasta recipe and return JSON to print it
+- "print that" or "print the above" → Return JSON with the last thing you discussed
+- "can you print me a haiku about coffee" → Generate haiku and return JSON to print it
+- "I want to print a shopping list for tacos" → Generate list and return JSON to print it
 
-Keep responses concise since they may be printed on a narrow thermal printer (about 32 characters wide). Use simple formatting:
-- Short paragraphs
-- Bullet points for lists
+For normal conversation (no printing), just respond normally with plain text.
+
+Guidelines for printed content:
+- Keep content concise (thermal printer is narrow, ~32 chars wide)
+- Use simple formatting: short paragraphs, bullet points
 - No markdown headers or complex formatting
+- Title should be 2-4 words max
 
-Current context:
-- You're running on a small device in the user's home
-- Responses may be printed on paper, so be mindful of length
-- Be warm, helpful, and conversational
-"""
+You're running on a small home device. Be warm, helpful, and conversational."""
 
 MAX_HISTORY_LENGTH = 20  # Keep last N messages per user
 
@@ -81,7 +82,6 @@ MAX_HISTORY_LENGTH = 20  # Keep last N messages per user
 class ConversationState:
     """Tracks conversation history for a user."""
     messages: List[Dict[str, str]] = field(default_factory=list)
-    last_bot_response: str = ""
 
 
 class TelegramBotService:
@@ -208,10 +208,29 @@ class TelegramBotService:
             logger.error(f"AI API error: {e}", exc_info=True)
             return f"Sorry, I encountered an error: {str(e)}"
     
-    def _is_print_request(self, message: str) -> bool:
-        """Check if the message is a print command."""
-        message_lower = message.lower().strip()
-        return any(trigger in message_lower for trigger in PRINT_TRIGGERS)
+    def _parse_print_response(self, response: str) -> Optional[Dict[str, Any]]:
+        """
+        Try to parse a print instruction from AI response.
+        
+        Returns dict with 'content' and 'title' if print requested, None otherwise.
+        """
+        response = response.strip()
+        
+        # Check if response looks like JSON
+        if not (response.startswith('{') and response.endswith('}')):
+            return None
+        
+        try:
+            data = json.loads(response)
+            if data.get('print') and data.get('content'):
+                return {
+                    'content': data['content'],
+                    'title': data.get('title', 'TELEGRAM')[:30]  # Limit title length
+                }
+        except json.JSONDecodeError:
+            pass
+        
+        return None
     
     def _is_user_authorized(self, user_id: int) -> bool:
         """Check if a user is authorized to use the bot."""
@@ -246,7 +265,7 @@ class TelegramBotService:
                 printer.reset_buffer(max_lines)
             
             # Print header
-            printer.print_header(title, icon="chat")
+            printer.print_header(title.upper(), icon="chat")
             printer.print_caption(datetime.now().strftime("%A, %B %d, %Y %I:%M %p"))
             printer.print_line()
             
@@ -265,7 +284,7 @@ class TelegramBotService:
             logger.error(f"Print error: {e}", exc_info=True)
             return False
     
-    async def _handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_message(self, update: Update, context: Any):
         """Handle incoming messages."""
         if not update.message or not update.message.text:
             return
@@ -284,18 +303,31 @@ class TelegramBotService:
         
         logger.info(f"Message from {user_id}: {message[:50]}...")
         
-        # Check for print command
-        if self._is_print_request(message):
-            await self._handle_print(update, user_id, message)
-            return
-        
-        # Normal conversation
+        # Show typing indicator
         await update.message.chat.send_action("typing")
         
         # Call AI
         response = await asyncio.to_thread(self._call_ai_sync, user_id, message)
         
-        await update.message.reply_text(response)
+        # Check if AI wants to print something
+        print_data = self._parse_print_response(response)
+        
+        if print_data:
+            # AI returned a print instruction
+            await update.message.reply_text(f"🖨️ Printing: {print_data['title']}...")
+            
+            # Print in background thread
+            success = await asyncio.to_thread(
+                self._print_sync, print_data['content'], print_data['title']
+            )
+            
+            if success:
+                await update.message.reply_text("✅ Done! Check your printer.")
+            else:
+                await update.message.reply_text("❌ Print failed. Check printer connection.")
+        else:
+            # Normal conversation - just send the response
+            await update.message.reply_text(response)
     
     def _call_ai_sync(self, user_id: int, message: str) -> str:
         """Synchronous wrapper for AI call (for thread pool)."""
@@ -306,40 +338,16 @@ class TelegramBotService:
         finally:
             loop.close()
     
-    async def _handle_print(self, update: Update, user_id: int, message: str):
-        """Handle a print command."""
-        # Get the last bot response for this user
-        state = self.conversations.get(user_id)
-        
-        if not state or not state.last_bot_response:
-            await update.message.reply_text(
-                "Nothing to print! Send me a message first, then say 'print that'."
-            )
-            return
-        
-        # Send printing indicator
-        await update.message.reply_text("🖨️ Printing...")
-        
-        # Print in background thread (printer operations can be slow)
-        success = await asyncio.to_thread(
-            self._print_sync, state.last_bot_response
-        )
-        
-        if success:
-            await update.message.reply_text("✅ Done! Check your printer.")
-        else:
-            await update.message.reply_text("❌ Print failed. Check printer connection.")
-    
-    def _print_sync(self, content: str) -> bool:
+    def _print_sync(self, content: str, title: str = "TELEGRAM") -> bool:
         """Synchronous print wrapper for thread pool."""
         import asyncio
         loop = asyncio.new_event_loop()
         try:
-            return loop.run_until_complete(self._send_to_printer(content))
+            return loop.run_until_complete(self._send_to_printer(content, title))
         finally:
             loop.close()
     
-    async def _handle_start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_start(self, update: Update, context: Any):
         """Handle /start command."""
         user = update.effective_user
         if not user:
@@ -350,12 +358,14 @@ class TelegramBotService:
         
         await update.message.reply_text(
             f"👋 Hi {user.first_name}! I'm your PC-1 assistant.\n\n"
-            "Just chat with me naturally, and when you want to print something, "
-            "say 'print that' or '/print'.\n\n"
+            "Just chat with me! When you want to print something, just ask:\n"
+            "• 'Print a pasta recipe'\n"
+            "• 'Print me a haiku about coffee'\n"
+            "• 'Print a shopping list for tacos'\n\n"
             f"Your Telegram ID is: {user.id}"
         )
     
-    async def _handle_help(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_help(self, update: Update, context: Any):
         """Handle /help command."""
         user = update.effective_user
         if not user or not self._is_user_authorized(user.id):
@@ -363,17 +373,18 @@ class TelegramBotService:
             
         await update.message.reply_text(
             "🖨️ **PC-1 Telegram Bot**\n\n"
+            "**How to print:**\n"
+            "• 'Print a joke'\n"
+            "• 'Print me a recipe for cookies'\n"
+            "• 'Print a motivational quote'\n\n"
             "**Commands:**\n"
-            "• Just chat naturally!\n"
-            "• Say 'print that' to print my last response\n"
-            "• /print - Same as 'print that'\n"
             "• /start - Welcome message\n"
             "• /help - This message\n"
             "• /id - Show your Telegram user ID\n\n"
             f"Your ID: {user.id}"
         )
     
-    async def _handle_id(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def _handle_id(self, update: Update, context: Any):
         """Handle /id command - shows user their Telegram ID."""
         user = update.effective_user
         if not user:
@@ -436,12 +447,15 @@ class TelegramBotService:
         finally:
             await self.stop()
     
-    async def _handle_print_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Handle /print command."""
+    async def _handle_print_command(self, update: Update, context: Any):
+        """Handle /print command - redirect to help text."""
         user = update.effective_user
         if not user or not self._is_user_authorized(user.id):
             return
-        await self._handle_print(update, user.id, "/print")
+        await update.message.reply_text(
+            "Just tell me what you want to print!\n\n"
+            "Try: 'Print a joke' or 'Print me a haiku'"
+        )
     
     async def stop(self):
         """Stop the bot gracefully."""

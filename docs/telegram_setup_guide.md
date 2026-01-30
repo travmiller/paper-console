@@ -45,27 +45,26 @@ Control your PC-1 through Telegram with AI-powered conversations and instant pri
 
 ## Using the Bot
 
-### Chat Naturally
-Just send messages to your bot like you would to a friend:
+### Just Ask to Print!
+Include "print" in your message and the bot will generate content and print it automatically:
 
-> "What's a good recipe for pasta?"  
-> "Tell me an interesting fact about space"  
-> "Write a short poem about coffee"
+> "Print a pasta recipe"  
+> "Print me a haiku about coffee"  
+> "Print a shopping list for tacos"  
+> "Can you print a motivational quote?"
 
-### Print Responses
-After the bot replies, say:
-- `print that`
-- `print this`
-- `print last response`
-- `/print`
+The bot will generate the content and send it directly to your printer.
 
-The response will print on your PC-1!
+### Normal Chat
+Without "print" in your message, it's just a regular conversation:
+
+> "What's the weather like in Paris?"  
+> "Tell me a joke"  
 
 ### Bot Commands
 - `/start` - Welcome message
-- `/help` - List of commands
+- `/help` - List of commands  
 - `/id` - Show your Telegram user ID
-- `/print` - Print the last response
 
 ## Troubleshooting
 
