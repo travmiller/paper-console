@@ -508,6 +508,71 @@ function App() {
     saveGlobalSettings({ channels: newChannels });
   };
 
+  // Move a module between channels (or reorder within same channel)
+  const moveModuleBetweenChannels = async (sourceChannel, destChannel, moduleId, destIndexOrOrders) => {
+    try {
+      // If same channel, this is a reorder operation
+      if (sourceChannel === destChannel && typeof destIndexOrOrders === 'object') {
+        await reorderChannelModules(sourceChannel, destIndexOrOrders);
+        return;
+      }
+
+      // Otherwise, move between channels
+      // 1. Remove from source channel
+      const removeResponse = await fetch(`/api/channels/${sourceChannel}/modules/${moduleId}`, {
+        method: 'DELETE',
+      });
+      if (!removeResponse.ok) throw new Error('Failed to remove module from source channel');
+      const removeData = await removeResponse.json();
+
+      // 2. Add to destination channel
+      const order = typeof destIndexOrOrders === 'number' ? destIndexOrOrders : null;
+      const addResponse = await fetch(`/api/channels/${destChannel}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`, {
+        method: 'POST',
+      });
+      if (!addResponse.ok) throw new Error('Failed to add module to destination channel');
+      const addData = await addResponse.json();
+
+      // Update local state
+      setSettings((prev) => ({
+        ...prev,
+        channels: {
+          ...prev.channels,
+          [sourceChannel]: removeData.channel,
+          [destChannel]: addData.channel,
+        },
+      }));
+
+      setStatus({ type: 'success', message: 'Module moved!' });
+      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+    } catch (err) {
+      console.error('Error moving module between channels:', err);
+      setStatus({ type: 'error', message: err.message || 'Failed to move module' });
+    }
+  };
+
+  // Unassign a module from a channel (move to unassigned)
+  const unassignModule = async (channelPosition, moduleId) => {
+    try {
+      const response = await fetch(`/api/channels/${channelPosition}/modules/${moduleId}`, {
+        method: 'DELETE',
+      });
+      if (!response.ok) throw new Error('Failed to unassign module');
+
+      const data = await response.json();
+      setSettings((prev) => ({
+        ...prev,
+        channels: { ...prev.channels, [channelPosition]: data.channel },
+      }));
+
+      setStatus({ type: 'success', message: 'Module unassigned!' });
+      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+    } catch (err) {
+      console.error('Error unassigning module:', err);
+      setStatus({ type: 'error', message: err.message || 'Failed to unassign module' });
+    }
+  };
+
   const handleWiFiSetupComplete = () => {
     setWifiMode('client');
     window.location.reload();
@@ -630,6 +695,9 @@ function App() {
             setShowAddModuleModal={setShowAddModuleModal}
             setShowCreateUnassignedModal={setShowCreateUnassignedModal}
             wifiStatus={wifiStatus}
+            onMoveModuleBetweenChannels={moveModuleBetweenChannels}
+            onUnassignModule={unassignModule}
+            onAssignModuleToChannel={assignModuleToChannel}
           />
         )}
 
