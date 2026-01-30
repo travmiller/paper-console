@@ -104,6 +104,17 @@ class EmptyConfig(BaseModel):
     pass
 
 
+class TelegramBotConfig(BaseModel):
+    """Configuration for the Telegram bot service."""
+    model_config = ConfigDict(extra="ignore")
+    enabled: bool = False
+    bot_token: str = ""
+    allowed_user_ids: List[int] = []  # Telegram user IDs authorized to use the bot
+    ai_provider: str = "anthropic"  # "anthropic" or "openai"
+    ai_api_key: str = ""
+    ai_model: str = ""  # Optional: override default model
+
+
 
 class ModuleInstance(BaseModel):
     """A module instance with its configuration."""
@@ -272,6 +283,9 @@ class Settings(BaseModel):
     # Key is position (1-8), Value is the configuration for that channel
     # Default: Ch1=Weather, Ch2=Astronomy, Ch3=Sudoku, Ch4-8=Empty
     channels: Dict[int, ChannelConfig] = Field(default_factory=_default_channels)
+
+    # Telegram Bot Configuration
+    telegram_bot: TelegramBotConfig = Field(default_factory=TelegramBotConfig)
 
     @field_validator("latitude")
     @classmethod

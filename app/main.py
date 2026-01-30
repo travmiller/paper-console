@@ -72,6 +72,7 @@ async def save_settings_background(settings_snapshot: Settings):
 email_polling_task = None
 scheduler_task = None
 task_monitor_task = None
+telegram_bot_task = None
 
 
 async def task_watchdog():
@@ -661,10 +662,22 @@ async def lifespan(app: FastAPI):
     # Factory reset (15s) = Factory Reset
     button.set_factory_reset_callback(on_factory_reset_threadsafe)
 
+    # Start Telegram bot if enabled
+    global telegram_bot_task
+    if settings.telegram_bot.enabled:
+        try:
+            from app.telegram_bot import start_telegram_bot
+            service = await start_telegram_bot(settings.telegram_bot)
+            if service:
+                telegram_bot_task = asyncio.create_task(service.run())
+                logger.info("Telegram bot started")
+        except Exception as e:
+            logger.error(f"Failed to start Telegram bot: {e}")
+
     yield
 
     # Shutdown - cancel all background tasks
-    for task in [email_polling_task, scheduler_task, task_monitor_task]:
+    for task in [email_polling_task, scheduler_task, task_monitor_task, telegram_bot_task]:
         if task:
             task.cancel()
             try:
@@ -673,6 +686,13 @@ async def lifespan(app: FastAPI):
                 pass
             except Exception:
                 pass
+
+    # Stop Telegram bot gracefully
+    try:
+        from app.telegram_bot import stop_telegram_bot
+        await stop_telegram_bot()
+    except Exception:
+        pass
 
     # Cleanup hardware drivers
     if hasattr(printer, "close"):
@@ -879,6 +899,64 @@ async def reload_settings():
     config_module.settings = settings
 
     return {"message": "Settings reloaded from disk", "config": settings}
+
+
+# --- TELEGRAM BOT API ---
+
+
+@app.get("/api/telegram/status")
+async def get_telegram_status():
+    """Get the current status of the Telegram bot."""
+    try:
+        from app.telegram_bot import get_telegram_bot_status
+        status = get_telegram_bot_status()
+        return {
+            "enabled": settings.telegram_bot.enabled,
+            "configured": bool(settings.telegram_bot.bot_token),
+            **status,
+        }
+    except Exception as e:
+        return {
+            "enabled": settings.telegram_bot.enabled,
+            "configured": bool(settings.telegram_bot.bot_token),
+            "available": False,
+            "running": False,
+            "error": str(e),
+        }
+
+
+@app.post("/api/telegram/restart")
+async def restart_telegram_bot():
+    """Restart the Telegram bot with current settings."""
+    global telegram_bot_task
+    
+    try:
+        from app.telegram_bot import start_telegram_bot, stop_telegram_bot
+        
+        # Stop existing bot
+        if telegram_bot_task:
+            telegram_bot_task.cancel()
+            try:
+                await telegram_bot_task
+            except asyncio.CancelledError:
+                pass
+        await stop_telegram_bot()
+        
+        # Start new bot if enabled
+        if settings.telegram_bot.enabled:
+            service = await start_telegram_bot(settings.telegram_bot)
+            if service:
+                telegram_bot_task = asyncio.create_task(service.run())
+                return {"message": "Telegram bot restarted", "running": True}
+            else:
+                return {"message": "Failed to start Telegram bot", "running": False}
+        else:
+            telegram_bot_task = None
+            return {"message": "Telegram bot disabled", "running": False}
+            
+    except Exception as e:
+        logger.error(f"Error restarting Telegram bot: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # --- SYSTEM TIME API ---
