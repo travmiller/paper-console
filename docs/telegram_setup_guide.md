@@ -61,6 +61,20 @@ Without "print" in your message, it's just a regular conversation:
 > "What's the weather like in Paris?"  
 > "Tell me a joke"  
 
+### Module Control
+You can also run your installed modules directly:
+
+**By Channel:**
+> "Print channel 1"  
+> "Run the module on channel 5"
+
+**By Name/Type:**
+> "Print me a maze"  
+> "Run the weather module"  
+> "Print a sudoku puzzle"
+
+The bot knows your location, timezone, and channel assignments, so it can give you relevant answers about your setup.
+
 ### Bot Commands
 - `/start` - Welcome message
 - `/help` - List of commands  

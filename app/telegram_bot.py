@@ -54,27 +54,84 @@ except ImportError:
 
 # --- Constants ---
 
-SYSTEM_PROMPT = """You are a helpful AI assistant connected to a thermal receipt printer (PC-1 Paper Console).
+# Base prompt - context is appended dynamically
+SYSTEM_PROMPT_BASE = """You are a helpful AI assistant for the PC-1 Paper Console, a thermal receipt printer device.
 
-ALWAYS respond with JSON in this exact format:
+ALWAYS respond with JSON. Available response types:
 
-For normal conversation:
-{"print": false, "message": "Your response here"}
+1. Normal chat:
+{"print": false, "message": "Your response"}
 
-When the user wants to print something:
-{"print": true, "content": "Content to print", "title": "Short Title"}
+2. Print AI-generated content:
+{"print": true, "content": "Text to print", "title": "Title"}
+
+3. Run a channel (execute module assigned to that channel):
+{"action": "run_channel", "channel": 1}
+
+4. Run a module by type:
+{"action": "run_module", "type": "maze"}
 
 RULES:
-- ALWAYS respond with valid JSON, nothing else
-- When user says "print" something, set print: true and put printable content in "content"
-- For normal chat, set print: false and put your response in "message"
-- For printed content: keep it concise (~32 chars wide), use - for bullets, no markdown
-
-Examples:
-User: "tell me a joke" → {"print": false, "message": "Why did the chicken cross the road? To get to the other side!"}
-User: "print a haiku" → {"print": true, "content": "An old silent pond\\nA frog jumps into the pond\\nSplash! Silence again", "title": "Haiku"}"""
+- ALWAYS respond with valid JSON only
+- Use run_channel when user says "print channel X" or references a channel
+- Use run_module when user asks for a specific module type like "print me a maze"
+- Use print:true for AI-generated content like recipes, poems, jokes
+- Title: 2-4 words max"""
 
 MAX_HISTORY_LENGTH = 20  # Keep last N messages per user
+
+
+def _build_context() -> str:
+    """Build dynamic context about user's PC-1 configuration."""
+    try:
+        from app.config import settings
+        from app.module_registry import get_all_modules
+        from datetime import datetime
+        import pytz
+        
+        # Get current time in user's timezone
+        try:
+            tz = pytz.timezone(settings.timezone)
+            now = datetime.now(tz)
+            time_str = now.strftime("%A, %B %d, %Y %I:%M %p")
+        except Exception:
+            time_str = datetime.now().strftime("%A, %B %d, %Y %I:%M %p")
+        
+        lines = [
+            f"\n--- YOUR USER'S PC-1 CONFIG ---",
+            f"Location: {settings.city_name}" + (f", {settings.state}" if settings.state else ""),
+            f"Timezone: {settings.timezone}",
+            f"Current time: {time_str}",
+            "",
+            "Channels:"
+        ]
+        
+        # Build channel list
+        for ch_num in range(1, 9):
+            ch_config = settings.channels.get(ch_num)
+            if ch_config and ch_config.modules:
+                # Get first module on channel
+                first_assignment = ch_config.modules[0]
+                module_instance = settings.modules.get(first_assignment.module_id)
+                if module_instance:
+                    lines.append(f"  {ch_num}: {module_instance.name} ({module_instance.type})")
+                else:
+                    lines.append(f"  {ch_num}: [empty]")
+            else:
+                lines.append(f"  {ch_num}: [empty]")
+        
+        # List available module types
+        all_modules = get_all_modules()
+        module_types = sorted(all_modules.keys())
+        lines.append("")
+        lines.append(f"Available module types: {', '.join(module_types)}")
+        
+        return "\n".join(lines)
+        
+    except Exception as e:
+        logger.warning(f"Failed to build context: {e}")
+        return ""
+
 
 
 @dataclass
@@ -174,17 +231,20 @@ class TelegramBotService:
             provider = self.config.ai_provider.lower()
             model = self._get_ai_model()
             
+            # Build dynamic system prompt with user context
+            system_prompt = SYSTEM_PROMPT_BASE + _build_context()
+            
             if provider == "anthropic":
                 response = self._ai_client.messages.create(
                     model=model,
                     max_tokens=1024,
-                    system=SYSTEM_PROMPT,
+                    system=system_prompt,
                     messages=state.messages,
                 )
                 reply = response.content[0].text
                 
             elif provider == "openai":
-                messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+                messages = [{"role": "system", "content": system_prompt}]
                 messages.extend(state.messages)
                 
                 response = self._ai_client.chat.completions.create(
@@ -211,33 +271,43 @@ class TelegramBotService:
         """
         Parse AI JSON response.
         
-        Returns dict with:
-        - 'print': bool - whether to print
-        - 'message': str - chat message (when print=False)
-        - 'content': str - print content (when print=True)
-        - 'title': str - print title (when print=True)
+        Returns dict with one of:
+        - {'type': 'message', 'message': str}
+        - {'type': 'print', 'content': str, 'title': str}
+        - {'type': 'run_channel', 'channel': int}
+        - {'type': 'run_module', 'module_type': str}
         """
         response = response.strip()
         
         try:
             data = json.loads(response)
             
+            # Check for action-based responses
+            if 'action' in data:
+                action = data['action']
+                if action == 'run_channel':
+                    return {'type': 'run_channel', 'channel': int(data.get('channel', 1))}
+                elif action == 'run_module':
+                    return {'type': 'run_module', 'module_type': data.get('type', '')}
+            
+            # Check for print responses
             if data.get('print'):
                 return {
-                    'print': True,
+                    'type': 'print',
                     'content': data.get('content', ''),
                     'title': data.get('title', 'TELEGRAM')[:30]
                 }
-            else:
-                return {
-                    'print': False,
-                    'message': data.get('message', response)
-                }
+            
+            # Default: message response
+            return {
+                'type': 'message',
+                'message': data.get('message', response)
+            }
                 
         except json.JSONDecodeError:
             # Fallback: treat as plain text message
             return {
-                'print': False,
+                'type': 'message',
                 'message': response
             }
     
@@ -293,6 +363,121 @@ class TelegramBotService:
             logger.error(f"Print error: {e}", exc_info=True)
             return False
     
+    def _run_channel(self, channel: int) -> tuple[bool, str]:
+        """
+        Execute the module assigned to a channel.
+        
+        Returns (success, message) tuple.
+        """
+        try:
+            from app.config import settings
+            from app.hardware import printer
+            from app.module_registry import execute_module_by_type
+            from app.selection_mode import exit_selection_mode
+            
+            # Exit any active selection mode
+            exit_selection_mode()
+            
+            # Get channel config
+            ch_config = settings.channels.get(channel)
+            if not ch_config or not ch_config.modules:
+                return False, f"Channel {channel} is empty"
+            
+            # Get first module on channel
+            first_assignment = ch_config.modules[0]
+            module_instance = settings.modules.get(first_assignment.module_id)
+            
+            if not module_instance:
+                return False, f"Module not found for channel {channel}"
+            
+            # Reset printer buffer
+            if hasattr(printer, "reset_buffer"):
+                max_lines = getattr(settings, "max_print_lines", 200)
+                printer.reset_buffer(max_lines)
+            
+            # Execute the module
+            success = execute_module_by_type(
+                module_instance.type,
+                printer,
+                module_instance.config,
+                module_instance.name
+            )
+            
+            # Flush to hardware
+            if hasattr(printer, "flush_buffer"):
+                printer.flush_buffer()
+            
+            if success:
+                return True, module_instance.name
+            else:
+                return False, f"Module execution failed"
+                
+        except Exception as e:
+            logger.error(f"Channel execution error: {e}", exc_info=True)
+            return False, str(e)
+    
+    def _run_module_by_type(self, module_type: str) -> tuple[bool, str]:
+        """
+        Find and execute a module by its type.
+        
+        Searches channels first, then unassigned modules.
+        Returns (success, module_name) tuple.
+        """
+        try:
+            from app.config import settings
+            from app.hardware import printer
+            from app.module_registry import execute_module_by_type, get_module
+            from app.selection_mode import exit_selection_mode
+            
+            # Check if module type exists
+            module_def = get_module(module_type)
+            if not module_def:
+                return False, f"Unknown module type: {module_type}"
+            
+            # Exit any active selection mode
+            exit_selection_mode()
+            
+            # Find a module instance of this type
+            target_instance = None
+            for module_id, instance in settings.modules.items():
+                if instance.type == module_type:
+                    target_instance = instance
+                    break
+            
+            if not target_instance:
+                # No instance exists, create a temporary one with defaults
+                target_instance = type('ModuleInstance', (), {
+                    'type': module_type,
+                    'name': module_def.label,
+                    'config': {}
+                })()
+            
+            # Reset printer buffer
+            if hasattr(printer, "reset_buffer"):
+                max_lines = getattr(settings, "max_print_lines", 200)
+                printer.reset_buffer(max_lines)
+            
+            # Execute the module
+            success = execute_module_by_type(
+                target_instance.type,
+                printer,
+                getattr(target_instance, 'config', {}),
+                getattr(target_instance, 'name', module_def.label)
+            )
+            
+            # Flush to hardware
+            if hasattr(printer, "flush_buffer"):
+                printer.flush_buffer()
+            
+            if success:
+                return True, getattr(target_instance, 'name', module_def.label)
+            else:
+                return False, "Module execution failed"
+                
+        except Exception as e:
+            logger.error(f"Module execution error: {e}", exc_info=True)
+            return False, str(e)
+    
     async def _handle_message(self, update: Update, context: Any):
         """Handle incoming messages."""
         if not update.message or not update.message.text:
@@ -320,12 +505,12 @@ class TelegramBotService:
         
         # Parse the JSON response
         parsed = self._parse_ai_response(response)
+        response_type = parsed.get('type', 'message')
         
-        if parsed['print']:
-            # AI wants to print something
+        if response_type == 'print':
+            # AI-generated print content
             await update.message.reply_text(f"🖨️ Printing: {parsed['title']}...")
             
-            # Print in background thread
             success = await asyncio.to_thread(
                 self._print_sync, parsed['content'], parsed['title']
             )
@@ -334,9 +519,34 @@ class TelegramBotService:
                 await update.message.reply_text("✅ Done! Check your printer.")
             else:
                 await update.message.reply_text("❌ Print failed. Check printer connection.")
+        
+        elif response_type == 'run_channel':
+            # Execute channel module
+            channel = parsed['channel']
+            await update.message.reply_text(f"🖨️ Running channel {channel}...")
+            
+            success, name = await asyncio.to_thread(self._run_channel, channel)
+            
+            if success:
+                await update.message.reply_text(f"✅ Printed: {name}")
+            else:
+                await update.message.reply_text(f"❌ Failed: {name}")
+        
+        elif response_type == 'run_module':
+            # Execute module by type
+            module_type = parsed['module_type']
+            await update.message.reply_text(f"🖨️ Running {module_type} module...")
+            
+            success, name = await asyncio.to_thread(self._run_module_by_type, module_type)
+            
+            if success:
+                await update.message.reply_text(f"✅ Printed: {name}")
+            else:
+                await update.message.reply_text(f"❌ Failed: {name}")
+        
         else:
             # Normal conversation
-            await update.message.reply_text(parsed['message'])
+            await update.message.reply_text(parsed.get('message', response))
     
     def _call_ai_sync(self, user_id: int, message: str) -> str:
         """Synchronous wrapper for AI call (for thread pool)."""
