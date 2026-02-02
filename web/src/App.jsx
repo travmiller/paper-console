@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import WiFiSetup from './WiFiSetup';
 import GeneralSettings from './components/GeneralSettings';
+import Assistant from './components/Assistant';
 import ChannelList from './components/ChannelList';
 import AddModuleModal from './components/AddModuleModal';
 import EditModuleModal from './components/EditModuleModal';
@@ -11,6 +12,7 @@ import ResetSettingsButton from './components/ResetSettingsButton';
 import { useModuleTypes } from './hooks/useModuleTypes';
 import GitHubIcon from './assets/GitHubIcon';
 import BorderWidthIcon from './assets/BorderWidthIcon';
+import ChatIcon from './assets/ChatIcon';
 import PreferencesIcon from './assets/PreferencesIcon';
 
 
@@ -33,7 +35,7 @@ function App() {
   const [searchTerm, setSearchTerm] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
-  const [activeTab, setActiveTab] = useState('channels'); // 'general', 'channels'
+  const [activeTab, setActiveTab] = useState('channels'); // 'general', 'assistant', 'channels'
   const [showAddModuleModal, setShowAddModuleModal] = useState(null); // channel position or null
   const [showCreateUnassignedModal, setShowCreateUnassignedModal] = useState(false); // true/false for unassigned module creation
   const [showEditModuleModal, setShowEditModuleModal] = useState(null); // module ID or null
@@ -654,6 +656,26 @@ function App() {
         </button>
         <button
           type='button'
+          onClick={() => setActiveTab('assistant')}
+          className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
+            activeTab === 'assistant' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
+          }`}
+          style={
+            activeTab === 'assistant'
+              ? { borderColor: 'var(--color-border-main)', color: 'var(--color-text-main)' }
+              : { color: 'var(--color-text-muted)' }
+          }
+          onMouseEnter={(e) => {
+            if (activeTab !== 'assistant') e.currentTarget.style.color = 'var(--color-text-main)';
+          }}
+          onMouseLeave={(e) => {
+            if (activeTab !== 'assistant') e.currentTarget.style.color = 'var(--color-text-muted)';
+          }}>
+          <ChatIcon className='w-4 h-4' />
+          ASSISTANT
+        </button>
+        <button
+          type='button'
           onClick={() => setActiveTab('channels')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
             activeTab === 'channels' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
@@ -704,6 +726,8 @@ function App() {
             </div>
           </>
         )}
+
+        {activeTab === 'assistant' && <Assistant settings={settings} setStatus={setStatus} />}
 
         {activeTab === 'channels' && (
           <ChannelList

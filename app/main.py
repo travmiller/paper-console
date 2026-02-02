@@ -961,6 +961,113 @@ async def restart_telegram_bot():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# --- ASSISTANT API ---
+
+
+class AssistantChatRequest(BaseModel):
+    message: str
+
+
+class AssistantExecuteRequest(BaseModel):
+    type: str  # "print" | "run_channel" | "run_module"
+    title: Optional[str] = None
+    content: Optional[str] = None
+    channel: Optional[int] = None
+    module_type: Optional[str] = None
+
+
+@app.post("/api/assistant/chat")
+async def assistant_chat(req: AssistantChatRequest):
+    """Chat with the built-in AI assistant (no server-side memory)."""
+    message = (req.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Message is required")
+
+    # Reuse Telegram AI configuration (provider, key, model)
+    if not getattr(settings, "telegram_bot", None) or not settings.telegram_bot.ai_api_key:
+        raise HTTPException(
+            status_code=400,
+            detail="AI is not configured. Add an AI API key in General → Telegram Bot.",
+        )
+
+    try:
+        from app.telegram_bot import TelegramBotService
+
+        service = TelegramBotService(settings.telegram_bot)
+        service._init_ai_client()
+
+        if getattr(service, "_ai_client", None) is None:
+            raise HTTPException(
+                status_code=500,
+                detail="AI client could not be initialized. Check provider and installed libraries.",
+            )
+
+        # Run the AI call off the event loop (client calls are blocking)
+        ai_text = await asyncio.to_thread(service._call_ai_sync, 0, message)
+        parsed = service._parse_ai_response(ai_text)
+        return parsed
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Assistant chat error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/assistant/execute")
+async def assistant_execute(req: AssistantExecuteRequest):
+    """Execute an assistant-proposed action (print / run channel / run module)."""
+    global print_in_progress
+
+    action_type = (req.type or "").strip()
+    if action_type not in {"print", "run_channel", "run_module"}:
+        raise HTTPException(status_code=400, detail="Unknown action type")
+
+    # Only allow one print job at a time (shared with physical button + other endpoints)
+    with print_lock:
+        if print_in_progress:
+            raise HTTPException(status_code=409, detail="Print already in progress")
+        print_in_progress = True
+
+    try:
+        from app.telegram_bot import TelegramBotService
+
+        service = TelegramBotService(getattr(settings, "telegram_bot", None))
+
+        if action_type == "print":
+            content = (req.content or "").strip()
+            if not content:
+                raise HTTPException(status_code=400, detail="Print content is required")
+            title = (req.title or "ASSISTANT").strip()[:30]
+            success = await asyncio.to_thread(service._print_sync, content, title)
+            return {"success": bool(success), "title": title}
+
+        if action_type == "run_channel":
+            if req.channel is None:
+                raise HTTPException(status_code=400, detail="Channel is required")
+            channel = int(req.channel)
+            if channel < 1 or channel > 8:
+                raise HTTPException(status_code=400, detail="Channel must be 1-8")
+            success, name = await asyncio.to_thread(service._run_channel, channel)
+            return {"success": bool(success), "name": name, "channel": channel}
+
+        # run_module
+        module_type = (req.module_type or "").strip()
+        if not module_type:
+            raise HTTPException(status_code=400, detail="Module type is required")
+        success, name = await asyncio.to_thread(service._run_module_by_type, module_type)
+        return {"success": bool(success), "name": name, "module_type": module_type}
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Assistant execute error: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        with print_lock:
+            print_in_progress = False
+
+
 # --- SYSTEM TIME API ---
 
 
