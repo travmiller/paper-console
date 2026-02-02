@@ -432,6 +432,22 @@ function App() {
 
   const assignModuleToChannel = async (position, moduleId, order = null, options = {}) => {
     try {
+      if (options?.optimistic) {
+        setSettings((prev) => {
+          const channels = { ...(prev.channels || {}) };
+          const channel = channels[position] ? { ...channels[position] } : { modules: [] };
+          const existing = (channel.modules || [])
+            .filter((assignment) => assignment.module_id !== moduleId)
+            .sort((a, b) => a.order - b.order);
+          const insertIndex = order === null ? existing.length : Math.max(0, Math.min(order, existing.length));
+          const next = [...existing];
+          next.splice(insertIndex, 0, { module_id: moduleId, order: insertIndex });
+          channel.modules = next.map((assignment, idx) => ({ ...assignment, order: idx }));
+          channels[position] = channel;
+          return { ...prev, channels };
+        });
+      }
+
       const response = await fetch(`/api/channels/${position}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`, {
         method: 'POST',
       });
@@ -457,6 +473,24 @@ function App() {
 
   const removeModuleFromChannel = async (position, moduleId, options = {}) => {
     try {
+      if (options?.optimistic) {
+        setSettings((prev) => {
+          const existingChannel = prev.channels?.[position];
+          if (!existingChannel || !existingChannel.modules) return prev;
+          const remaining = existingChannel.modules
+            .filter((assignment) => assignment.module_id !== moduleId)
+            .sort((a, b) => a.order - b.order)
+            .map((assignment, idx) => ({ ...assignment, order: idx }));
+          return {
+            ...prev,
+            channels: {
+              ...prev.channels,
+              [position]: { ...existingChannel, modules: remaining },
+            },
+          };
+        });
+      }
+
       const response = await fetch(`/api/channels/${position}/modules/${moduleId}`, {
         method: 'DELETE',
       });
@@ -480,8 +514,32 @@ function App() {
     }
   };
 
-  const reorderChannelModules = async (position, moduleOrders) => {
+  const reorderChannelModules = async (position, moduleOrders, options = {}) => {
     try {
+      if (options?.optimistic) {
+        setSettings((prev) => {
+          const existingChannel = prev.channels?.[position];
+          if (!existingChannel || !existingChannel.modules) return prev;
+          const existingIds = existingChannel.modules.map((assignment) => assignment.module_id);
+          const existingSet = new Set(existingIds);
+          const orders = moduleOrders || {};
+          const orderedIds = Object.entries(orders)
+            .sort((a, b) => a[1] - b[1])
+            .map(([id]) => id)
+            .filter((id) => existingSet.has(id));
+          const remaining = existingIds.filter((id) => !Object.prototype.hasOwnProperty.call(orders, id));
+          const finalIds = [...orderedIds, ...remaining];
+          const nextModules = finalIds.map((id, idx) => ({ module_id: id, order: idx }));
+          return {
+            ...prev,
+            channels: {
+              ...prev.channels,
+              [position]: { ...existingChannel, modules: nextModules },
+            },
+          };
+        });
+      }
+
       const response = await fetch(`/api/channels/${position}/modules/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -523,7 +581,7 @@ function App() {
       moduleOrders[m.module_id] = m.order;
     });
 
-    reorderChannelModules(position, moduleOrders);
+    reorderChannelModules(position, moduleOrders, { optimistic: true });
   };
 
   const swapChannels = (pos1, pos2) => {

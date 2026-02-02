@@ -196,7 +196,7 @@ const ChannelList = ({
     setEditingModule(JSON.parse(JSON.stringify(module)));
   };
 
-  const handleDrop = async (event, targetListId) => {
+  const handleDrop = (event, targetListId) => {
     event.preventDefault();
     const drag = dragStateRef.current;
     if (!drag) return;
@@ -229,7 +229,7 @@ const ChannelList = ({
       if (sourceDesc.type === 'unassigned') {
         setUnassignedModuleOrder(nextIds);
       } else {
-        await reorderChannelModules(sourceDesc.position, buildModuleOrders(nextIds));
+        void reorderChannelModules(sourceDesc.position, buildModuleOrders(nextIds), { optimistic: true });
       }
       handleDragEnd();
       return;
@@ -240,58 +240,41 @@ const ChannelList = ({
       const insertIndex = Math.max(0, Math.min(targetIndexRaw, destIds.length));
       const nextDestIds = [...destIds];
       nextDestIds.splice(insertIndex, 0, drag.moduleId);
-      const assigned = await assignModuleToChannel(targetDesc.position, drag.moduleId, insertIndex, { silent: true });
-      if (!assigned) {
-        handleDragEnd();
-        return;
-      }
-      await reorderChannelModules(targetDesc.position, buildModuleOrders(nextDestIds));
       setUnassignedModuleOrder((prev) => prev.filter((id) => id !== drag.moduleId));
       handleDragEnd();
+      void (async () => {
+        const assigned = await assignModuleToChannel(targetDesc.position, drag.moduleId, insertIndex, { silent: true, optimistic: true });
+        if (!assigned) return;
+        await reorderChannelModules(targetDesc.position, buildModuleOrders(nextDestIds), { optimistic: true });
+      })();
       return;
     }
 
     if (sourceDesc.type === 'channel' && targetDesc.type === 'unassigned') {
-      const sourceIds = getModuleIdsForList(sourceListId).filter((id) => id !== drag.moduleId);
       const insertIndex = Math.max(0, Math.min(targetIndexRaw, unassignedModules.length));
-      const removed = await removeModuleFromChannel(sourceDesc.position, drag.moduleId, { silent: true });
-      if (!removed) {
-        handleDragEnd();
-        return;
-      }
-      if (sourceIds.length > 0) {
-        await reorderChannelModules(sourceDesc.position, buildModuleOrders(sourceIds));
-      }
       setUnassignedModuleOrder((prev) => {
         const next = prev.filter((id) => id !== drag.moduleId);
         next.splice(insertIndex, 0, drag.moduleId);
         return next;
       });
+      void removeModuleFromChannel(sourceDesc.position, drag.moduleId, { silent: true, optimistic: true });
       handleDragEnd();
       return;
     }
 
     if (sourceDesc.type === 'channel' && targetDesc.type === 'channel') {
-      const sourceIds = getModuleIdsForList(sourceListId).filter((id) => id !== drag.moduleId);
       const destIds = getModuleIdsForList(targetListId);
       const insertIndex = Math.max(0, Math.min(targetIndexRaw, destIds.length));
       const nextDestIds = [...destIds];
       nextDestIds.splice(insertIndex, 0, drag.moduleId);
-      const removed = await removeModuleFromChannel(sourceDesc.position, drag.moduleId, { silent: true });
-      if (!removed) {
-        handleDragEnd();
-        return;
-      }
-      if (sourceIds.length > 0) {
-        await reorderChannelModules(sourceDesc.position, buildModuleOrders(sourceIds));
-      }
-      const assigned = await assignModuleToChannel(targetDesc.position, drag.moduleId, insertIndex, { silent: true });
-      if (!assigned) {
-        handleDragEnd();
-        return;
-      }
-      await reorderChannelModules(targetDesc.position, buildModuleOrders(nextDestIds));
       handleDragEnd();
+      void (async () => {
+        const removed = await removeModuleFromChannel(sourceDesc.position, drag.moduleId, { silent: true, optimistic: true });
+        if (!removed) return;
+        const assigned = await assignModuleToChannel(targetDesc.position, drag.moduleId, insertIndex, { silent: true, optimistic: true });
+        if (!assigned) return;
+        await reorderChannelModules(targetDesc.position, buildModuleOrders(nextDestIds), { optimistic: true });
+      })();
       return;
     }
 
