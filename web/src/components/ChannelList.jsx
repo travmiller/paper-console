@@ -32,6 +32,8 @@ const ChannelList = ({
   const dragRafRef = useRef(null);
   const [dragState, setDragState] = useState(null);
   const [dropIndicator, setDropIndicator] = useState(null);
+  const dropIndicatorRef = useRef(null);
+  const [dropGhost, setDropGhost] = useState(null);
 
   const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
 
@@ -99,6 +101,7 @@ const ChannelList = ({
       }
       return indicator;
     });
+    dropIndicatorRef.current = indicator;
   };
 
   const computeIndicator = (listId, clientY) => {
@@ -138,11 +141,22 @@ const ChannelList = ({
     return { listId, index, top: clampedTop };
   };
 
+  const computeGhost = (listId, indicatorTop, itemHeight) => {
+    const container = listRefs.current[listId];
+    if (!container) return null;
+    const rect = container.getBoundingClientRect();
+    const height = Math.max(28, Math.min(itemHeight || 44, rect.height));
+    const top = Math.max(4, Math.min(indicatorTop - height / 2, rect.height - height - 4));
+    return { listId, top, height };
+  };
+
   const handleDragStart = (event, payload) => {
     if (event.target.closest('[data-no-drag="true"]')) {
       event.preventDefault();
       return;
     }
+    const dragRect = event.currentTarget?.getBoundingClientRect?.();
+    payload.itemHeight = dragRect?.height || 44;
     dragSuppressRef.current = true;
     event.dataTransfer.effectAllowed = 'move';
     event.dataTransfer.setData('text/plain', payload.moduleId);
@@ -159,12 +173,21 @@ const ChannelList = ({
       dragRafRef.current = null;
       const indicator = computeIndicator(listId, clientY);
       setDropIndicatorSafe(indicator);
+      if (indicator) {
+        const ghost = computeGhost(listId, indicator.top, dragStateRef.current?.itemHeight);
+        setDropGhost(ghost);
+      } else {
+        setDropGhost(null);
+      }
     });
   };
 
   const handleDragLeave = (event, listId) => {
     if (!event.currentTarget.contains(event.relatedTarget)) {
-      setDropIndicator((prev) => (prev && prev.listId === listId ? null : prev));
+      if (dropIndicatorRef.current?.listId === listId) {
+        setDropIndicatorSafe(null);
+      }
+      setDropGhost((prev) => (prev && prev.listId === listId ? null : prev));
     }
   };
 
@@ -174,8 +197,10 @@ const ChannelList = ({
       dragRafRef.current = null;
     }
     setDropIndicator(null);
+    setDropGhost(null);
     setDragState(null);
     dragStateRef.current = null;
+    dropIndicatorRef.current = null;
     setTimeout(() => {
       dragSuppressRef.current = false;
     }, 0);
@@ -201,7 +226,8 @@ const ChannelList = ({
     const drag = dragStateRef.current;
     if (!drag) return;
 
-    const targetIndicator = computeIndicator(targetListId, event.clientY) || dropIndicator;
+    const cachedIndicator = dropIndicatorRef.current?.listId === targetListId ? dropIndicatorRef.current : null;
+    const targetIndicator = cachedIndicator || computeIndicator(targetListId, event.clientY) || dropIndicator;
     const targetIndexRaw = targetIndicator ? targetIndicator.index : 0;
     const sourceListId = drag.listId;
 
@@ -538,8 +564,8 @@ const ChannelList = ({
                     </div>
                   </div>
                 ))}
-                {dropIndicator?.listId === listId && (
-                  <div className='dnd-indicator' style={{ top: dropIndicator.top }} />
+                {dropGhost?.listId === listId && (
+                  <div className='dnd-ghost' style={{ top: dropGhost.top, height: dropGhost.height }} />
                 )}
               </div>
 
@@ -674,8 +700,8 @@ const ChannelList = ({
               );
             })
           )}
-          {dropIndicator?.listId === 'unassigned' && (
-            <div className='dnd-indicator' style={{ top: dropIndicator.top }} />
+          {dropGhost?.listId === 'unassigned' && (
+            <div className='dnd-ghost' style={{ top: dropGhost.top, height: dropGhost.height }} />
           )}
         </div>
         
