@@ -112,7 +112,7 @@ const ChannelList = ({
     if (!container) return null;
     const items = Array.from(container.querySelectorAll('[data-dnd-item="true"]'));
     const containerRect = container.getBoundingClientRect();
-    const indicatorOffset = 6;
+    const minGap = 12;
 
     if (items.length === 0) {
       return {
@@ -133,12 +133,19 @@ const ChannelList = ({
     }
 
     let top;
-    if (index >= items.length) {
+    if (index === 0) {
+      const firstRect = items[0].getBoundingClientRect();
+      const gap = Math.max(minGap, firstRect.top - containerRect.top);
+      top = firstRect.top - containerRect.top - gap / 2;
+    } else if (index >= items.length) {
       const lastRect = items[items.length - 1].getBoundingClientRect();
-      top = lastRect.bottom - containerRect.top + indicatorOffset;
+      const gap = Math.max(minGap, containerRect.bottom - lastRect.bottom);
+      top = lastRect.bottom - containerRect.top + gap / 2;
     } else {
-      const targetRect = items[index].getBoundingClientRect();
-      top = targetRect.top - containerRect.top - indicatorOffset;
+      const prevRect = items[index - 1].getBoundingClientRect();
+      const nextRect = items[index].getBoundingClientRect();
+      const gap = Math.max(minGap, nextRect.top - prevRect.bottom);
+      top = prevRect.bottom - containerRect.top + gap / 2;
     }
 
     const clampedTop = Math.max(6, Math.min(top, containerRect.height - 6));
