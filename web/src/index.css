@@ -317,17 +317,17 @@ body {
   box-shadow: inset 0 0 0 1px rgba(174, 134, 29, 0.15);
   border-radius: 0.75rem;
 }
-.dnd-ghost {
+.dnd-indicator {
   position: absolute;
   left: 12px;
   right: 12px;
+  height: 2px;
   margin-top: 0 !important;
-  background: rgba(255, 255, 255, 0.7);
-  border: 2px dashed rgba(42, 42, 42, 0.85);
-  border-radius: 12px;
+  background: rgba(42, 42, 42, 0.9);
+  border-radius: 999px;
   pointer-events: none;
   z-index: 1;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 0 1px rgba(42, 42, 42, 0.15);
   transition: top 120ms ease;
 }
 .dnd-item[draggable="true"] {

@@ -34,7 +34,6 @@ const ChannelList = ({
   const [dropIndicator, setDropIndicator] = useState(null);
   const dropIndicatorRef = useRef(null);
   const indicatorByListRef = useRef(new Map());
-  const [dropGhost, setDropGhost] = useState(null);
 
   const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
 
@@ -145,15 +144,6 @@ const ChannelList = ({
     return { listId, index, top: clampedTop };
   };
 
-  const computeGhost = (listId, indicatorTop, itemHeight) => {
-    const container = listRefs.current[listId];
-    if (!container) return null;
-    const rect = container.getBoundingClientRect();
-    const height = Math.max(28, Math.min(itemHeight || 44, rect.height));
-    const top = Math.max(4, Math.min(indicatorTop - height / 2, rect.height - height - 4));
-    return { listId, top, height };
-  };
-
   const handleDragStart = (event, payload) => {
     if (event.target.closest('[data-no-drag="true"]')) {
       event.preventDefault();
@@ -177,12 +167,7 @@ const ChannelList = ({
       dragRafRef.current = null;
       const indicator = computeIndicator(listId, clientY);
       setDropIndicatorSafe(indicator);
-      if (indicator) {
-        const ghost = computeGhost(listId, indicator.top, dragStateRef.current?.itemHeight);
-        setDropGhost(ghost);
-      } else {
-        setDropGhost(null);
-      }
+      // no ghost preview
     });
   };
 
@@ -198,7 +183,6 @@ const ChannelList = ({
       dragRafRef.current = null;
     }
     setDropIndicator(null);
-    setDropGhost(null);
     setDragState(null);
     dragStateRef.current = null;
     dropIndicatorRef.current = null;
@@ -463,6 +447,13 @@ const ChannelList = ({
                 data-drop-active={dropIndicator?.listId === listId}
                 className='space-y-2 mb-2 flex-grow min-h-[36px] dnd-list'
                 role='list'>
+                {channelModules.length === 0 && (
+                  <div
+                    className='dnd-empty text-xs text-gray-500 italic border-2 border-dashed border-gray-300 rounded-lg py-3 px-2 text-center'
+                    aria-hidden="true">
+                    Drop module here
+                  </div>
+                )}
                 {channelModules.map((item, idx) => (
                   <div
                     key={item.module_id}
@@ -566,8 +557,8 @@ const ChannelList = ({
                     </div>
                   </div>
                 ))}
-                {dropGhost?.listId === listId && (
-                  <div className='dnd-ghost' style={{ top: dropGhost.top, height: dropGhost.height }} />
+                {dropIndicator?.listId === listId && (
+                  <div className='dnd-indicator' style={{ top: dropIndicator.top }} />
                 )}
               </div>
 
@@ -702,8 +693,8 @@ const ChannelList = ({
               );
             })
           )}
-          {dropGhost?.listId === 'unassigned' && (
-            <div className='dnd-ghost' style={{ top: dropGhost.top, height: dropGhost.height }} />
+          {dropIndicator?.listId === 'unassigned' && (
+            <div className='dnd-indicator' style={{ top: dropIndicator.top }} />
           )}
         </div>
         
