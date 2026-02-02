@@ -4,7 +4,7 @@ import PrimaryButton from './PrimaryButton';
 
 const makeId = () => `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 
-const Assistant = ({ settings, setStatus }) => {
+const Assistant = ({ settings, setStatus, setSettings, setModules }) => {
   const inkGradients = INK_GRADIENTS;
   const inputRef = useRef(null);
 
@@ -94,6 +94,24 @@ const Assistant = ({ settings, setStatus }) => {
     setActionState(messageId, { state: 'executing', resultText: '' });
 
     try {
+      if (action.type === 'config_plan') {
+        const res = await fetch('/api/assistant/apply-config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ operations: action.operations || [] }),
+        });
+
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.detail || 'Failed to apply config');
+
+        if (setSettings && data.settings) setSettings(data.settings);
+        if (setModules && data.modules) setModules(data.modules);
+
+        setActionState(messageId, { state: 'done', resultText: '✅ Applied. Settings updated.' });
+        if (setStatus) setStatus({ type: 'success', message: 'Assistant applied configuration.' });
+        return;
+      }
+
       const payload = { type: action.type };
       if (action.type === 'print') {
         payload.title = action.title || 'ASSISTANT';
@@ -166,12 +184,28 @@ const Assistant = ({ settings, setStatus }) => {
           <div className='font-bold'>Proposed action: Run module “{a.module_type}”</div>
         )}
 
+        {type === 'config_plan' && (
+          <>
+            <div className='font-bold'>Proposed config changes</div>
+            {a.summary && (
+              <div className='mt-1 text-xs' style={{ color: 'var(--color-text-muted)' }}>
+                {a.summary}
+              </div>
+            )}
+            <div
+              className='mt-2 rounded-lg border-2 border-dashed p-3 text-xs whitespace-pre-wrap'
+              style={{ borderColor: 'var(--color-border-main)' }}>
+              {Array.isArray(a.operations) && a.operations.length ? JSON.stringify(a.operations, null, 2) : 'No operations provided.'}
+            </div>
+          </>
+        )}
+
         <div className='mt-3 flex items-center gap-2'>
           <PrimaryButton
             onClick={() => confirmAction(m.id, a)}
             disabled={m.state !== 'pending' || isSending}
             loading={m.state === 'executing'}>
-            Confirm
+            {type === 'config_plan' ? 'Confirm Apply' : 'Confirm'}
           </PrimaryButton>
           {m.state === 'pending' && (
             <button
@@ -249,4 +283,3 @@ const Assistant = ({ settings, setStatus }) => {
 };
 
 export default Assistant;
-

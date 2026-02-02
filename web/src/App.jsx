@@ -727,7 +727,9 @@ function App() {
           </>
         )}
 
-        {activeTab === 'assistant' && <Assistant settings={settings} setStatus={setStatus} />}
+        {activeTab === 'assistant' && (
+          <Assistant settings={settings} setStatus={setStatus} setSettings={setSettings} setModules={setModules} />
+        )}
 
         {activeTab === 'channels' && (
           <ChannelList

@@ -9,6 +9,7 @@ import os
 from typing import Dict, Optional, List
 from datetime import datetime
 from pydantic import BaseModel
+import re
 import subprocess
 import platform
 import pytz
@@ -976,6 +977,10 @@ class AssistantExecuteRequest(BaseModel):
     module_type: Optional[str] = None
 
 
+class AssistantApplyConfigRequest(BaseModel):
+    operations: List[Dict]
+
+
 @app.post("/api/assistant/chat")
 async def assistant_chat(req: AssistantChatRequest):
     """Chat with the built-in AI assistant (no server-side memory)."""
@@ -991,21 +996,13 @@ async def assistant_chat(req: AssistantChatRequest):
         )
 
     try:
-        from app.telegram_bot import TelegramBotService
+        from app.assistant_service import AssistantService
 
-        service = TelegramBotService(settings.telegram_bot)
-        service._init_ai_client()
+        service = AssistantService(settings.telegram_bot)
+        service.init_client()
 
-        if getattr(service, "_ai_client", None) is None:
-            raise HTTPException(
-                status_code=500,
-                detail="AI client could not be initialized. Check provider and installed libraries.",
-            )
-
-        # Run the AI call off the event loop (client calls are blocking)
-        ai_text = await asyncio.to_thread(service._call_ai_sync, 0, message)
-        parsed = service._parse_ai_response(ai_text)
-        return parsed
+        result = await asyncio.to_thread(service.chat_once, message)
+        return result.payload
 
     except HTTPException:
         raise
@@ -1066,6 +1063,176 @@ async def assistant_execute(req: AssistantExecuteRequest):
     finally:
         with print_lock:
             print_in_progress = False
+
+
+def _validate_schedule_entries(entries: List[str]) -> None:
+    pattern = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
+    for t in entries:
+        if not isinstance(t, str) or not pattern.match(t.strip()):
+            raise HTTPException(status_code=400, detail=f"Invalid schedule time: {t}")
+
+
+def _apply_assistant_operations(operations: List[Dict]) -> Settings:
+    from app.module_registry import is_registered, validate_module_config
+    from app.config import ModuleInstance
+
+    new_settings = settings.model_copy(deep=True)
+    created: Dict[str, str] = {}
+
+    def resolve_module_id(op: Dict) -> Optional[str]:
+        if op.get("module_id"):
+            return str(op["module_id"])
+        if op.get("module_ref") and str(op["module_ref"]) in created:
+            return created[str(op["module_ref"])]
+        return None
+
+    for op in operations:
+        if not isinstance(op, dict):
+            raise HTTPException(status_code=400, detail="Each operation must be an object")
+        op_type = (op.get("op") or "").strip()
+        if not op_type:
+            raise HTTPException(status_code=400, detail="Operation missing 'op'")
+
+        if op_type == "swap_channels":
+            a = int(op.get("a", 0))
+            b = int(op.get("b", 0))
+            if a < 1 or a > 8 or b < 1 or b > 8:
+                raise HTTPException(status_code=400, detail="Channels must be 1-8")
+            ca = new_settings.channels.get(a, ChannelConfig(modules=[]))
+            cb = new_settings.channels.get(b, ChannelConfig(modules=[]))
+            new_settings.channels[a], new_settings.channels[b] = cb, ca
+
+        elif op_type == "create_module":
+            module_type = (op.get("module_type") or "").strip()
+            if not module_type or not is_registered(module_type):
+                raise HTTPException(status_code=400, detail=f"Unknown module type: {module_type}")
+            name = (op.get("name") or "").strip() or module_type
+            config = op.get("config") if isinstance(op.get("config"), dict) else {}
+
+            validate_module_config(module_type, config)
+
+            module_id = str(uuid.uuid4())
+            instance = ModuleInstance(id=module_id, type=module_type, name=name, config=config)
+            new_settings.modules[module_id] = instance
+
+            temp_id = (op.get("temp_id") or "").strip()
+            if temp_id:
+                created[temp_id] = module_id
+
+            assign_to = op.get("assign_to_channel")
+            if assign_to is not None:
+                ch = int(assign_to)
+                if ch < 1 or ch > 8:
+                    raise HTTPException(status_code=400, detail="Channels must be 1-8")
+                if ch not in new_settings.channels:
+                    new_settings.channels[ch] = ChannelConfig(modules=[])
+                channel = new_settings.channels[ch]
+                order = op.get("order")
+                if order is None:
+                    order = max([a.order for a in (channel.modules or [])], default=-1) + 1
+                channel.modules = channel.modules or []
+                channel.modules.append(ChannelModuleAssignment(module_id=module_id, order=int(order)))
+
+        elif op_type == "rename_module":
+            module_id = resolve_module_id(op)
+            if not module_id or module_id not in new_settings.modules:
+                raise HTTPException(status_code=400, detail="Module not found for rename")
+            name = (op.get("name") or "").strip()
+            if not name:
+                raise HTTPException(status_code=400, detail="Name is required")
+            new_settings.modules[module_id].name = name
+
+        elif op_type == "update_module_config":
+            module_id = resolve_module_id(op)
+            if not module_id or module_id not in new_settings.modules:
+                raise HTTPException(status_code=400, detail="Module not found for update")
+            config = op.get("config")
+            if not isinstance(config, dict):
+                raise HTTPException(status_code=400, detail="Config must be an object")
+            module = new_settings.modules[module_id]
+            validate_module_config(module.type, config)
+            module.config = config
+
+        elif op_type == "assign_module_to_channel":
+            ch = int(op.get("channel", 0))
+            if ch < 1 or ch > 8:
+                raise HTTPException(status_code=400, detail="Channels must be 1-8")
+            module_id = resolve_module_id(op)
+            if not module_id or module_id not in new_settings.modules:
+                raise HTTPException(status_code=400, detail="Module not found for assignment")
+            if ch not in new_settings.channels:
+                new_settings.channels[ch] = ChannelConfig(modules=[])
+            channel = new_settings.channels[ch]
+            channel.modules = channel.modules or []
+            if any(a.module_id == module_id for a in channel.modules):
+                continue
+            order = op.get("order")
+            if order is None:
+                order = max([a.order for a in channel.modules], default=-1) + 1
+            channel.modules.append(ChannelModuleAssignment(module_id=module_id, order=int(order)))
+
+        elif op_type == "remove_module_from_channel":
+            ch = int(op.get("channel", 0))
+            if ch < 1 or ch > 8:
+                raise HTTPException(status_code=400, detail="Channels must be 1-8")
+            module_id = resolve_module_id(op)
+            if not module_id:
+                raise HTTPException(status_code=400, detail="Module id is required")
+            channel = new_settings.channels.get(ch)
+            if not channel or not channel.modules:
+                continue
+            channel.modules = [a for a in channel.modules if a.module_id != module_id]
+
+        elif op_type == "reorder_channel_modules":
+            ch = int(op.get("channel", 0))
+            if ch < 1 or ch > 8:
+                raise HTTPException(status_code=400, detail="Channels must be 1-8")
+            channel = new_settings.channels.get(ch)
+            if not channel or not channel.modules:
+                raise HTTPException(status_code=400, detail="Channel has no modules")
+            module_orders = op.get("module_orders")
+            if not isinstance(module_orders, dict):
+                raise HTTPException(status_code=400, detail="module_orders must be an object")
+            for assignment in channel.modules:
+                if assignment.module_id in module_orders:
+                    assignment.order = int(module_orders[assignment.module_id])
+
+        elif op_type == "update_channel_schedule":
+            ch = int(op.get("channel", 0))
+            if ch < 1 or ch > 8:
+                raise HTTPException(status_code=400, detail="Channels must be 1-8")
+            schedule = op.get("schedule")
+            if not isinstance(schedule, list):
+                raise HTTPException(status_code=400, detail="schedule must be a list")
+            _validate_schedule_entries(schedule)
+            if ch not in new_settings.channels:
+                new_settings.channels[ch] = ChannelConfig(modules=[])
+            new_settings.channels[ch].schedule = [s.strip() for s in schedule]
+
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown operation: {op_type}")
+
+    return new_settings
+
+
+@app.post("/api/assistant/apply-config")
+async def assistant_apply_config(req: AssistantApplyConfigRequest, background_tasks: BackgroundTasks):
+    """Apply a confirmed configuration plan from the Assistant."""
+    global settings
+    import app.config as config_module
+
+    ops = req.operations or []
+    if not isinstance(ops, list) or not ops:
+        raise HTTPException(status_code=400, detail="operations must be a non-empty list")
+
+    new_settings = _apply_assistant_operations(ops)
+
+    # Persist atomically
+    settings = new_settings
+    config_module.settings = settings
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
+
+    return {"message": "Config applied", "settings": settings, "modules": settings.modules}
 
 
 # --- SYSTEM TIME API ---
