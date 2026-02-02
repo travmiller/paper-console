@@ -33,6 +33,7 @@ const ChannelList = ({
   const [dragState, setDragState] = useState(null);
   const [dropIndicator, setDropIndicator] = useState(null);
   const dropIndicatorRef = useRef(null);
+  const indicatorByListRef = useRef(new Map());
   const [dropGhost, setDropGhost] = useState(null);
 
   const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
@@ -102,6 +103,9 @@ const ChannelList = ({
       return indicator;
     });
     dropIndicatorRef.current = indicator;
+    if (indicator?.listId) {
+      indicatorByListRef.current.set(indicator.listId, indicator);
+    }
   };
 
   const computeIndicator = (listId, clientY) => {
@@ -184,10 +188,7 @@ const ChannelList = ({
 
   const handleDragLeave = (event, listId) => {
     if (!event.currentTarget.contains(event.relatedTarget)) {
-      if (dropIndicatorRef.current?.listId === listId) {
-        setDropIndicatorSafe(null);
-      }
-      setDropGhost((prev) => (prev && prev.listId === listId ? null : prev));
+      // Keep indicator until drag ends; avoids drop mismatch on fast moves.
     }
   };
 
@@ -201,6 +202,7 @@ const ChannelList = ({
     setDragState(null);
     dragStateRef.current = null;
     dropIndicatorRef.current = null;
+    indicatorByListRef.current.clear();
     setTimeout(() => {
       dragSuppressRef.current = false;
     }, 0);
@@ -226,7 +228,7 @@ const ChannelList = ({
     const drag = dragStateRef.current;
     if (!drag) return;
 
-    const cachedIndicator = dropIndicatorRef.current?.listId === targetListId ? dropIndicatorRef.current : null;
+    const cachedIndicator = indicatorByListRef.current.get(targetListId);
     const targetIndicator = cachedIndicator || computeIndicator(targetListId, event.clientY) || dropIndicator;
     const targetIndexRaw = targetIndicator ? targetIndicator.index : 0;
     const sourceListId = drag.listId;
