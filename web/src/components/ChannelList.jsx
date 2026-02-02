@@ -139,12 +139,12 @@ const ChannelList = ({
     } else if (index >= items.length) {
       const lastRect = items[items.length - 1].getBoundingClientRect();
       const gap = Math.max(0, containerRect.bottom - lastRect.bottom);
-      top = lastRect.bottom - containerRect.top + gap / 2 - 2;
+      top = lastRect.bottom - containerRect.top + gap / 2 - 1;
     } else {
       const prevRect = items[index - 1].getBoundingClientRect();
       const nextRect = items[index].getBoundingClientRect();
       const gap = Math.max(0, nextRect.top - prevRect.bottom);
-      top = prevRect.bottom - containerRect.top + gap / 2 - 2;
+      top = prevRect.bottom - containerRect.top + gap / 2 - 1;
     }
 
     const clampedTop = Math.max(6, Math.min(top, containerRect.height - 6));
