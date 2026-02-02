@@ -112,6 +112,7 @@ const ChannelList = ({
     if (!container) return null;
     const items = Array.from(container.querySelectorAll('[data-dnd-item="true"]'));
     const containerRect = container.getBoundingClientRect();
+    const indicatorOffset = 6;
 
     if (items.length === 0) {
       return {
@@ -134,13 +135,13 @@ const ChannelList = ({
     let top;
     if (index >= items.length) {
       const lastRect = items[items.length - 1].getBoundingClientRect();
-      top = lastRect.bottom - containerRect.top;
+      top = lastRect.bottom - containerRect.top + indicatorOffset;
     } else {
       const targetRect = items[index].getBoundingClientRect();
-      top = targetRect.top - containerRect.top;
+      top = targetRect.top - containerRect.top - indicatorOffset;
     }
 
-    const clampedTop = Math.max(4, Math.min(top, containerRect.height - 4));
+    const clampedTop = Math.max(6, Math.min(top, containerRect.height - 6));
     return { listId, index, top: clampedTop };
   };
 
@@ -447,13 +448,6 @@ const ChannelList = ({
                 data-drop-active={dropIndicator?.listId === listId}
                 className='space-y-2 mb-2 flex-grow min-h-[36px] dnd-list'
                 role='list'>
-                {channelModules.length === 0 && (
-                  <div
-                    className='dnd-empty text-xs text-gray-500 italic border-2 border-dashed border-gray-300 rounded-lg py-3 px-2 text-center'
-                    aria-hidden="true">
-                    Drop module here
-                  </div>
-                )}
                 {channelModules.map((item, idx) => (
                   <div
                     key={item.module_id}
@@ -462,6 +456,8 @@ const ChannelList = ({
                     onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-white)', 'important')}
                     onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-card)', 'important')}
                     onClick={() => openEditModule(item.module_id, modules[item.module_id])}
+                    onDragOver={(event) => handleDragOver(event, listId)}
+                    onDrop={(event) => handleDrop(event, listId)}
                     draggable
                     data-dnd-item="true"
                     data-dragging={dragState?.moduleId === item.module_id ? 'true' : 'false'}
@@ -562,15 +558,17 @@ const ChannelList = ({
                 )}
               </div>
 
-              <div className='mt-auto'>
-                <button
-                  type='button'
-                  onClick={() => setShowAddModuleModal(pos)}
-                  className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer'
-                  style={{ backgroundColor: 'transparent' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-white)'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                  title='Add a module to this channel'>
+                <div className='mt-auto'>
+                  <button
+                    type='button'
+                    onClick={() => setShowAddModuleModal(pos)}
+                    onDragOver={(event) => handleDragOver(event, listId)}
+                    onDrop={(event) => handleDrop(event, listId)}
+                    className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer'
+                    style={{ backgroundColor: 'transparent' }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-white)'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                    title='Add a module to this channel'>
                   + ADD MODULE
                 </button>
               </div>
@@ -620,6 +618,8 @@ const ChannelList = ({
                   onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-white)', 'important')}
                   onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-card)', 'important')}
                   onClick={() => openEditModule(module.id, module)}
+                  onDragOver={(event) => handleDragOver(event, 'unassigned')}
+                  onDrop={(event) => handleDrop(event, 'unassigned')}
                   draggable
                   data-dnd-item="true"
                   data-dragging={dragState?.moduleId === module.id ? 'true' : 'false'}

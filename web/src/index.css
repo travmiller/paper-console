@@ -309,6 +309,7 @@ body {
 /* Drag and drop */
 .dnd-list {
   position: relative;
+  padding-top: 0.25rem;
   padding-bottom: 0.25rem;
   transition: background-color 120ms ease, box-shadow 120ms ease;
 }
