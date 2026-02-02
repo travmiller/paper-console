@@ -430,7 +430,7 @@ function App() {
 
   // --- Channel Management ---
 
-  const assignModuleToChannel = async (position, moduleId, order = null) => {
+  const assignModuleToChannel = async (position, moduleId, order = null, options = {}) => {
     try {
       const response = await fetch(`/api/channels/${position}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`, {
         method: 'POST',
@@ -443,11 +443,40 @@ function App() {
         ...prev,
         channels: { ...prev.channels, [position]: data.channel },
       }));
-      setStatus({ type: 'success', message: 'Module assigned to channel!' });
-      setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+      if (!options?.silent) {
+        setStatus({ type: 'success', message: 'Module assigned to channel!' });
+        setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+      }
+      return data.channel;
     } catch (err) {
       console.error('Error assigning module:', err);
       setStatus({ type: 'error', message: err.message || 'Failed to assign module' });
+      return null;
+    }
+  };
+
+  const removeModuleFromChannel = async (position, moduleId, options = {}) => {
+    try {
+      const response = await fetch(`/api/channels/${position}/modules/${moduleId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) throw new Error('Failed to remove module');
+
+      const data = await response.json();
+      setSettings((prev) => ({
+        ...prev,
+        channels: { ...prev.channels, [position]: data.channel },
+      }));
+      if (!options?.silent) {
+        setStatus({ type: 'success', message: 'Module removed from channel!' });
+        setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+      }
+      return data.channel;
+    } catch (err) {
+      console.error('Error removing module:', err);
+      setStatus({ type: 'error', message: err.message || 'Failed to remove module' });
+      return null;
     }
   };
 
@@ -466,9 +495,11 @@ function App() {
         ...prev,
         channels: { ...prev.channels, [position]: data.channel },
       }));
+      return data.channel;
     } catch (err) {
       console.error('Error reordering modules:', err);
       setStatus({ type: 'error', message: 'Failed to reorder modules' });
+      return null;
     }
   };
 
@@ -627,6 +658,9 @@ function App() {
             setShowEditModuleModal={setShowEditModuleModal}
             setEditingModule={setEditingModule}
             moveModuleInChannel={moveModuleInChannel}
+            assignModuleToChannel={assignModuleToChannel}
+            reorderChannelModules={reorderChannelModules}
+            removeModuleFromChannel={removeModuleFromChannel}
             setShowAddModuleModal={setShowAddModuleModal}
             setShowCreateUnassignedModal={setShowCreateUnassignedModal}
             wifiStatus={wifiStatus}

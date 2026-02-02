@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { INK_GRADIENTS } from '../constants';
 import { useModuleTypes } from '../hooks/useModuleTypes';
 import WiFiIcon from '../assets/WiFiIcon';
@@ -18,11 +18,20 @@ const ChannelList = ({
   setShowEditModuleModal,
   setEditingModule,
   moveModuleInChannel,
+  assignModuleToChannel,
+  reorderChannelModules,
+  removeModuleFromChannel,
   setShowAddModuleModal,
   setShowCreateUnassignedModal,
   wifiStatus,
 }) => {
   const { moduleTypes } = useModuleTypes();
+  const listRefs = useRef({});
+  const dragStateRef = useRef(null);
+  const dragSuppressRef = useRef(false);
+  const dragRafRef = useRef(null);
+  const [dragState, setDragState] = useState(null);
+  const [dropIndicator, setDropIndicator] = useState(null);
 
   const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
 
@@ -49,50 +58,300 @@ const ChannelList = ({
     }
   };
 
+  const listIdForChannel = (pos) => `channel:${pos}`;
+
+  const parseListId = (listId) => {
+    if (listId === 'unassigned') return { type: 'unassigned' };
+    if (listId?.startsWith('channel:')) {
+      const position = Number(listId.split(':')[1]);
+      if (Number.isFinite(position)) {
+        return { type: 'channel', position };
+      }
+    }
+    return null;
+  };
+
+  const buildModuleOrders = (moduleIds) => {
+    const moduleOrders = {};
+    moduleIds.forEach((id, idx) => {
+      moduleOrders[id] = idx;
+    });
+    return moduleOrders;
+  };
+
+  const arrayMove = (list, fromIndex, toIndex) => {
+    const next = [...list];
+    const [item] = next.splice(fromIndex, 1);
+    next.splice(toIndex, 0, item);
+    return next;
+  };
+
+  const setDropIndicatorSafe = (indicator) => {
+    setDropIndicator((prev) => {
+      if (!indicator) return prev ? null : prev;
+      if (
+        prev &&
+        prev.listId === indicator.listId &&
+        prev.index === indicator.index &&
+        Math.abs(prev.top - indicator.top) < 1
+      ) {
+        return prev;
+      }
+      return indicator;
+    });
+  };
+
+  const computeIndicator = (listId, clientY) => {
+    const container = listRefs.current[listId];
+    if (!container) return null;
+    const items = Array.from(container.querySelectorAll('[data-dnd-item="true"]'));
+    const containerRect = container.getBoundingClientRect();
+
+    if (items.length === 0) {
+      return {
+        listId,
+        index: 0,
+        top: Math.max(8, Math.floor(containerRect.height / 2)),
+      };
+    }
+
+    let index = items.length;
+    for (let i = 0; i < items.length; i += 1) {
+      const rect = items[i].getBoundingClientRect();
+      const midpoint = rect.top + rect.height / 2;
+      if (clientY < midpoint) {
+        index = i;
+        break;
+      }
+    }
+
+    let top;
+    if (index >= items.length) {
+      const lastRect = items[items.length - 1].getBoundingClientRect();
+      top = lastRect.bottom - containerRect.top;
+    } else {
+      const targetRect = items[index].getBoundingClientRect();
+      top = targetRect.top - containerRect.top;
+    }
+
+    const clampedTop = Math.max(4, Math.min(top, containerRect.height - 4));
+    return { listId, index, top: clampedTop };
+  };
+
+  const handleDragStart = (event, payload) => {
+    if (event.target.closest('[data-no-drag="true"]')) {
+      event.preventDefault();
+      return;
+    }
+    dragSuppressRef.current = true;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', payload.moduleId);
+    dragStateRef.current = payload;
+    setDragState(payload);
+  };
+
+  const handleDragOver = (event, listId) => {
+    if (!dragStateRef.current) return;
+    event.preventDefault();
+    if (dragRafRef.current) return;
+    const clientY = event.clientY;
+    dragRafRef.current = requestAnimationFrame(() => {
+      dragRafRef.current = null;
+      const indicator = computeIndicator(listId, clientY);
+      setDropIndicatorSafe(indicator);
+    });
+  };
+
+  const handleDragLeave = (event, listId) => {
+    if (!event.currentTarget.contains(event.relatedTarget)) {
+      setDropIndicator((prev) => (prev && prev.listId === listId ? null : prev));
+    }
+  };
+
+  const handleDragEnd = () => {
+    if (dragRafRef.current) {
+      cancelAnimationFrame(dragRafRef.current);
+      dragRafRef.current = null;
+    }
+    setDropIndicator(null);
+    setDragState(null);
+    dragStateRef.current = null;
+    setTimeout(() => {
+      dragSuppressRef.current = false;
+    }, 0);
+  };
+
+  const getModuleIdsForList = (listId) => {
+    const desc = parseListId(listId);
+    if (!desc) return [];
+    if (desc.type === 'unassigned') {
+      return unassignedModules.map((module) => module.id);
+    }
+    return (channelModulesByPos[desc.position] || []).map((item) => item.module_id);
+  };
+
+  const openEditModule = (moduleId, module) => {
+    if (dragSuppressRef.current) return;
+    setShowEditModuleModal(moduleId);
+    setEditingModule(JSON.parse(JSON.stringify(module)));
+  };
+
+  const handleDrop = async (event, targetListId) => {
+    event.preventDefault();
+    const drag = dragStateRef.current;
+    if (!drag) return;
+
+    const targetIndicator = computeIndicator(targetListId, event.clientY) || dropIndicator;
+    const targetIndexRaw = targetIndicator ? targetIndicator.index : 0;
+    const sourceListId = drag.listId;
+
+    const sourceDesc = parseListId(sourceListId);
+    const targetDesc = parseListId(targetListId);
+    if (!sourceDesc || !targetDesc) {
+      handleDragEnd();
+      return;
+    }
+
+    if (sourceListId === targetListId) {
+      const currentIds = getModuleIdsForList(sourceListId);
+      const fromIndex = currentIds.indexOf(drag.moduleId);
+      if (fromIndex === -1) {
+        handleDragEnd();
+        return;
+      }
+      let targetIndex = targetIndexRaw;
+      if (targetIndex > fromIndex) targetIndex -= 1;
+      if (targetIndex === fromIndex) {
+        handleDragEnd();
+        return;
+      }
+      const nextIds = arrayMove(currentIds, fromIndex, targetIndex);
+      if (sourceDesc.type === 'unassigned') {
+        setUnassignedModuleOrder(nextIds);
+      } else {
+        await reorderChannelModules(sourceDesc.position, buildModuleOrders(nextIds));
+      }
+      handleDragEnd();
+      return;
+    }
+
+    if (sourceDesc.type === 'unassigned' && targetDesc.type === 'channel') {
+      const destIds = getModuleIdsForList(targetListId);
+      const insertIndex = Math.max(0, Math.min(targetIndexRaw, destIds.length));
+      const nextDestIds = [...destIds];
+      nextDestIds.splice(insertIndex, 0, drag.moduleId);
+      const assigned = await assignModuleToChannel(targetDesc.position, drag.moduleId, insertIndex, { silent: true });
+      if (!assigned) {
+        handleDragEnd();
+        return;
+      }
+      await reorderChannelModules(targetDesc.position, buildModuleOrders(nextDestIds));
+      setUnassignedModuleOrder((prev) => prev.filter((id) => id !== drag.moduleId));
+      handleDragEnd();
+      return;
+    }
+
+    if (sourceDesc.type === 'channel' && targetDesc.type === 'unassigned') {
+      const sourceIds = getModuleIdsForList(sourceListId).filter((id) => id !== drag.moduleId);
+      const insertIndex = Math.max(0, Math.min(targetIndexRaw, unassignedModules.length));
+      const removed = await removeModuleFromChannel(sourceDesc.position, drag.moduleId, { silent: true });
+      if (!removed) {
+        handleDragEnd();
+        return;
+      }
+      if (sourceIds.length > 0) {
+        await reorderChannelModules(sourceDesc.position, buildModuleOrders(sourceIds));
+      }
+      setUnassignedModuleOrder((prev) => {
+        const next = prev.filter((id) => id !== drag.moduleId);
+        next.splice(insertIndex, 0, drag.moduleId);
+        return next;
+      });
+      handleDragEnd();
+      return;
+    }
+
+    if (sourceDesc.type === 'channel' && targetDesc.type === 'channel') {
+      const sourceIds = getModuleIdsForList(sourceListId).filter((id) => id !== drag.moduleId);
+      const destIds = getModuleIdsForList(targetListId);
+      const insertIndex = Math.max(0, Math.min(targetIndexRaw, destIds.length));
+      const nextDestIds = [...destIds];
+      nextDestIds.splice(insertIndex, 0, drag.moduleId);
+      const removed = await removeModuleFromChannel(sourceDesc.position, drag.moduleId, { silent: true });
+      if (!removed) {
+        handleDragEnd();
+        return;
+      }
+      if (sourceIds.length > 0) {
+        await reorderChannelModules(sourceDesc.position, buildModuleOrders(sourceIds));
+      }
+      const assigned = await assignModuleToChannel(targetDesc.position, drag.moduleId, insertIndex, { silent: true });
+      if (!assigned) {
+        handleDragEnd();
+        return;
+      }
+      await reorderChannelModules(targetDesc.position, buildModuleOrders(nextDestIds));
+      handleDragEnd();
+      return;
+    }
+
+    handleDragEnd();
+  };
+
+  const channelModulesByPos = useMemo(() => {
+    const result = {};
+    for (let pos = 1; pos <= 8; pos += 1) {
+      const channel = settings.channels?.[pos] || { modules: [] };
+      const channelModules = (channel.modules || [])
+        .map((assignment) => ({
+          ...assignment,
+          module: modules[assignment.module_id],
+        }))
+        .filter((item) => item.module)
+        .sort((a, b) => a.order - b.order);
+      result[pos] = channelModules;
+    }
+    return result;
+  }, [modules, settings.channels]);
+
   // Find modules that aren't assigned to any channel
-  const getUnassignedModules = () => {
+  const unassignedModulesRaw = useMemo(() => {
     const assignedModuleIds = new Set();
     Object.values(settings.channels || {}).forEach((channel) => {
       (channel.modules || []).forEach((assignment) => {
         assignedModuleIds.add(assignment.module_id);
       });
     });
-    
+
     return Object.values(modules || {}).filter((module) => !assignedModuleIds.has(module.id));
-  };
+  }, [modules, settings.channels]);
 
   // Track display order of unassigned modules
   const [unassignedModuleOrder, setUnassignedModuleOrder] = useState([]);
+
+  const unassignedModuleIds = useMemo(
+    () => unassignedModulesRaw.map((module) => module.id),
+    [unassignedModulesRaw],
+  );
+  const unassignedModuleSet = useMemo(() => new Set(unassignedModuleIds), [unassignedModuleIds]);
   
   useEffect(() => {
-    // Initialize order when modules change
-    const assignedModuleIds = new Set();
-    Object.values(settings.channels || {}).forEach((channel) => {
-      (channel.modules || []).forEach((assignment) => {
-        assignedModuleIds.add(assignment.module_id);
-      });
-    });
-    
-    const unassigned = Object.values(modules || {}).filter((module) => !assignedModuleIds.has(module.id));
-    const currentOrder = unassigned.map(m => m.id);
-    
-    // Only update if the set of module IDs has changed (new modules added/removed)
-    setUnassignedModuleOrder(prevOrder => {
-      const prevSet = new Set(prevOrder);
-      const currentSet = new Set(currentOrder);
-      // Check if sets are different
-      if (prevSet.size !== currentSet.size || 
-          ![...prevSet].every(id => currentSet.has(id))) {
-        return currentOrder;
+    setUnassignedModuleOrder((prevOrder) => {
+      const currentSet = new Set(unassignedModuleIds);
+      const filtered = prevOrder.filter((id) => currentSet.has(id));
+      const filteredSet = new Set(filtered);
+      const missing = unassignedModuleIds.filter((id) => !filteredSet.has(id));
+      if (missing.length === 0 && filtered.length === prevOrder.length) {
+        return prevOrder;
       }
-      // Keep existing order if modules haven't changed
-      return prevOrder;
+      return [...filtered, ...missing];
     });
-  }, [modules, settings.channels]);
+  }, [unassignedModuleIds]);
 
   // Get unassigned modules in display order
   const unassignedModules = unassignedModuleOrder
-    .map(id => modules[id])
+    .filter((id) => unassignedModuleSet.has(id))
+    .map((id) => modules[id])
     .filter(Boolean);
 
   const moveUnassignedModule = (moduleId, direction) => {
@@ -118,13 +377,8 @@ const ChannelList = ({
       <div className='space-y-4'>
         {[1, 2, 3, 4, 5, 6, 7, 8].map((pos) => {
           const channel = settings.channels?.[pos] || { modules: [] };
-          const channelModules = (channel.modules || [])
-            .map((assignment) => ({
-              ...assignment,
-              module: modules[assignment.module_id],
-            }))
-            .filter((item) => item.module)
-            .sort((a, b) => a.order - b.order);
+          const channelModules = channelModulesByPos[pos] || [];
+          const listId = listIdForChannel(pos);
 
           // Use shared ink gradients
           const inkGradients = INK_GRADIENTS;
@@ -188,18 +442,35 @@ const ChannelList = ({
                 </div>
               </div>
 
-              <div className='space-y-2 mb-2 flex-grow'>
+              <div
+                ref={(el) => {
+                  listRefs.current[listId] = el;
+                }}
+                onDragOver={(event) => handleDragOver(event, listId)}
+                onDragLeave={(event) => handleDragLeave(event, listId)}
+                onDrop={(event) => handleDrop(event, listId)}
+                data-drop-active={dropIndicator?.listId === listId}
+                className='space-y-2 mb-2 flex-grow min-h-[36px] dnd-list'
+                role='list'>
                 {channelModules.map((item, idx) => (
                   <div
                     key={item.module_id}
-                    className='flex items-center justify-between p-2 rounded-lg border-2 border-gray-600 hover:border-black group transition-all cursor-pointer'
+                    className='flex items-center justify-between p-2 rounded-lg border-2 border-gray-600 hover:border-black group transition-all dnd-item cursor-pointer'
                     style={{ backgroundColor: 'var(--color-bg-card)' }}
                     onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-white)', 'important')}
                     onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-card)', 'important')}
-                    onClick={() => {
-                      setShowEditModuleModal(item.module_id);
-                      setEditingModule(JSON.parse(JSON.stringify(modules[item.module_id])));
-                    }}>
+                    onClick={() => openEditModule(item.module_id, modules[item.module_id])}
+                    draggable
+                    data-dnd-item="true"
+                    data-dragging={dragState?.moduleId === item.module_id ? 'true' : 'false'}
+                    onDragStart={(event) =>
+                      handleDragStart(event, {
+                        moduleId: item.module_id,
+                        listId,
+                        index: idx,
+                      })}
+                    onDragEnd={handleDragEnd}
+                    role='listitem'>
                     <div className='flex-1 min-w-0 mr-2'>
                       {(() => {
                         const typeMeta = moduleTypes.find((t) => t.id === item.module.type);
@@ -241,7 +512,7 @@ const ChannelList = ({
                         );
                       })()}
                     </div>
-                    <div className='flex gap-2 items-center' onClick={(e) => e.stopPropagation()}>
+                    <div className='flex gap-2 items-center' onClick={(e) => e.stopPropagation()} data-no-drag="true">
                       <button
                         type='button'
                         onClick={() => triggerModulePrint(item.module_id)}
@@ -284,6 +555,9 @@ const ChannelList = ({
                     </div>
                   </div>
                 ))}
+                {dropIndicator?.listId === listId && (
+                  <div className='dnd-indicator' style={{ top: dropIndicator.top }} />
+                )}
               </div>
 
               <div className='mt-auto'>
@@ -307,13 +581,22 @@ const ChannelList = ({
       {/* Unassigned Modules Section */}
       <div className='mt-8'>
         <h3 className='text-lg font-bold text-black mb-4 tracking-tight border-b-2 border-dashed border-gray-300 pb-2'>UNASSIGNED MODULES</h3>
-        <div className='space-y-2'>
+        <div
+          ref={(el) => {
+            listRefs.current.unassigned = el;
+          }}
+          onDragOver={(event) => handleDragOver(event, 'unassigned')}
+          onDragLeave={(event) => handleDragLeave(event, 'unassigned')}
+          onDrop={(event) => handleDrop(event, 'unassigned')}
+          data-drop-active={dropIndicator?.listId === 'unassigned'}
+          className='space-y-2 min-h-[36px] dnd-list'
+          role='list'>
           {unassignedModules.length === 0 ? (
             <div className='text-sm text-gray-500 italic py-4'>
               No unassigned modules. Create a module below or assign existing modules to channels.
             </div>
           ) : (
-            unassignedModules.map((module) => {
+            unassignedModules.map((module, idx) => {
               const typeMeta = moduleTypes.find((t) => t.id === module.type);
               const isOnline = typeMeta ? !typeMeta.offline : false;
               const configured = moduleIsConfigured(module);
@@ -330,14 +613,22 @@ const ChannelList = ({
               return (
                 <div
                   key={module.id}
-                  className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-300 hover:border-black group transition-all cursor-pointer'
+                  className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-300 hover:border-black group transition-all dnd-item cursor-pointer'
                   style={{ backgroundColor: 'var(--color-bg-card)' }}
                   onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-white)', 'important')}
                   onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-card)', 'important')}
-                  onClick={() => {
-                    setShowEditModuleModal(module.id);
-                    setEditingModule(JSON.parse(JSON.stringify(module)));
-                  }}>
+                  onClick={() => openEditModule(module.id, module)}
+                  draggable
+                  data-dnd-item="true"
+                  data-dragging={dragState?.moduleId === module.id ? 'true' : 'false'}
+                  onDragStart={(event) =>
+                    handleDragStart(event, {
+                      moduleId: module.id,
+                      listId: 'unassigned',
+                      index: idx,
+                    })}
+                  onDragEnd={handleDragEnd}
+                  role='listitem'>
                   <div className='flex-1 min-w-0 mr-2'>
                     <div className='text-sm font-bold text-gray-700 group-hover:text-black truncate transition-colors'>{module.name}</div>
                     <div
@@ -355,7 +646,7 @@ const ChannelList = ({
                       <span className="truncate font-mono group-hover:text-black transition-colors" style={{ color: 'var(--color-text-muted)' }}>{typeMeta?.label?.toUpperCase()}</span>
                     </div>
                   </div>
-                  <div className='flex gap-2 items-center' onClick={(e) => e.stopPropagation()}>
+                  <div className='flex gap-2 items-center' onClick={(e) => e.stopPropagation()} data-no-drag="true">
                     <button
                       type='button'
                       onClick={() => triggerModulePrint(module.id)}
@@ -399,6 +690,9 @@ const ChannelList = ({
                 </div>
               );
             })
+          )}
+          {dropIndicator?.listId === 'unassigned' && (
+            <div className='dnd-indicator' style={{ top: dropIndicator.top }} />
           )}
         </div>
         
