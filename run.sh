@@ -5,11 +5,12 @@ set -euo pipefail
 PORT=${PORT:-8000}
 SERVICE_NAME="pc-1"
 SERVICE_WAS_ACTIVE=0
+export PYTHONUNBUFFERED="${PYTHONUNBUFFERED:-1}"
 
 # Try to activate venv if it exists
-if [ -f "venv/Scripts/activate" ]; then
+if [ -f ".venv/bin/activate" ]; then
     # shellcheck disable=SC1091
-    source venv/Scripts/activate
+    source .venv/bin/activate
 elif [ -f "venv/bin/activate" ]; then
     # shellcheck disable=SC1091
     source venv/bin/activate
@@ -48,5 +49,17 @@ fi
 pkill -f "uvicorn app.main:app" || true
 
 echo "Starting PC-1 Server on port ${PORT}..."
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT}"
 
+# In dev (interactive), enable auto-reload by default.
+if [ -t 0 ]; then
+    RELOAD="${RELOAD:-1}"
+else
+    RELOAD="${RELOAD:-0}"
+fi
+
+UVICORN_ARGS=(app.main:app --host 0.0.0.0 --port "${PORT}")
+if [ "${RELOAD}" -eq 1 ]; then
+    UVICORN_ARGS+=(--reload)
+fi
+
+exec uvicorn "${UVICORN_ARGS[@]}"

@@ -12,7 +12,8 @@ beautifulsoup4
 
 # Hardware drivers (optional - only needed on Raspberry Pi)
 pyserial
-RPi.GPIO; sys_platform == "linux"  # Only install on Linux (Raspberry Pi)
+# Only install on Raspberry Pi / ARM Linux (avoid breaking WSL x86_64 installs)
+RPi.GPIO; platform_system == "Linux" and (platform_machine == "aarch64" or platform_machine == "armv7l" or platform_machine == "armv6l")
 qrcode[pil]
 jsonschema
 openai>=1.0.0

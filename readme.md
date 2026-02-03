@@ -23,19 +23,15 @@ Run the entire system on your PC without hardware to test logic and see "printer
 **Backend:**
 
 ```bash
-# Raspberry Pi / Linux (port 8000)
+# WSL / Linux (port 8000)
 ./run.sh
-
-# Windows (port 8001 to avoid conflicts)
-run.bat
 
 # Or run directly
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 * **API Docs:** 
-  * Pi/Linux: [http://localhost:8000/docs](http://localhost:8000/docs)
-  * Windows: [http://localhost:8001/docs](http://localhost:8001/docs)
+  * Local: [http://localhost:8000/docs](http://localhost:8000/docs)
 * **Mock Output:** Watch your Terminal window. The "Printer" writes text there.
 
 **Frontend (Settings UI):**
@@ -46,22 +42,32 @@ npm run dev
 ```
 * **URL:** [http://localhost:5173](http://localhost:5173)
 
+**Smoke Test (API + UI + mock print):**
+```bash
+scripts/smoke_test.sh --build-web
+```
+
 ---
 
 ## 2. Software Installation
 
 ### Development Environment
 
+0. **WSL/Ubuntu Prereqs (one-time):**
+   ```bash
+   sudo apt update
+   sudo apt install -y python3-venv python3-pip
+   ```
+
 1. **Install Python Dependencies:**
    ```bash
-   pip install -r requirements.txt
+   python3 -m pip install -r requirements.txt
    ```
-   This installs `pyserial`, `RPi.GPIO`, and other dependencies.
+   This installs `pyserial`, and (on Raspberry Pi) `RPi.GPIO`, plus other dependencies.
 
 2. **Run the Server:**
    ```bash
-   ./run.sh           # Raspberry Pi/Linux
-   run.bat            # Windows
+   ./run.sh           # WSL/Linux/Raspberry Pi
    # Or: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
    ```
 
@@ -69,7 +75,7 @@ npm run dev
 
 1. **Install Python Dependencies:**
    ```bash
-   pip install -r requirements.txt
+   python3 -m pip install -r requirements.txt
    ```
 
 2. **Run Setup Script:**
@@ -155,9 +161,7 @@ paper-console/
 │   └── wifi_ap_nmcli.sh      # WiFi AP mode manager
 ├── testing/
 │   ├── test_modules.py       # Module testing script
-│   └── test_windows.bat      # Windows test runner
 ├── run.sh                 # Development server launcher
-├── run.bat                # Windows development launcher
 ├── requirements.txt       # Python dependencies
 └── readme.md              # This file
 ```

@@ -6,7 +6,7 @@ This document describes the automated deployment workflow for PC-1 Paper Console
 
 The deployment system consists of three main components:
 
-1. **`deploy.sh`** / **`deploy.bat`** - Enhanced shell scripts for manual deployment
+1. **`deploy.sh`** - Enhanced shell script for manual deployment (WSL/Linux)
 2. **`scripts/deploy_automated.py`** - Python script designed for AI agent automation
 3. **`.deploy_config`** - Configuration file for Pi connection details (gitignored)
 
@@ -51,12 +51,6 @@ ssh admin@pc-1.local
 
 ```bash
 ./deploy.sh
-```
-
-#### Manual Deployment (Windows)
-
-```cmd
-deploy.bat
 ```
 
 #### Automated Deployment (AI Agent / Python)
