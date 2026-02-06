@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 
 const ALLOWED_TAGS = new Set(['p', 'div', 'br', 'strong', 'em', 'ul', 'ol', 'li', 'h1', 'h2']);
+const CHECKBOX_PREFIX = /^\s*\[( |x|X)\]\s*/;
 
 const escapeHtml = (text) =>
   String(text || '')
@@ -108,6 +109,7 @@ const ToolbarButton = ({ label, onClick, title }) => (
   <button
     type="button"
     className="px-3 py-1.5 text-xs font-bold border-2 border-zinc-300 rounded-md bg-white hover:border-black transition-colors cursor-pointer whitespace-nowrap"
+    onPointerDown={(event) => event.preventDefault()}
     onMouseDown={(event) => event.preventDefault()}
     onClick={onClick}
     title={title || label}
@@ -122,6 +124,7 @@ const NoteEditor = ({ value, onChange, placeholder = 'Write your note...' }) => 
   const inlineEditorRef = useRef(null);
   const fullscreenEditorRef = useRef(null);
   const lastCommittedValueRef = useRef(value || '');
+  const savedRangeRef = useRef(null);
 
   useEffect(() => {
     const incoming = value || '';
@@ -142,6 +145,31 @@ const NoteEditor = ({ value, onChange, placeholder = 'Write your note...' }) => 
   const isEmpty = useMemo(() => !getTextContent(editorHtml), [editorHtml]);
 
   const getActiveEditor = () => (isFullscreen ? fullscreenEditorRef.current : inlineEditorRef.current);
+
+  const saveSelectionFromEditor = (editor) => {
+    const selection = window.getSelection();
+    if (!editor || !selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer)) return;
+    savedRangeRef.current = range.cloneRange();
+  };
+
+  const restoreSelectionToEditor = (editor) => {
+    if (!editor || !savedRangeRef.current) return false;
+    if (!editor.contains(savedRangeRef.current.commonAncestorContainer)) return false;
+
+    const selection = window.getSelection();
+    if (!selection) return false;
+
+    try {
+      selection.removeAllRanges();
+      selection.addRange(savedRangeRef.current);
+      return true;
+    } catch {
+      savedRangeRef.current = null;
+      return false;
+    }
+  };
 
   useEffect(() => {
     const editors = [inlineEditorRef.current, fullscreenEditorRef.current].filter(Boolean);
@@ -172,18 +200,26 @@ const NoteEditor = ({ value, onChange, placeholder = 'Write your note...' }) => 
     syncFromEditor(getActiveEditor());
   };
 
-  const focusActiveEditor = () => {
-    const editor = getActiveEditor();
+  const focusEditor = (editor) => {
     if (!editor) return;
-    editor.focus();
+    editor.focus({ preventScroll: true });
+  };
+
+  const prepareCommandTarget = () => {
+    const editor = getActiveEditor();
+    if (!editor) return null;
+    focusEditor(editor);
+    restoreSelectionToEditor(editor);
+    return editor;
   };
 
   const insertPlainText = (text) => {
-    focusActiveEditor();
+    const editor = prepareCommandTarget();
+    if (!editor) return;
 
     if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
       document.execCommand('insertText', false, text);
-      syncFromActiveEditor();
+      syncFromEditor(editor);
       return;
     }
 
@@ -195,20 +231,138 @@ const NoteEditor = ({ value, onChange, placeholder = 'Write your note...' }) => 
     range.collapse(false);
     selection.removeAllRanges();
     selection.addRange(range);
-    syncFromActiveEditor();
+    saveSelectionFromEditor(editor);
+    syncFromEditor(editor);
+  };
+
+  const transformSelectedTextLines = (transformLine, onNoSelection) => {
+    const editor = prepareCommandTarget();
+    if (!editor) return false;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      if (onNoSelection) onNoSelection();
+      return false;
+    }
+
+    const range = selection.getRangeAt(0);
+    if (!editor.contains(range.commonAncestorContainer)) {
+      if (onNoSelection) onNoSelection();
+      return false;
+    }
+
+    const selectedText = range.toString();
+    if (!selectedText) {
+      if (onNoSelection) onNoSelection();
+      return false;
+    }
+
+    const normalized = selectedText.replace(/\r\n/g, '\n');
+    const lines = normalized.split('\n');
+    const transformed = lines.map((line, index) => transformLine(line, index, lines)).join('\n');
+
+    if (document.queryCommandSupported && document.queryCommandSupported('insertText')) {
+      document.execCommand('insertText', false, transformed);
+    } else {
+      range.deleteContents();
+      range.insertNode(document.createTextNode(transformed));
+      range.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(range);
+      saveSelectionFromEditor(editor);
+    }
+
+    syncFromEditor(editor);
+    return true;
   };
 
   const runCommand = (command, commandValue = null) => {
-    focusActiveEditor();
+    const editor = prepareCommandTarget();
+    if (!editor) return false;
+    const before = editor.innerHTML;
     document.execCommand(command, false, commandValue);
-    syncFromActiveEditor();
+    syncFromEditor(editor);
+    return before !== editor.innerHTML;
   };
 
-  const setBlockTag = (tagName) => {
-    focusActiveEditor();
-    document.execCommand('formatBlock', false, tagName);
-    document.execCommand('formatBlock', false, `<${tagName.toLowerCase()}>`);
-    syncFromActiveEditor();
+  const setBlockTag = (tagNameLower) => {
+    const editor = prepareCommandTarget();
+    if (!editor) return;
+    const before = editor.innerHTML;
+
+    document.execCommand('formatBlock', false, `<${tagNameLower}>`);
+    document.execCommand('formatBlock', false, tagNameLower);
+
+    syncFromEditor(editor);
+
+    if (before === editor.innerHTML) {
+      const selection = window.getSelection();
+      if (!selection || selection.rangeCount === 0) return;
+      const range = selection.getRangeAt(0);
+      if (!editor.contains(range.commonAncestorContainer)) return;
+
+      const selectedText = range.toString().trim();
+      if (!selectedText) return;
+
+      const heading = document.createElement(tagNameLower);
+      heading.textContent = selectedText;
+      range.deleteContents();
+      range.insertNode(heading);
+
+      const newRange = document.createRange();
+      newRange.selectNodeContents(heading);
+      newRange.collapse(false);
+      selection.removeAllRanges();
+      selection.addRange(newRange);
+      saveSelectionFromEditor(editor);
+      syncFromEditor(editor);
+    }
+  };
+
+  const applyChecklist = () => {
+    transformSelectedTextLines(
+      (line) => {
+        if (!line.trim()) return line;
+        const indent = line.match(/^\s*/)?.[0] || '';
+        const text = line.slice(indent.length);
+        if (CHECKBOX_PREFIX.test(text)) return `${indent}${text}`;
+        return `${indent}[ ] ${text}`;
+      },
+      () => insertPlainText('[ ] ')
+    );
+  };
+
+  const applyBullets = () => {
+    const changed = runCommand('insertUnorderedList');
+    if (changed) return;
+
+    transformSelectedTextLines(
+      (line) => {
+        if (!line.trim()) return line;
+        const indent = line.match(/^\s*/)?.[0] || '';
+        const text = line.slice(indent.length).replace(/^[-*]\s+/, '');
+        return `${indent}- ${text}`;
+      },
+      () => insertPlainText('- ')
+    );
+  };
+
+  const applyNumbers = () => {
+    const changed = runCommand('insertOrderedList');
+    if (changed) return;
+
+    let index = 1;
+    transformSelectedTextLines(
+      (line) => {
+        if (!line.trim()) return line;
+        const indent = line.match(/^\s*/)?.[0] || '';
+        const text = line.slice(indent.length).replace(/^\d+\.\s+/, '');
+        const numbered = `${indent}${index}. ${text}`;
+        index += 1;
+        return numbered;
+      },
+      () => insertPlainText('1. ')
+    );
   };
 
   const handleKeyDown = (event) => {
@@ -232,18 +386,19 @@ const NoteEditor = ({ value, onChange, placeholder = 'Write your note...' }) => 
 
   const toolbar = (
     <div className="flex gap-2 overflow-x-auto pb-1">
-      <ToolbarButton label="H" title="Heading" onClick={() => setBlockTag('H2')} />
+      <ToolbarButton label="H" title="Heading" onClick={() => setBlockTag('h2')} />
       <ToolbarButton label="B" title="Bold" onClick={() => runCommand('bold')} />
       <ToolbarButton label="I" title="Italic" onClick={() => runCommand('italic')} />
-      <ToolbarButton label="Bullets" title="Bulleted List" onClick={() => runCommand('insertUnorderedList')} />
-      <ToolbarButton label="Numbers" title="Numbered List" onClick={() => runCommand('insertOrderedList')} />
-      <ToolbarButton label="Checklist" title="Insert Checklist Item" onClick={() => insertPlainText('[ ] ')} />
+      <ToolbarButton label="Bullets" title="Bulleted List" onClick={applyBullets} />
+      <ToolbarButton label="Numbers" title="Numbered List" onClick={applyNumbers} />
+      <ToolbarButton label="Checklist" title="Insert Checklist Item" onClick={applyChecklist} />
       <ToolbarButton
         label="Clear"
         title="Clear Formatting"
         onClick={() => {
           runCommand('removeFormat');
-          setBlockTag('P');
+          runCommand('formatBlock', 'p');
+          runCommand('formatBlock', '<p>');
         }}
       />
     </div>
@@ -260,8 +415,15 @@ const NoteEditor = ({ value, onChange, placeholder = 'Write your note...' }) => 
         ref={ref}
         contentEditable
         suppressContentEditableWarning
+        onFocus={(event) => saveSelectionFromEditor(event.currentTarget)}
         onInput={(event) => syncFromEditor(event.currentTarget)}
-        onBlur={(event) => syncFromEditor(event.currentTarget)}
+        onBlur={(event) => {
+          saveSelectionFromEditor(event.currentTarget);
+          syncFromEditor(event.currentTarget);
+        }}
+        onMouseUp={(event) => saveSelectionFromEditor(event.currentTarget)}
+        onTouchEnd={(event) => saveSelectionFromEditor(event.currentTarget)}
+        onKeyUp={(event) => saveSelectionFromEditor(event.currentTarget)}
         onKeyDown={handleKeyDown}
         onPaste={handlePaste}
         className={`w-full p-3 text-base bg-white border-2 border-zinc-300 rounded-lg text-black focus:border-black focus:outline-none overflow-y-auto ${heightClass}`}
