@@ -6,11 +6,12 @@ import Checklist from './widgets/Checklist';
 import PresetSelect from './widgets/PresetSelect';
 import WebhookTest from './widgets/WebhookTest';
 import ActionButton from './widgets/ActionButton';
+import NoteEditor from './widgets/NoteEditor';
 
 /**
  * A lightweight JSON Schema form renderer.
  * Supports: string, number, boolean, object, array.
- * Supports ui:widget: "textarea", "location-search".
+ * Supports ui:widget: "textarea", "location-search", "note-editor".
  */
 const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange, moduleId, onActionComplete }) => {
   if (!schema) return null;
@@ -119,6 +120,20 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 moduleId={moduleId}
                 onActionComplete={onActionComplete}
             />
+        );
+    }
+
+    if (widget === 'note-editor') {
+        return (
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
+                <NoteEditor
+                    value={value || ''}
+                    onChange={onChange}
+                    placeholder={uiSchema?.['ui:placeholder']}
+                />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+            </div>
         );
     }
 

@@ -8,6 +8,14 @@ const ModuleTestList = ({ settings, modules, triggerModulePrint, wifiStatus, set
   const { moduleTypes } = useModuleTypes();
 
   const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
+  const isNonEmptyNote = (v) => {
+    if (!isNonEmptyString(v)) return false;
+    const plain = String(v)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .trim();
+    return plain.length > 0;
+  };
 
   const moduleIsConfigured = (module) => {
     const cfg = module?.config || {};
@@ -23,7 +31,7 @@ const ModuleTestList = ({ settings, modules, triggerModulePrint, wifiStatus, set
       case 'webhook':
         return isNonEmptyString(cfg.url);
       case 'text':
-        return isNonEmptyString(cfg.content);
+        return isNonEmptyNote(cfg.content);
       case 'weather':
         // Weather can use either module-level location OR global settings location.
         return isNonEmptyString(cfg.city_name) || isNonEmptyString(settings?.city_name);
