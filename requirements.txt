@@ -15,6 +15,3 @@ pyserial
 RPi.GPIO; sys_platform == "linux"  # Only install on Linux (Raspberry Pi)
 qrcode[pil]
 jsonschema
-openai>=1.0.0
-anthropic>=0.40.0
-python-telegram-bot>=21.0

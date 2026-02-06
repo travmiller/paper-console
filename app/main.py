@@ -9,7 +9,6 @@ import os
 from typing import Dict, Optional, List
 from datetime import datetime
 from pydantic import BaseModel
-import re
 import subprocess
 import platform
 import pytz
@@ -74,7 +73,6 @@ async def save_settings_background(settings_snapshot: Settings):
 email_polling_task = None
 scheduler_task = None
 task_monitor_task = None
-telegram_bot_task = None
 
 
 async def task_watchdog():
@@ -661,22 +659,10 @@ async def lifespan(app: FastAPI):
     # Factory reset (15s) = Factory Reset
     button.set_factory_reset_callback(on_factory_reset_threadsafe)
 
-    # Start Telegram bot if enabled
-    global telegram_bot_task
-    if settings.telegram_bot.enabled:
-        try:
-            from app.telegram_bot import start_telegram_bot
-            service = await start_telegram_bot(settings.telegram_bot)
-            if service:
-                telegram_bot_task = asyncio.create_task(service.run())
-                logger.info("Telegram bot started")
-        except Exception as e:
-            logger.error(f"Failed to start Telegram bot: {e}")
-
     yield
 
     # Shutdown - cancel all background tasks
-    for task in [email_polling_task, scheduler_task, task_monitor_task, telegram_bot_task]:
+    for task in [email_polling_task, scheduler_task, task_monitor_task]:
         if task:
             task.cancel()
             try:
@@ -685,13 +671,6 @@ async def lifespan(app: FastAPI):
                 pass
             except Exception:
                 pass
-
-    # Stop Telegram bot gracefully
-    try:
-        from app.telegram_bot import stop_telegram_bot
-        await stop_telegram_bot()
-    except Exception:
-        pass
 
     # Cleanup hardware drivers
     if hasattr(printer, "close"):
@@ -902,337 +881,6 @@ async def reload_settings():
     config_module.settings = settings
 
     return {"message": "Settings reloaded from disk", "config": settings}
-
-
-# --- TELEGRAM BOT API ---
-
-
-@app.get("/api/telegram/status")
-async def get_telegram_status():
-    """Get the current status of the Telegram bot."""
-    try:
-        from app.telegram_bot import get_telegram_bot_status
-        status = get_telegram_bot_status()
-        return {
-            "enabled": settings.telegram_bot.enabled,
-            "configured": bool(settings.telegram_bot.bot_token),
-            **status,
-        }
-    except Exception as e:
-        return {
-            "enabled": settings.telegram_bot.enabled,
-            "configured": bool(settings.telegram_bot.bot_token),
-            "available": False,
-            "running": False,
-            "error": str(e),
-        }
-
-
-@app.post("/api/telegram/restart")
-async def restart_telegram_bot():
-    """Restart the Telegram bot with current settings."""
-    global telegram_bot_task
-    
-    try:
-        from app.telegram_bot import start_telegram_bot, stop_telegram_bot
-        
-        # Stop existing bot
-        if telegram_bot_task:
-            telegram_bot_task.cancel()
-            try:
-                await telegram_bot_task
-            except asyncio.CancelledError:
-                pass
-        await stop_telegram_bot()
-        
-        # Start new bot if enabled
-        if settings.telegram_bot.enabled:
-            service = await start_telegram_bot(settings.telegram_bot)
-            if service:
-                telegram_bot_task = asyncio.create_task(service.run())
-                return {"message": "Telegram bot restarted", "running": True}
-            else:
-                return {"message": "Failed to start Telegram bot", "running": False}
-        else:
-            telegram_bot_task = None
-            return {"message": "Telegram bot disabled", "running": False}
-            
-    except Exception as e:
-        logger.error(f"Error restarting Telegram bot: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# --- ASSISTANT API ---
-
-
-class AssistantChatRequest(BaseModel):
-    message: str
-
-
-class AssistantExecuteRequest(BaseModel):
-    type: str  # "print" | "run_channel" | "run_module"
-    title: Optional[str] = None
-    content: Optional[str] = None
-    channel: Optional[int] = None
-    module_type: Optional[str] = None
-
-
-class AssistantApplyConfigRequest(BaseModel):
-    operations: List[Dict]
-
-
-@app.post("/api/assistant/chat")
-async def assistant_chat(req: AssistantChatRequest):
-    """Chat with the built-in AI assistant (no server-side memory)."""
-    message = (req.message or "").strip()
-    if not message:
-        raise HTTPException(status_code=400, detail="Message is required")
-
-    # Reuse Telegram AI configuration (provider, key, model)
-    if not getattr(settings, "telegram_bot", None) or not settings.telegram_bot.ai_api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="AI is not configured. Add an AI API key in General → Telegram Bot.",
-        )
-
-    try:
-        from app.assistant_service import AssistantService
-
-        service = AssistantService(settings.telegram_bot)
-        service.init_client()
-
-        result = await asyncio.to_thread(service.chat_once, message)
-        return result.payload
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Assistant chat error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@app.post("/api/assistant/execute")
-async def assistant_execute(req: AssistantExecuteRequest):
-    """Execute an assistant-proposed action (print / run channel / run module)."""
-    global print_in_progress
-
-    action_type = (req.type or "").strip()
-    if action_type not in {"print", "run_channel", "run_module"}:
-        raise HTTPException(status_code=400, detail="Unknown action type")
-
-    # Only allow one print job at a time (shared with physical button + other endpoints)
-    with print_lock:
-        if print_in_progress:
-            raise HTTPException(status_code=409, detail="Print already in progress")
-        print_in_progress = True
-
-    try:
-        from app.telegram_bot import TelegramBotService
-
-        service = TelegramBotService(getattr(settings, "telegram_bot", None))
-
-        if action_type == "print":
-            content = (req.content or "").strip()
-            if not content:
-                raise HTTPException(status_code=400, detail="Print content is required")
-            title = (req.title or "ASSISTANT").strip()[:30]
-            success = await asyncio.to_thread(service._print_sync, content, title)
-            return {"success": bool(success), "title": title}
-
-        if action_type == "run_channel":
-            if req.channel is None:
-                raise HTTPException(status_code=400, detail="Channel is required")
-            channel = int(req.channel)
-            if channel < 1 or channel > 8:
-                raise HTTPException(status_code=400, detail="Channel must be 1-8")
-            success, name = await asyncio.to_thread(service._run_channel, channel)
-            return {"success": bool(success), "name": name, "channel": channel}
-
-        # run_module
-        module_type = (req.module_type or "").strip()
-        if not module_type:
-            raise HTTPException(status_code=400, detail="Module type is required")
-        success, name = await asyncio.to_thread(service._run_module_by_type, module_type)
-        return {"success": bool(success), "name": name, "module_type": module_type}
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Assistant execute error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=str(e))
-    finally:
-        with print_lock:
-            print_in_progress = False
-
-
-def _validate_schedule_entries(entries: List[str]) -> None:
-    pattern = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
-    for t in entries:
-        if not isinstance(t, str) or not pattern.match(t.strip()):
-            raise HTTPException(status_code=400, detail=f"Invalid schedule time: {t}")
-
-
-def _apply_assistant_operations(operations: List[Dict]) -> Settings:
-    from app.module_registry import is_registered, validate_module_config
-    from app.config import ModuleInstance
-
-    new_settings = settings.model_copy(deep=True)
-    created: Dict[str, str] = {}
-
-    def resolve_module_id(op: Dict) -> Optional[str]:
-        if op.get("module_id"):
-            return str(op["module_id"])
-        if op.get("module_ref") and str(op["module_ref"]) in created:
-            return created[str(op["module_ref"])]
-        return None
-
-    for op in operations:
-        if not isinstance(op, dict):
-            raise HTTPException(status_code=400, detail="Each operation must be an object")
-        op_type = (op.get("op") or "").strip()
-        if not op_type:
-            raise HTTPException(status_code=400, detail="Operation missing 'op'")
-
-        if op_type == "swap_channels":
-            a = int(op.get("a", 0))
-            b = int(op.get("b", 0))
-            if a < 1 or a > 8 or b < 1 or b > 8:
-                raise HTTPException(status_code=400, detail="Channels must be 1-8")
-            ca = new_settings.channels.get(a, ChannelConfig(modules=[]))
-            cb = new_settings.channels.get(b, ChannelConfig(modules=[]))
-            new_settings.channels[a], new_settings.channels[b] = cb, ca
-
-        elif op_type == "create_module":
-            module_type = (op.get("module_type") or "").strip()
-            if not module_type or not is_registered(module_type):
-                raise HTTPException(status_code=400, detail=f"Unknown module type: {module_type}")
-            name = (op.get("name") or "").strip() or module_type
-            config = op.get("config") if isinstance(op.get("config"), dict) else {}
-
-            validate_module_config(module_type, config)
-
-            module_id = str(uuid.uuid4())
-            instance = ModuleInstance(id=module_id, type=module_type, name=name, config=config)
-            new_settings.modules[module_id] = instance
-
-            temp_id = (op.get("temp_id") or "").strip()
-            if temp_id:
-                created[temp_id] = module_id
-
-            assign_to = op.get("assign_to_channel")
-            if assign_to is not None:
-                ch = int(assign_to)
-                if ch < 1 or ch > 8:
-                    raise HTTPException(status_code=400, detail="Channels must be 1-8")
-                if ch not in new_settings.channels:
-                    new_settings.channels[ch] = ChannelConfig(modules=[])
-                channel = new_settings.channels[ch]
-                order = op.get("order")
-                if order is None:
-                    order = max([a.order for a in (channel.modules or [])], default=-1) + 1
-                channel.modules = channel.modules or []
-                channel.modules.append(ChannelModuleAssignment(module_id=module_id, order=int(order)))
-
-        elif op_type == "rename_module":
-            module_id = resolve_module_id(op)
-            if not module_id or module_id not in new_settings.modules:
-                raise HTTPException(status_code=400, detail="Module not found for rename")
-            name = (op.get("name") or "").strip()
-            if not name:
-                raise HTTPException(status_code=400, detail="Name is required")
-            new_settings.modules[module_id].name = name
-
-        elif op_type == "update_module_config":
-            module_id = resolve_module_id(op)
-            if not module_id or module_id not in new_settings.modules:
-                raise HTTPException(status_code=400, detail="Module not found for update")
-            config = op.get("config")
-            if not isinstance(config, dict):
-                raise HTTPException(status_code=400, detail="Config must be an object")
-            module = new_settings.modules[module_id]
-            validate_module_config(module.type, config)
-            module.config = config
-
-        elif op_type == "assign_module_to_channel":
-            ch = int(op.get("channel", 0))
-            if ch < 1 or ch > 8:
-                raise HTTPException(status_code=400, detail="Channels must be 1-8")
-            module_id = resolve_module_id(op)
-            if not module_id or module_id not in new_settings.modules:
-                raise HTTPException(status_code=400, detail="Module not found for assignment")
-            if ch not in new_settings.channels:
-                new_settings.channels[ch] = ChannelConfig(modules=[])
-            channel = new_settings.channels[ch]
-            channel.modules = channel.modules or []
-            if any(a.module_id == module_id for a in channel.modules):
-                continue
-            order = op.get("order")
-            if order is None:
-                order = max([a.order for a in channel.modules], default=-1) + 1
-            channel.modules.append(ChannelModuleAssignment(module_id=module_id, order=int(order)))
-
-        elif op_type == "remove_module_from_channel":
-            ch = int(op.get("channel", 0))
-            if ch < 1 or ch > 8:
-                raise HTTPException(status_code=400, detail="Channels must be 1-8")
-            module_id = resolve_module_id(op)
-            if not module_id:
-                raise HTTPException(status_code=400, detail="Module id is required")
-            channel = new_settings.channels.get(ch)
-            if not channel or not channel.modules:
-                continue
-            channel.modules = [a for a in channel.modules if a.module_id != module_id]
-
-        elif op_type == "reorder_channel_modules":
-            ch = int(op.get("channel", 0))
-            if ch < 1 or ch > 8:
-                raise HTTPException(status_code=400, detail="Channels must be 1-8")
-            channel = new_settings.channels.get(ch)
-            if not channel or not channel.modules:
-                raise HTTPException(status_code=400, detail="Channel has no modules")
-            module_orders = op.get("module_orders")
-            if not isinstance(module_orders, dict):
-                raise HTTPException(status_code=400, detail="module_orders must be an object")
-            for assignment in channel.modules:
-                if assignment.module_id in module_orders:
-                    assignment.order = int(module_orders[assignment.module_id])
-
-        elif op_type == "update_channel_schedule":
-            ch = int(op.get("channel", 0))
-            if ch < 1 or ch > 8:
-                raise HTTPException(status_code=400, detail="Channels must be 1-8")
-            schedule = op.get("schedule")
-            if not isinstance(schedule, list):
-                raise HTTPException(status_code=400, detail="schedule must be a list")
-            _validate_schedule_entries(schedule)
-            if ch not in new_settings.channels:
-                new_settings.channels[ch] = ChannelConfig(modules=[])
-            new_settings.channels[ch].schedule = [s.strip() for s in schedule]
-
-        else:
-            raise HTTPException(status_code=400, detail=f"Unknown operation: {op_type}")
-
-    return new_settings
-
-
-@app.post("/api/assistant/apply-config")
-async def assistant_apply_config(req: AssistantApplyConfigRequest, background_tasks: BackgroundTasks):
-    """Apply a confirmed configuration plan from the Assistant."""
-    global settings
-    import app.config as config_module
-
-    ops = req.operations or []
-    if not isinstance(ops, list) or not ops:
-        raise HTTPException(status_code=400, detail="operations must be a non-empty list")
-
-    new_settings = _apply_assistant_operations(ops)
-
-    # Persist atomically
-    settings = new_settings
-    config_module.settings = settings
-    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
-
-    return {"message": "Config applied", "settings": settings, "modules": settings.modules}
 
 
 # --- SYSTEM TIME API ---
@@ -2788,27 +2436,19 @@ async def delete_module(module_id: str, background_tasks: BackgroundTasks):
 
 
 @app.post("/api/modules/{module_id}/actions/{action}")
-async def execute_module_action(module_id: str, action: str, background_tasks: BackgroundTasks):
+async def execute_module_action(module_id: str, action: str):
     """
-    Execute a module-specific action (e.g., reset conversation for AI).
-    
+    Execute a module-specific action.
+
     Supported actions depend on the module type.
     """
     if module_id not in settings.modules:
         raise HTTPException(status_code=404, detail="Module not found")
-    
+
     module = settings.modules[module_id]
-    
-    # Handle AI module load_defaults action
-    if module.type == "ai" and action == "load_defaults":
-        from app.modules.ai import DEFAULT_AI_MODES
-        # Update the module config with default modes
-        module.config["ai_modes"] = DEFAULT_AI_MODES
-        background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
-        return {"message": "Default modes loaded", "action": action, "reload": True}
-    
+
     # Add other module actions here as needed
-    
+
     raise HTTPException(status_code=400, detail=f"Unknown action '{action}' for module type '{module.type}'")
 
 

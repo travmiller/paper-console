@@ -104,18 +104,6 @@ class EmptyConfig(BaseModel):
     pass
 
 
-class TelegramBotConfig(BaseModel):
-    """Configuration for the Telegram bot service."""
-    model_config = ConfigDict(extra="ignore")
-    enabled: bool = False
-    bot_token: str = ""
-    allowed_user_ids: List[int] = []  # Telegram user IDs authorized to use the bot
-    ai_provider: str = "anthropic"  # "anthropic" or "openai"
-    ai_api_key: str = ""
-    ai_model: str = ""  # Optional: override default model
-
-
-
 class ModuleInstance(BaseModel):
     """A module instance with its configuration."""
 
@@ -160,9 +148,7 @@ DEFAULT_QUOTES_ID = "default-quotes-001"
 DEFAULT_HISTORY_ID = "default-history-001"
 DEFAULT_TEXT_ID = "default-text-001"
 DEFAULT_CHECKLIST_ID = "default-checklist-001"
-DEFAULT_CHECKLIST_ID = "default-checklist-001"
 DEFAULT_SYSTEM_MONITOR_ID = "default-system-monitor-001"
-DEFAULT_AI_ID = "default-ai-001"
 
 
 def _default_modules() -> Dict[str, ModuleInstance]:
@@ -222,12 +208,6 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             name="System Monitor",
             config={},
         ),
-        DEFAULT_AI_ID: ModuleInstance(
-            id=DEFAULT_AI_ID,
-            type="ai",
-            name="AI Assistant",
-            config={},
-        ),
     }
 
 
@@ -283,9 +263,6 @@ class Settings(BaseModel):
     # Key is position (1-8), Value is the configuration for that channel
     # Default: Ch1=Weather, Ch2=Astronomy, Ch3=Sudoku, Ch4-8=Empty
     channels: Dict[int, ChannelConfig] = Field(default_factory=_default_channels)
-
-    # Telegram Bot Configuration
-    telegram_bot: TelegramBotConfig = Field(default_factory=TelegramBotConfig)
 
     @field_validator("latitude")
     @classmethod
@@ -426,6 +403,39 @@ def migrate_old_config(data: dict) -> dict:
     return data
 
 
+def remove_deprecated_features(data: dict) -> dict:
+    """Remove deprecated settings/modules from existing configs."""
+    modules = data.get("modules")
+    removed_module_ids = set()
+
+    if isinstance(modules, dict):
+        for module_id, module_data in list(modules.items()):
+            if isinstance(module_data, dict) and module_data.get("type") == "ai":
+                removed_module_ids.add(str(module_id))
+                modules.pop(module_id, None)
+
+    if removed_module_ids:
+        channels = data.get("channels")
+        if isinstance(channels, dict):
+            for channel_data in channels.values():
+                if not isinstance(channel_data, dict):
+                    continue
+                assignments = channel_data.get("modules")
+                if not isinstance(assignments, list):
+                    continue
+                channel_data["modules"] = [
+                    assignment
+                    for assignment in assignments
+                    if isinstance(assignment, dict)
+                    and str(assignment.get("module_id")) not in removed_module_ids
+                ]
+
+    if "telegram_bot" in data:
+        data.pop("telegram_bot", None)
+
+    return data
+
+
 def _try_load_config_file(config_path: str) -> Settings | None:
     """Attempt to load config from a specific file path. Returns None on failure."""
     if not os.path.exists(config_path):
@@ -442,6 +452,7 @@ def _try_load_config_file(config_path: str) -> Settings | None:
 
             # Migrate old format to new format if needed
             data = migrate_old_config(data)
+            data = remove_deprecated_features(data)
 
             # Normalize channel keys to integers (JSON loads them as strings)
             if "channels" in data and data["channels"]:
