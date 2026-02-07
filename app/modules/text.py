@@ -81,6 +81,15 @@ def _print_markdown(printer: PrinterDriver, markdown_text: str):
             printer.print_text(heading_text, "bold_lg")
             continue
         
+        # Checkbox list items (must be before regular bullet list)
+        checkbox_match = re.match(r'^- \[([ xX])\] (.+)$', stripped)
+        if checkbox_match:
+            is_checked = checkbox_match.group(1).lower() == 'x'
+            checkbox_text = checkbox_match.group(2)
+            checkbox_symbol = '☑' if is_checked else '☐'
+            _print_formatted_line(printer, f"{checkbox_symbol} {checkbox_text}")
+            continue
+        
         # Bullet list
         if stripped.startswith('- ') or stripped.startswith('* '):
             list_text = stripped[2:].strip()

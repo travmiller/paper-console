@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import TaskList from '@tiptap/extension-task-list';
+import TaskItem from '@tiptap/extension-task-item';
 
 // Toolbar button component
 const ToolbarButton = ({ onClick, active, title, children }) => (
@@ -69,6 +71,14 @@ const Toolbar = ({ editor, isFullscreen, onToggleFullscreen }) => {
         1.
       </ToolbarButton>
       
+      <ToolbarButton
+        onClick={() => editor.chain().focus().toggleTaskList().run()}
+        active={editor.isActive('taskList')}
+        title="Checkbox List"
+      >
+        ☐
+      </ToolbarButton>
+      
       <div className="w-px bg-[var(--color-border-gray-300)] mx-1" />
       
       <ToolbarButton
@@ -109,6 +119,10 @@ const RichTextEditor = ({ value, onChange }) => {
         code: false,
         blockquote: false,
         strike: false,
+      }),
+      TaskList,
+      TaskItem.configure({
+        nested: false,
       }),
     ],
     content: value ? parseMarkdownToHtml(value) : '',
@@ -204,6 +218,28 @@ const RichTextEditor = ({ value, onChange }) => {
           border-top: 2px dashed var(--color-border-gray-400);
           margin: 1em 0;
         }
+        /* Task List Styles */
+        .ProseMirror ul[data-type="taskList"] {
+          list-style: none !important;
+          padding-left: 0 !important;
+        }
+        .ProseMirror ul[data-type="taskList"] li {
+          display: flex !important;
+          align-items: flex-start;
+          gap: 0.5em;
+        }
+        .ProseMirror ul[data-type="taskList"] li > label {
+          flex-shrink: 0;
+          margin-top: 0.15em;
+        }
+        .ProseMirror ul[data-type="taskList"] li > label input[type="checkbox"] {
+          width: 1em;
+          height: 1em;
+          cursor: pointer;
+        }
+        .ProseMirror ul[data-type="taskList"] li > div {
+          flex: 1;
+        }
         .ProseMirror p.is-editor-empty:first-child::before {
           content: attr(data-placeholder);
           color: var(--color-text-muted);
@@ -232,10 +268,18 @@ function parseMarkdownToHtml(markdown) {
     .replace(/_(.+?)_/g, '<em>$1</em>')
     // Horizontal rule
     .replace(/^---$/gm, '<hr>')
+    // Task list items (must be before regular lists)
+    .replace(/^- \[x\] (.+)$/gm, '<taskitem checked>$1</taskitem>')
+    .replace(/^- \[ \] (.+)$/gm, '<taskitem>$1</taskitem>')
     // Unordered lists
     .replace(/^[*-] (.+)$/gm, '<li>$1</li>')
     // Ordered lists
     .replace(/^\d+\. (.+)$/gm, '<oli>$1</oli>')
+    // Wrap consecutive <taskitem> in task list
+    .replace(/(<taskitem[^>]*>.*<\/taskitem>\n?)+/g, '<ul data-type="taskList">$&</ul>')
+    .replace(/<taskitem checked>/g, '<li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked></label><div><p>')
+    .replace(/<taskitem>/g, '<li data-type="taskItem" data-checked="false"><label><input type="checkbox"></label><div><p>')
+    .replace(/<\/taskitem>/g, '</p></div></li>')
     // Wrap consecutive <li> in <ul>
     .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
     // Wrap consecutive <oli> in <ol>
@@ -292,6 +336,12 @@ function htmlToMarkdown(html) {
         return children;
       case 'li':
         const parent = node.parentElement;
+        // Check if this is a task item
+        if (node.dataset?.type === 'taskItem' || node.getAttribute('data-type') === 'taskItem') {
+          const isChecked = node.dataset?.checked === 'true' || node.getAttribute('data-checked') === 'true';
+          const checkbox = isChecked ? '[x]' : '[ ]';
+          return `- ${checkbox} ${children}\n`;
+        }
         if (parent.tagName.toLowerCase() === 'ol') {
           const index = Array.from(parent.children).indexOf(node) + 1;
           return `${index}. ${children}\n`;
@@ -301,6 +351,10 @@ function htmlToMarkdown(html) {
         return '---\n';
       case 'br':
         return '\n';
+      case 'label':
+        return ''; // Skip checkbox labels
+      case 'input':
+        return ''; // Skip checkbox inputs
       default:
         return children;
     }

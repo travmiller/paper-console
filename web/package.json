@@ -12,6 +12,8 @@
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",
     "@tiptap/extension-horizontal-rule": "^3.19.0",
+    "@tiptap/extension-task-item": "^3.19.0",
+    "@tiptap/extension-task-list": "^3.19.0",
     "@tiptap/pm": "^3.19.0",
     "@tiptap/react": "^3.19.0",
     "@tiptap/starter-kit": "^3.19.0",
