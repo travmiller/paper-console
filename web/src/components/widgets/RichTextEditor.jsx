@@ -225,7 +225,7 @@ const RichTextEditor = ({ value, onChange }) => {
         }
         .ProseMirror ul[data-type="taskList"] li {
           display: flex !important;
-          align-items: flex-start;
+          align-items: center;
           gap: 0.5em;
         }
         .ProseMirror ul[data-type="taskList"] li > label {

@@ -201,7 +201,7 @@ ${v.slice(h+2)}`,y+=1;else break}e.push({indent:h,number:parseInt(f,10),content:
         }
         .ProseMirror ul[data-type="taskList"] li {
           display: flex !important;
-          align-items: flex-start;
+          align-items: center;
           gap: 0.5em;
         }
         .ProseMirror ul[data-type="taskList"] li > label {
