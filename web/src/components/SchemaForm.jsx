@@ -6,6 +6,7 @@ import Checklist from './widgets/Checklist';
 import PresetSelect from './widgets/PresetSelect';
 import WebhookTest from './widgets/WebhookTest';
 import ActionButton from './widgets/ActionButton';
+import RichTextEditor from './widgets/RichTextEditor';
 
 /**
  * A lightweight JSON Schema form renderer.
@@ -119,6 +120,16 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 moduleId={moduleId}
                 onActionComplete={onActionComplete}
             />
+        );
+    }
+    
+    if (widget === 'richtext') {
+        return (
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
+                <RichTextEditor value={value} onChange={onChange} />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+            </div>
         );
     }
 

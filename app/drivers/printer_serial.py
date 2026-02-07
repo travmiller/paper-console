@@ -152,7 +152,7 @@ class PrinterDriver:
         fonts = {}
 
         # Font variants we want to load
-        # IBM Plex Mono has: Regular, Medium, SemiBold, Bold
+        # IBM Plex Mono has: Regular, Medium, SemiBold, Bold, Italic
         # Using Medium as base weight, SemiBold and Bold for headings
         font_variants = {
             "regular": "IBMPlexMono-Medium.ttf",  # Medium as base weight
@@ -160,6 +160,7 @@ class PrinterDriver:
             "medium": "IBMPlexMono-Medium.ttf",
             "light": "IBMPlexMono-Medium.ttf",  # Map light to Medium (base weight)
             "semibold": "IBMPlexMono-SemiBold.ttf",  # SemiBold for headings
+            "italic": "IBMPlexMono-MediumItalic.ttf",  # Italic for emphasis
         }
 
         # Base paths to search
