@@ -86,7 +86,8 @@ def _print_markdown(printer: PrinterDriver, markdown_text: str):
         if checkbox_match:
             is_checked = checkbox_match.group(1).lower() == 'x'
             checkbox_text = checkbox_match.group(2)
-            checkbox_symbol = '☑' if is_checked else '☐'
+            # Use ASCII checkboxes that will print on any font
+            checkbox_symbol = '[x]' if is_checked else '[ ]'
             _print_formatted_line(printer, f"{checkbox_symbol} {checkbox_text}")
             continue
         
