@@ -149,18 +149,20 @@ const RichTextEditor = ({ value, onChange }) => {
         .ProseMirror em {
           font-style: italic;
         }
-        .ProseMirror ul, .ProseMirror ol {
-          padding-left: 1.5em;
-          margin: 0.5em 0;
-        }
-        .ProseMirror ul {
+        .ProseMirror ul, .ProseMirror.prose ul {
           list-style-type: disc !important;
+          list-style-position: outside !important;
+          padding-left: 1.5em !important;
+          margin: 0.5em 0 !important;
         }
-        .ProseMirror ol {
+        .ProseMirror ol, .ProseMirror.prose ol {
           list-style-type: decimal !important;
+          list-style-position: outside !important;
+          padding-left: 1.5em !important;
+          margin: 0.5em 0 !important;
         }
-        .ProseMirror li {
-          margin: 0.25em 0;
+        .ProseMirror li, .ProseMirror.prose li {
+          margin: 0.25em 0 !important;
           display: list-item !important;
         }
         .ProseMirror hr {
