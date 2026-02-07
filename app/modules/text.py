@@ -68,8 +68,8 @@ def _print_markdown(printer: PrinterDriver, markdown_text: str):
             printer.print_text("", "regular")
             continue
         
-        # Horizontal rule
-        if stripped == '---' or stripped == '***' or stripped == '___':
+        # Horizontal rule (3+ dashes, asterisks, or underscores)
+        if re.match(r'^[-*_]{3,}$', stripped):
             printer.print_line()
             continue
         
