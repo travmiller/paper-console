@@ -153,8 +153,15 @@ const RichTextEditor = ({ value, onChange }) => {
           padding-left: 1.5em;
           margin: 0.5em 0;
         }
+        .ProseMirror ul {
+          list-style-type: disc !important;
+        }
+        .ProseMirror ol {
+          list-style-type: decimal !important;
+        }
         .ProseMirror li {
           margin: 0.25em 0;
+          display: list-item !important;
         }
         .ProseMirror hr {
           border: none;
