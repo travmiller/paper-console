@@ -340,9 +340,13 @@ function htmlToMarkdown(html) {
         if (node.dataset?.type === 'taskItem' || node.getAttribute('data-type') === 'taskItem') {
           const isChecked = node.dataset?.checked === 'true' || node.getAttribute('data-checked') === 'true';
           const checkbox = isChecked ? '[x]' : '[ ]';
-          return `- ${checkbox} ${children}\n`;
+          // For task items, get text from the content div, not all children
+          // TipTap structure: li > label + div > p
+          const contentDiv = node.querySelector('div');
+          const textContent = contentDiv ? contentDiv.textContent.trim() : children.trim();
+          return `- ${checkbox} ${textContent}\n`;
         }
-        if (parent.tagName.toLowerCase() === 'ol') {
+        if (parent && parent.tagName.toLowerCase() === 'ol') {
           const index = Array.from(parent.children).indexOf(node) + 1;
           return `${index}. ${children}\n`;
         }
