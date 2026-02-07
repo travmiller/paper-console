@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 
@@ -22,7 +22,7 @@ const ToolbarButton = ({ onClick, active, title, children }) => (
 );
 
 // Toolbar component
-const Toolbar = ({ editor }) => {
+const Toolbar = ({ editor, isFullscreen, onToggleFullscreen }) => {
   if (!editor) return null;
 
   return (
@@ -78,6 +78,17 @@ const Toolbar = ({ editor }) => {
       >
         —
       </ToolbarButton>
+      
+      {/* Spacer to push fullscreen button to the right */}
+      <div className="flex-1" />
+      
+      <ToolbarButton
+        onClick={onToggleFullscreen}
+        active={isFullscreen}
+        title={isFullscreen ? "Exit Fullscreen (Esc)" : "Fullscreen"}
+      >
+        {isFullscreen ? '✕' : '⛶'}
+      </ToolbarButton>
     </div>
   );
 };
@@ -87,6 +98,8 @@ const Toolbar = ({ editor }) => {
  * Outputs Markdown-compatible content for printing
  */
 const RichTextEditor = ({ value, onChange }) => {
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
@@ -120,14 +133,35 @@ const RichTextEditor = ({ value, onChange }) => {
       }
     }
   }, [value, editor]);
+  
+  // Handle Escape key to exit fullscreen
+  React.useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && isFullscreen) {
+        setIsFullscreen(false);
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [isFullscreen]);
+
+  const containerClasses = isFullscreen
+    ? 'fixed inset-0 z-50 flex flex-col bg-[var(--color-bg-base)]'
+    : 'border-2 border-[var(--color-border-gray-300)] rounded-lg overflow-hidden bg-[var(--color-bg-input)] focus-within:border-[var(--color-border-main)] transition-colors';
 
   return (
-    <div className="border-2 border-[var(--color-border-gray-300)] rounded-lg overflow-hidden bg-[var(--color-bg-input)] focus-within:border-[var(--color-border-main)] transition-colors">
-      <Toolbar editor={editor} />
-      <EditorContent editor={editor} />
+    <div className={containerClasses}>
+      <Toolbar 
+        editor={editor} 
+        isFullscreen={isFullscreen} 
+        onToggleFullscreen={() => setIsFullscreen(!isFullscreen)} 
+      />
+      <div className={isFullscreen ? 'flex-1 overflow-auto' : ''}>
+        <EditorContent editor={editor} />
+      </div>
       <style>{`
         .ProseMirror {
-          min-height: 120px;
+          min-height: ${isFullscreen ? 'calc(100vh - 60px)' : '120px'};
           font-family: 'IBM Plex Mono', monospace;
           font-size: 14px;
           color: var(--color-text-main);
