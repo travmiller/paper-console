@@ -101,6 +101,10 @@ def get_almanac_data():
     except:
         current_altitude = -90.0
     
+    day_length_seconds = int((s["sunset"] - s["sunrise"]).total_seconds())
+    day_hours = day_length_seconds // 3600
+    day_minutes = (day_length_seconds % 3600) // 60
+
     return {
         "date": now.strftime("%A, %b %d %Y"),
         "sunrise": format_time(s["sunrise"]),
@@ -112,7 +116,7 @@ def get_almanac_data():
         "sun_path": sun_path,
         "moon_phase_val": current_phase,
         "moon_phase": get_moon_phase_text(current_phase),
-        "day_length": str(s["sunset"] - s["sunrise"]).split('.')[0] # HH:MM:SS
+        "day_length": f"{day_hours}h {day_minutes:02d}m"
     }
 
 def draw_moon_phase_image(phase: float, size: int) -> Image.Image:
@@ -127,6 +131,7 @@ def draw_moon_phase_image(phase: float, size: int) -> Image.Image:
     cycle = (phase % 28) / 28.0
     lunar_longitude = cycle * 2 * math.pi
     phase_angle = abs(lunar_longitude - math.pi)
+    illumination = (math.cos(phase_angle) + 1) / 2
 
     # Waxing moon is lit on the right; waning moon is lit on the left.
     sun_x = math.sin(phase_angle) * (1 if cycle < 0.5 else -1)
@@ -161,28 +166,50 @@ def draw_moon_phase_image(phase: float, size: int) -> Image.Image:
             dot = nx * sun_x + nz * sun_z
 
             if dot <= 0:
-                # Very dim earthshine keeps the disc shape visible near new moon.
-                intensity = 2 + int(6 * nz)
+                # Avoid heavy solid-black fill to reduce thermal print banding.
+                if illumination < 0.08:
+                    intensity = 62 + int(16 * nz)
+                else:
+                    intensity = 74 + int(14 * nz)
             else:
                 # Lambertian lighting with mild limb darkening.
                 diffuse = dot ** 0.82
                 limb = 0.66 + 0.34 * nz
                 intensity = 220 + int(35 * diffuse * limb)
 
-                # Apply deterministic surface albedo features (maria/highlands).
-                albedo = 1.0
-                for maria_x, maria_y, sigma, depth in maria:
-                    dx = nx - maria_x
-                    dy = ny - maria_y
-                    albedo -= depth * math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma))
-                highlands = 0.02 * math.exp(-(((nx + 0.20) ** 2) + ((ny - 0.34) ** 2)) / (2 * 0.11 * 0.11))
-                albedo = max(0.82, min(1.04, albedo + highlands))
-                intensity = int(intensity * albedo)
+                # Keep near-new moon cleaner with less surface noise.
+                if illumination >= 0.08:
+                    # Apply deterministic surface albedo features (maria/highlands).
+                    albedo = 1.0
+                    for maria_x, maria_y, sigma, depth in maria:
+                        dx = nx - maria_x
+                        dy = ny - maria_y
+                        albedo -= depth * math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma))
+                    highlands = 0.02 * math.exp(-(((nx + 0.20) ** 2) + ((ny - 0.34) ** 2)) / (2 * 0.11 * 0.11))
+                    albedo = max(0.82, min(1.04, albedo + highlands))
+                    intensity = int(intensity * albedo)
 
             gray_pixels[px, py] = max(0, min(255, intensity))
 
-    # Dither grayscale to 1-bit for the printer while preserving tonal detail.
-    image = grayscale.convert("1", dither=Image.FLOYDSTEINBERG)
+    # Ordered dithering creates stable grain and fewer dense black streaks.
+    image = Image.new("1", (size, size), 1)
+    pixels = image.load()
+    bayer_8x8 = [
+        [0, 48, 12, 60, 3, 51, 15, 63],
+        [32, 16, 44, 28, 35, 19, 47, 31],
+        [8, 56, 4, 52, 11, 59, 7, 55],
+        [40, 24, 36, 20, 43, 27, 39, 23],
+        [2, 50, 14, 62, 1, 49, 13, 61],
+        [34, 18, 46, 30, 33, 17, 45, 29],
+        [10, 58, 6, 54, 9, 57, 5, 53],
+        [42, 26, 38, 22, 41, 25, 37, 21],
+    ]
+    for py in range(size):
+        for px in range(size):
+            level = gray_pixels[px, py]
+            threshold = int(((bayer_8x8[py % 8][px % 8] + 0.5) / 64.0) * 255)
+            pixels[px, py] = 1 if level >= threshold else 0
+
     draw = ImageDraw.Draw(image)
     draw.ellipse(
         [center_x - radius - 1, center_y - radius - 1, center_x + radius + 1, center_y + radius + 1],
@@ -204,7 +231,7 @@ def draw_sun_path_image(
     fonts: Dict[str, Any]
 ) -> Image.Image:
     """Draw a sun path curve visualization."""
-    height = 200 # Fixed height for chart
+    height = 220  # Fixed height with reserved label area to prevent overlap
     image = Image.new("1", (width, height), 1)
     draw = ImageDraw.Draw(image)
     
@@ -214,11 +241,18 @@ def draw_sun_path_image(
     x = 0
     y = 0
 
-    # Calculate drawing area
-    curve_height = height - 60 
-    curve_y = y + 20 
-    curve_bottom = curve_y + curve_height - 20
-    horizon_y = curve_y + (curve_height - 20) // 2
+    # Draw title and calculate chart/label layout with explicit separation.
+    title_height = 12
+    if font:
+        draw.text((x, y), "SUN", font=font, fill=0)
+        title_bbox = font.getbbox("SUN")
+        title_height = max(10, title_bbox[3] - title_bbox[1])
+
+    chart_top = y + title_height + 8
+    label_value_y = height - 54
+    label_caption_y = label_value_y + 20
+    chart_bottom = label_value_y - 22
+    horizon_y = chart_top + (chart_bottom - chart_top) // 2
 
     # Find min/max altitude
     altitudes = [alt for _, alt in sun_path]
@@ -228,10 +262,6 @@ def draw_sun_path_image(
     alt_range = max(max_alt - min_alt, 10)
     alt_min = min_alt
     alt_max = max_alt
-
-    # Draw title
-    if font:
-        draw.text((x, y), "SUN", font=font, fill=0)
 
     # Draw horizon line
     horizon_x_start = x + 10
@@ -264,7 +294,7 @@ def draw_sun_path_image(
         else:
             normalized_alt = 0.5
 
-        curve_y_pos = curve_y + int((1.0 - normalized_alt) * (curve_bottom - curve_y))
+        curve_y_pos = chart_top + int((1.0 - normalized_alt) * (chart_bottom - chart_top))
         points.append((curve_x, curve_y_pos))
 
         if abs((dt - current_time).total_seconds()) < 15 * 60:
@@ -280,7 +310,7 @@ def draw_sun_path_image(
             future_start = max(0, current_point_idx)
             future_points = points[future_start:]
             for i in range(len(future_points) - 1):
-                if i % 2 == 0:
+                if i % 3 != 1:
                     draw.line([future_points[i], future_points[i + 1]], fill=0, width=1)
 
     # Markers
@@ -319,29 +349,29 @@ def draw_sun_path_image(
 
     # Labels
     if font:
-        draw.text((x, horizon_y + 25), sunrise_time, font=font, fill=0)
+        draw.text((x, label_value_y), sunrise_time, font=font, fill=0)
         if font_caption:
-            draw.text((x, horizon_y + 45), "Sunrise", font=font_caption, fill=0)
+            draw.text((x, label_caption_y), "Sunrise", font=font_caption, fill=0)
 
         text_bbox = font.getbbox(sunset_time)
         text_width = text_bbox[2] - text_bbox[0]
         sunset_text_x = x + width - text_width
-        draw.text((sunset_text_x, horizon_y + 25), sunset_time, font=font, fill=0)
+        draw.text((sunset_text_x, label_value_y), sunset_time, font=font, fill=0)
         if font_caption:
             caption_bbox = font_caption.getbbox("Sunset")
             caption_width = caption_bbox[2] - caption_bbox[0]
-            draw.text((x + width - caption_width, horizon_y + 45), "Sunset", font=font_caption, fill=0)
+            draw.text((x + width - caption_width, label_caption_y), "Sunset", font=font_caption, fill=0)
 
         if day_length:
             text_bbox = font.getbbox(day_length)
             text_width = text_bbox[2] - text_bbox[0]
             duration_x = x + (width - text_width) // 2
-            draw.text((duration_x, horizon_y + 25), day_length, font=font, fill=0)
+            draw.text((duration_x, label_value_y), day_length, font=font, fill=0)
             if font_caption:
                 caption_bbox = font_caption.getbbox("Day Length")
                 caption_width = caption_bbox[2] - caption_bbox[0]
                 caption_x = x + (width - caption_width) // 2
-                draw.text((caption_x, horizon_y + 45), "Day Length", font=font_caption, fill=0)
+                draw.text((caption_x, label_caption_y), "Day Length", font=font_caption, fill=0)
 
     return image
 
@@ -400,7 +430,7 @@ def format_astronomy_receipt(printer, config: Dict[str, Any] = None, module_name
     printer.print_line()
     
     # Moon phase graphic
-    moon_image = draw_moon_phase_image(data['moon_phase_val'], size=64)
+    moon_image = draw_moon_phase_image(data['moon_phase_val'], size=80)
     # Center moon image
     # To center it, we can create a full-width image and paste the moon in the center
     # OR rely on printer to center it (printer_serial does center images)

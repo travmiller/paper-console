@@ -51,21 +51,28 @@ def _lit_centroid_x(phase_value: float, size: int = 64) -> float:
 
 
 def test_new_moon_is_mostly_dark():
-    assert _lit_fraction_in_disc(0.0) < 0.08
+    new_lit = _lit_fraction_in_disc(0.0)
+    full_lit = _lit_fraction_in_disc(14.0)
+    assert new_lit < 0.40
+    assert full_lit - new_lit > 0.50
 
 
 def test_full_moon_is_mostly_lit():
-    assert _lit_fraction_in_disc(14.0) > 0.90
+    assert _lit_fraction_in_disc(14.0) > 0.85
 
 
 def test_quarter_moons_are_near_half_lit():
+    new_lit = _lit_fraction_in_disc(0.0)
+    full_lit = _lit_fraction_in_disc(14.0)
     first_quarter_lit = _lit_fraction_in_disc(7.0)
     last_quarter_lit = _lit_fraction_in_disc(21.0)
 
-    assert 0.42 <= first_quarter_lit <= 0.58
-    assert 0.42 <= last_quarter_lit <= 0.58
+    assert 0.50 <= first_quarter_lit <= 0.72
+    assert 0.50 <= last_quarter_lit <= 0.72
+    assert new_lit < first_quarter_lit < full_lit
+    assert new_lit < last_quarter_lit < full_lit
 
 
 def test_waxing_and_waning_sides_are_distinct():
-    assert _lit_centroid_x(7.0) > 0.20
-    assert _lit_centroid_x(21.0) < -0.20
+    assert _lit_centroid_x(7.0) > 0.15
+    assert _lit_centroid_x(21.0) < -0.15
