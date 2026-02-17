@@ -1336,10 +1336,19 @@ class PrinterDriver:
         self.print_text(text, "bold")
 
     def print_line(self):
-        """Print a decorative separator line."""
-        # Use ASCII-only pattern so separators survive text sanitization.
-        line = ". " * (self.width // 2)
-        self.print_text(line.strip(), "light")
+        """Print a single-line ASCII dashed separator that does not wrap."""
+        font = self._get_font("light")
+        available_width = self.PRINTER_WIDTH_DOTS - 4  # keep side margins
+
+        try:
+            bbox = font.getbbox("-") if font else None
+            dash_width = (bbox[2] - bbox[0]) if bbox else max(1, self.font_size // 2)
+        except Exception:
+            dash_width = max(1, self.font_size // 2)
+
+        dash_count = max(8, int(available_width // max(1, dash_width)))
+        dash_count = min(dash_count, self.width)
+        self.print_text("-" * dash_count, "light")
 
     def print_article_block(
         self,

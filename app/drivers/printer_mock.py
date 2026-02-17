@@ -98,7 +98,7 @@ class PrinterDriver:
 
     def print_line(self):
         """Prints a decorative separator line."""
-        print(f"[PRINT] {'. ' * (self.width // 2)}")
+        print(f"[PRINT] {'-' * self.width}")
         self.lines_printed += 1
 
     def print_article_block(
