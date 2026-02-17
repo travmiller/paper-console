@@ -203,14 +203,25 @@ def _print_calendar_timeline_view(printer, sorted_dates, all_events):
         width - 20, 120, d, events, False, font, font_sm
     )
     printer.print_image(img)
-    printer.print_line()
+    printer.feed(1)
+
+
+def _calendar_grid_cell_size(printer) -> int:
+    """Choose a cell size that fills most of the printer width."""
+    dots_width = getattr(printer, "PRINTER_WIDTH_DOTS", None)
+    if not isinstance(dots_width, int) or dots_width <= 0:
+        chars_width = getattr(printer, "width", 42)
+        dots_width = max(200, int(chars_width * 9))
+
+    # Leave a small margin so print_image does not downscale.
+    target_width = max(140, dots_width - 8)
+    cell_size = (target_width - 4) // 7
+    return max(14, min(56, cell_size))
 
 
 def _print_calendar_month_view(printer, sorted_dates, all_events):
     """Full month calendar view with events."""
-    from datetime import datetime
-    import app.config
-    
+
     # Get current month
     today = date.today()
     month_start = date(today.year, today.month, 1)
@@ -223,21 +234,7 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
         next_month = date(today.year + 1, 1, 1)
     else:
         next_month = date(today.year, today.month + 1, 1)
-    days_in_month = (next_month - month_start).days
-    
-    # For month view, we need to fetch events for the entire month
-    # Re-fetch events for the full month range
-    month_all_events = {}
-    sources = []
-    # We need access to config, but we'll parse for the full month
-    # Calculate end date for the month
-    month_end = next_month - timedelta(days=1)
-    
-    # Re-parse events for the entire month
-    # This is a bit of a hack - we'll need to re-fetch, but for now use what we have
-    # and extend it by parsing with a larger days_to_show
-    # Actually, let's just use all_events we have and extend the range
-    
+
     # Convert all_events to format expected by calendar grid (date string -> event count)
     # Also collect all events in the month
     events_by_date = {}
@@ -251,20 +248,16 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
         if month_start <= d < next_month:
             month_events_by_date[d] = events
     
-    # Print month header
-    month_name = today.strftime("%B %Y").upper()
-    printer.print_subheader(month_name)
-    
     # Calculate grid start (first Sunday before or on month start)
     days_since_sunday = first_weekday + 1  # Monday=0, so +1
     grid_start = month_start - timedelta(days=days_since_sunday % 7)
     
-    # Print full month calendar grid with event highlighting
-    # Print full month calendar grid with event highlighting
+    # Print full month calendar grid with event highlighting.
+    cell_size = _calendar_grid_cell_size(printer)
     font_sm = getattr(printer, "_get_font", lambda s: None)("regular_sm")
     img = draw_calendar_grid_image(
         weeks=6,
-        cell_size=14,
+        cell_size=cell_size,
         start_date=grid_start,
         events_by_date=events_by_date,
         font=font_sm,
@@ -273,15 +266,14 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
         month_end=next_month,
     )
     printer.print_image(img)
-    printer.print_line()
+    printer.feed(1)
     
     # Print all events from the month below calendar
     if month_events_by_date:
-        printer.print_subheader("MONTH EVENTS")
         # Sort dates
         sorted_month_dates = sorted([d for d in month_events_by_date.keys() if month_start <= d < next_month])
         
-        for d in sorted_month_dates:
+        for i, d in enumerate(sorted_month_dates):
             events = month_events_by_date[d]
             events.sort(key=lambda x: x["sort_key"])
             
@@ -305,11 +297,12 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
                 
                 printer.print_body(f"  {time_str:<8}{summary}")
             
-            printer.print_line()
+            if i < len(sorted_month_dates) - 1:
+                printer.print_line()
     elif sorted_dates:
         # Fallback: show what we have
         printer.print_subheader("UPCOMING EVENTS")
-        for d in sorted_dates:
+        for i, d in enumerate(sorted_dates):
             events = all_events[d]
             events.sort(key=lambda x: x["sort_key"])
             
@@ -333,7 +326,8 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
                 
                 printer.print_body(f"  {time_str:<8}{summary}")
             
-            printer.print_line()
+            if i < len(sorted_dates) - 1:
+                printer.print_line()
 
 
 def _print_calendar_compact_view(printer, sorted_dates, all_events):
@@ -364,7 +358,7 @@ def _print_calendar_compact_view(printer, sorted_dates, all_events):
             printer.print_body(f"{time_str:<8}{summary}")
         
         if i < len(sorted_dates) - 1:
-            printer.print_line()  # Separator
+            printer.print_line()
 
 
 def _print_calendar_week_view(printer, sorted_dates, all_events):
@@ -375,15 +369,14 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
         date_key = d.isoformat() if isinstance(d, date) else str(d)
         events_by_date[date_key] = len(events)
     
-    # Print mini calendar grid
+    # Print week calendar grid.
     today = date.today()
-    # Print mini calendar grid
-    today = date.today()
+    cell_size = _calendar_grid_cell_size(printer)
     font_sm = getattr(printer, "_get_font", lambda s: None)("regular_sm")
     img = draw_calendar_grid_image(
-        weeks=1, 
-        cell_size=10, 
-        start_date=today, 
+        weeks=1,
+        cell_size=cell_size,
+        start_date=today,
         events_by_date=events_by_date,
         font=font_sm,
         highlight_date=today,
@@ -421,6 +414,23 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
             printer.print_line()
 
 
+def _resolve_view_mode(config: CalendarConfig) -> str:
+    """Resolve calendar view mode from modern or legacy config fields."""
+    mode = (getattr(config, "view_mode", None) or "").strip().lower()
+    if mode in {"day", "week", "month"}:
+        return mode
+
+    # Legacy fallback from previous numeric days_to_show options.
+    legacy = getattr(config, "days_to_show", None)
+    if legacy == 1:
+        return "day"
+    if legacy == 2:
+        return "month"
+    if legacy in {3, 7}:
+        return "week"
+    return "month"
+
+
 @register_module(
     type_id="calendar",
     label="Calendar",
@@ -442,12 +452,12 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
                     }
                 }
             },
-            "days_to_show": {
-                "type": "integer", 
-                "title": "View Mode", 
-                "enum": [1, 2, 3, 7],
-                "enumNames": ["1 Day (Timeline)", "Month View", "3 Days (Compact)", "Week View"],
-                "default": 2
+            "view_mode": {
+                "type": "string",
+                "title": "View Mode",
+                "enum": ["day", "week", "month"],
+                "enumNames": ["Day", "Week", "Month"],
+                "default": "month"
             }
         }
     },
@@ -467,7 +477,7 @@ def format_calendar_receipt(
     header_label = module_name or "CALENDAR"
     printer.print_header(header_label, icon="calendar-blank")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
-    printer.print_line()
+    printer.feed(1)
 
     # Collect calendar sources
     sources = []
@@ -482,20 +492,20 @@ def format_calendar_receipt(
 
     all_events = {}
 
-    # For month view, we need to parse events for the entire month
-    days_to_show = config.days_to_show or 2
-    if days_to_show == 2:  # Month view
+    view_mode = _resolve_view_mode(config)
+
+    if view_mode == "month":
         # Parse events for the entire current month
         today = date.today()
-        month_start = date(today.year, today.month, 1)
         if today.month == 12:
             next_month = date(today.year + 1, 1, 1)
         else:
             next_month = date(today.year, today.month + 1, 1)
-        days_in_month = (next_month - today).days
-        parse_days = days_in_month + 1  # Include today through end of month
+        parse_days = (next_month - today).days + 1  # Include today through end of month
+    elif view_mode == "day":
+        parse_days = 1
     else:
-        parse_days = days_to_show
+        parse_days = 7
     
     for url in sources:
         ics_data = fetch_ics(url)
@@ -513,20 +523,13 @@ def format_calendar_receipt(
         return
 
     sorted_dates = sorted(all_events.keys())
-    days_to_show = config.days_to_show or 2
-    
-    # Use different visualizations based on number of days
-    if days_to_show == 1:
-        # Detailed timeline view for single day
+
+    # Use different visualizations by explicit view mode.
+    if view_mode == "day":
         _print_calendar_timeline_view(printer, sorted_dates, all_events)
-    elif days_to_show == 2:
-        # Full month view
+    elif view_mode == "month":
         _print_calendar_month_view(printer, sorted_dates, all_events)
-    elif days_to_show == 3:
-        # Compact timeline view for 3 days
-        _print_calendar_compact_view(printer, sorted_dates, all_events)
-    else:  # 7 days
-        # Week view with calendar grid
+    else:
         _print_calendar_week_view(printer, sorted_dates, all_events)
 
 
@@ -541,88 +544,65 @@ def draw_calendar_grid_image(
     month_end=None,
 ) -> Image.Image:
     """Draw a calendar grid to an image."""
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
-    # Fixed parameters
-    header_height = 10
+    if not start_date:
+        start_date = date.today()
+
+    # Align the grid so columns are always Sunday -> Saturday.
+    days_since_sunday = (start_date.weekday() + 1) % 7
+    grid_start = start_date - timedelta(days=days_since_sunday)
+
+    day_key_top_pad = 4
+    day_key_bottom_pad = 2
+    day_key_to_grid_gap = 4
+
+    header_height = 12
+    if font:
+        bbox = font.getbbox("M")
+        font_h = bbox[3] - bbox[1] if bbox else 0
+        header_height = max(header_height, font_h + day_key_top_pad + day_key_bottom_pad)
     grid_width = 7 * cell_size
-    grid_height = header_height + 2 + (weeks * cell_size)
-    
-    # Create image
-    img = Image.new("1", (grid_width + 4, grid_height + 4), 1)  # White background
+    grid_top = 2 + header_height + day_key_to_grid_gap
+    grid_height = weeks * cell_size
+
+    img = Image.new("1", (grid_width + 4, grid_top + grid_height + 2), 1)
     draw = ImageDraw.Draw(img)
-    x, y = 2, 0  # Offset
+    x0, y0 = 2, 2
 
-    # Day headers (S M T W T F S)
+    # Day headers (S M T W T F S).
     day_names = ["S", "M", "T", "W", "T", "F", "S"]
-    header_y = y + 2
-    
-    # Draw header background line
-    draw.line(
-        [
-            (x, header_y + header_height),
-            (x + grid_width, header_y + header_height),
-        ],
-        fill=0,
-        width=1,
-    )
     for i, day_name in enumerate(day_names):
-        day_x = x + i * cell_size
+        day_x = x0 + i * cell_size
         if font:
-            bbox = font.getbbox(day_name)
-            text_w = bbox[2] - bbox[0] if bbox else cell_size // 2
-            text_x = day_x + (cell_size - text_w) // 2
-            draw.text((text_x, header_y), day_name, font=font, fill=0)
-
-    # Draw grid cells
-    current_date = start_date if start_date else datetime.now().date()
-    # Find first Sunday before or on start_date
-    days_since_sunday = (current_date.weekday() + 1) % 7
-    # If using Python's weekday: Mon=0...Sun=6. 
-    # We want Sun=0...Sat=6 logic for this grid usually.
-    # Current logic: python weekday(): Mon=0, Sun=6.
-    # If today is Mon(0), days_since_sunday should be 1.
-    # If today is Sun(6), days_since_sunday should be 0.
-    days_since_sunday = (current_date.weekday() + 1) % 7
-    grid_start = current_date - timedelta(days=days_since_sunday)
+            gx0, gy0, gx1, gy1 = draw.textbbox((0, 0), day_name, font=font)
+            text_w = gx1 - gx0
+            text_h = gy1 - gy0
+            key_inner_h = max(1, header_height - day_key_top_pad - day_key_bottom_pad)
+            text_x = day_x + (cell_size - text_w) // 2 - gx0
+            text_y = y0 + day_key_top_pad + (key_inner_h - text_h) // 2 - gy0
+            draw.text((text_x, text_y), day_name, font=font, fill=0)
+        else:
+            draw.text((day_x + (cell_size // 2), y0), day_name, fill=0)
 
     for week in range(weeks):
         for day in range(7):
-            cell_x = x + day * cell_size
-            cell_y = y + 12 + week * cell_size  # +12 for header
-
-            # Get date for this cell
+            cell_x = x0 + day * cell_size
+            cell_y = grid_top + week * cell_size
             cell_date = grid_start + timedelta(days=week * 7 + day)
 
-            # Check if this is the highlighted date (e.g., today)
-            is_highlighted = highlight_date and cell_date == highlight_date
-
-            # Check if date is in current month (for month view)
+            is_today = bool(highlight_date and cell_date == highlight_date)
             is_current_month = True
             if month_start and month_end:
                 is_current_month = month_start <= cell_date < month_end
-            elif start_date:
-                try:
-                    # Check if start_date represents a month start
-                    if start_date.day <= 7:  # Likely a month start
-                        is_current_month = (
-                            cell_date.month == start_date.month
-                            and cell_date.year == start_date.year
-                        )
-                except:
-                    pass
 
-            # Check if date has events
-            date_key = cell_date.isoformat()
-            has_events = date_key in events_by_date and events_by_date[date_key] > 0
+            raw_event_count = events_by_date.get(cell_date.isoformat(), 0)
+            try:
+                event_count = max(0, min(6, int(raw_event_count)))
+            except (TypeError, ValueError):
+                event_count = 0
 
-            # Draw cell border
-            if is_highlighted:
-                border_width = 2
-            elif has_events:
-                border_width = 2  # Also thick for events
-            else:
-                border_width = 1
+            border_width = 2 if is_today else 1
 
             draw.rectangle(
                 [cell_x, cell_y, cell_x + cell_size - 1, cell_y + cell_size - 1],
@@ -630,53 +610,76 @@ def draw_calendar_grid_image(
                 width=border_width,
             )
 
-            # Fill cell background if highlighted or has events
-            if is_highlighted:
-                # Draw filled rectangle with checkerboard pattern for today
-                for px in range(cell_x + 1, cell_x + cell_size - 1):
-                    for py in range(cell_y + 1, cell_y + cell_size - 1):
-                        if ((px - cell_x) + (py - cell_y)) % 3 < 2:
-                            draw.point((px, py), fill=0)
-            elif has_events and is_current_month:
-                # Draw lighter pattern for dates with events
-                for px in range(cell_x + 1, cell_x + cell_size - 1, 2):
-                    for py in range(cell_y + 1, cell_y + cell_size - 1, 2):
-                        draw.point((px, py), fill=0)
-
-            # Draw day number
+            # Day number. Only today is inverted.
             day_num = str(cell_date.day)
-            if font:
-                bbox = font.getbbox(day_num)
-                text_x = cell_x + 2
-                text_y = cell_y + 2
-                # Use inverted fill for highlighted dates, lighter for other months
-                if is_highlighted:
-                    text_fill = 1  # White on black
-                elif not is_current_month:
-                    text_fill = 0  # Black, but we'll make it lighter with pattern
-                    # Draw lighter pattern for other months
-                    for px in range(cell_x + 1, cell_x + cell_size - 1, 2):
-                        for py in range(cell_y + 1, cell_y + cell_size - 1, 2):
-                            draw.point((px, py), fill=0)
-                else:
-                    text_fill = 0  # Normal black
-                draw.text((text_x, text_y), day_num, font=font, fill=text_fill)
+            text_fill = 0
+            text_x = cell_x + 2
+            text_y = cell_y + 2
 
-            # Draw event indicator (dot) - only if not already highlighted
-            if has_events and not is_highlighted:
-                dot_x = cell_x + cell_size - 4
-                dot_y = cell_y + cell_size - 4
-                # Draw a small filled circle for events
-                draw.ellipse([dot_x - 2, dot_y - 2, dot_x + 2, dot_y + 2], fill=0)
-            elif has_events and is_highlighted:
-                # For highlighted dates with events, draw a larger indicator
-                dot_x = cell_x + cell_size - 5
-                dot_y = cell_y + cell_size - 5
-                # Draw white circle on black background
-                draw.ellipse(
-                    [dot_x - 2, dot_y - 2, dot_x + 2, dot_y + 2], fill=1, outline=0
-                )
-    
+            if is_today:
+                pad = 1
+                if font:
+                    gx0, gy0, gx1, gy1 = draw.textbbox((0, 0), day_num, font=font)
+                else:
+                    gx0, gy0, gx1, gy1 = 0, 0, max(5, len(day_num) * 5), 7
+
+                text_w = gx1 - gx0
+                text_h = gy1 - gy0
+                min_side = max(text_w, text_h) + (pad * 2)
+                preferred_side = max(min_side, int(cell_size * 0.42))
+                side = min(cell_size - 2, preferred_side)
+
+                box_x0 = cell_x + 1
+                box_y0 = cell_y + 1
+                box_x1 = box_x0 + side
+                box_y1 = box_y0 + side
+                draw.rectangle([box_x0, box_y0, box_x1, box_y1], fill=0)
+
+                # Center text in the square while accounting for glyph bbox offsets.
+                text_x = box_x0 + ((side - text_w) // 2) - gx0
+                text_y = box_y0 + ((side - text_h) // 2) - gy0
+                text_fill = 1
+
+            if font:
+                draw.text((text_x, text_y), day_num, font=font, fill=text_fill)
+            else:
+                draw.text((text_x, text_y), day_num, fill=text_fill)
+
+            # Draw event dots around the lower-middle area of the cell (up to 6 dots).
+            if event_count > 0:
+                dots_per_row = 3
+                dot_size = 3 if cell_size < 20 else 4
+                dot_gap = 2
+                row_gap = 2
+                rows = (event_count + dots_per_row - 1) // dots_per_row
+                dots_h = rows * dot_size + (rows - 1) * row_gap
+                target_center_y = cell_y + int(cell_size * (2 / 3))
+                start_y = target_center_y - (dots_h // 2)
+                min_y = cell_y + 2
+                max_y = cell_y + cell_size - dots_h - 2
+                start_y = max(min_y, min(start_y, max_y))
+
+                dots_drawn = 0
+                for row in range(rows):
+                    row_count = min(dots_per_row, event_count - dots_drawn)
+                    row_w = row_count * dot_size + (row_count - 1) * dot_gap
+                    start_x = cell_x + (cell_size - row_w) // 2
+                    y = start_y + row * (dot_size + row_gap)
+
+                    for i in range(row_count):
+                        x = start_x + i * (dot_size + dot_gap)
+                        draw.ellipse(
+                            [x, y, x + dot_size - 1, y + dot_size - 1],
+                            fill=0,
+                        )
+                    dots_drawn += row_count
+
+            # Crosshatch dates outside this month in month-view to de-emphasize.
+            if month_start and month_end and not is_current_month:
+                for px in range(cell_x + 2, cell_x + cell_size - 2, 3):
+                    draw.point((px, cell_y + 2), fill=0)
+                    draw.point((px, cell_y + cell_size - 3), fill=0)
+
     return img
 
 

@@ -257,9 +257,7 @@ def format_sudoku_receipt(
 
     printer.print_header(module_name or "SUDOKU", icon="grid-nine")
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
-    printer.print_line()
     printer.print_subheader(f"Difficulty: {difficulty.title()}")
-    printer.print_line()
 
     # Render grid as full width (384 dots - 4px borders) / 9 cells = ~42px per cell
     printer_width_dots = getattr(printer, 'PRINTER_WIDTH_DOTS', 384)
@@ -271,6 +269,3 @@ def format_sudoku_receipt(
     # Generate image and print
     sudoku_image = draw_sudoku_image(grid, cell_size, font)
     printer.print_image(sudoku_image)
-    
-    printer.print_line()
-    printer.print_caption("Good luck!")

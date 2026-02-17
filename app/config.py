@@ -1,5 +1,5 @@
 from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, Dict, List, Any, Union
+from typing import Optional, Dict, List, Any, Union, Literal
 from datetime import datetime
 import json
 import os
@@ -90,7 +90,8 @@ class CalendarSource(BaseModel):
 class CalendarConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
     ical_sources: List[CalendarSource] = []
-    days_to_show: int = 2  # 1=Today, 2=Today+Tomorrow
+    view_mode: Optional[Literal["day", "week", "month"]] = None
+    days_to_show: Optional[int] = None  # Legacy fallback for older saved configs.
 
 
 
