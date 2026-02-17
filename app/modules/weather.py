@@ -309,23 +309,64 @@ def draw_weather_forecast_image(
     num_days = min(len(forecast), 7)
     col_width = total_width // num_days
     icon_size = 24
-    day_height = 150  # Increased to prevent bottom cutoff
     divider_width = 1
-
-    # Create white image
-    image = Image.new("1", (total_width, day_height), 1)
-    draw = ImageDraw.Draw(image)
 
     font_sm = fonts.get("regular_sm")
     font_md = fonts.get("regular")
     font_lg = fonts.get("bold")
+
+    # Compute height dynamically so the bottom row never clips.
+    sample_day = "Today"
+    sample_date = "12/31"
+    sample_high = "100°"
+    sample_low = "-10°"
+    sample_precip = "100%"
+    element_spacing = 10
+    top_padding = 4
+    bottom_padding = 8
+
+    day_text_h = (
+        (font_sm.getbbox(sample_day)[3] - font_sm.getbbox(sample_day)[1]) if font_sm else 10
+    )
+    date_text_h = (
+        (font_sm.getbbox(sample_date)[3] - font_sm.getbbox(sample_date)[1]) if font_sm else 10
+    )
+    high_text_h = (
+        (font_lg.getbbox(sample_high)[3] - font_lg.getbbox(sample_high)[1]) if font_lg else 16
+    )
+    low_text_h = (
+        (font_md.getbbox(sample_low)[3] - font_md.getbbox(sample_low)[1]) if font_md else 14
+    )
+    precip_text_h = (
+        (font_sm.getbbox(sample_precip)[3] - font_sm.getbbox(sample_precip)[1]) if font_sm else 10
+    )
+
+    day_height = (
+        top_padding
+        + day_text_h
+        + 2
+        + date_text_h
+        + element_spacing
+        + high_text_h
+        + element_spacing
+        + low_text_h
+        + element_spacing
+        + icon_size
+        + element_spacing
+        + precip_text_h
+        + bottom_padding
+    )
+
+    # Create white image with padded height.
+    image = Image.new("1", (total_width, day_height), 1)
+    draw = ImageDraw.Draw(image)
 
     for i, day_data in enumerate(forecast[:7]):
         col_x = i * col_width
         col_center = col_x + col_width // 2
         col_right = col_x + col_width
         day_top = 0
-        day_bottom = day_height
+        day_bottom = day_height - 1
 
         # Data
         day_label = day_data.get("day", "--")
@@ -333,8 +374,7 @@ def draw_weather_forecast_image(
         precip = day_data.get("precipitation")
         precip_value = precip if precip is not None else 0
 
-        element_spacing = 10
-        current_y = day_top + 4
+        current_y = day_top + top_padding
 
         # 1. Day/Date (at top so it's visible)
         if font_sm:
@@ -437,18 +477,45 @@ def draw_hourly_forecast_image(
 
     hour_spacing = 5
     icon_size = 24
-    entry_height = 110  # Increased to prevent bottom cutoff (time+icon+temp+precip with proper spacing)
+    top_padding = 2
+    between_blocks = 8
+    bottom_padding = 10
     row_spacing = 10
-    total_height = num_rows * (entry_height + row_spacing) if num_rows > 0 else 0
 
-    if total_height == 0:
+    if num_rows == 0:
         return None
-
-    image = Image.new("1", (total_width, total_height), 1)
-    draw = ImageDraw.Draw(image)
 
     font_sm = fonts.get("regular_sm")
     font_md = fonts.get("regular")
+
+    # Compute entry height dynamically to avoid clipping on the final row.
+    sample_time = "12 PM"
+    sample_temp = "100°"
+    sample_precip = "100%"
+    time_height = (
+        (font_sm.getbbox(sample_time)[3] - font_sm.getbbox(sample_time)[1]) if font_sm else 10
+    )
+    temp_height = (
+        (font_md.getbbox(sample_temp)[3] - font_md.getbbox(sample_temp)[1]) if font_md else 12
+    )
+    precip_height = (
+        (font_sm.getbbox(sample_precip)[3] - font_sm.getbbox(sample_precip)[1]) if font_sm else 10
+    )
+    entry_height = (
+        top_padding
+        + time_height
+        + between_blocks
+        + icon_size
+        + between_blocks
+        + temp_height
+        + between_blocks
+        + precip_height
+        + bottom_padding
+    )
+    total_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing)
+
+    image = Image.new("1", (total_width, total_height), 1)
+    draw = ImageDraw.Draw(image)
 
     # Grid Logic
     left_margin = 8
@@ -462,13 +529,16 @@ def draw_hourly_forecast_image(
 
     # Horizontal grid lines
     for row in range(num_rows + 1):
-        line_y = row * (entry_height + row_spacing)
+        if row == num_rows:
+            line_y = total_height - 1
+        else:
+            line_y = row * (entry_height + row_spacing)
         draw.line([(leftmost_x, line_y), (rightmost_x, line_y)], fill=0, width=1)
 
     # Vertical grid lines
     for col_x in actual_col_positions:
-        draw.line([(col_x, 0), (col_x, total_height)], fill=0, width=1)
-    draw.line([(rightmost_x, 0), (rightmost_x, total_height)], fill=0, width=1)
+        draw.line([(col_x, 0), (col_x, total_height - 1)], fill=0, width=1)
+    draw.line([(rightmost_x, 0), (rightmost_x, total_height - 1)], fill=0, width=1)
 
     # Content
     for row in range(num_rows):
@@ -484,7 +554,7 @@ def draw_hourly_forecast_image(
 
             # Time
             time_str = hour_data.get("time", "--")
-            time_y = row_y + 2
+            time_y = row_y + top_padding
             if font_sm:
                 bbox = font_sm.getbbox(time_str)
                 text_w = bbox[2] - bbox[0]
@@ -495,7 +565,7 @@ def draw_hourly_forecast_image(
                 time_height = 10
 
             # Icon
-            icon_y = time_y + time_height + 8
+            icon_y = time_y + time_height + between_blocks
             icon_x = col_center - icon_size // 2
             icon_type = _get_icon_type(hour_data.get("condition", ""))
             draw_icon_on_image(draw, icon_x, icon_y, icon_type, icon_size)
@@ -503,7 +573,7 @@ def draw_hourly_forecast_image(
             # Temp
             temp = hour_data.get("temperature", "--")
             temp_str = f"{temp}°" if temp != "--" else "--"
-            temp_y = icon_y + icon_size + 8
+            temp_y = icon_y + icon_size + between_blocks
             if font_md:
                 bbox = font_md.getbbox(temp_str)
                 text_w = bbox[2] - bbox[0]
@@ -517,7 +587,7 @@ def draw_hourly_forecast_image(
             precip = hour_data.get("precipitation")
             precip_value = precip if precip is not None else 0
             precip_str = f"{precip_value}%"
-            precip_y = temp_y + temp_height + 8
+            precip_y = temp_y + temp_height + between_blocks
             if font_sm:
                 bbox = font_sm.getbbox(precip_str)
                 text_w = bbox[2] - bbox[0]
