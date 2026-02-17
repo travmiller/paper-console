@@ -262,7 +262,7 @@ def draw_weather_forecast_image(forecast: list, total_width: int, fonts: Dict[st
     num_days = min(len(forecast), 7)
     col_width = total_width // num_days
     icon_size = 24
-    day_height = 114
+    day_height = 130  # Increased to fit day/date at top
     divider_width = 1
     
     # Create white image
@@ -286,10 +286,28 @@ def draw_weather_forecast_image(forecast: list, total_width: int, fonts: Dict[st
         precip = day_data.get("precipitation")
         precip_value = precip if precip is not None else 0
         
-        element_spacing = 12
-        current_y = day_top + 8
+        element_spacing = 10
+        current_y = day_top + 4
         
-        # 1. High Temp
+        # 1. Day/Date (at top so it's visible)
+        if font_sm:
+            day_bbox = font_sm.getbbox(day_label)
+            day_text_w = day_bbox[2] - day_bbox[0]
+            day_text_x = col_center - day_text_w // 2
+            draw.text((day_text_x, current_y), day_label, font=font_sm, fill=0)
+            current_y += (day_bbox[3] - day_bbox[1]) + 2
+            
+            if date_label:
+                date_bbox = font_sm.getbbox(date_label)
+                date_text_w = date_bbox[2] - date_bbox[0]
+                date_text_x = col_center - date_text_w // 2
+                draw.text((date_text_x, current_y), date_label, font=font_sm, fill=0)
+                current_y += (date_bbox[3] - date_bbox[1])
+        else:
+            current_y += 20
+        current_y += element_spacing
+        
+        # 2. High Temp
         high = day_data.get("high", "--")
         high_str = f"{high}°" if high != "--" else "--"
         if font_lg:
@@ -302,7 +320,7 @@ def draw_weather_forecast_image(forecast: list, total_width: int, fonts: Dict[st
             current_y += 16
         current_y += element_spacing
         
-        # 2. Low Temp
+        # 3. Low Temp
         low = day_data.get("low", "--")
         low_str = f"{low}°" if low != "--" else "--"
         if font_md:
@@ -315,13 +333,13 @@ def draw_weather_forecast_image(forecast: list, total_width: int, fonts: Dict[st
             current_y += 14
         current_y += element_spacing
         
-        # 3. Icon
+        # 4. Icon
         icon_x = col_center - icon_size // 2
         icon_type = _get_icon_type(day_data.get("condition", ""))
         draw_icon_on_image(draw, icon_x, current_y, icon_type, icon_size)
         current_y += icon_size + element_spacing
         
-        # 4. Precipitation
+        # 5. Precipitation
         precip_str = f"{precip_value}%"
         if font_sm:
             bbox = font_sm.getbbox(precip_str)
@@ -331,21 +349,6 @@ def draw_weather_forecast_image(forecast: list, total_width: int, fonts: Dict[st
             current_y += (bbox[3] - bbox[1])
         else:
             current_y += 10
-        current_y += element_spacing
-        
-        # 5. Day/Date
-        if font_sm:
-            day_bbox = font_sm.getbbox(day_label)
-            day_text_w = day_bbox[2] - day_bbox[0]
-            day_text_x = col_center - day_text_w // 2
-            draw.text((day_text_x, current_y), day_label, font=font_sm, fill=0)
-            
-            if date_label:
-                date_bbox = font_sm.getbbox(date_label)
-                date_text_w = date_bbox[2] - date_bbox[0]
-                date_text_x = col_center - date_text_w // 2
-                date_y = current_y + (day_bbox[3] - day_bbox[1]) + 2
-                draw.text((date_text_x, date_y), date_label, font=font_sm, fill=0)
         
         # Dividers
         if i < num_days - 1:
@@ -369,9 +372,9 @@ def draw_hourly_forecast_image(hourly_forecast: list, total_width: int, fonts: D
     
     hour_spacing = 5
     icon_size = 24
-    entry_height = 86
+    entry_height = 98  # Increased from 86 to prevent clipping (time+icon+temp+precip ~82px + buffer)
     row_spacing = 10
-    total_height = (num_rows * entry_height) + ((num_rows - 1) * row_spacing) if num_rows > 0 else 0
+    total_height = num_rows * (entry_height + row_spacing) if num_rows > 0 else 0
     
     if total_height == 0:
         return None
