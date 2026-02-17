@@ -458,9 +458,9 @@ def _write_long_press_menu_compact(position: int):
     printer.print_caption(f"Dial: {position}")
     printer.print_body("[1] Table of contents")
     printer.print_body("[2] System monitor")
-    printer.print_body("[3] Reset WiFi")
-    printer.print_body("[4] Reset Factory Settings")
-    printer.print_body("[5] Reprint setup instructions")
+    printer.print_body("[3] Reprint setup instructions")
+    printer.print_body("[4] Reset WiFi")
+    printer.print_body("[5] Reset Factory Settings")
     printer.print_caption("[8] Cancel")
     printer.print_caption("Turn dial, press button")
 
@@ -586,11 +586,18 @@ async def long_press_menu_trigger():
 
         if dial_position == 3:
             exit_selection_mode()
+            from app.utils import print_setup_instructions_sync
+
+            print_setup_instructions_sync()
+            return
+
+        if dial_position == 4:
+            exit_selection_mode()
             if global_loop and global_loop.is_running():
                 asyncio.run_coroutine_threadsafe(manual_ap_mode_trigger(), global_loop)
             return
 
-        if dial_position == 4:
+        if dial_position == 5:
             exit_selection_mode()
             try:
                 from app.modules.settings_menu import _confirm_factory_reset
@@ -598,13 +605,6 @@ async def long_press_menu_trigger():
                 _confirm_factory_reset(hw_printer, "quick-factory-reset")
             except Exception:
                 logger.exception("Failed to open factory reset confirmation")
-            return
-
-        if dial_position == 5:
-            exit_selection_mode()
-            from app.utils import print_setup_instructions_sync
-
-            print_setup_instructions_sync()
             return
 
         # Invalid selection: exit quick actions without side effects.

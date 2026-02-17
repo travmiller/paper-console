@@ -77,28 +77,20 @@ def print_setup_instructions_sync():
     This function is safe to call from background tasks.
     """
     try:
-        printer.feed(1)
-
-        def center(text):
-            padding = max(0, (PRINTER_WIDTH - len(text)) // 2)
-            return " " * padding + text
-
-        printer.print_text(center("PC-1 SETUP MODE"))
-        printer.print_text(center("=" * 20))
-        printer.feed(1)
-        printer.print_text(center("Connect to WiFi:"))
+        printer.print_header("SETUP INSTRUCTIONS", icon="wifi")
+        printer.print_line()
+        printer.print_body("Connect to WiFi:")
 
         ssid = wifi_manager.get_ap_ssid()
         ap_password = wifi_manager.get_ap_password()
 
-        printer.print_text(center(ssid))
-        printer.print_text(center(f"Password: {ap_password}"))
+        printer.print_bold(f"  {ssid}")
+        printer.print_caption(f"  Password: {ap_password}")
+        printer.print_line()
+        printer.print_body("Then visit:")
+        printer.print_bold("  http://pc-1.local")
+        printer.print_caption("  or http://10.42.0.1")
         printer.feed(1)
-        printer.print_text(center("Then visit:"))
-        printer.print_text(center("http://pc-1.local"))
-        printer.print_text(center("OR"))
-        printer.print_text(center("http://10.42.0.1"))
-        printer.feed(3)
 
         # Flush buffer to print
         if hasattr(printer, "flush_buffer"):

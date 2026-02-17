@@ -81,9 +81,9 @@ When a user unboxes a PC-1 and powers it on for the first time, the expected flo
    - Hold button ~5 seconds (half-line paper cue appears at threshold), then release to open **Quick Actions**:
      - `1` Table of Contents
      - `2` System Monitor
-     - `3` Reset WiFi
-     - `4` Reset Factory Settings
-     - `5` Reprint Setup Instructions
+     - `3` Reprint Setup Instructions
+     - `4` Reset WiFi
+     - `5` Reset Factory Settings
      - `8` Cancel
    - Quick Actions are single-shot: after you pick an option, the menu exits automatically.
    - If no option is selected for 2 minutes, Quick Actions auto-exits and prints a timeout note.
