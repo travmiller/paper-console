@@ -454,8 +454,7 @@ def _write_channel_overview_compact():
 
 def _write_long_press_menu_compact(position: int):
     """Write long-press quick action menu in compact format (no reset/flush)."""
-    printer.print_line()
-    printer.print_subheader("QUICK ACTIONS")
+    printer.print_header("QUICK ACTIONS", icon="settings")
     printer.print_caption(f"Dial: {position}")
     printer.print_body("[1] Table of contents")
     printer.print_body("[2] System monitor")
@@ -588,10 +587,12 @@ async def long_press_menu_trigger():
             return
 
         if dial_position == 1:
+            exit_selection_mode()
             _print_overview_and_menu(position)
             return
 
         if dial_position == 2:
+            exit_selection_mode()
             _print_system_monitor_and_menu(position)
             return
 
@@ -612,14 +613,22 @@ async def long_press_menu_trigger():
             return
 
         if dial_position == 5:
+            exit_selection_mode()
             from app.utils import print_setup_instructions_sync
 
             print_setup_instructions_sync()
-            _print_long_press_menu(position)
             return
 
-        # Any other dial position: re-show the menu for clarity.
-        _print_long_press_menu(position)
+        # Invalid selection: exit quick actions without side effects.
+        exit_selection_mode()
+        if hasattr(hw_printer, "reset_buffer"):
+            hw_printer.reset_buffer()
+        hw_printer.print_header("QUICK ACTIONS", icon="settings")
+        hw_printer.print_caption("No action selected.")
+        hw_printer.print_caption("Hold button 5s to open menu.")
+        hw_printer.feed(1)
+        if hasattr(hw_printer, "flush_buffer"):
+            hw_printer.flush_buffer()
 
     enter_selection_mode(_handle_quick_action, f"quick-actions-{position}")
 
