@@ -79,8 +79,9 @@ class PrinterDriver:
         self._max_lines_hit = False  # Flag set when max lines exceeded during flush
 
         # Cutter feed space (pixels to add at end of print for cutter clearance)
+        # Placed at tear edge so content isn't cut off. Increased for reliability.
         # Can be updated via set_cutter_feed() method
-        self.cutter_feed_dots = 6 * 24  # Default: 6 lines * 24 dots/line = 144 dots
+        self.cutter_feed_dots = 12 * 24  # 12 lines * 24 dots/line = 288 dots
 
         # Font settings (fixed values)
         self.font_size = self.FONT_SIZE
@@ -786,7 +787,7 @@ class PrinterDriver:
         # Remove trailing spacing
         measured_content_height -= last_spacing
         
-        # Add safety buffer (32px) + Start Padding (168px)
+        # Content at top; cutter feed at bottom (becomes tear edge after 180° rotation)
         total_height = measured_content_height + (self.SPACING_LARGE * 2) + self.cutter_feed_dots
         
         # Create Image
@@ -794,8 +795,8 @@ class PrinterDriver:
         img = Image.new("1", (width, total_height), 1)
         draw = ImageDraw.Draw(img)
         
-        # Pass 2: Draw
-        current_y = self.cutter_feed_dots
+        # Pass 2: Draw content from top (y=0); bottom = white = tear-edge clearance
+        current_y = 0
         for op_type, op_data in ops:
              h, s = self._render_op(img, draw, current_y, op_type, op_data, dry_run=False)
              if h > 0:
@@ -811,7 +812,7 @@ class PrinterDriver:
             dash_length = 8
             gap_length = 4
             
-            for y in range(self.cutter_feed_dots, current_y, dash_length + gap_length):
+            for y in range(0, current_y, dash_length + gap_length):
                 segment_end = min(y + dash_length, current_y)
                 if segment_end > y:
                     draw.rectangle(
