@@ -6,8 +6,8 @@
 set +e
 
 AP_SSID_PREFIX="PC-1-Setup"
-AP_PASSWORD="setup1234"
 AP_INTERFACE="wlan0"
+AP_PASSWORD="${PC1_SETUP_PASSWORD:-}"
 
 # Generate unique SSID suffix from CPU serial
 get_device_id() {
@@ -25,11 +25,21 @@ get_ap_ip() {
     ip -4 addr show "$AP_INTERFACE" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1
 }
 
+get_ap_password() {
+    local device_id="$1"
+    if [ -n "$AP_PASSWORD" ] && [ "${#AP_PASSWORD}" -ge 8 ]; then
+        echo "$AP_PASSWORD"
+    else
+        echo "pc1-${device_id,,}-setup"
+    fi
+}
+
 start_ap() {
     echo "Starting AP Mode..."
     
     DEVICE_ID=$(get_device_id)
     SSID="${AP_SSID_PREFIX}-${DEVICE_ID}"
+    AP_PASS=$(get_ap_password "$DEVICE_ID")
     
     # 1. CLEANUP: Delete any existing hotspot connection to avoid conflicts
     nmcli connection delete "PC-1-Hotspot" 2>/dev/null || true
@@ -47,7 +57,7 @@ start_ap() {
         ifname "$AP_INTERFACE" \
         con-name "PC-1-Hotspot" \
         ssid "$SSID" \
-        password "$AP_PASSWORD" \
+        password "$AP_PASS" \
         band bg \
         channel 1
     
@@ -71,7 +81,7 @@ start_ap() {
         echo "========================================"
         echo "AP Mode Active!"
         echo "SSID: $SSID"
-        echo "Password: $AP_PASSWORD"
+        echo "Password: $AP_PASS"
         echo "IP: ${AP_IP:-10.42.0.1}"
         echo "========================================"
         
@@ -110,9 +120,10 @@ status() {
     if nmcli connection show --active 2>/dev/null | grep -q "PC-1-Hotspot"; then
         echo "AP Mode: ACTIVE"
         DEVICE_ID=$(get_device_id)
+        AP_PASS=$(get_ap_password "$DEVICE_ID")
         AP_IP=$(get_ap_ip)
         echo "SSID: ${AP_SSID_PREFIX}-${DEVICE_ID}"
-        echo "Password: $AP_PASSWORD"
+        echo "Password: $AP_PASS"
         echo "IP: ${AP_IP:-unknown}"
     else
         echo "AP Mode: INACTIVE"

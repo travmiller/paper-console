@@ -1,7 +1,10 @@
 import React from 'react';
 
-const APInstructionsModal = ({ show }) => {
+const APInstructionsModal = ({ show, wifiStatus }) => {
   if (!show) return null;
+
+  const apSsid = wifiStatus?.ap_ssid || 'PC-1-Setup-<device>';
+  const apPassword = wifiStatus?.ap_password || 'Check printed instructions';
 
   return (
     <div className='fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4'>
@@ -25,7 +28,7 @@ const APInstructionsModal = ({ show }) => {
               2
             </span>
             <p className='text-black text-sm'>
-              Connect your device to the <span className='text-black bg-gray-200 px-1 rounded border border-gray-300'>PC-1-Setup-XXXX</span>{' '}
+              Connect your device to the <span className='text-black bg-gray-200 px-1 rounded border border-gray-300'>{apSsid}</span>{' '}
               WiFi network.
             </p>
           </div>
@@ -34,6 +37,16 @@ const APInstructionsModal = ({ show }) => {
               className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold'
               style={{ backgroundColor: 'var(--color-brass)' }}>
               3
+            </span>
+            <p className='text-black text-sm'>
+              Password: <span className='text-black bg-gray-200 px-1 rounded border border-gray-300'>{apPassword}</span>
+            </p>
+          </div>
+          <div className='flex gap-3'>
+            <span
+              className='flex-shrink-0 w-6 h-6 rounded-full text-white flex items-center justify-center text-sm font-bold'
+              style={{ backgroundColor: 'var(--color-brass)' }}>
+              4
             </span>
             <p className='text-black text-sm'>
               Navigate to <span className='text-black bg-gray-200 px-1 rounded border border-gray-300'>http://10.42.0.1</span> to configure

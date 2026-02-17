@@ -597,11 +597,6 @@ function App() {
     saveGlobalSettings({ channels: newChannels });
   };
 
-  const handleWiFiSetupComplete = () => {
-    setWifiMode('client');
-    window.location.reload();
-  };
-
   const triggerAPMode = async () => {
     try {
       await fetch('/api/wifi/ap-mode', { method: 'POST' });
@@ -617,7 +612,7 @@ function App() {
   }
 
   if (wifiMode === 'ap') {
-    return <WiFiSetup onComplete={handleWiFiSetupComplete} />;
+    return <WiFiSetup wifiStatus={wifiStatus} />;
   }
 
   return (
@@ -782,7 +777,7 @@ function App() {
           timeFormat={settings.time_format}
         />
 
-        <APInstructionsModal show={showAPInstructions} />
+        <APInstructionsModal show={showAPInstructions} wifiStatus={wifiStatus} />
 
         <StatusMessage status={status} />
       </div>

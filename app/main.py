@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, Response
@@ -13,6 +13,8 @@ import subprocess
 import platform
 import pytz
 import logging
+import ipaddress
+from urllib.parse import urlparse
 
 # Configure logging
 logging.basicConfig(
@@ -23,6 +25,98 @@ logging.basicConfig(
     ],
 )
 logger = logging.getLogger(__name__)
+
+
+def _parse_cors_origins() -> List[str]:
+    """
+    Parse allowed CORS origins from env.
+    Defaults to local/dev origins rather than wildcard.
+    """
+    raw = os.environ.get("PC1_CORS_ORIGINS", "").strip()
+    if raw:
+        origins = [o.strip() for o in raw.split(",") if o.strip()]
+        if "*" in origins:
+            return ["*"]
+        return origins
+    return [
+        "http://localhost",
+        "http://localhost:5173",
+        "http://localhost:8000",
+        "http://127.0.0.1",
+        "http://127.0.0.1:5173",
+        "http://127.0.0.1:8000",
+        "http://pc-1.local",
+    ]
+
+
+def _host_is_private_or_local(host: Optional[str]) -> bool:
+    if not host:
+        return False
+
+    # Handle values like "127.0.0.1:12345"
+    if ":" in host and host.count(":") == 1:
+        host = host.split(":")[0]
+
+    lowered = host.lower()
+    if lowered in {"localhost", "pc-1.local"}:
+        return True
+
+    try:
+        addr = ipaddress.ip_address(host)
+        return addr.is_loopback or addr.is_private or addr.is_link_local
+    except ValueError:
+        return False
+
+
+def _origin_is_local(origin: Optional[str]) -> bool:
+    if not origin:
+        return False
+    try:
+        parsed = urlparse(origin)
+        return _host_is_private_or_local(parsed.hostname)
+    except Exception:
+        return False
+
+
+def require_admin_access(request: Request):
+    """
+    Protect privileged endpoints.
+    - If PC1_ADMIN_TOKEN is set, require X-PC1-Admin-Token.
+    - Otherwise, allow only local/private network requests.
+    """
+    configured_token = os.environ.get("PC1_ADMIN_TOKEN", "").strip()
+    provided_token = request.headers.get("X-PC1-Admin-Token", "").strip()
+
+    if configured_token:
+        if provided_token != configured_token:
+            raise HTTPException(
+                status_code=401,
+                detail="Admin token required or invalid.",
+                headers={"X-PC1-Auth-Required": "true"},
+            )
+        return
+
+    client_host = request.client.host if request.client else None
+    origin = request.headers.get("origin")
+    if not (_host_is_private_or_local(client_host) or _origin_is_local(origin)):
+        raise HTTPException(
+            status_code=403,
+            detail="Privileged endpoint is restricted to local/private networks.",
+        )
+
+
+def get_admin_auth_status() -> Dict[str, object]:
+    """Return current privileged-endpoint auth mode (without exposing secrets)."""
+    token_set = bool(os.environ.get("PC1_ADMIN_TOKEN", "").strip())
+    return {
+        "token_required": token_set,
+        "auth_mode": "token" if token_set else "local_network",
+        "message": (
+            "Admin token required for privileged actions."
+            if token_set
+            else "Privileged actions are limited to local/private network clients."
+        ),
+    }
 from app.config import (
     settings,
     Settings,
@@ -261,10 +355,180 @@ async def handle_selection_async(dial_position: int):
 
 
 def on_button_long_press_threadsafe():
-    """Callback for long press (5 seconds) - triggers AP mode."""
+    """Callback for long press (5 seconds) - opens quick actions menu."""
     global global_loop
     if global_loop and global_loop.is_running():
-        asyncio.run_coroutine_threadsafe(manual_ap_mode_trigger(), global_loop)
+        asyncio.run_coroutine_threadsafe(long_press_menu_trigger(), global_loop)
+
+
+def _print_channel_config_summary(position: int):
+    """Print a summary of the currently selected channel configuration."""
+    if hasattr(printer, "reset_buffer"):
+        max_lines = getattr(settings, "max_print_lines", 200)
+        printer.reset_buffer(max_lines)
+
+    printer.print_header(f"CHANNEL {position}", icon="list")
+    printer.print_line()
+
+    channel = settings.channels.get(position)
+    if not channel or not channel.modules:
+        printer.print_body("This channel is empty.")
+        printer.print_caption("Use web settings to add modules.")
+    else:
+        sorted_assignments = sorted(channel.modules, key=lambda m: m.order)
+        printer.print_caption("Assigned modules:")
+        for idx, assignment in enumerate(sorted_assignments, start=1):
+            module = settings.modules.get(assignment.module_id)
+            module_name = module.name if module else "(missing module)"
+            printer.print_body(f"  {idx}. {module_name}")
+
+        if channel.schedule:
+            printer.feed(1)
+            printer.print_caption("Schedule:")
+            for schedule_time in channel.schedule[:8]:
+                printer.print_body(f"  - {schedule_time}")
+            if len(channel.schedule) > 8:
+                printer.print_caption(f"  +{len(channel.schedule) - 8} more")
+        else:
+            printer.feed(1)
+            printer.print_caption("Schedule: none")
+
+    printer.print_line()
+    printer.print_caption("Visit http://pc-1.local")
+    printer.print_caption("to edit this channel.")
+    printer.feed(1)
+
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+
+
+def _print_channel_overview():
+    """Print all channel assignments (compact view)."""
+    if hasattr(printer, "reset_buffer"):
+        max_lines = getattr(settings, "max_print_lines", 200)
+        printer.reset_buffer(max_lines)
+
+    printer.print_header("CHANNEL OVERVIEW", icon="list")
+    printer.print_line()
+
+    for channel_num in range(1, 9):
+        channel = settings.channels.get(channel_num)
+        if channel and channel.modules:
+            names = []
+            for assignment in sorted(channel.modules, key=lambda m: m.order):
+                module = settings.modules.get(assignment.module_id)
+                if module:
+                    names.append(module.name)
+            if names:
+                printer.print_body(f"{channel_num}. {' + '.join(names)}")
+            else:
+                printer.print_caption(f"{channel_num}. (empty)")
+        else:
+            printer.print_caption(f"{channel_num}. (empty)")
+
+    printer.print_line()
+    printer.feed(1)
+
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+
+
+def _print_long_press_menu(position: int):
+    """Print long-press quick action menu."""
+    if hasattr(printer, "reset_buffer"):
+        max_lines = getattr(settings, "max_print_lines", 200)
+        printer.reset_buffer(max_lines)
+
+    printer.print_header("QUICK ACTIONS", icon="settings")
+    printer.print_caption(f"Dial is on channel {position}")
+    printer.print_line()
+    printer.print_body("  [1] Print current channel config")
+    printer.print_body("  [2] Enter WiFi setup mode")
+    printer.print_body("  [3] Print channel overview")
+    printer.print_body("  [4] Open settings menu")
+    printer.feed(1)
+    printer.print_caption("  [8] Cancel")
+    printer.print_line()
+    printer.print_caption("Turn dial, then press button")
+    printer.feed(1)
+
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+
+
+async def long_press_menu_trigger():
+    """Long-press flow: print current channel config and enter quick selection mode."""
+    from concurrent.futures import ThreadPoolExecutor
+    from app.selection_mode import enter_selection_mode, exit_selection_mode
+
+    # Cancel any existing interactive mode before opening quick actions
+    exit_selection_mode()
+
+    position = dial.read_position()
+
+    def _initial_print():
+        # Print the current channel config first, then show quick actions.
+        _print_channel_config_summary(position)
+        _print_long_press_menu(position)
+
+    try:
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _initial_print)
+    except Exception:
+        logger.exception("Failed to render long-press menu")
+        return
+
+    def _handle_quick_action(dial_position: int):
+        from app.selection_mode import exit_selection_mode
+        from app.hardware import printer as hw_printer
+
+        if dial_position == 8:
+            exit_selection_mode()
+            if hasattr(hw_printer, "reset_buffer"):
+                hw_printer.reset_buffer()
+            hw_printer.print_header("CANCELLED", icon="x")
+            hw_printer.print_line()
+            hw_printer.feed(1)
+            if hasattr(hw_printer, "flush_buffer"):
+                hw_printer.flush_buffer()
+            return
+
+        if dial_position == 1:
+            _print_channel_config_summary(position)
+            _print_long_press_menu(position)
+            return
+
+        if dial_position == 2:
+            exit_selection_mode()
+            if global_loop and global_loop.is_running():
+                asyncio.run_coroutine_threadsafe(manual_ap_mode_trigger(), global_loop)
+            return
+
+        if dial_position == 3:
+            _print_channel_overview()
+            _print_long_press_menu(position)
+            return
+
+        if dial_position == 4:
+            exit_selection_mode()
+            try:
+                from app.modules.settings_menu import format_settings_menu_receipt
+
+                format_settings_menu_receipt(
+                    hw_printer,
+                    config={},
+                    module_name="SETTINGS",
+                    module_id="quick-settings-menu",
+                )
+            except Exception:
+                logger.exception("Failed to open settings menu from quick actions")
+            return
+
+        # Any other dial position: re-show the menu for clarity.
+        _print_long_press_menu(position)
+
+    enter_selection_mode(_handle_quick_action, f"quick-actions-{position}")
 
 
 from app.utils import print_setup_instructions_sync
@@ -367,19 +631,8 @@ async def check_first_boot():
                 return
             else:
                 # First boot! Print welcome message
-                # Get device ID for SSID
-                ssid_suffix = "XXXX"
-                try:
-                    if _is_raspberry_pi:
-                        with open("/proc/cpuinfo", "r") as f:
-                            for line in f:
-                                if line.startswith("Serial"):
-                                    ssid_suffix = line.split(":")[1].strip()[-4:]
-                                    break
-                except Exception:
-                    pass
-
-                ssid = f"PC-1-Setup-{ssid_suffix}"
+                ssid = wifi_manager.get_ap_ssid()
+                ap_password = wifi_manager.get_ap_password()
 
                 # Welcome header with icon (no feed before - content starts immediately)
                 printer.print_header("WELCOME")
@@ -402,7 +655,7 @@ async def check_first_boot():
                 printer.print_body("connect to WiFi network:")
                 printer.print_line()
                 printer.print_bold(f"  {ssid}")
-                printer.print_caption("  Password: setup1234")
+                printer.print_caption(f"  Password: {ap_password}")
                 printer.print_line()
 
                 # Step 2
@@ -443,7 +696,7 @@ async def check_first_boot():
                 printer.print_line()
 
                 printer.print_subheader("QUICK HELP")
-                printer.print_body("Button 5s = WiFi setup")
+                printer.print_body("Button 5s = Quick actions")
                 printer.print_body("Button 15s = Reset all")
                 printer.print_line()
                 printer.feed(1)
@@ -510,7 +763,7 @@ async def periodic_wifi_recovery():
 
 
 async def manual_ap_mode_trigger():
-    """Manually trigger AP mode (e.g. via button hold 5-15 seconds)."""
+    """Manually trigger AP mode."""
     logger.info("Manual AP mode trigger initiated")
 
     from app.selection_mode import exit_selection_mode
@@ -624,6 +877,14 @@ async def lifespan(app: FastAPI):
     # Capture the running loop
     global_loop = asyncio.get_running_loop()
 
+    admin_auth = get_admin_auth_status()
+    if admin_auth["token_required"]:
+        logger.info("Admin protection mode: token")
+    else:
+        logger.warning(
+            "PC1_ADMIN_TOKEN not set. Privileged endpoints are restricted to local/private networks only."
+        )
+
     # Clear printer hardware buffer first to prevent startup garbage
     # Run in thread pool to avoid blocking event loop
     def _init_printer():
@@ -654,7 +915,7 @@ async def lifespan(app: FastAPI):
     # Initialize Main Button Callbacks
     # Short press = Print
     button.set_callback(on_button_press_threadsafe)
-    # Long press (5s) = AP Mode
+    # Long press (5s) = Quick actions menu
     button.set_long_press_callback(on_button_long_press_threadsafe)
     # Factory reset (15s) = Factory Reset
     button.set_factory_reset_callback(on_factory_reset_threadsafe)
@@ -691,8 +952,8 @@ app = FastAPI(
 # Allow Frontend (React) to talk to Backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict this to localhost
-    allow_credentials=True,
+    allow_origins=_parse_cors_origins(),
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -723,6 +984,12 @@ async def read_root():
         "current_channel": pos,
         "current_module": module_info,
     }
+
+
+@app.get("/api/system/auth/status")
+async def get_auth_status():
+    """Return privileged endpoint auth mode for UI guidance."""
+    return get_admin_auth_status()
 
 
 @app.get("/api/health")
@@ -1016,7 +1283,7 @@ class SetTimezoneRequest(BaseModel):
     timezone: str
 
 
-@app.post("/api/system/timezone")
+@app.post("/api/system/timezone", dependencies=[Depends(require_admin_access)])
 async def set_system_timezone(request: SetTimezoneRequest):
     """
     Set the system timezone.
@@ -1138,7 +1405,7 @@ class SetTimeRequest(BaseModel):
     time: str
 
 
-@app.post("/api/system/time")
+@app.post("/api/system/time", dependencies=[Depends(require_admin_access)])
 async def set_system_time(request: SetTimeRequest):
     """
     Set the system time and date.
@@ -1259,7 +1526,7 @@ async def set_system_time(request: SetTimeRequest):
         }
 
 
-@app.post("/api/system/time/sync/disable")
+@app.post("/api/system/time/sync/disable", dependencies=[Depends(require_admin_access)])
 async def disable_ntp_sync():
     """
     Disable NTP synchronization to allow manual time setting.
@@ -1292,7 +1559,7 @@ async def disable_ntp_sync():
         }
 
 
-@app.post("/api/system/time/sync")
+@app.post("/api/system/time/sync", dependencies=[Depends(require_admin_access)])
 async def sync_system_time():
     """
     Automatically synchronize system time using NTP.
@@ -1603,7 +1870,7 @@ async def check_for_updates():
         }
 
 
-@app.post("/api/system/updates/install")
+@app.post("/api/system/updates/install", dependencies=[Depends(require_admin_access)])
 async def install_updates():
     """
     Install available updates by pulling from the remote repository and restarting the service.
@@ -1819,7 +2086,7 @@ async def get_ssh_status():
         }
 
 
-@app.post("/api/system/ssh/enable")
+@app.post("/api/system/ssh/enable", dependencies=[Depends(require_admin_access)])
 async def enable_ssh():
     """
     Enable SSH service.
@@ -1879,7 +2146,7 @@ async def enable_ssh():
         }
 
 
-@app.post("/api/system/ssh/disable")
+@app.post("/api/system/ssh/disable", dependencies=[Depends(require_admin_access)])
 async def disable_ssh():
     """
     Disable SSH service.
@@ -1944,7 +2211,7 @@ class SSHPasswordChange(BaseModel):
     new_password: str
 
 
-@app.post("/api/system/ssh/password")
+@app.post("/api/system/ssh/password", dependencies=[Depends(require_admin_access)])
 async def change_ssh_password(password_data: SSHPasswordChange):
     """
     Change SSH user password.

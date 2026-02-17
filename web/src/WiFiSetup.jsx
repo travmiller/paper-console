@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export default function WiFiSetup({ onComplete }) {
+export default function WiFiSetup({ wifiStatus }) {
   const [networks, setNetworks] = useState([]);
   const [selectedSSID, setSelectedSSID] = useState('');
   const [password, setPassword] = useState('');
@@ -58,7 +58,7 @@ export default function WiFiSetup({ onComplete }) {
         setError(errorData.detail || 'Failed to connect');
         setIsConnecting(false);
       }
-    } catch (err) {
+    } catch {
       // Connection might have been lost because AP mode stopped - that's expected!
       setConnectionStarted(true);
       setIsConnecting(false);
@@ -84,7 +84,9 @@ export default function WiFiSetup({ onComplete }) {
             <ol className='space-y-3 text-black'>
               <li className='flex items-start gap-2'>
                 <span className='bg-black text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm font-bold'>1</span>
-                <span>Disconnect from <strong>PC-1-Setup</strong> network on your phone</span>
+                <span>
+                  Disconnect from <strong>{wifiStatus?.ap_ssid || 'PC-1 Setup network'}</strong> on your phone
+                </span>
               </li>
               <li className='flex items-start gap-2'>
                 <span className='bg-black text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm font-bold'>2</span>

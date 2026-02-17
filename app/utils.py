@@ -1,7 +1,8 @@
 """Shared utility functions for modules."""
 
-from app.hardware import printer, _is_raspberry_pi
+from app.hardware import printer
 from app.config import PRINTER_WIDTH
+import app.wifi_manager as wifi_manager
 
 
 def wrap_text(text: str, width: int = 42, indent: int = 0, preserve_line_breaks: bool = False) -> list[str]:
@@ -87,22 +88,11 @@ def print_setup_instructions_sync():
         printer.feed(1)
         printer.print_text(center("Connect to WiFi:"))
 
-        # Get device ID for SSID
-        ssid_suffix = "XXXX"
-        try:
-            if _is_raspberry_pi:
-                with open("/proc/cpuinfo", "r") as f:
-                    for line in f:
-                        if line.startswith("Serial"):
-                            ssid_suffix = line.split(":")[1].strip()[-4:]
-                            break
-        except Exception:
-            pass
-
-        ssid = f"PC-1-Setup-{ssid_suffix}"
+        ssid = wifi_manager.get_ap_ssid()
+        ap_password = wifi_manager.get_ap_password()
 
         printer.print_text(center(ssid))
-        printer.print_text(center("Password: setup1234"))
+        printer.print_text(center(f"Password: {ap_password}"))
         printer.feed(1)
         printer.print_text(center("Then visit:"))
         printer.print_text(center("http://pc-1.local"))

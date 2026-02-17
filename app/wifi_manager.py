@@ -8,6 +8,37 @@ import os
 import logging
 from typing import List, Dict, Optional
 
+AP_SSID_PREFIX = "PC-1-Setup"
+AP_PASSWORD_ENV = "PC1_SETUP_PASSWORD"
+
+
+def get_device_suffix() -> str:
+    """Return a stable 4-char device suffix from CPU serial when available."""
+    try:
+        if os.path.exists("/proc/cpuinfo"):
+            with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.lower().startswith("serial"):
+                        serial = line.split(":", 1)[1].strip()
+                        if serial:
+                            return serial[-4:].upper()
+    except Exception:
+        pass
+    return "XXXX"
+
+
+def get_ap_ssid() -> str:
+    """Get setup AP SSID."""
+    return f"{AP_SSID_PREFIX}-{get_device_suffix()}"
+
+
+def get_ap_password() -> str:
+    """Get setup AP password (env override or per-device fallback)."""
+    env_password = os.environ.get(AP_PASSWORD_ENV, "").strip()
+    if len(env_password) >= 8:
+        return env_password
+    return f"pc1-{get_device_suffix().lower()}-setup"
+
 
 def run_command(cmd: List[str], check: bool = True) -> subprocess.CompletedProcess:
     """Run a shell command and return the result."""
@@ -52,7 +83,14 @@ def get_wifi_status() -> Dict:
     """Get current WiFi connection status."""
     try:
         if is_ap_mode_active():
-            return {"connected": False, "mode": "ap", "ssid": None, "ip": "10.42.0.1"}
+            return {
+                "connected": False,
+                "mode": "ap",
+                "ssid": None,
+                "ip": "10.42.0.1",
+                "ap_ssid": get_ap_ssid(),
+                "ap_password": get_ap_password(),
+            }
 
         result = run_command(
             ["nmcli", "-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"],

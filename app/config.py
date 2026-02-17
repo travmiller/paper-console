@@ -408,9 +408,14 @@ def remove_deprecated_features(data: dict) -> dict:
     modules = data.get("modules")
     removed_module_ids = set()
 
+    deprecated_module_types = {"ai", "settings_menu"}
+
     if isinstance(modules, dict):
         for module_id, module_data in list(modules.items()):
-            if isinstance(module_data, dict) and module_data.get("type") == "ai":
+            if (
+                isinstance(module_data, dict)
+                and module_data.get("type") in deprecated_module_types
+            ):
                 removed_module_ids.add(str(module_id))
                 modules.pop(module_id, None)
 

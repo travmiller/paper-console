@@ -5,14 +5,10 @@ import PrimaryButton from './PrimaryButton';
 import WiFiIcon from '../assets/WiFiIcon';
 import WiFiOffIcon from '../assets/WiFiOffIcon';
 import LocationSearch from './widgets/LocationSearch';
+import { adminAuthFetch, getAdminToken, setAdminToken, clearAdminToken } from '../lib/adminAuthFetch';
 
 
 const GeneralSettings = ({
-  searchTerm,
-  searchResults,
-  isSearching,
-  handleSearch,
-  selectLocation,
   settings,
   saveGlobalSettings,
   triggerAPMode,
@@ -47,6 +43,9 @@ const GeneralSettings = ({
   const [updateMessage, setUpdateMessage] = useState({ type: '', message: '' });
   const [currentVersion, setCurrentVersion] = useState(null);
   const [updateProgress, setUpdateProgress] = useState({ stage: '', progress: 0 });
+  const [authStatus, setAuthStatus] = useState(null);
+  const [adminTokenInput, setAdminTokenInput] = useState('');
+  const [tokenSaved, setTokenSaved] = useState(false);
 
   // Fetch current system time on mount and periodically
   useEffect(() => {
@@ -116,38 +115,28 @@ const GeneralSettings = ({
     fetchCurrentVersion();
   }, []);
 
-  // Format timezone to a more readable format
-  const formatTimezone = (tz) => {
-    if (!tz) return 'Not Set';
+  useEffect(() => {
+    const currentToken = getAdminToken();
+    if (currentToken) {
+      setAdminTokenInput(currentToken);
+      setTokenSaved(true);
+    }
 
-    const timezoneMap = {
-      'America/New_York': 'Eastern Time (ET)',
-      'America/Chicago': 'Central Time (CT)',
-      'America/Denver': 'Mountain Time (MT)',
-      'America/Phoenix': 'Mountain Time (MT)',
-      'America/Los_Angeles': 'Pacific Time (PT)',
-      'America/Anchorage': 'Alaska Time (AKT)',
-      'Pacific/Honolulu': 'Hawaii Time (HST)',
-      'America/Puerto_Rico': 'Atlantic Time (AST)',
-      'America/St_Thomas': 'Atlantic Time (AST)',
-      'Pacific/Guam': 'Chamorro Time (ChST)',
-      'Pacific/Pago_Pago': 'Samoa Time (SST)',
-      'Pacific/Saipan': 'Chamorro Time (ChST)',
+    const fetchAuthStatus = async () => {
+      try {
+        const response = await fetch('/api/system/auth/status');
+        const data = await response.json();
+        setAuthStatus(data);
+      } catch (err) {
+        console.error('Error fetching auth status:', err);
+      }
     };
 
-    // Check for exact match first
-    if (timezoneMap[tz]) {
-      return timezoneMap[tz];
-    }
+    fetchAuthStatus();
+  }, []);
 
-    // Try to extract timezone name from IANA format
-    const parts = tz.split('/');
-    if (parts.length >= 2) {
-      const location = parts[parts.length - 1].replace(/_/g, ' ');
-      return `${location} (${tz})`;
-    }
-
-    return tz;
+  const getApiError = (data, fallback) => {
+    return data?.detail || data?.message || data?.error || fallback;
   };
 
   // Auto sync time
@@ -160,7 +149,7 @@ const GeneralSettings = ({
 
     setTimeStatus({ type: '', message: '' });
     try {
-      const response = await fetch('/api/system/time/sync', {
+      const response = await adminAuthFetch('/api/system/time/sync', {
         method: 'POST',
       });
 
@@ -177,7 +166,7 @@ const GeneralSettings = ({
           setManualTime(timeData.time.substring(0, 5));
         }
       } else {
-        setTimeStatus({ type: 'error', message: data.message || data.error || 'Failed to sync time' });
+        setTimeStatus({ type: 'error', message: getApiError(data, 'Failed to sync time') });
       }
     } catch (err) {
       setTimeStatus({ type: 'error', message: 'Error syncing time: ' + err.message });
@@ -268,7 +257,7 @@ const GeneralSettings = ({
 
     try {
       console.log('Setting time:', { date: normalizedDate, time: normalizedTimeStr });
-      const response = await fetch('/api/system/time', {
+      const response = await adminAuthFetch('/api/system/time', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ date: normalizedDate, time: normalizedTimeStr }),
@@ -301,7 +290,7 @@ const GeneralSettings = ({
       } else {
         setTimeStatus({
           type: 'error',
-          message: data.message || data.error || 'Failed to set system time. The application may need sudo privileges.',
+          message: getApiError(data, 'Failed to set system time. The application may need sudo privileges.'),
         });
       }
     } catch (err) {
@@ -317,6 +306,68 @@ const GeneralSettings = ({
 
   return (
     <div className='space-y-4'>
+      {/* Admin Access */}
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[0] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
+          <h3 className='font-bold text-black text-lg tracking-tight mb-3'>Admin Access</h3>
+          <p className='text-sm text-gray-600 mb-3'>
+            Time, SSH, and update installation actions may require admin authorization.
+          </p>
+
+          {authStatus && (
+            <div className='mb-3 text-sm'>
+              <span className='text-gray-600 font-bold'>Mode: </span>
+              <span className='text-black font-bold'>
+                {authStatus.token_required ? 'Admin token required' : 'Local/private network only'}
+              </span>
+            </div>
+          )}
+
+          {authStatus?.token_required && (
+            <>
+              <label className='block mb-2 text-sm text-black font-bold'>Admin Token</label>
+              <input
+                type='password'
+                value={adminTokenInput}
+                onChange={(e) => {
+                  setAdminTokenInput(e.target.value);
+                  setTokenSaved(false);
+                }}
+                placeholder='Paste PC1_ADMIN_TOKEN'
+                className={inputClass}
+              />
+              <div className='flex gap-3 mt-3'>
+                <PrimaryButton
+                  onClick={() => {
+                    const token = adminTokenInput.trim();
+                    if (!token) {
+                      setUpdateMessage({ type: 'error', message: 'Enter an admin token first.' });
+                      setTimeout(() => setUpdateMessage({ type: '', message: '' }), 4000);
+                      return;
+                    }
+                    setAdminToken(token);
+                    setTokenSaved(true);
+                  }}
+                  className='flex-1'>
+                  Save Token
+                </PrimaryButton>
+                <button
+                  type='button'
+                  onClick={() => {
+                    clearAdminToken();
+                    setAdminTokenInput('');
+                    setTokenSaved(false);
+                  }}
+                  className='px-4 py-2.5 bg-transparent border-2 border-gray-400 text-black rounded-lg font-bold hover:border-black transition-all cursor-pointer'>
+                  Clear
+                </button>
+              </div>
+              {tokenSaved && <p className='text-xs text-gray-600 mt-2'>Token saved in this browser.</p>}
+            </>
+          )}
+        </div>
+      </div>
+
       {/* Update Check */}
       <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[5] || inkGradients[0] }}>
         <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
@@ -393,7 +444,7 @@ const GeneralSettings = ({
                       setUpdateMessage({ type: 'error', message: data.error });
                       setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
                     }
-                  } catch (err) {
+                  } catch {
                     setUpdateMessage({ type: 'error', message: 'Could not check for updates. Check your internet connection.' });
                     setTimeout(() => setUpdateMessage({ type: '', message: '' }), 5000);
                   } finally {
@@ -427,7 +478,7 @@ const GeneralSettings = ({
                       });
                     }, 500);
                     
-                    const response = await fetch('/api/system/updates/install', {
+                    const response = await adminAuthFetch('/api/system/updates/install', {
                       method: 'POST',
                     });
                     
@@ -440,11 +491,11 @@ const GeneralSettings = ({
                       setUpdateStatus(null);
                     } else {
                       setUpdateProgress({ stage: '', progress: 0 });
-                      setUpdateMessage({ type: 'error', message: data.error || data.message || 'Update failed. Please try again.' });
+                      setUpdateMessage({ type: 'error', message: getApiError(data, 'Update failed. Please try again.') });
                       setInstallingUpdate(false);
                       return;
                     }
-                  } catch (err) {
+                  } catch {
                     // Network error is expected during restart - treat as success
                     setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
                     setUpdateStatus(null);
@@ -497,7 +548,7 @@ const GeneralSettings = ({
                             setTimeout(() => window.location.reload(), 500);
                           }
                         }
-                      } catch (err) {
+                      } catch {
                         clearTimeout(timeoutId);
                         // Service not ready yet, keep trying
                         if (attempts < maxAttempts) {
@@ -603,10 +654,10 @@ const GeneralSettings = ({
                     // When switching to manual, disable NTP sync to prevent override
                     try {
                       // Disable NTP sync when switching to manual mode
-                      await fetch('/api/system/time/sync/disable', { method: 'POST' }).catch(() => {
+                      await adminAuthFetch('/api/system/time/sync/disable', { method: 'POST' }).catch(() => {
                         // Ignore errors - the backend will handle NTP disable when setting time
                       });
-                    } catch (err) {
+                    } catch {
                       // Ignore errors
                     }
                     // When switching to manual, ensure inputs are populated
@@ -833,7 +884,7 @@ const GeneralSettings = ({
                       setSshLoading(true);
                       setSshMessage({ type: '', message: '' });
                       try {
-                        const response = await fetch('/api/system/ssh/enable', { method: 'POST' });
+                        const response = await adminAuthFetch('/api/system/ssh/enable', { method: 'POST' });
                         const data = await response.json();
                         if (data.success) {
                           setSshMessage({ type: 'success', message: data.message });
@@ -842,9 +893,9 @@ const GeneralSettings = ({
                           const statusData = await statusResponse.json();
                           setSshStatus(statusData);
                         } else {
-                          setSshMessage({ type: 'error', message: data.message || 'Failed to enable SSH' });
+                          setSshMessage({ type: 'error', message: getApiError(data, 'Failed to enable SSH') });
                         }
-                      } catch (err) {
+                      } catch {
                         setSshMessage({ type: 'error', message: 'Error enabling SSH' });
                       } finally {
                         setSshLoading(false);
@@ -865,7 +916,7 @@ const GeneralSettings = ({
                       setSshLoading(true);
                       setSshMessage({ type: '', message: '' });
                       try {
-                        const response = await fetch('/api/system/ssh/disable', { method: 'POST' });
+                        const response = await adminAuthFetch('/api/system/ssh/disable', { method: 'POST' });
                         const data = await response.json();
                         if (data.success) {
                           setSshMessage({ type: 'success', message: data.message });
@@ -874,9 +925,9 @@ const GeneralSettings = ({
                           const statusData = await statusResponse.json();
                           setSshStatus(statusData);
                         } else {
-                          setSshMessage({ type: 'error', message: data.message || 'Failed to disable SSH' });
+                          setSshMessage({ type: 'error', message: getApiError(data, 'Failed to disable SSH') });
                         }
-                      } catch (err) {
+                      } catch {
                         setSshMessage({ type: 'error', message: 'Error disabling SSH' });
                       } finally {
                         setSshLoading(false);
@@ -947,7 +998,7 @@ const GeneralSettings = ({
                         setChangingPassword(true);
                         setSshMessage({ type: '', message: '' });
                         try {
-                          const response = await fetch('/api/system/ssh/password', {
+                          const response = await adminAuthFetch('/api/system/ssh/password', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ new_password: newPassword }),
@@ -959,9 +1010,9 @@ const GeneralSettings = ({
                             setConfirmPassword('');
                             setShowPasswordChange(false);
                           } else {
-                            setSshMessage({ type: 'error', message: data.message || 'Failed to change password' });
+                            setSshMessage({ type: 'error', message: getApiError(data, 'Failed to change password') });
                           }
-                        } catch (err) {
+                        } catch {
                           setSshMessage({ type: 'error', message: 'Error changing password' });
                         } finally {
                           setChangingPassword(false);

@@ -46,6 +46,44 @@ npm run dev
 ```
 * **URL:** [http://localhost:5173](http://localhost:5173)
 
+### Unboxing & First-Use Experience
+
+When a user unboxes a PC-1 and powers it on for the first time, the expected flow is:
+
+1. **First boot prints setup receipt**
+   - The printer automatically outputs onboarding instructions.
+   - It includes:
+     - Setup SSID: `PC-1-Setup-XXXX` (device-specific suffix)
+     - Setup password (device-specific by default, or overridden by `PC1_SETUP_PASSWORD`)
+     - Setup URL: `http://10.42.0.1` (and `http://pc-1.local`)
+
+2. **User connects to setup WiFi**
+   - On phone/computer, connect to the printed SSID.
+   - Enter the printed setup password.
+
+3. **User configures home WiFi in the setup web UI**
+   - Open `http://10.42.0.1`
+   - Choose home network and enter password.
+   - The UI explains that connection may drop while PC-1 switches networks.
+
+4. **PC-1 joins home WiFi**
+   - Device attempts connection in the background.
+   - On success, PC-1 prints a confirmation receipt.
+   - User reconnects their phone/computer to home WiFi.
+
+5. **User opens settings**
+   - Visit `http://pc-1.local`
+   - Configure channels/modules and print behavior.
+
+6. **Normal daily usage**
+   - Turn dial to select channel (1-8)
+   - Press button to print selected channel
+   - Hold button ~5 seconds to open **Quick Actions** (print current channel config, WiFi setup mode, channel overview, or open Settings Menu)
+   - Hold button ~15 seconds for **Factory Reset** (clears settings and reboots)
+   - Use Web UI anytime for editing modules, schedules, and system settings
+
+If WiFi setup fails, PC-1 returns to setup mode so the user can try again.
+
 ---
 
 ## 2. Software Installation
@@ -114,6 +152,15 @@ Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **
 ### Settings Storage
 * **Settings File:** `config.json` (auto-saved, gitignored)
 * **Reset:** "Reset All Settings" button restores factory defaults
+
+### Security & Network Environment Variables
+For production deployments, configure these environment variables:
+
+* **`PC1_ADMIN_TOKEN`**: Optional admin token for privileged system APIs (time/SSH/update install).  
+  When set, clients must send header `X-PC1-Admin-Token`.
+* **`PC1_CORS_ORIGINS`**: Comma-separated CORS origins (default is local/dev origins only).
+* **`PC1_SETUP_PASSWORD`**: Optional override for setup AP password (must be at least 8 chars).  
+  If unset, PC-1 generates a per-device setup password automatically.
 
 ---
 

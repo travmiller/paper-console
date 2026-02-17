@@ -16,7 +16,6 @@ Options:
 import logging
 from typing import Dict, Any
 from datetime import datetime
-from app.module_registry import register_module
 
 logger = logging.getLogger(__name__)
 
@@ -72,6 +71,7 @@ def _print_system_status(printer):
 
 def _trigger_ap_mode(printer):
     """Enter AP mode for WiFi setup."""
+    import app.wifi_manager as wifi_manager
     import asyncio
     
     printer.print_header("WIFI RESET", icon="wifi")
@@ -79,8 +79,8 @@ def _trigger_ap_mode(printer):
     printer.print_body("Starting WiFi setup mode...")
     printer.print_body("")
     printer.print_body("Connect to network:")
-    printer.print_bold("  PC-1-Setup-XXXX")
-    printer.print_caption("  Password: setup1234")
+    printer.print_bold(f"  {wifi_manager.get_ap_ssid()}")
+    printer.print_caption(f"  Password: {wifi_manager.get_ap_password()}")
     printer.print_line()
     printer.print_body("Then visit:")
     printer.print_bold("  http://10.42.0.1")
@@ -92,7 +92,6 @@ def _trigger_ap_mode(printer):
     
     # Trigger AP mode in background
     try:
-        import app.wifi_manager as wifi_manager
         wifi_manager.start_ap_mode()
     except Exception as e:
         logger.error(f"Failed to start AP mode: {e}")
@@ -267,21 +266,8 @@ def _handle_menu_choice(module_id: str, dial_position: int, module_name: str):
     )
 
 
-# --- Module Registration ---
+# --- Public Entry Point ---
 
-@register_module(
-    type_id="settings_menu",
-    label="Settings Menu",
-    description="Access settings from the dial: view channels, system status, WiFi reset, factory reset",
-    icon="settings",
-    offline=True,
-    interactive=True,
-    category="utilities",
-    config_schema={
-        "type": "object",
-        "properties": {}
-    },
-)
 def format_settings_menu_receipt(
     printer, config: Dict[str, Any] = None, module_name: str = None, module_id: str = None
 ):
