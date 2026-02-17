@@ -309,7 +309,7 @@ def draw_weather_forecast_image(
     num_days = min(len(forecast), 7)
     col_width = total_width // num_days
     icon_size = 24
-    day_height = 130  # Increased to fit day/date at top
+    day_height = 150  # Increased to prevent bottom cutoff
     divider_width = 1
 
     # Create white image
@@ -437,7 +437,7 @@ def draw_hourly_forecast_image(
 
     hour_spacing = 5
     icon_size = 24
-    entry_height = 98  # Increased from 86 to prevent clipping (time+icon+temp+precip ~82px + buffer)
+    entry_height = 110  # Increased to prevent bottom cutoff (time+icon+temp+precip with proper spacing)
     row_spacing = 10
     total_height = num_rows * (entry_height + row_spacing) if num_rows > 0 else 0
 
