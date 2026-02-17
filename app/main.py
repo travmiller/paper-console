@@ -117,6 +117,8 @@ def get_admin_auth_status() -> Dict[str, object]:
             else "Privileged actions are limited to local/private network clients."
         ),
     }
+
+
 from app.config import (
     settings,
     Settings,
@@ -310,6 +312,7 @@ def on_button_press_threadsafe():
         if global_loop and global_loop.is_running():
             # Check for selection mode (adventure game, settings menu, etc.)
             from app.selection_mode import is_selection_mode_active
+
             if is_selection_mode_active():
                 # In selection mode: use dial position as choice input
                 position = dial.read_position()
@@ -516,6 +519,7 @@ async def long_press_menu_trigger():
     """Long-press flow: print current channel config and enter quick selection mode."""
     from concurrent.futures import ThreadPoolExecutor
     from app.selection_mode import enter_selection_mode, exit_selection_mode
+
     global print_in_progress
 
     # Cancel any existing interactive mode before opening quick actions
@@ -828,6 +832,7 @@ async def manual_ap_mode_trigger():
     logger.info("Manual AP mode trigger initiated")
 
     from app.selection_mode import exit_selection_mode
+
     exit_selection_mode()
 
     # Print instructions BEFORE switching network mode
@@ -1142,13 +1147,13 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
 
     # Update in-memory - create new settings object
     settings = new_settings
-    
+
     # VALIDATE MODULE CONFIGS
     # Ensure all modules have valid configuration before saving
     for module_id, module in settings.modules.items():
         if module_id == "unassigned":
             continue
-            
+
         try:
             # We don't validate unassigned explicitly here since they are just copies
             # but we definitely validate the configured ones.
@@ -1158,11 +1163,11 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
             # Revert in-memory settings on failure
             # config_module.settings = load_config()  # Reload old config
             # raise HTTPException(status_code=400, detail=str(e))
-            
+
             # Log warning but allow save to proceed
             # This prevents unrelated module validation errors from blocking global settings updates
             logging.warning(f"Validation warning: {e}")
-            
+
     # Update module-level reference so modules that access app.config.settings will see the update
     config_module.settings = settings
 
@@ -1979,7 +1984,7 @@ async def install_updates():
 
         # Install Python dependencies
         import sys
-        
+
         # Use the current python executable to ensure we use the active venv if present
         install_result = subprocess.run(
             [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
@@ -1993,7 +1998,6 @@ async def install_updates():
             # We log the error but try to continue, as sometimes it's just a warning or minor issue
             # Using logger would be better but simple logging here:
             pass
-
 
         # Rebuild UI if web directory exists
         web_dir = project_root / "web"
@@ -2669,7 +2673,7 @@ async def search_location(q: str, limit: int = 20, use_api: Optional[str] = None
 async def get_module_types():
     """
     Returns all available module types from the registry.
-    
+
     This endpoint enables the frontend to dynamically discover what module
     types are available without hardcoding them. Each module type includes:
     - id: The module type identifier (e.g., "weather", "quotes")
@@ -2777,7 +2781,10 @@ async def execute_module_action(module_id: str, action: str):
 
     # Add other module actions here as needed
 
-    raise HTTPException(status_code=400, detail=f"Unknown action '{action}' for module type '{module.type}'")
+    raise HTTPException(
+        status_code=400,
+        detail=f"Unknown action '{action}' for module type '{module.type}'",
+    )
 
 
 @app.post("/api/channels/{position}/modules")
@@ -2894,7 +2901,7 @@ async def update_channel_schedule(
 def execute_module(module: ModuleInstance) -> bool:
     """
     Execute a single module instance using the module registry.
-    
+
     Returns True if successful, False if failed.
     """
     module_type = module.type
@@ -3015,12 +3022,13 @@ async def trigger_channel(position: int):
 
         # Sort modules by order
         sorted_modules = sorted(channel.modules, key=lambda m: m.order)
-        
+
         # Separate standard and interactive modules
         from app.module_registry import get_module
+
         standard_modules = []
         interactive_modules = []
-        
+
         for assignment in sorted_modules:
             module = settings.modules.get(assignment.module_id)
             if module:
@@ -3029,11 +3037,11 @@ async def trigger_channel(position: int):
                     interactive_modules.append(module)
                 else:
                     standard_modules.append(module)
-        
+
         # 1. Execute all standard modules first
         for module in standard_modules:
             execute_module(module)
-            
+
             # Separator between modules (unless it's the last standard one)
             if module != standard_modules[-1]:
                 printer.feed(2)
@@ -3048,7 +3056,7 @@ async def trigger_channel(position: int):
                 printer.print_text("")
                 printer.print_text("--- MAX LENGTH REACHED ---")
                 printer.feed(1)
-                
+
                 # Flush again for the message
                 if hasattr(printer, "flush_buffer"):
                     printer.flush_buffer()
@@ -3058,46 +3066,47 @@ async def trigger_channel(position: int):
         if not interactive_modules:
             # Done
             pass
-            
+
         elif len(interactive_modules) == 1:
             # Single interactive module - run it directly
             if standard_modules:
                 printer.feed(2)  # Separator from previous content
             execute_module(interactive_modules[0])
-            
+
         else:
             # Multiple interactive modules - show selection menu
             if standard_modules:
                 printer.feed(2)
-                
+
             printer.print_header("SELECT APP", icon="list")
             printer.print_line()
-            
+
             # Print menu options
             for i, module in enumerate(interactive_modules, 1):
                 # Ensure we don't exceed 7 options (8 is reserved for Exit)
                 if i > 7:
                     break
                 printer.print_body(f"[{i}] {module.name}")
-            
+
             printer.feed(1)
             printer.print_caption("[8] Cancel")
             printer.print_line()
             printer.print_caption("Turn dial to select")
             printer.feed(1)
-            
+
             if hasattr(printer, "flush_buffer"):
                 printer.flush_buffer()
-            
+
             # Enter special selection mode to choose the app
             from app.selection_mode import enter_selection_mode, exit_selection_mode
-            
+
             def handle_app_selection(dial_position: int):
                 # Position 8 = Cancel
                 if dial_position == 8:
                     exit_selection_mode()
                     # Print cancellation message
                     from app.hardware import printer as hw_printer
+
                     if hasattr(hw_printer, "reset_buffer"):
                         hw_printer.reset_buffer()
                     hw_printer.print_header("CANCELLED", icon="x")
@@ -3106,34 +3115,35 @@ async def trigger_channel(position: int):
                     if hasattr(hw_printer, "flush_buffer"):
                         hw_printer.flush_buffer()
                     return
-                
+
                 # Check valid selection index (1-based)
                 idx = dial_position - 1
                 if 0 <= idx < len(interactive_modules):
                     # Valid selection - Exit menu selection mode first
                     exit_selection_mode()
-                    
+
                     # Execute the chosen module
                     # This module will then likely enter its OWN selection mode
                     target_module = interactive_modules[idx]
-                    
+
                     # We need to run this on the main thread via execute_module,
                     # but we are currently in the selection callback (potentially thread pool).
                     # Actually, execute_module just queues prints or runs logic.
                     # The tricky part is the adventure module expects to be called to PRINT content
                     # and enters its OWN selection mode.
-                    
+
                     # We can directly call execute_module from here.
                     # IMPORTANT: The printer buffer needs reset? Maybe.
                     from app.hardware import printer as hw_printer
+
                     if hasattr(hw_printer, "reset_buffer"):
                         hw_printer.reset_buffer()
-                        
+
                     execute_module(target_module)
-                    
+
                     if hasattr(hw_printer, "flush_buffer"):
                         hw_printer.flush_buffer()
-                        
+
                 else:
                     # Invalid selection
                     # Ideally we'd re-print or just beep, but for now we do nothing
@@ -3142,14 +3152,12 @@ async def trigger_channel(position: int):
             # Register the callback
             # We use a special ID to indicate this is the channel meta-menu
             enter_selection_mode(handle_app_selection, f"channel-menu-{position}")
-            
+
             # Return early since we've handled the printing/logic
             return
 
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
-
-
 
         # Flush buffer to actually print (in reverse order for tear-off orientation)
         # Spacing is built into the bitmap (5 lines at end of each print job)
@@ -3362,7 +3370,9 @@ async def preview_webhook(config: dict):
                         json_body = json.loads(body)
                     except json.JSONDecodeError:
                         json_body = {}
-                response = requests.post(url, json=json_body, headers=headers, timeout=10)
+                response = requests.post(
+                    url, json=json_body, headers=headers, timeout=10
+                )
             else:
                 response = requests.get(url, headers=headers, timeout=10)
 
@@ -3370,7 +3380,7 @@ async def preview_webhook(config: dict):
                 return {
                     "success": False,
                     "error": f"HTTP {response.status_code}: {response.text[:200]}",
-                    "status_code": response.status_code
+                    "status_code": response.status_code,
                 }
 
             # Parse response
@@ -3382,7 +3392,7 @@ async def preview_webhook(config: dict):
                     "success": True,
                     "content": response.text[:500],
                     "content_type": "text",
-                    "status_code": response.status_code
+                    "status_code": response.status_code,
                 }
 
             # Extract value at json_path if specified
@@ -3408,14 +3418,14 @@ async def preview_webhook(config: dict):
                         "content": str(value),
                         "content_type": "extracted",
                         "json_path": json_path,
-                        "status_code": response.status_code
+                        "status_code": response.status_code,
                     }
                 else:
                     return {
                         "success": False,
                         "error": f"Path '{json_path}' not found in response",
                         "raw_response": json.dumps(data, indent=2)[:500],
-                        "status_code": response.status_code
+                        "status_code": response.status_code,
                     }
 
             # Return full JSON response
@@ -3423,13 +3433,16 @@ async def preview_webhook(config: dict):
                 "success": True,
                 "content": json.dumps(data, indent=2)[:500],
                 "content_type": "json",
-                "status_code": response.status_code
+                "status_code": response.status_code,
             }
 
         except requests.exceptions.Timeout:
             return {"success": False, "error": "Request timed out (10s limit)"}
         except requests.exceptions.ConnectionError:
-            return {"success": False, "error": "Could not connect to server. Check the URL."}
+            return {
+                "success": False,
+                "error": "Could not connect to server. Check the URL.",
+            }
         except Exception as e:
             return {"success": False, "error": str(e)}
 

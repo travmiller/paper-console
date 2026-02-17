@@ -5,7 +5,7 @@ import PrimaryButton from './PrimaryButton';
 import WiFiIcon from '../assets/WiFiIcon';
 import WiFiOffIcon from '../assets/WiFiOffIcon';
 import LocationSearch from './widgets/LocationSearch';
-import { adminAuthFetch, getAdminToken, setAdminToken, clearAdminToken } from '../lib/adminAuthFetch';
+import { adminAuthFetch } from '../lib/adminAuthFetch';
 
 
 const GeneralSettings = ({
@@ -43,9 +43,6 @@ const GeneralSettings = ({
   const [updateMessage, setUpdateMessage] = useState({ type: '', message: '' });
   const [currentVersion, setCurrentVersion] = useState(null);
   const [updateProgress, setUpdateProgress] = useState({ stage: '', progress: 0 });
-  const [authStatus, setAuthStatus] = useState(null);
-  const [adminTokenInput, setAdminTokenInput] = useState('');
-  const [tokenSaved, setTokenSaved] = useState(false);
 
   // Fetch current system time on mount and periodically
   useEffect(() => {
@@ -113,26 +110,6 @@ const GeneralSettings = ({
     };
 
     fetchCurrentVersion();
-  }, []);
-
-  useEffect(() => {
-    const currentToken = getAdminToken();
-    if (currentToken) {
-      setAdminTokenInput(currentToken);
-      setTokenSaved(true);
-    }
-
-    const fetchAuthStatus = async () => {
-      try {
-        const response = await fetch('/api/system/auth/status');
-        const data = await response.json();
-        setAuthStatus(data);
-      } catch (err) {
-        console.error('Error fetching auth status:', err);
-      }
-    };
-
-    fetchAuthStatus();
   }, []);
 
   const getApiError = (data, fallback) => {
@@ -306,68 +283,6 @@ const GeneralSettings = ({
 
   return (
     <div className='space-y-4'>
-      {/* Admin Access */}
-      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[0] }}>
-        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
-          <h3 className='font-bold text-black text-lg tracking-tight mb-3'>Admin Access</h3>
-          <p className='text-sm text-gray-600 mb-3'>
-            Time, SSH, and update installation actions may require admin authorization.
-          </p>
-
-          {authStatus && (
-            <div className='mb-3 text-sm'>
-              <span className='text-gray-600 font-bold'>Mode: </span>
-              <span className='text-black font-bold'>
-                {authStatus.token_required ? 'Admin token required' : 'Local/private network only'}
-              </span>
-            </div>
-          )}
-
-          {authStatus?.token_required && (
-            <>
-              <label className='block mb-2 text-sm text-black font-bold'>Admin Token</label>
-              <input
-                type='password'
-                value={adminTokenInput}
-                onChange={(e) => {
-                  setAdminTokenInput(e.target.value);
-                  setTokenSaved(false);
-                }}
-                placeholder='Paste PC1_ADMIN_TOKEN'
-                className={inputClass}
-              />
-              <div className='flex gap-3 mt-3'>
-                <PrimaryButton
-                  onClick={() => {
-                    const token = adminTokenInput.trim();
-                    if (!token) {
-                      setUpdateMessage({ type: 'error', message: 'Enter an admin token first.' });
-                      setTimeout(() => setUpdateMessage({ type: '', message: '' }), 4000);
-                      return;
-                    }
-                    setAdminToken(token);
-                    setTokenSaved(true);
-                  }}
-                  className='flex-1'>
-                  Save Token
-                </PrimaryButton>
-                <button
-                  type='button'
-                  onClick={() => {
-                    clearAdminToken();
-                    setAdminTokenInput('');
-                    setTokenSaved(false);
-                  }}
-                  className='px-4 py-2.5 bg-transparent border-2 border-gray-400 text-black rounded-lg font-bold hover:border-black transition-all cursor-pointer'>
-                  Clear
-                </button>
-              </div>
-              {tokenSaved && <p className='text-xs text-gray-600 mt-2'>Token saved in this browser.</p>}
-            </>
-          )}
-        </div>
-      </div>
-
       {/* Update Check */}
       <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[5] || inkGradients[0] }}>
         <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
