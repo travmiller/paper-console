@@ -299,6 +299,18 @@ def draw_icon_on_image(draw: ImageDraw.Draw, x: int, y: int, icon_type: str, siz
             pass
 
 
+def _draw_centered_text(
+    draw: ImageDraw.Draw, text: str, center_x: int, y: int, font: Any
+) -> int:
+    """Draw text centered on x and return text height."""
+    bbox = font.getbbox(text)
+    text_w = bbox[2] - bbox[0]
+    text_h = bbox[3] - bbox[1]
+    text_x = int(round(center_x - (text_w / 2)))
+    draw.text((text_x, y), text, font=font, fill=0)
+    return text_h
+
+
 def draw_weather_forecast_image(
     forecast: list, total_width: int, fonts: Dict[str, Any]
 ) -> Image.Image:
@@ -307,7 +319,12 @@ def draw_weather_forecast_image(
         return None
 
     num_days = min(len(forecast), 7)
-    col_width = total_width // num_days
+    # Keep the 7-day grid centered with small horizontal margins.
+    side_padding = 8
+    content_width = max(total_width - (side_padding * 2), num_days)
+    col_width = max(content_width // num_days, 1)
+    grid_width = col_width * num_days
+    grid_left = (total_width - grid_width) // 2
     icon_size = 24
     divider_width = 1
 
@@ -362,7 +379,7 @@ def draw_weather_forecast_image(
     draw = ImageDraw.Draw(image)
 
     for i, day_data in enumerate(forecast[:7]):
-        col_x = i * col_width
+        col_x = grid_left + (i * col_width)
         col_center = col_x + col_width // 2
         col_right = col_x + col_width
         day_top = 0
@@ -378,18 +395,14 @@ def draw_weather_forecast_image(
 
         # 1. Day/Date (at top so it's visible)
         if font_sm:
-            day_bbox = font_sm.getbbox(day_label)
-            day_text_w = day_bbox[2] - day_bbox[0]
-            day_text_x = col_center - day_text_w // 2
-            draw.text((day_text_x, current_y), day_label, font=font_sm, fill=0)
-            current_y += (day_bbox[3] - day_bbox[1]) + 2
+            day_h = _draw_centered_text(draw, day_label, col_center, current_y, font_sm)
+            current_y += day_h + 2
 
             if date_label:
-                date_bbox = font_sm.getbbox(date_label)
-                date_text_w = date_bbox[2] - date_bbox[0]
-                date_text_x = col_center - date_text_w // 2
-                draw.text((date_text_x, current_y), date_label, font=font_sm, fill=0)
-                current_y += date_bbox[3] - date_bbox[1]
+                date_h = _draw_centered_text(
+                    draw, date_label, col_center, current_y, font_sm
+                )
+                current_y += date_h
         else:
             current_y += 20
         current_y += element_spacing
@@ -398,11 +411,7 @@ def draw_weather_forecast_image(
         high = day_data.get("high", "--")
         high_str = f"{high}°" if high != "--" else "--"
         if font_lg:
-            bbox = font_lg.getbbox(high_str)
-            text_w = bbox[2] - bbox[0]
-            text_x = col_center - text_w // 2
-            draw.text((text_x, current_y), high_str, font=font_lg, fill=0)
-            current_y += bbox[3] - bbox[1]
+            current_y += _draw_centered_text(draw, high_str, col_center, current_y, font_lg)
         else:
             current_y += 16
         current_y += element_spacing
@@ -411,11 +420,7 @@ def draw_weather_forecast_image(
         low = day_data.get("low", "--")
         low_str = f"{low}°" if low != "--" else "--"
         if font_md:
-            bbox = font_md.getbbox(low_str)
-            text_w = bbox[2] - bbox[0]
-            text_x = col_center - text_w // 2
-            draw.text((text_x, current_y), low_str, font=font_md, fill=0)
-            current_y += bbox[3] - bbox[1]
+            current_y += _draw_centered_text(draw, low_str, col_center, current_y, font_md)
         else:
             current_y += 14
         current_y += element_spacing
@@ -429,11 +434,9 @@ def draw_weather_forecast_image(
         # 5. Precipitation
         precip_str = f"{precip_value}%"
         if font_sm:
-            bbox = font_sm.getbbox(precip_str)
-            text_w = bbox[2] - bbox[0]
-            text_x = col_center - text_w // 2
-            draw.text((text_x, current_y), precip_str, font=font_sm, fill=0)
-            current_y += bbox[3] - bbox[1]
+            current_y += _draw_centered_text(
+                draw, precip_str, col_center, current_y, font_sm
+            )
         else:
             current_y += 10
 
@@ -473,13 +476,18 @@ def draw_hourly_forecast_image(
 
     hours_per_row = 4
     num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
-    col_width = (total_width - 16 - (hours_per_row - 1) * 5) // hours_per_row
-
     hour_spacing = 5
+    side_padding = 8
+    available_width = max(total_width - (side_padding * 2), hours_per_row)
+    col_width = max(
+        (available_width - ((hours_per_row - 1) * hour_spacing)) // hours_per_row, 1
+    )
+    grid_width = (hours_per_row * col_width) + ((hours_per_row - 1) * hour_spacing)
     icon_size = 24
     top_padding = 2
     between_blocks = 8
-    bottom_padding = 10
+    # Extra bottom breathing room so the precip row doesn't feel cramped.
+    bottom_padding = 16
     row_spacing = 10
 
     if num_rows == 0:
@@ -518,14 +526,14 @@ def draw_hourly_forecast_image(
     draw = ImageDraw.Draw(image)
 
     # Grid Logic
-    left_margin = 8
+    left_margin = (total_width - grid_width) // 2
     actual_col_positions = []
     for col in range(hours_per_row):
         col_x = col * (col_width + hour_spacing) + left_margin
         actual_col_positions.append(col_x)
 
     leftmost_x = actual_col_positions[0]
-    rightmost_x = min(total_width - 8, actual_col_positions[-1] + col_width)
+    rightmost_x = actual_col_positions[-1] + col_width
 
     # Horizontal grid lines
     for row in range(num_rows + 1):
@@ -556,11 +564,9 @@ def draw_hourly_forecast_image(
             time_str = hour_data.get("time", "--")
             time_y = row_y + top_padding
             if font_sm:
-                bbox = font_sm.getbbox(time_str)
-                text_w = bbox[2] - bbox[0]
-                text_x = col_center - text_w // 2
-                draw.text((text_x, time_y), time_str, font=font_sm, fill=0)
-                time_height = bbox[3] - bbox[1]
+                time_height = _draw_centered_text(
+                    draw, time_str, col_center, time_y, font_sm
+                )
             else:
                 time_height = 10
 
@@ -575,11 +581,9 @@ def draw_hourly_forecast_image(
             temp_str = f"{temp}°" if temp != "--" else "--"
             temp_y = icon_y + icon_size + between_blocks
             if font_md:
-                bbox = font_md.getbbox(temp_str)
-                text_w = bbox[2] - bbox[0]
-                text_x = col_center - text_w // 2
-                draw.text((text_x, temp_y), temp_str, font=font_md, fill=0)
-                temp_height = bbox[3] - bbox[1]
+                temp_height = _draw_centered_text(
+                    draw, temp_str, col_center, temp_y, font_md
+                )
             else:
                 temp_height = 12
 
@@ -589,10 +593,7 @@ def draw_hourly_forecast_image(
             precip_str = f"{precip_value}%"
             precip_y = temp_y + temp_height + between_blocks
             if font_sm:
-                bbox = font_sm.getbbox(precip_str)
-                text_w = bbox[2] - bbox[0]
-                text_x = col_center - text_w // 2
-                draw.text((text_x, precip_y), precip_str, font=font_sm, fill=0)
+                _draw_centered_text(draw, precip_str, col_center, precip_y, font_sm)
 
     return image
 
