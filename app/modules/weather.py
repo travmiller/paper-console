@@ -283,18 +283,48 @@ def draw_icon_on_image(draw: ImageDraw.Draw, x: int, y: int, icon_type: str, siz
 
     if os.path.exists(icon_path):
         try:
-            icon_img = Image.open(icon_path)
+            icon_img = Image.open(icon_path).convert("RGBA")
             if icon_img.size != (size, size):
                 icon_img = icon_img.resize((size, size), Image.NEAREST)
-            if icon_img.mode != "1":
-                icon_img = icon_img.convert("1")
 
-            width, height = icon_img.size
-            pixels = icon_img.load()
+            # Flatten alpha then threshold to stable 1-bit output.
+            bg = Image.new("RGBA", icon_img.size, (255, 255, 255, 255))
+            bg.alpha_composite(icon_img)
+            icon_mono = bg.convert("L").point(
+                lambda value: 0 if value < 160 else 255, mode="1"
+            )
+
+            width, height = icon_mono.size
+            pixels = icon_mono.load()
+
+            # Center based on drawn pixels (not source canvas) so spacing above/below looks even.
+            left = width
+            top = height
+            right = -1
+            bottom = -1
             for py in range(height):
                 for px in range(width):
                     if pixels[px, py] == 0:
-                        draw.point((x + px, y + py), fill=0)
+                        left = min(left, px)
+                        top = min(top, py)
+                        right = max(right, px)
+                        bottom = max(bottom, py)
+
+            if right == -1:
+                return
+
+            glyph_w = (right - left) + 1
+            glyph_h = (bottom - top) + 1
+            offset_x = ((size - glyph_w) // 2) - left
+            offset_y = ((size - glyph_h) // 2) - top
+
+            for py in range(height):
+                for px in range(width):
+                    if pixels[px, py] == 0:
+                        draw_x = x + px + offset_x
+                        draw_y = y + py + offset_y
+                        if x <= draw_x < (x + size) and y <= draw_y < (y + size):
+                            draw.point((draw_x, draw_y), fill=0)
         except Exception:
             pass
 
@@ -302,45 +332,173 @@ def draw_icon_on_image(draw: ImageDraw.Draw, x: int, y: int, icon_type: str, siz
 def _draw_centered_text(
     draw: ImageDraw.Draw, text: str, center_x: int, y: int, font: Any
 ) -> int:
-    """Draw text centered on x and return text height."""
+    """Draw text centered on x with a top-aligned y and return text height."""
     bbox = font.getbbox(text)
     text_w = bbox[2] - bbox[0]
     text_h = bbox[3] - bbox[1]
-    text_x = int(round(center_x - (text_w / 2)))
-    draw.text((text_x, y), text, font=font, fill=0)
+    text_x = int(round(center_x - (text_w / 2) - bbox[0]))
+    text_y = y - bbox[1]
+    draw.text((text_x, text_y), text, font=font, fill=0)
     return text_h
+
+
+def _draw_left_text(
+    draw: ImageDraw.Draw, text: str, x: int, y: int, font: Any
+) -> int:
+    """Draw text left-aligned with a top-aligned y and return text height."""
+    bbox = font.getbbox(text)
+    text_h = bbox[3] - bbox[1]
+    text_x = x - bbox[0]
+    text_y = y - bbox[1]
+    draw.text((text_x, text_y), text, font=font, fill=0)
+    return text_h
+
+
+def _format_temperature(value: Any, include_unit: bool = False) -> str:
+    """Format temperatures using ASCII-only output for thermal printer reliability."""
+    if value in (None, "", "--"):
+        return "--"
+
+    try:
+        temp_int = int(round(float(value)))
+    except (TypeError, ValueError):
+        return str(value)
+
+    return f"{temp_int}F" if include_unit else f"{temp_int}"
+
+
+def draw_current_conditions_panel(
+    weather: Dict[str, Any], total_width: int, fonts: Dict[str, Any]
+) -> Image.Image:
+    """Draw current conditions with centered date/location above a full-width box."""
+    if total_width <= 0:
+        return None
+
+    font_caption = fonts.get("regular_sm") or fonts.get("regular")
+    font_body = fonts.get("regular") or font_caption
+    font_sub = fonts.get("semibold") or fonts.get("bold") or font_body
+    font_temp = fonts.get("bold_lg") or fonts.get("bold") or font_body
+    if not all([font_caption, font_body, font_sub, font_temp]):
+        return None
+
+    city = str(weather.get("city") or "LOCATION").upper()
+    section_title = "CURRENT WEATHER"
+    condition = str(weather.get("condition") or "Unavailable")
+    temperature = _format_temperature(weather.get("current"), include_unit=True)
+    high = _format_temperature(weather.get("high"), include_unit=True)
+    low = _format_temperature(weather.get("low"), include_unit=True)
+    stats_line = f"H {high}   L {low}"
+    date_line = datetime.now().strftime("%a, %b %d, %Y")
+    icon_type = _get_icon_type(condition)
+
+    date_h = font_caption.getbbox(date_line)[3] - font_caption.getbbox(date_line)[1]
+    city_h = font_sub.getbbox(city)[3] - font_sub.getbbox(city)[1]
+    section_h = font_sub.getbbox(section_title)[3] - font_sub.getbbox(section_title)[1]
+
+    outside_top = 12
+    outside_gap = 4
+    gap_after_city = 24
+    gap_after_section = 8
+    box_height = 108
+    panel_bottom_padding = 2
+    panel_height = (
+        outside_top
+        + date_h
+        + outside_gap
+        + city_h
+        + gap_after_city
+        + section_h
+        + gap_after_section
+        + box_height
+        + panel_bottom_padding
+    )
+    panel = Image.new("1", (total_width, panel_height), 1)
+    draw = ImageDraw.Draw(panel)
+
+    # Date + location + section label above the box.
+    date_y = outside_top
+    city_y = date_y + date_h + outside_gap
+    section_y = city_y + city_h + gap_after_city
+    _draw_centered_text(draw, date_line, total_width // 2, date_y, font_caption)
+    _draw_centered_text(draw, city, total_width // 2, city_y, font_sub)
+    _draw_left_text(draw, section_title, 2, section_y, font_sub)
+
+    # Match grid footprint width (same visual left/right inset as 12-hour and 5-day grids).
+    x0 = 2
+    y0 = section_y + section_h + gap_after_section
+    x1 = total_width - 4
+    y1 = y0 + box_height - 1
+    if x1 <= x0 or y1 <= y0:
+        return None
+
+    draw.rectangle([(x0, y0), (x1, y1)], outline=0, width=1)
+    split_x = x0 + int((x1 - x0) * 0.45)
+    draw.line([(split_x, y0), (split_x, y1)], fill=0, width=1)
+
+    icon_size = 52
+    icon_x = x0 + ((split_x - x0) - icon_size) // 2
+    icon_y = y0 + ((y1 - y0) - icon_size) // 2 - 1
+    draw_icon_on_image(draw, icon_x, icon_y, icon_type, icon_size)
+
+    # Right-side text stack is vertically centered within the middle cell.
+    gap_after_temp = 5
+    gap_after_condition = 3
+    temp_h = font_temp.getbbox(temperature)[3] - font_temp.getbbox(temperature)[1]
+    cond_h = font_body.getbbox(condition)[3] - font_body.getbbox(condition)[1]
+    stats_h = font_caption.getbbox(stats_line)[3] - font_caption.getbbox(stats_line)[1]
+    text_block_h = temp_h + gap_after_temp + cond_h + gap_after_condition + stats_h
+
+    text_cell_top = y0
+    text_cell_bottom = y1
+    text_start_y = text_cell_top + max((text_cell_bottom - text_cell_top - text_block_h) // 2, 0)
+    text_x = split_x + 10
+
+    current_y = text_start_y
+    current_y += _draw_left_text(draw, temperature, text_x, current_y, font_temp)
+    current_y += gap_after_temp
+    current_y += _draw_left_text(draw, condition, text_x, current_y, font_body)
+    current_y += gap_after_condition
+    _draw_left_text(draw, stats_line, text_x, current_y, font_caption)
+
+    return panel
 
 
 def draw_weather_forecast_image(
     forecast: list, total_width: int, fonts: Dict[str, Any]
 ) -> Image.Image:
-    """Draw 7-day forecast as an image."""
+    """Draw a compact daily forecast image optimized for 58mm receipts."""
     if not forecast:
         return None
 
-    num_days = min(len(forecast), 7)
-    # Keep the 7-day grid centered with small horizontal margins.
-    side_padding = 8
+    max_days = 5 if total_width <= 384 else 7
+    visible_forecast = forecast[:max_days]
+    num_days = len(visible_forecast)
+    if num_days == 0:
+        return None
+
+    side_padding = 2
     content_width = max(total_width - (side_padding * 2), num_days)
     col_width = max(content_width // num_days, 1)
     grid_width = col_width * num_days
     grid_left = (total_width - grid_width) // 2
-    icon_size = 24
+    icon_size = 20
     divider_width = 1
 
     font_sm = fonts.get("regular_sm")
     font_md = fonts.get("regular")
     font_lg = fonts.get("bold")
+    low_font = font_sm or font_md
 
-    # Compute height dynamically so the bottom row never clips.
     sample_day = "Today"
     sample_date = "12/31"
-    sample_high = "100°"
-    sample_low = "-10°"
+    sample_high = "100"
+    sample_low = "-10"
     sample_precip = "100%"
-    element_spacing = 10
-    top_padding = 4
-    bottom_padding = 8
+    element_spacing = 7
+    precip_spacing = 5
+    icon_vertical_nudge = 2
+    top_padding = 6
+    bottom_padding = 12
 
     day_text_h = (
         (font_sm.getbbox(sample_day)[3] - font_sm.getbbox(sample_day)[1]) if font_sm else 10
@@ -352,113 +510,66 @@ def draw_weather_forecast_image(
         (font_lg.getbbox(sample_high)[3] - font_lg.getbbox(sample_high)[1]) if font_lg else 16
     )
     low_text_h = (
-        (font_md.getbbox(sample_low)[3] - font_md.getbbox(sample_low)[1]) if font_md else 14
+        (low_font.getbbox(sample_low)[3] - low_font.getbbox(sample_low)[1]) if low_font else 14
     )
     precip_text_h = (
         (font_sm.getbbox(sample_precip)[3] - font_sm.getbbox(sample_precip)[1]) if font_sm else 10
     )
 
-    day_height = (
-        top_padding
-        + day_text_h
-        + 2
-        + date_text_h
-        + element_spacing
-        + high_text_h
-        + element_spacing
-        + low_text_h
-        + element_spacing
-        + icon_size
-        + element_spacing
-        + precip_text_h
-        + bottom_padding
-    )
+    # Fixed row anchors keep each cell aligned, regardless of glyph-specific descenders.
+    day_y = top_padding
+    date_y = day_y + day_text_h + 2
+    high_y = date_y + date_text_h + element_spacing
+    low_y = high_y + high_text_h + element_spacing
+    icon_y = low_y + low_text_h + element_spacing + icon_vertical_nudge
+    precip_y = icon_y + icon_size + precip_spacing
 
-    # Create white image with padded height.
+    day_height = precip_y + precip_text_h + bottom_padding
+
     image = Image.new("1", (total_width, day_height), 1)
     draw = ImageDraw.Draw(image)
 
-    for i, day_data in enumerate(forecast[:7]):
+    border_left = grid_left
+    border_right = grid_left + grid_width - 1
+    draw.rectangle([(border_left, 0), (border_right, day_height - 1)], outline=0, width=1)
+
+    for i, day_data in enumerate(visible_forecast):
         col_x = grid_left + (i * col_width)
         col_center = col_x + col_width // 2
         col_right = col_x + col_width
-        day_top = 0
-        day_bottom = day_height - 1
 
-        # Data
         day_label = day_data.get("day", "--")
         date_label = day_data.get("date", "")
-        precip = day_data.get("precipitation")
-        precip_value = precip if precip is not None else 0
 
-        current_y = day_top + top_padding
-
-        # 1. Day/Date (at top so it's visible)
         if font_sm:
-            day_h = _draw_centered_text(draw, day_label, col_center, current_y, font_sm)
-            current_y += day_h + 2
-
+            _draw_centered_text(draw, day_label, col_center, day_y, font_sm)
             if date_label:
-                date_h = _draw_centered_text(
-                    draw, date_label, col_center, current_y, font_sm
-                )
-                current_y += date_h
-        else:
-            current_y += 20
-        current_y += element_spacing
+                _draw_centered_text(draw, date_label, col_center, date_y, font_sm)
 
-        # 2. High Temp
         high = day_data.get("high", "--")
-        high_str = f"{high}°" if high != "--" else "--"
+        high_str = _format_temperature(high)
         if font_lg:
-            current_y += _draw_centered_text(draw, high_str, col_center, current_y, font_lg)
-        else:
-            current_y += 16
-        current_y += element_spacing
+            _draw_centered_text(draw, high_str, col_center, high_y, font_lg)
 
-        # 3. Low Temp
         low = day_data.get("low", "--")
-        low_str = f"{low}°" if low != "--" else "--"
-        if font_md:
-            current_y += _draw_centered_text(draw, low_str, col_center, current_y, font_md)
-        else:
-            current_y += 14
-        current_y += element_spacing
+        low_str = _format_temperature(low)
+        if low_font:
+            _draw_centered_text(draw, low_str, col_center, low_y, low_font)
 
-        # 4. Icon
         icon_x = col_center - icon_size // 2
         icon_type = _get_icon_type(day_data.get("condition", ""))
-        draw_icon_on_image(draw, icon_x, current_y, icon_type, icon_size)
-        current_y += icon_size + element_spacing
+        draw_icon_on_image(draw, icon_x, icon_y, icon_type, icon_size)
 
-        # 5. Precipitation
-        precip_str = f"{precip_value}%"
+        precip = day_data.get("precipitation")
+        precip_value = precip if precip is not None else 0
         if font_sm:
-            current_y += _draw_centered_text(
-                draw, precip_str, col_center, current_y, font_sm
-            )
-        else:
-            current_y += 10
+            _draw_centered_text(draw, f"{precip_value}%", col_center, precip_y, font_sm)
 
-        # Dividers
         if i < num_days - 1:
             draw.line(
                 [
-                    (col_right - divider_width // 2, day_top),
-                    (col_right - divider_width // 2, day_bottom),
-                ],
-                fill=0,
-                width=divider_width,
-            )
-        if i == 0:
-            draw.line(
-                [(col_x, day_top), (col_x, day_bottom)], fill=0, width=divider_width
-            )
-        if i == num_days - 1:
-            draw.line(
-                [
-                    (col_right - divider_width // 2, day_top),
-                    (col_right - divider_width // 2, day_bottom),
+                    (col_right - divider_width // 2, 0),
+                    (col_right - divider_width // 2, day_height - 1),
                 ],
                 fill=0,
                 width=divider_width,
@@ -470,25 +581,29 @@ def draw_weather_forecast_image(
 def draw_hourly_forecast_image(
     hourly_forecast: list, total_width: int, fonts: Dict[str, Any]
 ) -> Image.Image:
-    """Draw 24-hour forecast as an image."""
+    """Draw a compact 12-hour forecast image."""
     if not hourly_forecast:
         return None
 
-    hours_per_row = 4
-    num_rows = (len(hourly_forecast) + hours_per_row - 1) // hours_per_row
-    hour_spacing = 5
-    side_padding = 8
+    visible_hours = hourly_forecast[:12]
+    if not visible_hours:
+        return None
+
+    hours_per_row = 3
+    num_rows = (len(visible_hours) + hours_per_row - 1) // hours_per_row
+    hour_spacing = 0
+    side_padding = 2
     available_width = max(total_width - (side_padding * 2), hours_per_row)
     col_width = max(
         (available_width - ((hours_per_row - 1) * hour_spacing)) // hours_per_row, 1
     )
     grid_width = (hours_per_row * col_width) + ((hours_per_row - 1) * hour_spacing)
-    icon_size = 24
-    top_padding = 2
-    between_blocks = 8
-    # Extra bottom breathing room so the precip row doesn't feel cramped.
-    bottom_padding = 16
-    row_spacing = 10
+    icon_size = 20
+    top_padding = 6
+    between_blocks = 6
+    bottom_padding = 12
+    row_spacing = 0
+    icon_vertical_nudge = 2
 
     if num_rows == 0:
         return None
@@ -496,9 +611,8 @@ def draw_hourly_forecast_image(
     font_sm = fonts.get("regular_sm")
     font_md = fonts.get("regular")
 
-    # Compute entry height dynamically to avoid clipping on the final row.
     sample_time = "12 PM"
-    sample_temp = "100°"
+    sample_temp = "100"
     sample_precip = "100%"
     time_height = (
         (font_sm.getbbox(sample_time)[3] - font_sm.getbbox(sample_time)[1]) if font_sm else 10
@@ -525,7 +639,6 @@ def draw_hourly_forecast_image(
     image = Image.new("1", (total_width, total_height), 1)
     draw = ImageDraw.Draw(image)
 
-    # Grid Logic
     left_margin = (total_width - grid_width) // 2
     actual_col_positions = []
     for col in range(hours_per_row):
@@ -535,64 +648,50 @@ def draw_hourly_forecast_image(
     leftmost_x = actual_col_positions[0]
     rightmost_x = actual_col_positions[-1] + col_width
 
-    # Horizontal grid lines
-    for row in range(num_rows + 1):
-        if row == num_rows:
-            line_y = total_height - 1
-        else:
-            line_y = row * (entry_height + row_spacing)
-        draw.line([(leftmost_x, line_y), (rightmost_x, line_y)], fill=0, width=1)
+    draw.rectangle([(leftmost_x, 0), (rightmost_x - 1, total_height - 1)], outline=0, width=1)
 
-    # Vertical grid lines
-    for col_x in actual_col_positions:
-        draw.line([(col_x, 0), (col_x, total_height - 1)], fill=0, width=1)
-    draw.line([(rightmost_x, 0), (rightmost_x, total_height - 1)], fill=0, width=1)
+    for row in range(1, num_rows):
+        line_y = row * (entry_height + row_spacing)
+        draw.line([(leftmost_x, line_y), (rightmost_x - 1, line_y)], fill=0, width=1)
 
-    # Content
+    for col in range(1, hours_per_row):
+        line_x = actual_col_positions[col]
+        draw.line([(line_x, 0), (line_x, total_height - 1)], fill=0, width=1)
+
     for row in range(num_rows):
         row_y = row * (entry_height + row_spacing)
         start_idx = row * hours_per_row
-        end_idx = min(start_idx + hours_per_row, len(hourly_forecast))
+        end_idx = min(start_idx + hours_per_row, len(visible_hours))
+
+        # Fixed row anchors avoid per-value vertical drift.
+        time_y = row_y + top_padding
+        icon_y = time_y + time_height + between_blocks + icon_vertical_nudge
+        temp_y = icon_y + icon_size + between_blocks
+        precip_y = temp_y + temp_height + between_blocks
 
         for col in range(start_idx, end_idx):
-            hour_data = hourly_forecast[col]
+            hour_data = visible_hours[col]
             col_idx = col - start_idx
             col_x = col_idx * (col_width + hour_spacing) + left_margin
             col_center = col_x + col_width // 2
 
-            # Time
             time_str = hour_data.get("time", "--")
-            time_y = row_y + top_padding
             if font_sm:
-                time_height = _draw_centered_text(
-                    draw, time_str, col_center, time_y, font_sm
-                )
-            else:
-                time_height = 10
+                _draw_centered_text(draw, time_str, col_center, time_y, font_sm)
 
-            # Icon
-            icon_y = time_y + time_height + between_blocks
             icon_x = col_center - icon_size // 2
             icon_type = _get_icon_type(hour_data.get("condition", ""))
             draw_icon_on_image(draw, icon_x, icon_y, icon_type, icon_size)
 
-            # Temp
             temp = hour_data.get("temperature", "--")
-            temp_str = f"{temp}°" if temp != "--" else "--"
-            temp_y = icon_y + icon_size + between_blocks
+            temp_str = _format_temperature(temp)
             if font_md:
-                temp_height = _draw_centered_text(
-                    draw, temp_str, col_center, temp_y, font_md
-                )
-            else:
-                temp_height = 12
+                _draw_centered_text(draw, temp_str, col_center, temp_y, font_md)
 
-            # Precip
             precip = hour_data.get("precipitation")
             precip_value = precip if precip is not None else 0
-            precip_str = f"{precip_value}%"
-            precip_y = temp_y + temp_height + between_blocks
             if font_sm:
+                precip_str = f"{precip_value}%"
                 _draw_centered_text(draw, precip_str, col_center, precip_y, font_sm)
 
     return image
@@ -628,34 +727,17 @@ def draw_hourly_forecast_image(
 def format_weather_receipt(
     printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None
 ):
-    """Prints the weather receipt with current conditions, 24-hour forecast, and 7-day forecast."""
+    """Prints weather with current conditions plus compact hourly/daily forecasts."""
     weather = get_weather(config)
 
     # Header
     printer.print_header(module_name or "WEATHER", icon="cloud-sun")
-    printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
-    printer.print_line()
 
-    # Location
-    printer.print_subheader(weather["city"].upper())
-
-    # Weather icon and current conditions (Text-based for now, simple icon below)
-    icon_type = _get_icon_type(weather["condition"])
-
-    # Generate generic icon image for current conditions
-    icon_size = 64
-    icon_image = Image.new("1", (icon_size, icon_size), 1)
-    icon_draw = ImageDraw.Draw(icon_image)
-    draw_icon_on_image(icon_draw, 0, 0, icon_type, icon_size)
-    printer.print_image(icon_image)
-
-    # Current temperature - big and bold
-    printer.print_bold(f"{weather['current']}°F")
-    printer.print_body(weather["condition"])
-
-    # High/Low for today
-    printer.print_body(f"High {weather['high']}°F  ·  Low {weather['low']}°F")
-    printer.print_line()
+    printer_width = getattr(
+        printer,
+        "_get_content_width",
+        lambda: getattr(printer, "PRINTER_WIDTH_DOTS", 384),
+    )()
 
     # Get fonts from printer for image generation
     # Note: Accessing internal _get_font is acceptable for system fonts
@@ -663,31 +745,44 @@ def format_weather_receipt(
         "regular_sm": getattr(printer, "_get_font", lambda s: None)("regular_sm"),
         "regular": getattr(printer, "_get_font", lambda s: None)("regular"),
         "bold": getattr(printer, "_get_font", lambda s: None)("bold"),
+        "bold_lg": getattr(printer, "_get_font", lambda s: None)("bold_lg"),
+        "semibold": getattr(printer, "_get_font", lambda s: None)("semibold"),
     }
-    printer_width = getattr(printer, "PRINTER_WIDTH_DOTS", 384)
 
-    # 24-Hour Forecast
+    panel_image = draw_current_conditions_panel(weather, printer_width, fonts)
+    if panel_image:
+        printer.print_image(panel_image)
+    else:
+        # Fallback to text-only output if panel render fails.
+        printer.print_subheader((weather.get("city") or "LOCATION").upper())
+        printer.print_text(_format_temperature(weather.get("current"), include_unit=True), "bold_lg")
+        printer.print_body(weather.get("condition") or "Unavailable")
+        printer.print_body(
+            f"High {_format_temperature(weather.get('high'), include_unit=True)} | "
+            f"Low {_format_temperature(weather.get('low'), include_unit=True)}"
+        )
+    printer.feed(1)
+
+    # 12-Hour Forecast
     hourly_forecast = weather.get("hourly_forecast", [])
     if hourly_forecast:
-        printer.print_subheader("24-HOUR FORECAST")
-        printer.print_line()
+        printer.print_subheader("12-HOUR FORECAST")
 
         # Turn generic forecast data into an image
         hourly_image = draw_hourly_forecast_image(hourly_forecast, printer_width, fonts)
         if hourly_image:
             printer.print_image(hourly_image)
 
-        printer.print_line()
+        printer.feed(1)
 
-    # 7-Day Forecast
+    # 5-Day Forecast
     forecast = weather.get("forecast", [])
     if forecast:
-        printer.print_subheader("7-DAY FORECAST")
-        printer.print_line()
+        printer.print_subheader("5-DAY FORECAST")
 
         # Turn generic forecast data into an image
         daily_image = draw_weather_forecast_image(forecast, printer_width, fonts)
         if daily_image:
             printer.print_image(daily_image)
 
-        printer.print_line()
+        printer.feed(1)
