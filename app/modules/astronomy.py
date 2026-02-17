@@ -1,7 +1,6 @@
 from datetime import datetime, timedelta
 import pytz
 import math
-import random
 from astral import LocationInfo
 from astral.sun import sun, zenith_and_azimuth
 from astral.moon import phase
@@ -117,93 +116,79 @@ def get_almanac_data():
     }
 
 def draw_moon_phase_image(phase: float, size: int) -> Image.Image:
-    """Draw a moon phase graphic with smooth terminator and surface detail."""
-    # Create white image
-    image = Image.new("1", (size, size), 1)
-    draw = ImageDraw.Draw(image)
-    
-    x = 0
-    y = 0
-    
-    # Normalize phase to 0-1 (0 = new, 0.5 = full, 1 = new)
-    phase_normalized = (phase % 28) / 28.0
+    """Draw a moon phase with textured lunar shading for thermal printers."""
+    grayscale = Image.new("L", (size, size), 255)
+    gray_pixels = grayscale.load()
 
-    # Calculate illumination (0 = new moon, 1 = full moon)
-    illumination = (1 - math.cos(phase_normalized * 2 * math.pi)) / 2
+    center_x = size // 2
+    center_y = size // 2
+    radius = max(2, (size // 2) - 2)
 
-    center_x = x + size // 2
-    center_y = y + size // 2
-    radius = size // 2
-    inner_radius = radius - 2  # Account for outline
+    cycle = (phase % 28) / 28.0
+    lunar_longitude = cycle * 2 * math.pi
+    phase_angle = abs(lunar_longitude - math.pi)
 
-    # Draw the moon outline (black circle)
-    draw.ellipse([x, y, x + size - 1, y + size - 1], outline=0, width=2)
+    # Waxing moon is lit on the right; waning moon is lit on the left.
+    sun_x = math.sin(phase_angle) * (1 if cycle < 0.5 else -1)
+    sun_z = math.cos(phase_angle)
 
-    # Handle new moon (completely dark)
-    if illumination < 0.01:
-        # Just return current image (outline only)
-        return image
+    # Major maria (dark plains) to make the disc read as "moon", not a flat icon.
+    maria = [
+        (-0.36, -0.22, 0.22, 0.10),
+        (-0.13, 0.11, 0.20, 0.09),
+        (0.15, -0.07, 0.16, 0.08),
+        (0.31, 0.23, 0.12, 0.07),
+        (0.43, -0.20, 0.10, 0.06),
+    ]
 
-    # Fill the whole moon white first (lit portion)
-    draw.ellipse([x + 2, y + 2, x + size - 3, y + size - 3], fill=1)
-
-    # Calculate terminator position
-    # Terminator X position: moves from right edge to left edge as illumination increases
-    terminator_x = center_x - (illumination * 2 - 1) * inner_radius
-
-    # Draw shadow
-    if phase_normalized < 0.5:
-        # Waxing: right side illuminated, left side dark
-        # Shadow is on the left side (px < terminator_x)
-        for py in range(y + 2, y + size - 2):
-            for px in range(x + 2, min(int(terminator_x) + 1, x + size - 2)):
-                dx = px - center_x
-                dy = py - center_y
-                dist_sq = dx * dx + dy * dy
-                if dist_sq <= inner_radius * inner_radius and px < terminator_x:
-                    draw.point((px, py), fill=0)
-    else:
-        # Waning: left side illuminated, right side dark
-        # Shadow is on the right side (px > terminator_x)
-        for py in range(y + 2, y + size - 2):
-            for px in range(max(int(terminator_x), x + 2), x + size - 2):
-                dx = px - center_x
-                dy = py - center_y
-                dist_sq = dx * dx + dy * dy
-                if dist_sq <= inner_radius * inner_radius and px > terminator_x:
-                    draw.point((px, py), fill=0)
-
-    # Add subtle surface texture (craters)
-    random.seed(int(phase * 100))
-    num_craters = max(3, size // 20)
-    for _ in range(num_craters):
-        angle = random.uniform(0, 2 * math.pi)
-        dist = random.uniform(0, inner_radius * 0.7)
-        crater_x = int(center_x + dist * math.cos(angle))
-        crater_y = int(center_y + dist * math.sin(angle))
-        
-        dx = crater_x - center_x
-        dy = crater_y - center_y
-        if dx * dx + dy * dy > inner_radius * inner_radius:
+    for py in range(center_y - radius, center_y + radius + 1):
+        ny = (py - center_y) / radius
+        ny_sq = ny * ny
+        if ny_sq > 1:
             continue
 
-        if phase_normalized < 0.5:
-            if crater_x > terminator_x:
-                crater_size = random.randint(1, max(1, size // 30))
-                draw.ellipse(
-                    [crater_x - crater_size, crater_y - crater_size, crater_x + crater_size, crater_y + crater_size],
-                    fill=0, outline=1, width=1
-                )
-        else:
-            if crater_x < terminator_x:
-                crater_size = random.randint(1, max(1, size // 30))
-                draw.ellipse(
-                    [crater_x - crater_size, crater_y - crater_size, crater_x + crater_size, crater_y + crater_size],
-                    fill=0, outline=1, width=1
-                )
+        row_half_width = math.sqrt(1 - ny_sq)
+        row_x_min = max(center_x - radius, int(math.ceil(center_x - row_half_width * radius)))
+        row_x_max = min(center_x + radius, int(math.floor(center_x + row_half_width * radius)))
 
-    # Redraw outline to ensure clean edges
-    draw.ellipse([x, y, x + size - 1, y + size - 1], outline=0, width=2)
+        for px in range(row_x_min, row_x_max + 1):
+            nx = (px - center_x) / radius
+            nz_sq = 1 - nx * nx - ny_sq
+            if nz_sq < 0:
+                continue
+            nz = math.sqrt(nz_sq)
+
+            dot = nx * sun_x + nz * sun_z
+
+            if dot <= 0:
+                # Very dim earthshine keeps the disc shape visible near new moon.
+                intensity = 2 + int(6 * nz)
+            else:
+                # Lambertian lighting with mild limb darkening.
+                diffuse = dot ** 0.82
+                limb = 0.66 + 0.34 * nz
+                intensity = 220 + int(35 * diffuse * limb)
+
+                # Apply deterministic surface albedo features (maria/highlands).
+                albedo = 1.0
+                for maria_x, maria_y, sigma, depth in maria:
+                    dx = nx - maria_x
+                    dy = ny - maria_y
+                    albedo -= depth * math.exp(-(dx * dx + dy * dy) / (2 * sigma * sigma))
+                highlands = 0.02 * math.exp(-(((nx + 0.20) ** 2) + ((ny - 0.34) ** 2)) / (2 * 0.11 * 0.11))
+                albedo = max(0.82, min(1.04, albedo + highlands))
+                intensity = int(intensity * albedo)
+
+            gray_pixels[px, py] = max(0, min(255, intensity))
+
+    # Dither grayscale to 1-bit for the printer while preserving tonal detail.
+    image = grayscale.convert("1", dither=Image.FLOYDSTEINBERG)
+    draw = ImageDraw.Draw(image)
+    draw.ellipse(
+        [center_x - radius - 1, center_y - radius - 1, center_x + radius + 1, center_y + radius + 1],
+        outline=0,
+        width=2,
+    )
     return image
 
 def draw_sun_path_image(
