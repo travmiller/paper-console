@@ -78,7 +78,13 @@ When a user unboxes a PC-1 and powers it on for the first time, the expected flo
 6. **Normal daily usage**
    - Turn dial to select channel (1-8)
    - Press button to print selected channel
-   - Hold button ~5 seconds to open **Quick Actions** (print current channel config, WiFi setup mode, channel overview, or open Settings Menu)
+   - Hold button ~5 seconds to open **Quick Actions**:
+     - `1` Table of Contents
+     - `2` System Monitor
+     - `3` Reset WiFi
+     - `4` Reset Factory Settings
+     - `5` Reprint Setup Instructions
+     - `8` Cancel
    - Hold button ~15 seconds for **Factory Reset** (clears settings and reboots)
    - Use Web UI anytime for editing modules, schedules, and system settings
 

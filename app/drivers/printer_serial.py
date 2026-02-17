@@ -1578,6 +1578,21 @@ class PrinterDriver:
         except Exception:
             pass
 
+    def feed_dots(self, dots: int = 12):
+        """Feed paper by raw dot count (12 dots ~= half line)."""
+        if dots <= 0:
+            return
+        remaining = int(dots)
+        try:
+            while remaining > 0:
+                chunk = min(remaining, 255)
+                self._write(b"\x1b\x4a" + bytes([chunk]))  # ESC J n
+                remaining -= chunk
+            if self.ser and self.ser.is_open:
+                self.ser.flush()
+        except Exception:
+            pass
+
     def blip(self):
         """Short paper feed for tactile feedback."""
         try:

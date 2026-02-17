@@ -36,6 +36,7 @@ class ButtonDriver:
         self.pin = pin
         self.callback = None
         self.long_press_callback = None
+        self.long_press_ready_callback = None
         self.factory_reset_callback = None
         self.long_press_duration = 5.0  # 5 seconds for long press (AP mode)
         self.factory_reset_duration = 15.0  # 15 seconds for factory reset
@@ -179,6 +180,11 @@ class ButtonDriver:
                     and "long_press_threshold" not in self.triggered_actions
                 ):
                     self.triggered_actions.add("long_press_threshold")
+                    if self.long_press_ready_callback:
+                        try:
+                            self.long_press_ready_callback()
+                        except Exception:
+                            pass
 
                 # Check for Factory Reset (15s) - triggers immediately while holding
                 if (
@@ -306,6 +312,10 @@ class ButtonDriver:
     def set_long_press_callback(self, callback: Callable[[], None]):
         """Register a function to be called on long press (5-15 seconds)."""
         self.long_press_callback = callback
+
+    def set_long_press_ready_callback(self, callback: Callable[[], None]):
+        """Register a function called once when long-press threshold is reached."""
+        self.long_press_ready_callback = callback
 
     def set_factory_reset_callback(self, callback: Callable[[], None]):
         """Register a function to be called on factory reset press (15+ seconds)."""

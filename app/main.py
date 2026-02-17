@@ -380,6 +380,18 @@ def on_button_long_press_threadsafe():
             print_in_progress = False
 
 
+def on_button_long_press_ready_threadsafe():
+    """Callback fired at 5s hold threshold to signal 'you can release now'."""
+    try:
+        # Half-line tactile feed cue.
+        if hasattr(printer, "feed_dots"):
+            printer.feed_dots(12)
+        elif hasattr(printer, "blip"):
+            printer.blip()
+    except Exception:
+        pass
+
+
 def _print_channel_config_summary(position: int):
     """Print a summary of the currently selected channel configuration."""
     if hasattr(printer, "reset_buffer"):
@@ -445,10 +457,11 @@ def _write_long_press_menu_compact(position: int):
     printer.print_line()
     printer.print_subheader("QUICK ACTIONS")
     printer.print_caption(f"Dial: {position}")
-    printer.print_body("[1] All channels")
-    printer.print_body("[2] WiFi setup")
-    printer.print_body("[3] Current channel")
-    printer.print_body("[4] Settings menu")
+    printer.print_body("[1] Table of contents")
+    printer.print_body("[2] System monitor")
+    printer.print_body("[3] Reset WiFi")
+    printer.print_body("[4] Reset Factory Settings")
+    printer.print_body("[5] Reprint setup instructions")
     printer.print_caption("[8] Cancel")
     printer.print_caption("Turn dial, press button")
 
@@ -459,6 +472,19 @@ def _print_overview_and_menu(position: int):
         max_lines = getattr(settings, "max_print_lines", 200)
         printer.reset_buffer(max_lines)
     _write_channel_overview_compact()
+    _write_long_press_menu_compact(position)
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+
+
+def _print_system_monitor_and_menu(position: int):
+    """Print system monitor receipt + quick menu in one print job."""
+    if hasattr(printer, "reset_buffer"):
+        max_lines = getattr(settings, "max_print_lines", 200)
+        printer.reset_buffer(max_lines)
+    from app.modules.system_monitor import format_system_monitor_receipt
+
+    format_system_monitor_receipt(printer, {}, "SYSTEM MONITOR")
     _write_long_press_menu_compact(position)
     if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
@@ -516,7 +542,7 @@ def _print_long_press_menu(position: int):
 
 
 async def long_press_menu_trigger():
-    """Long-press flow: print current channel config and enter quick selection mode."""
+    """Long-press flow: open quick action menu and enter selection mode."""
     from concurrent.futures import ThreadPoolExecutor
     from app.selection_mode import enter_selection_mode, exit_selection_mode
 
@@ -531,8 +557,8 @@ async def long_press_menu_trigger():
         # Start from a clean transport state to avoid mixed/partial frames.
         if hasattr(printer, "clear_hardware_buffer"):
             printer.clear_hardware_buffer()
-        # Print overview + quick actions in one job to reduce paper waste.
-        _print_overview_and_menu(position)
+        # Print quick actions menu only (no auto-TOC print).
+        _print_long_press_menu(position)
 
     try:
         loop = asyncio.get_event_loop()
@@ -566,28 +592,30 @@ async def long_press_menu_trigger():
             return
 
         if dial_position == 2:
+            _print_system_monitor_and_menu(position)
+            return
+
+        if dial_position == 3:
             exit_selection_mode()
             if global_loop and global_loop.is_running():
                 asyncio.run_coroutine_threadsafe(manual_ap_mode_trigger(), global_loop)
             return
 
-        if dial_position == 3:
-            _print_current_channel_and_menu(position)
-            return
-
         if dial_position == 4:
             exit_selection_mode()
             try:
-                from app.modules.settings_menu import format_settings_menu_receipt
+                from app.modules.settings_menu import _confirm_factory_reset
 
-                format_settings_menu_receipt(
-                    hw_printer,
-                    config={},
-                    module_name="SETTINGS",
-                    module_id="quick-settings-menu",
-                )
+                _confirm_factory_reset(hw_printer, "quick-factory-reset")
             except Exception:
-                logger.exception("Failed to open settings menu from quick actions")
+                logger.exception("Failed to open factory reset confirmation")
+            return
+
+        if dial_position == 5:
+            from app.utils import print_setup_instructions_sync
+
+            print_setup_instructions_sync()
+            _print_long_press_menu(position)
             return
 
         # Any other dial position: re-show the menu for clarity.
@@ -983,6 +1011,9 @@ async def lifespan(app: FastAPI):
     button.set_callback(on_button_press_threadsafe)
     # Long press (5s) = Quick actions menu
     button.set_long_press_callback(on_button_long_press_threadsafe)
+    # Long-press threshold reached (5s) = tactile cue
+    if hasattr(button, "set_long_press_ready_callback"):
+        button.set_long_press_ready_callback(on_button_long_press_ready_threadsafe)
     # Factory reset (15s) = Factory Reset
     button.set_factory_reset_callback(on_factory_reset_threadsafe)
 

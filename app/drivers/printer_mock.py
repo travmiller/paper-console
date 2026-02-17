@@ -247,6 +247,11 @@ class PrinterDriver:
         """Feed paper directly, bypassing the buffer."""
         self.feed(lines)
 
+    def feed_dots(self, dots: int = 12):
+        """Simulate dot feed (12 dots ~= half line)."""
+        lines = max(1, int(round(dots / 24.0)))
+        self.feed(lines)
+
     def set_cutter_feed(self, lines: int):
         """Set the cutter feed space (mock - just stores the value)."""
         self.cutter_feed_dots = lines * 24
