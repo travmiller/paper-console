@@ -78,13 +78,15 @@ When a user unboxes a PC-1 and powers it on for the first time, the expected flo
 6. **Normal daily usage**
    - Turn dial to select channel (1-8)
    - Press button to print selected channel
-   - Hold button ~5 seconds to open **Quick Actions**:
+   - Hold button ~5 seconds (half-line paper cue appears at threshold), then release to open **Quick Actions**:
      - `1` Table of Contents
      - `2` System Monitor
      - `3` Reset WiFi
      - `4` Reset Factory Settings
      - `5` Reprint Setup Instructions
      - `8` Cancel
+   - Quick Actions are single-shot: after you pick an option, the menu exits automatically.
+   - If no option is selected for 2 minutes, Quick Actions auto-exits and prints a timeout note.
    - Hold button ~15 seconds for **Factory Reset** (clears settings and reboots)
    - Use Web UI anytime for editing modules, schedules, and system settings
 

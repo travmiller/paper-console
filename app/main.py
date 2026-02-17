@@ -465,26 +465,14 @@ def _write_long_press_menu_compact(position: int):
     printer.print_caption("Turn dial, press button")
 
 
-def _print_overview_and_menu(position: int):
-    """Print compact channel overview + quick menu in one print job."""
-    if hasattr(printer, "reset_buffer"):
-        max_lines = getattr(settings, "max_print_lines", 200)
-        printer.reset_buffer(max_lines)
-    _write_channel_overview_compact()
-    _write_long_press_menu_compact(position)
-    if hasattr(printer, "flush_buffer"):
-        printer.flush_buffer()
-
-
-def _print_system_monitor_and_menu(position: int):
-    """Print system monitor receipt + quick menu in one print job."""
+def _print_system_monitor():
+    """Print system monitor receipt (single-shot)."""
     if hasattr(printer, "reset_buffer"):
         max_lines = getattr(settings, "max_print_lines", 200)
         printer.reset_buffer(max_lines)
     from app.modules.system_monitor import format_system_monitor_receipt
 
     format_system_monitor_receipt(printer, {}, "SYSTEM MONITOR")
-    _write_long_press_menu_compact(position)
     if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
 
@@ -588,12 +576,12 @@ async def long_press_menu_trigger():
 
         if dial_position == 1:
             exit_selection_mode()
-            _print_overview_and_menu(position)
+            _print_channel_overview()
             return
 
         if dial_position == 2:
             exit_selection_mode()
-            _print_system_monitor_and_menu(position)
+            _print_system_monitor()
             return
 
         if dial_position == 3:
@@ -630,7 +618,35 @@ async def long_press_menu_trigger():
         if hasattr(hw_printer, "flush_buffer"):
             hw_printer.flush_buffer()
 
-    enter_selection_mode(_handle_quick_action, f"quick-actions-{position}")
+    quick_actions_id = f"quick-actions-{position}"
+    enter_selection_mode(_handle_quick_action, quick_actions_id)
+
+    async def _auto_exit_quick_actions_after_timeout(module_id: str):
+        """Auto-exit quick actions if no selection is made within timeout."""
+        from app.selection_mode import is_selection_mode_active, get_current_module_id
+
+        await asyncio.sleep(120)
+
+        if not is_selection_mode_active():
+            return
+        if get_current_module_id() != module_id:
+            return
+
+        # Still in this quick-actions session after timeout: exit with a brief hint.
+        exit_selection_mode()
+        from app.hardware import printer as hw_printer
+
+        if hasattr(hw_printer, "reset_buffer"):
+            max_lines = getattr(settings, "max_print_lines", 200)
+            hw_printer.reset_buffer(max_lines)
+        hw_printer.print_header("QUICK ACTIONS", icon="settings")
+        hw_printer.print_caption("No action selected.")
+        hw_printer.print_caption("Menu timed out after 2 min.")
+        hw_printer.feed(1)
+        if hasattr(hw_printer, "flush_buffer"):
+            hw_printer.flush_buffer()
+
+    asyncio.create_task(_auto_exit_quick_actions_after_timeout(quick_actions_id))
 
 
 from app.utils import print_setup_instructions_sync
