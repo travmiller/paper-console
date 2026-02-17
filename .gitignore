@@ -67,6 +67,7 @@ raspberry_pi/*.img
 
 # Temporary files
 *.tmp
+testing/tmp/
 *.temp
 .cache/
 nul
@@ -89,4 +90,3 @@ deploy.sh
 
 # Deployment configuration (contains Pi connection details)
 .deploy_config
-
