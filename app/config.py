@@ -39,9 +39,13 @@ class EmailConfig(BaseModel):
     auto_print_new: bool = False  # Whether to automatically print new emails
 
 
+def _default_text_content_doc() -> Dict[str, Any]:
+    return {"type": "doc", "content": [{"type": "paragraph"}]}
+
+
 class TextConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
-    content: str = ""
+    content_doc: Dict[str, Any] = Field(default_factory=_default_text_content_doc)
 
 
 class QRCodeConfig(BaseModel):
@@ -184,7 +188,7 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             id=DEFAULT_TEXT_ID,
             type="text",
             name="Note",
-            config={"content": ""},
+            config={"content_doc": _default_text_content_doc()},
         ),
         DEFAULT_SYSTEM_MONITOR_ID: ModuleInstance(
             id=DEFAULT_SYSTEM_MONITOR_ID,
@@ -387,6 +391,55 @@ def migrate_old_config(data: dict) -> dict:
     return data
 
 
+def migrate_text_module_content(data: dict) -> dict:
+    """Migrate legacy text module markdown strings to TipTap doc JSON."""
+    modules = data.get("modules")
+    if not isinstance(modules, dict):
+        return data
+
+    for module_data in modules.values():
+        if not isinstance(module_data, dict):
+            continue
+        if module_data.get("type") != "text":
+            continue
+
+        config = module_data.get("config")
+        if not isinstance(config, dict):
+            module_data["config"] = {"content_doc": _default_text_content_doc()}
+            continue
+
+        content_doc = config.get("content_doc")
+        is_valid_doc = (
+            isinstance(content_doc, dict)
+            and content_doc.get("type") == "doc"
+            and isinstance(content_doc.get("content"), list)
+        )
+
+        if not is_valid_doc:
+            legacy_content = config.get("content")
+            if isinstance(legacy_content, str) and legacy_content:
+                lines = legacy_content.split("\n")
+                paragraph_nodes = []
+                for line in lines:
+                    if line.strip():
+                        paragraph_nodes.append(
+                            {"type": "paragraph", "content": [{"type": "text", "text": line}]}
+                        )
+                    else:
+                        paragraph_nodes.append({"type": "paragraph"})
+                config["content_doc"] = {
+                    "type": "doc",
+                    "content": paragraph_nodes or [{"type": "paragraph"}],
+                }
+            else:
+                config["content_doc"] = _default_text_content_doc()
+
+        # Remove legacy markdown field after migration.
+        config.pop("content", None)
+
+    return data
+
+
 def remove_deprecated_features(data: dict) -> dict:
     """Remove deprecated settings/modules from existing configs."""
     modules = data.get("modules")
@@ -465,6 +518,7 @@ def _try_load_config_file(config_path: str) -> Settings | None:
             # Migrate old format to new format if needed
             data = migrate_old_config(data)
             data = remove_deprecated_features(data)
+            data = migrate_text_module_content(data)
 
             # Normalize channel keys to integers (JSON loads them as strings)
             if "channels" in data and data["channels"]:

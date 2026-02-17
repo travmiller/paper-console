@@ -2699,6 +2699,43 @@ async def list_modules():
     return {"modules": settings.modules}
 
 
+def _normalize_text_module_config(module: ModuleInstance) -> None:
+    """Ensure text modules use content_doc and strip legacy markdown content."""
+    if module.type != "text":
+        return
+
+    config = module.config if isinstance(module.config, dict) else {}
+
+    content_doc = config.get("content_doc")
+    is_valid_doc = (
+        isinstance(content_doc, dict)
+        and content_doc.get("type") == "doc"
+        and isinstance(content_doc.get("content"), list)
+    )
+
+    if not is_valid_doc:
+        legacy_content = config.get("content")
+        if isinstance(legacy_content, str) and legacy_content:
+            lines = legacy_content.split("\n")
+            paragraphs = []
+            for line in lines:
+                if line.strip():
+                    paragraphs.append(
+                        {"type": "paragraph", "content": [{"type": "text", "text": line}]}
+                    )
+                else:
+                    paragraphs.append({"type": "paragraph"})
+            config["content_doc"] = {
+                "type": "doc",
+                "content": paragraphs or [{"type": "paragraph"}],
+            }
+        else:
+            config["content_doc"] = {"type": "doc", "content": [{"type": "paragraph"}]}
+
+    config.pop("content", None)
+    module.config = config
+
+
 @app.post("/api/modules", dependencies=[Depends(require_admin_access)])
 async def create_module(module: ModuleInstance, background_tasks: BackgroundTasks):
     """Create a new module instance."""
@@ -2708,6 +2745,7 @@ async def create_module(module: ModuleInstance, background_tasks: BackgroundTask
     if not module.id:
         module.id = str(uuid.uuid4())
 
+    _normalize_text_module_config(module)
     settings.modules[module.id] = module
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
@@ -2736,6 +2774,7 @@ async def update_module(
 
     # Ensure ID matches
     module.id = module_id
+    _normalize_text_module_config(module)
     settings.modules[module_id] = module
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 

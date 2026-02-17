@@ -8,6 +8,13 @@ const ModuleTestList = ({ settings, modules, triggerModulePrint, wifiStatus, set
   const { moduleTypes } = useModuleTypes();
 
   const isNonEmptyString = (v) => typeof v === 'string' && v.trim().length > 0;
+  const hasVisibleRichText = (node) => {
+    if (!node || typeof node !== 'object') return false;
+    if (node.type === 'horizontalRule') return true;
+    if (node.type === 'text') return typeof node.text === 'string' && node.text.trim().length > 0;
+    if (!Array.isArray(node.content)) return false;
+    return node.content.some((child) => hasVisibleRichText(child));
+  };
 
   const moduleIsConfigured = (module) => {
     const cfg = module?.config || {};
@@ -23,7 +30,7 @@ const ModuleTestList = ({ settings, modules, triggerModulePrint, wifiStatus, set
       case 'webhook':
         return isNonEmptyString(cfg.url);
       case 'text':
-        return isNonEmptyString(cfg.content);
+        return hasVisibleRichText(cfg.content_doc);
       case 'weather':
         // Weather can use either module-level location OR global settings location.
         return isNonEmptyString(cfg.city_name) || isNonEmptyString(settings?.city_name);

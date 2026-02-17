@@ -277,7 +277,7 @@ function App() {
       astronomy: {},
       calendar: { ical_sources: [], days_to_show: 2 },
       webhook: { url: '', method: 'GET', headers: {}, json_path: '' },
-      text: { content: '' },
+      text: { content_doc: { type: 'doc', content: [{ type: 'paragraph' }] } },
     };
     return defaults[moduleType] || {};
   };

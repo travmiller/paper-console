@@ -105,7 +105,7 @@ const Toolbar = ({ editor, isFullscreen, onToggleFullscreen }) => {
 
 /**
  * RichTextEditor - WYSIWYG editor using TipTap
- * Outputs Markdown-compatible content for printing
+ * Outputs TipTap JSON document content for storage/printing
  */
 const RichTextEditor = ({ value, onChange }) => {
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -125,11 +125,9 @@ const RichTextEditor = ({ value, onChange }) => {
         nested: false,
       }),
     ],
-    content: value ? parseMarkdownToHtml(value) : '',
+    content: normalizeContentDoc(value),
     onUpdate: ({ editor }) => {
-      // Convert to Markdown for storage
-      const markdown = htmlToMarkdown(editor.getHTML());
-      onChange(markdown);
+      onChange(editor.getJSON());
     },
     editorProps: {
       attributes: {
@@ -141,9 +139,11 @@ const RichTextEditor = ({ value, onChange }) => {
   // Update editor when external value changes
   React.useEffect(() => {
     if (editor && value !== undefined) {
-      const currentMarkdown = htmlToMarkdown(editor.getHTML());
-      if (currentMarkdown !== value) {
-        editor.commands.setContent(parseMarkdownToHtml(value));
+      const nextDoc = normalizeContentDoc(value);
+      const currentDoc = normalizeContentDoc(editor.getJSON());
+      if (!areDocsEqual(currentDoc, nextDoc)) {
+        // Sync external updates without emitting another change event
+        editor.commands.setContent(nextDoc, false);
       }
     }
   }, [value, editor]);
@@ -253,122 +253,42 @@ const RichTextEditor = ({ value, onChange }) => {
 };
 
 /**
- * Convert simple Markdown to HTML for TipTap
+ * Normalize stored note content into a valid TipTap doc.
+ * Legacy string content is converted to plain paragraph nodes (no markdown parsing).
  */
-function parseMarkdownToHtml(markdown) {
-  if (!markdown) return '';
-  
-  let html = markdown
-    // Headers (must be at line start)
-    .replace(/^# (.+)$/gm, '<h1>$1</h1>')
-    // Bold
-    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    // Italic (using * or _)
-    .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, '<em>$1</em>')
-    .replace(/_(.+?)_/g, '<em>$1</em>')
-    // Horizontal rule
-    .replace(/^---$/gm, '<hr>')
-    // Task list items (must be before regular lists)
-    .replace(/^- \[x\] (.+)$/gm, '<taskitem checked>$1</taskitem>')
-    .replace(/^- \[ \] (.+)$/gm, '<taskitem>$1</taskitem>')
-    // Unordered lists
-    .replace(/^[*-] (.+)$/gm, '<li>$1</li>')
-    // Ordered lists
-    .replace(/^\d+\. (.+)$/gm, '<oli>$1</oli>')
-    // Wrap consecutive <taskitem> in task list
-    .replace(/(<taskitem[^>]*>.*<\/taskitem>\n?)+/g, '<ul data-type="taskList">$&</ul>')
-    .replace(/<taskitem checked>/g, '<li data-type="taskItem" data-checked="true"><label><input type="checkbox" checked></label><div><p>')
-    .replace(/<taskitem>/g, '<li data-type="taskItem" data-checked="false"><label><input type="checkbox"></label><div><p>')
-    .replace(/<\/taskitem>/g, '</p></div></li>')
-    // Wrap consecutive <li> in <ul>
-    .replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>')
-    // Wrap consecutive <oli> in <ol>
-    .replace(/(<oli>.*<\/oli>\n?)+/g, '<ol>$&</ol>')
-    .replace(/<\/?oli>/g, (m) => m.replace('oli', 'li'))
-    // Paragraphs (lines not already wrapped)
-    .split('\n')
-    .map(line => {
-      if (line.match(/^<(h1|ul|ol|hr|li)/)) return line;
-      if (line.trim() === '') return '';
-      if (!line.match(/^<[a-z]/)) return `<p>${line}</p>`;
-      return line;
-    })
-    .join('\n');
-  
-  return html;
+function normalizeContentDoc(value) {
+  if (value && typeof value === 'object' && value.type === 'doc' && Array.isArray(value.content)) {
+    return value;
+  }
+  if (typeof value === 'string' && value.trim().length > 0) {
+    return plainTextToDoc(value);
+  }
+  return createEmptyDoc();
 }
 
-/**
- * Convert TipTap HTML back to Markdown
- */
-function htmlToMarkdown(html) {
-  if (!html) return '';
-  
-  // Create a temporary div to parse HTML
-  const div = document.createElement('div');
-  div.innerHTML = html;
-  
-  let markdown = '';
-  
-  const processNode = (node) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      return node.textContent;
+function plainTextToDoc(text) {
+  const lines = text.split('\n');
+  const content = lines.map((line) => {
+    if (!line.trim()) {
+      return { type: 'paragraph' };
     }
-    
-    if (node.nodeType !== Node.ELEMENT_NODE) {
-      return '';
-    }
-    
-    const children = Array.from(node.childNodes).map(processNode).join('');
-    
-    switch (node.tagName.toLowerCase()) {
-      case 'h1':
-        return `# ${children}\n`;
-      case 'p':
-        return `${children}\n`;
-      case 'strong':
-        return `**${children}**`;
-      case 'em':
-        return `*${children}*`;
-      case 'ul':
-        return children;
-      case 'ol':
-        return children;
-      case 'li': {
-        const parent = node.parentElement;
-        // Check if this is a task item
-        if (node.dataset?.type === 'taskItem' || node.getAttribute('data-type') === 'taskItem') {
-          const isChecked = node.dataset?.checked === 'true' || node.getAttribute('data-checked') === 'true';
-          const checkbox = isChecked ? '[x]' : '[ ]';
-          // For task items, get text from the content div, not all children
-          // TipTap structure: li > label + div > p
-          const contentDiv = node.querySelector('div');
-          const textContent = contentDiv ? contentDiv.textContent.trim() : children.trim();
-          return `- ${checkbox} ${textContent}\n`;
-        }
-        if (parent && parent.tagName.toLowerCase() === 'ol') {
-          const index = Array.from(parent.children).indexOf(node) + 1;
-          return `${index}. ${children}\n`;
-        }
-        return `- ${children}\n`;
-      }
-      case 'hr':
-        return '---\n';
-      case 'br':
-        return '\n';
-      case 'label':
-        return ''; // Skip checkbox labels
-      case 'input':
-        return ''; // Skip checkbox inputs
-      default:
-        return children;
-    }
+    return {
+      type: 'paragraph',
+      content: [{ type: 'text', text: line }],
+    };
+  });
+  return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] };
+}
+
+function createEmptyDoc() {
+  return {
+    type: 'doc',
+    content: [{ type: 'paragraph' }],
   };
-  
-  markdown = Array.from(div.childNodes).map(processNode).join('');
-  
-  // Clean up extra newlines
-  return markdown.replace(/\n{3,}/g, '\n\n').trim();
+}
+
+function areDocsEqual(a, b) {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export default RichTextEditor;
