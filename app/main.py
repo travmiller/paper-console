@@ -418,15 +418,9 @@ def _print_channel_config_summary(position: int):
         printer.flush_buffer()
 
 
-def _print_channel_overview():
-    """Print all channel assignments (compact view)."""
-    if hasattr(printer, "reset_buffer"):
-        max_lines = getattr(settings, "max_print_lines", 200)
-        printer.reset_buffer(max_lines)
-
-    printer.print_header("CHANNEL OVERVIEW", icon="list")
-    printer.print_line()
-
+def _write_channel_overview_compact():
+    """Write all channel assignments in a compact format (no reset/flush)."""
+    printer.print_header("CHANNELS", icon="list")
     for channel_num in range(1, 9):
         channel = settings.channels.get(channel_num)
         if channel and channel.modules:
@@ -436,14 +430,72 @@ def _print_channel_overview():
                 if module:
                     names.append(module.name)
             if names:
-                printer.print_body(f"{channel_num}. {' + '.join(names)}")
+                printer.print_body(f"{channel_num}: {' + '.join(names)}")
             else:
-                printer.print_caption(f"{channel_num}. (empty)")
+                printer.print_caption(f"{channel_num}: (empty)")
         else:
-            printer.print_caption(f"{channel_num}. (empty)")
+            printer.print_caption(f"{channel_num}: (empty)")
 
+
+def _write_long_press_menu_compact(position: int):
+    """Write long-press quick action menu in compact format (no reset/flush)."""
     printer.print_line()
-    printer.feed(1)
+    printer.print_subheader("QUICK ACTIONS")
+    printer.print_caption(f"Dial: {position}")
+    printer.print_body("[1] All channels")
+    printer.print_body("[2] WiFi setup")
+    printer.print_body("[3] Current channel")
+    printer.print_body("[4] Settings menu")
+    printer.print_caption("[8] Cancel")
+    printer.print_caption("Turn dial, press button")
+
+
+def _print_overview_and_menu(position: int):
+    """Print compact channel overview + quick menu in one print job."""
+    if hasattr(printer, "reset_buffer"):
+        max_lines = getattr(settings, "max_print_lines", 200)
+        printer.reset_buffer(max_lines)
+    _write_channel_overview_compact()
+    _write_long_press_menu_compact(position)
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+
+
+def _print_current_channel_and_menu(position: int):
+    """Print current channel details + quick menu in one print job."""
+    if hasattr(printer, "reset_buffer"):
+        max_lines = getattr(settings, "max_print_lines", 200)
+        printer.reset_buffer(max_lines)
+    channel = settings.channels.get(position)
+
+    printer.print_header(f"CHANNEL {position}", icon="list")
+    if not channel or not channel.modules:
+        printer.print_body("This channel is empty.")
+        printer.print_caption("Use web settings to add modules.")
+    else:
+        sorted_assignments = sorted(channel.modules, key=lambda m: m.order)
+        for idx, assignment in enumerate(sorted_assignments, start=1):
+            module = settings.modules.get(assignment.module_id)
+            module_name = module.name if module else "(missing module)"
+            printer.print_body(f"{idx}. {module_name}")
+        if channel.schedule:
+            printer.print_caption("Schedule: " + ", ".join(channel.schedule[:4]))
+            if len(channel.schedule) > 4:
+                printer.print_caption(f"+{len(channel.schedule) - 4} more times")
+        else:
+            printer.print_caption("Schedule: none")
+
+    _write_long_press_menu_compact(position)
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+
+
+def _print_channel_overview():
+    """Print all channel assignments (compact view)."""
+    if hasattr(printer, "reset_buffer"):
+        max_lines = getattr(settings, "max_print_lines", 200)
+        printer.reset_buffer(max_lines)
+    _write_channel_overview_compact()
 
     if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
@@ -454,19 +506,7 @@ def _print_long_press_menu(position: int):
     if hasattr(printer, "reset_buffer"):
         max_lines = getattr(settings, "max_print_lines", 200)
         printer.reset_buffer(max_lines)
-
-    printer.print_header("QUICK ACTIONS", icon="settings")
-    printer.print_caption(f"Dial is on channel {position}")
-    printer.print_line()
-    printer.print_body("  [1] Print current channel config")
-    printer.print_body("  [2] Enter WiFi setup mode")
-    printer.print_body("  [3] Print channel overview")
-    printer.print_body("  [4] Open settings menu")
-    printer.feed(1)
-    printer.print_caption("  [8] Cancel")
-    printer.print_line()
-    printer.print_caption("Turn dial, then press button")
-    printer.feed(1)
+    _write_long_press_menu_compact(position)
 
     if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
@@ -487,9 +527,8 @@ async def long_press_menu_trigger():
         # Start from a clean transport state to avoid mixed/partial frames.
         if hasattr(printer, "clear_hardware_buffer"):
             printer.clear_hardware_buffer()
-        # Print the current channel config first, then show quick actions.
-        _print_channel_config_summary(position)
-        _print_long_press_menu(position)
+        # Print overview + quick actions in one job to reduce paper waste.
+        _print_overview_and_menu(position)
 
     try:
         loop = asyncio.get_event_loop()
@@ -519,8 +558,7 @@ async def long_press_menu_trigger():
             return
 
         if dial_position == 1:
-            _print_channel_config_summary(position)
-            _print_long_press_menu(position)
+            _print_overview_and_menu(position)
             return
 
         if dial_position == 2:
@@ -530,8 +568,7 @@ async def long_press_menu_trigger():
             return
 
         if dial_position == 3:
-            _print_channel_overview()
-            _print_long_press_menu(position)
+            _print_current_channel_and_menu(position)
             return
 
         if dial_position == 4:
