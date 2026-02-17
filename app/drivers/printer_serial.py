@@ -1337,8 +1337,8 @@ class PrinterDriver:
 
     def print_line(self):
         """Print a decorative separator line."""
-        # Use a stylish dot pattern instead of plain dashes
-        line = "· " * (self.width // 2)
+        # Use ASCII-only pattern so separators survive text sanitization.
+        line = ". " * (self.width // 2)
         self.print_text(line.strip(), "light")
 
     def print_article_block(
