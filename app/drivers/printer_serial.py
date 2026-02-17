@@ -78,9 +78,9 @@ class PrinterDriver:
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
         self._max_lines_hit = False  # Flag set when max lines exceeded during flush
 
-        # Cutter feed space (pixels to add at end of print for cutter clearance)
-        # Placed at tear edge so content isn't cut off. Increased for reliability.
-        # Can be updated via set_cutter_feed() method
+        # Cutter feed space in dots (24 dots ~= 1 line).
+        # Applied as an explicit post-print feed command for reliability.
+        # Can be updated via set_cutter_feed() method.
         self.cutter_feed_dots = 12 * 24  # 12 lines * 24 dots/line = 288 dots
 
         # Font settings (fixed values)
@@ -787,8 +787,9 @@ class PrinterDriver:
         # Remove trailing spacing
         measured_content_height -= last_spacing
         
-        # Content at top; cutter feed at bottom (becomes tear edge after 180° rotation)
-        total_height = measured_content_height + (self.SPACING_LARGE * 2) + self.cutter_feed_dots
+        # Content-only bitmap height. Cutter feed is now applied explicitly
+        # after bitmap transmission for more consistent behavior across printers.
+        total_height = measured_content_height + (self.SPACING_LARGE * 2)
         
         # Create Image
         width = self.PRINTER_WIDTH_DOTS
@@ -1510,6 +1511,15 @@ class PrinterDriver:
                     self.ser.flush()
                 except Exception as e:
                     print(f"[ERROR] Serial flush failed: {e}")
+            # Explicit post-print feed for cutter clearance.
+            # Use feed_direct() because it sends both ESC d and ESC J variants
+            # for better compatibility across printer firmwares.
+            feed_lines = max(0, int(self.cutter_feed_dots / 24))
+            if feed_lines > 0:
+                try:
+                    self.feed_direct(feed_lines)
+                except Exception as e:
+                    print(f"[ERROR] Post-print feed failed: {e}")
         else:
             print("[DEBUG] No bitmap rendered from ops.")
 

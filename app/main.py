@@ -356,9 +356,25 @@ async def handle_selection_async(dial_position: int):
 
 def on_button_long_press_threadsafe():
     """Callback for long press (5 seconds) - opens quick actions menu."""
-    global global_loop
-    if global_loop and global_loop.is_running():
-        asyncio.run_coroutine_threadsafe(long_press_menu_trigger(), global_loop)
+    global global_loop, print_in_progress, last_print_time
+    import time
+
+    with print_lock:
+        # Don't interrupt active print jobs.
+        if print_in_progress:
+            return
+        print_in_progress = True
+        last_print_time = time.time()
+
+    try:
+        if global_loop and global_loop.is_running():
+            asyncio.run_coroutine_threadsafe(long_press_menu_trigger(), global_loop)
+        else:
+            with print_lock:
+                print_in_progress = False
+    except Exception:
+        with print_lock:
+            print_in_progress = False
 
 
 def _print_channel_config_summary(position: int):
@@ -460,6 +476,7 @@ async def long_press_menu_trigger():
     """Long-press flow: print current channel config and enter quick selection mode."""
     from concurrent.futures import ThreadPoolExecutor
     from app.selection_mode import enter_selection_mode, exit_selection_mode
+    global print_in_progress
 
     # Cancel any existing interactive mode before opening quick actions
     exit_selection_mode()
@@ -467,6 +484,9 @@ async def long_press_menu_trigger():
     position = dial.read_position()
 
     def _initial_print():
+        # Start from a clean transport state to avoid mixed/partial frames.
+        if hasattr(printer, "clear_hardware_buffer"):
+            printer.clear_hardware_buffer()
         # Print the current channel config first, then show quick actions.
         _print_channel_config_summary(position)
         _print_long_press_menu(position)
@@ -478,6 +498,10 @@ async def long_press_menu_trigger():
     except Exception:
         logger.exception("Failed to render long-press menu")
         return
+    finally:
+        # Release lock so normal button presses can drive selection mode.
+        with print_lock:
+            print_in_progress = False
 
     def _handle_quick_action(dial_position: int):
         from app.selection_mode import exit_selection_mode
