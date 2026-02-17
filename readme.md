@@ -1,15 +1,15 @@
 # PC-1 (Paper Console 1)
 
 **A tiny customizable printer that prints news, weather, emails, games, and other content on demand.**
-*Status: V1 Prototype*
-*Date: November 2025*
+*Status: Consumer Launch Candidate*
+*Date: February 2026*
 
 ---
 
 * **No screens:** output is physical thermal paper.
 * **No subscriptions:** user-owned API keys or local algorithms.
 * **Heirloom quality:** walnut, brass, and archival-grade paper.
-* **Universal channels:** fully configurable channels (Astronomy, Calendar Integration, Checklist Maker, Email Integration, On This Day in History, Maze Generator, News, Quote of the Day, RSS Feeds, Sudoku Generator, System Monitor, Text/Note, Weather, Custom Webhooks)
+* **Universal channels:** fully configurable channels (Astronomy, Calendar Integration, Email Integration, On This Day in History, Maze Generator, News, Quote of the Day, RSS Feeds, Sudoku Generator, System Monitor, Text/Note, Weather, Custom Webhooks)
 
 ![PC-1 Front View](images/pc-1_front.jpg)
 *Front view showing the brass rotary dial, push button, and thermal paper output*
@@ -45,6 +45,11 @@ npm install
 npm run dev
 ```
 * **URL:** [http://localhost:5173](http://localhost:5173)
+
+**Tests (WSL/Linux):**
+```bash
+./testing/run_tests.sh
+```
 
 ### Unboxing & First-Use Experience
 
@@ -155,7 +160,7 @@ Configuration is handled entirely via the **Web UI** at `http://pc-1.local` (or 
 
 Each module is an independent instance with its own configuration. See [Architecture & Modules](#4-architecture--modules) for detailed information.
 
-Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **Sudoku**, **Maze**, **Astronomy**, **Calendar**, **Webhook**, **Text / Note**, **Checklist**, **Quotes**, **History**.
+Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **Sudoku**, **Maze**, **Astronomy**, **Calendar**, **Webhook**, **Text / Note**, **Quotes**, **History**.
 
 ### Settings Storage
 * **Settings File:** `config.json` (auto-saved, gitignored)
@@ -169,6 +174,9 @@ For production deployments, configure these environment variables:
 * **`PC1_CORS_ORIGINS`**: Comma-separated CORS origins (default is local/dev origins only).
 * **`PC1_SETUP_PASSWORD`**: Optional override for setup AP password (must be at least 8 chars).  
   If unset, PC-1 generates a per-device setup password automatically.
+* **`PC1_LOG_LEVEL`**: Backend log level (default: `WARNING` on device builds).
+* **`UVICORN_LOG_LEVEL`**: Uvicorn log level for `run.sh` (default: `warning`).
+* **`UVICORN_ACCESS_LOG`**: Set to `1` to enable HTTP access logs (default: `0` for lower log volume).
 
 ---
 
@@ -201,7 +209,6 @@ paper-console/
 │   │   ├── webhook.py     # Generic API/Webhook Logic
 │   │   ├── text.py        # Static Text Logic
 │   │   ├── calendar.py    # iCal Calendar Parsing Logic
-│   │   ├── checklist.py   # Checklist Logic
 │   │   ├── quotes.py      # Quotes Logic
 │   │   └── history.py     # Historical Events Logic
 ├── web/                   # React + Vite + Tailwind CSS Frontend
@@ -209,11 +216,13 @@ paper-console/
 │   ├── setup_pi.sh            # Setup script (Hostname, Nginx, Systemd)
 │   └── wifi_ap_nmcli.sh      # WiFi AP mode manager
 ├── testing/
-│   ├── test_modules.py       # Module testing script
-│   └── test_windows.bat      # Windows test runner
+│   ├── test_core.py          # Pytest core suite (WSL/Linux)
+│   ├── run_tests.sh          # WSL/Linux test runner
+│   └── README.md             # Testing notes
 ├── run.sh                 # Development server launcher
 ├── run.bat                # Windows development launcher
 ├── requirements.txt       # Python dependencies
+├── requirements-dev.txt   # Dev/test dependencies
 └── readme.md              # This file
 ```
 
@@ -266,11 +275,6 @@ paper-console/
 **Text / Note:**
 * Features: Static multi-line text storage
 * Use Cases: WiFi passwords, to-do lists, quick reference notes
-
-**Checklist:**
-* Features: Printable checklist with checkboxes
-* Use Cases: Daily tasks, shopping lists, reminders
-* Format: Each item prints with a checkbox `[ ]` for manual checking
 
 **Quotes:**
 * Sources: Curated database of ~5,000 quotes
@@ -410,10 +414,16 @@ Legend: `[X]` = Used, `[ ]` = Empty. The header is 2 pins wide.
   * `run.sh` automatically kills zombie processes
   * If persistent, reboot: `sudo reboot`
   * **Log Storage:**
-  * Logs are stored in systemd journal (not files). Journal rotates automatically.
-  * Check journal size: `journalctl --disk-usage`
-  * Clear old logs: `sudo journalctl --vacuum-time=7d` (keeps last 7 days)
-  * Limit journal size: Edit `/etc/systemd/journald.conf` and set `SystemMaxUse=50M`
+  * Setup script configures journald in RAM (`Storage=volatile`) with a bounded budget (`RuntimeMaxUse=16M`).
+  * This minimizes SD writes and prevents long-term log growth on disk.
+  * Setup script also installs `pc1-storage-guard.timer` (runs every 6 hours) to trim journals/cache if root usage rises.
+  * Core dumps are disabled (`/etc/systemd/coredump.conf.d/pc-1.conf`) to prevent multi-megabyte crash artifacts.
+  * Check current journal usage: `journalctl --disk-usage`
+  * Check storage guard timer: `systemctl status pc1-storage-guard.timer`
+  * Run storage guard immediately: `sudo systemctl start pc1-storage-guard.service`
+  * Temporarily enable more logs for debugging by setting:
+    * `PC1_LOG_LEVEL=INFO`
+    * `UVICORN_ACCESS_LOG=1`
 
 ### Module-Specific Issues
 * **NewsAPI Returns 0 Articles:** Check if API key is valid and on free tier

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { commonClasses } from '../../design-tokens';
+import { adminAuthFetch } from '../../lib/adminAuthFetch';
 
 /**
  * ActionButton widget for schema forms.
@@ -13,8 +14,6 @@ import { commonClasses } from '../../design-tokens';
  * - style: "primary" | "danger" | "ghost" (default: "primary")
  */
 const ActionButton = ({ 
-    value, 
-    onChange, 
     schema, 
     uiSchema = {},
     moduleId,
@@ -45,7 +44,7 @@ const ActionButton = ({
         setStatus(null);
         
         try {
-            const response = await fetch(`/api/modules/${moduleId}/actions/${action}`, {
+            const response = await adminAuthFetch(`/api/modules/${moduleId}/actions/${action}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
             });

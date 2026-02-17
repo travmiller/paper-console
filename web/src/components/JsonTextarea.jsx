@@ -1,18 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from 'react';
 
 const JsonTextarea = ({ value, onChange, onBlur, className }) => {
   const [text, setText] = useState(JSON.stringify(value || {}, null, 2));
   const [isValid, setIsValid] = useState(true);
-
-  // Update local text when external value changes (but only if we're not focused)
-  const textareaRef = useRef(null);
-  const isFocused = useRef(false);
-
-  useEffect(() => {
-    if (!isFocused.current) {
-      setText(JSON.stringify(value || {}, null, 2));
-    }
-  }, [value]);
+  const [isFocused, setIsFocused] = useState(false);
+  const externalText = JSON.stringify(value || {}, null, 2);
 
   // Parse JSON, treating empty/whitespace as empty object
   const parseJson = (str) => {
@@ -35,8 +27,8 @@ const JsonTextarea = ({ value, onChange, onBlur, className }) => {
     }
   };
 
-  const handleBlur = (e) => {
-    isFocused.current = false;
+  const handleBlur = () => {
+    setIsFocused(false);
     try {
       const parsed = parseJson(text);
       setIsValid(true);
@@ -54,10 +46,12 @@ const JsonTextarea = ({ value, onChange, onBlur, className }) => {
 
   return (
     <textarea
-      ref={textareaRef}
-      value={text}
+      value={isFocused ? text : externalText}
       onChange={handleChange}
-      onFocus={() => (isFocused.current = true)}
+      onFocus={() => {
+        setIsFocused(true);
+        setText(externalText);
+      }}
       onBlur={handleBlur}
       className={`${className} ${!isValid ? 'border-red-500' : ''}`}
     />

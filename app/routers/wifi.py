@@ -3,11 +3,12 @@ WiFi API Router
 Provides endpoints for WiFi management.
 """
 
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from fastapi import APIRouter, HTTPException, BackgroundTasks, Depends
 from pydantic import BaseModel
 from typing import Optional
 import app.wifi_manager as wifi_manager
 import asyncio
+from app.auth import require_admin_access
 
 router = APIRouter(prefix="/api/wifi", tags=["wifi"])
 
@@ -92,7 +93,7 @@ async def scan_wifi_networks():
     return {"networks": networks}
 
 
-@router.post("/connect")
+@router.post("/connect", dependencies=[Depends(require_admin_access)])
 async def connect_wifi(request: WiFiConnectRequest, background_tasks: BackgroundTasks):
     """
     Connect to a WiFi network.
@@ -110,7 +111,7 @@ async def connect_wifi(request: WiFiConnectRequest, background_tasks: Background
     }
 
 
-@router.post("/ap-mode")
+@router.post("/ap-mode", dependencies=[Depends(require_admin_access)])
 async def trigger_ap_mode(background_tasks: BackgroundTasks):
     """Manually trigger AP mode for reconfiguration."""
 
@@ -132,7 +133,7 @@ async def trigger_ap_mode(background_tasks: BackgroundTasks):
     return {"success": True, "message": "AP mode activating in 2 seconds..."}
 
 
-@router.post("/forget")
+@router.post("/forget", dependencies=[Depends(require_admin_access)])
 async def forget_network(request: WiFiConnectRequest):
     """Forget a saved WiFi network."""
     success = wifi_manager.forget_wifi(request.ssid)

@@ -28,7 +28,7 @@ const PresetSelect = ({ value, onChange, presets = {}, onPresetSelect }) => {
         valuesToApply = preset.values;
       } else {
         // Exclude UI-only properties
-        const { label, ...rest } = preset;
+        const { label: _label, ...rest } = preset;
         valuesToApply = rest;
       }
       

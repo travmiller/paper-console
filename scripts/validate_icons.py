@@ -27,7 +27,7 @@ else:
 
 print(f"Loaded {len(available_icons)} available icons from icons.txt\n")
 
-# Extract icon_map from printer_serial.py
+# Extract icon alias mapping from printer_serial.py
 printer_serial_file = project_root / "app" / "drivers" / "printer_serial.py"
 icon_map = {}
 direct_references = set()
@@ -35,13 +35,14 @@ direct_references = set()
 if printer_serial_file.exists():
     with open(printer_serial_file, "r", encoding="utf-8") as f:
         content = f.read()
-        
-        # Extract icon_map dictionary
-        icon_map_match = re.search(r'icon_map\s*=\s*\{([^}]+)\}', content, re.DOTALL)
-        if icon_map_match:
-            icon_map_content = icon_map_match.group(1)
-            # Extract key-value pairs
-            pairs = re.findall(r'["\']([^"\']+)["\']\s*:\s*["\']([^"\']+)["\']', icon_map_content)
+
+        # Extract either legacy `icon_map` or current `icon_aliases` dictionary.
+        for var_name in ("icon_map", "icon_aliases"):
+            mapping_match = re.search(rf'{var_name}\s*=\s*\{{(.*?)\n\s*\}}', content, re.DOTALL)
+            if not mapping_match:
+                continue
+            mapping_content = mapping_match.group(1)
+            pairs = re.findall(r'["\']([^"\']+)["\']\s*:\s*["\']([^"\']+)["\']', mapping_content)
             for key, value in pairs:
                 icon_map[key.lower()] = value.lower()
 
@@ -65,7 +66,6 @@ code_files = [
     project_root / "app" / "modules" / "webhook.py",
     project_root / "app" / "modules" / "quotes.py",
     project_root / "app" / "modules" / "system_monitor.py",
-    project_root / "app" / "modules" / "checklist.py",
     project_root / "app" / "modules" / "history.py",
     project_root / "app" / "modules" / "sudoku.py",
     project_root / "app" / "modules" / "maze.py",

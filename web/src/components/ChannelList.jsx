@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { INK_GRADIENTS } from '../constants';
 import { useModuleTypes } from '../hooks/useModuleTypes';
 import WiFiIcon from '../assets/WiFiIcon';
@@ -178,7 +178,7 @@ const ChannelList = ({
     });
   };
 
-  const handleDragLeave = (event, listId) => {
+  const handleDragLeave = (event) => {
     if (!event.currentTarget.contains(event.relatedTarget)) {
       // Keep indicator until drag ends; avoids drop mismatch on fast moves.
     }
@@ -300,7 +300,7 @@ const ChannelList = ({
     handleDragEnd();
   };
 
-  const channelModulesByPos = useMemo(() => {
+  const channelModulesByPos = (() => {
     const result = {};
     for (let pos = 1; pos <= 8; pos += 1) {
       const channel = settings.channels?.[pos] || { modules: [] };
@@ -314,10 +314,10 @@ const ChannelList = ({
       result[pos] = channelModules;
     }
     return result;
-  }, [modules, settings.channels]);
+  })();
 
   // Find modules that aren't assigned to any channel
-  const unassignedModulesRaw = useMemo(() => {
+  const unassignedModulesRaw = (() => {
     const assignedModuleIds = new Set();
     Object.values(settings.channels || {}).forEach((channel) => {
       (channel.modules || []).forEach((assignment) => {
@@ -326,16 +326,13 @@ const ChannelList = ({
     });
 
     return Object.values(modules || {}).filter((module) => !assignedModuleIds.has(module.id));
-  }, [modules, settings.channels]);
+  })();
 
   // Track display order of unassigned modules
   const [unassignedModuleOrder, setUnassignedModuleOrder] = useState([]);
 
-  const unassignedModuleIds = useMemo(
-    () => unassignedModulesRaw.map((module) => module.id),
-    [unassignedModulesRaw],
-  );
-  const unassignedModuleSet = useMemo(() => new Set(unassignedModuleIds), [unassignedModuleIds]);
+  const unassignedModuleIds = unassignedModulesRaw.map((module) => module.id);
+  const unassignedModuleSet = new Set(unassignedModuleIds);
   
   useEffect(() => {
     setUnassignedModuleOrder((prevOrder) => {
@@ -449,7 +446,7 @@ const ChannelList = ({
                   listRefs.current[listId] = el;
                 }}
                 onDragOver={(event) => handleDragOver(event, listId)}
-                onDragLeave={(event) => handleDragLeave(event, listId)}
+                onDragLeave={handleDragLeave}
                 onDrop={(event) => handleDrop(event, listId)}
                 data-drop-active={dropIndicator?.listId === listId}
                 className='space-y-2 mb-2 flex-grow min-h-[36px] dnd-list'
@@ -592,7 +589,7 @@ const ChannelList = ({
             listRefs.current.unassigned = el;
           }}
           onDragOver={(event) => handleDragOver(event, 'unassigned')}
-          onDragLeave={(event) => handleDragLeave(event, 'unassigned')}
+          onDragLeave={handleDragLeave}
           onDrop={(event) => handleDrop(event, 'unassigned')}
           data-drop-active={dropIndicator?.listId === 'unassigned'}
           className='space-y-2 min-h-[36px] dnd-list'

@@ -5,6 +5,8 @@ set -euo pipefail
 PORT=${PORT:-8000}
 SERVICE_NAME="pc-1"
 SERVICE_WAS_ACTIVE=0
+UVICORN_LOG_LEVEL=${UVICORN_LOG_LEVEL:-warning}
+UVICORN_ACCESS_LOG=${UVICORN_ACCESS_LOG:-0}
 
 # Try to activate venv if it exists
 if [ -f "venv/Scripts/activate" ]; then
@@ -47,6 +49,9 @@ fi
 # Be careful not to kill system python, but this is usually safe in this context
 pkill -f "uvicorn app.main:app" || true
 
-echo "Starting PC-1 Server on port ${PORT}..."
-exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT}"
-
+echo "Starting PC-1 Server on port ${PORT} (log-level=${UVICORN_LOG_LEVEL}, access-log=${UVICORN_ACCESS_LOG})..."
+UVICORN_CMD=(uvicorn app.main:app --host 0.0.0.0 --port "${PORT}" --log-level "${UVICORN_LOG_LEVEL}")
+if [ "${UVICORN_ACCESS_LOG}" != "1" ]; then
+    UVICORN_CMD+=(--no-access-log)
+fi
+exec "${UVICORN_CMD[@]}"

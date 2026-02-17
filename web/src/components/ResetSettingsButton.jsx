@@ -1,10 +1,12 @@
 import React from 'react';
+import { adminAuthFetch } from '../lib/adminAuthFetch';
 
 const ResetSettingsButton = ({ setSettings, setModules, setStatus }) => {
   const handleReset = async () => {
     if (confirm('Are you sure you want to reset ALL settings to default? This cannot be undone.')) {
       try {
-        const res = await fetch('/api/settings/reset', { method: 'POST' });
+        const res = await adminAuthFetch('/api/settings/reset', { method: 'POST' });
+        if (!res.ok) throw new Error('Failed to reset settings');
         const data = await res.json();
         setSettings(data.config);
         setModules({});

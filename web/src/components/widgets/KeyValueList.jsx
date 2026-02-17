@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { commonClasses } from '../../design-tokens';
 
 const KeyValueList = ({ value = {}, onChange }) => {
@@ -6,17 +6,6 @@ const KeyValueList = ({ value = {}, onChange }) => {
   const [items, setItems] = useState(() => {
     return Object.entries(value || {}).map(([key, value]) => ({ key, value }));
   });
-
-  // Sync internal state if external value changes drastically (optional, but good for reset)
-  useEffect(() => {
-    const currentMap = new Map(Object.entries(value || {}));
-    const internalMap = new Map(items.map(i => [i.key, i.value]));
-    
-    // Simple check: if sizes diff or keys don't match, sync
-    if (currentMap.size !== internalMap.size) {
-         setItems(Object.entries(value || {}).map(([key, value]) => ({ key, value })));
-    }
-  }, [value]);
 
   const updateParent = (newItems) => {
       const newDict = {};

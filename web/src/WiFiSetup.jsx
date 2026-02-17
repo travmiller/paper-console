@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { adminAuthFetch } from './lib/adminAuthFetch';
 
 export default function WiFiSetup({ wifiStatus }) {
   const [networks, setNetworks] = useState([]);
@@ -40,7 +41,7 @@ export default function WiFiSetup({ wifiStatus }) {
     setError('');
 
     try {
-      const response = await fetch('/api/wifi/connect', {
+      const response = await adminAuthFetch('/api/wifi/connect', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

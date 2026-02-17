@@ -4,6 +4,8 @@ from datetime import datetime
 import json
 import os
 import uuid
+import re
+from pathlib import Path
 
 # Constants
 PRINTER_WIDTH = 42
@@ -40,17 +42,6 @@ class EmailConfig(BaseModel):
 class TextConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
     content: str = ""
-
-
-class ChecklistItem(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    text: str = ""
-
-
-class ChecklistConfig(BaseModel):
-    model_config = ConfigDict(extra="ignore")
-    title: str = "Checklist"
-    items: List[ChecklistItem] = []
 
 
 class QRCodeConfig(BaseModel):
@@ -147,7 +138,6 @@ DEFAULT_MAZE_ID = "default-maze-001"
 DEFAULT_QUOTES_ID = "default-quotes-001"
 DEFAULT_HISTORY_ID = "default-history-001"
 DEFAULT_TEXT_ID = "default-text-001"
-DEFAULT_CHECKLIST_ID = "default-checklist-001"
 DEFAULT_SYSTEM_MONITOR_ID = "default-system-monitor-001"
 
 
@@ -170,13 +160,13 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             id=DEFAULT_SUDOKU_ID,
             type="games",
             name="Sudoku",
-            config={"difficulty": "medium"},
+            config={"difficulty": "Medium"},
         ),
         DEFAULT_MAZE_ID: ModuleInstance(
             id=DEFAULT_MAZE_ID,
             type="maze",
             name="Maze",
-            config={"difficulty": "medium"},
+            config={"difficulty": "Medium"},
         ),
         DEFAULT_QUOTES_ID: ModuleInstance(
             id=DEFAULT_QUOTES_ID,
@@ -195,12 +185,6 @@ def _default_modules() -> Dict[str, ModuleInstance]:
             type="text",
             name="Note",
             config={"content": ""},
-        ),
-        DEFAULT_CHECKLIST_ID: ModuleInstance(
-            id=DEFAULT_CHECKLIST_ID,
-            type="checklist",
-            name="Checklist",
-            config={"items": []},
         ),
         DEFAULT_SYSTEM_MONITOR_ID: ModuleInstance(
             id=DEFAULT_SYSTEM_MONITOR_ID,
@@ -233,7 +217,7 @@ def _default_channels() -> Dict[int, ChannelConfig]:
             modules=[ChannelModuleAssignment(module_id=DEFAULT_TEXT_ID, order=0)]
         ),
         7: ChannelConfig(
-            modules=[ChannelModuleAssignment(module_id=DEFAULT_CHECKLIST_ID, order=0)]
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_WEATHER_ID, order=0)]
         ),
         8: ChannelConfig(
             modules=[ChannelModuleAssignment(module_id=DEFAULT_SYSTEM_MONITOR_ID, order=0)]
@@ -261,7 +245,7 @@ class Settings(BaseModel):
 
     # Universal Channel Configuration
     # Key is position (1-8), Value is the configuration for that channel
-    # Default: Ch1=Weather, Ch2=Astronomy, Ch3=Sudoku, Ch4-8=Empty
+    # Default: Pre-populated offline-friendly modules across all 8 channels
     channels: Dict[int, ChannelConfig] = Field(default_factory=_default_channels)
 
     @field_validator("latitude")
@@ -410,12 +394,35 @@ def remove_deprecated_features(data: dict) -> dict:
 
     deprecated_module_types = {"ai", "settings_menu"}
 
+    # Discover currently supported module types from local module source files
+    # to clean up old/removed module types without hardcoding each one.
+    supported_module_types = set()
+    modules_dir = Path(__file__).resolve().parent / "modules"
+    type_id_pattern = re.compile(r"type_id\s*=\s*['\"]([^'\"]+)['\"]")
+    if modules_dir.exists():
+        for module_file in modules_dir.glob("*.py"):
+            if module_file.name.startswith("_"):
+                continue
+            try:
+                content = module_file.read_text(encoding="utf-8")
+            except Exception:
+                continue
+            if "@register_module" not in content:
+                continue
+            supported_module_types.update(type_id_pattern.findall(content))
+
     if isinstance(modules, dict):
         for module_id, module_data in list(modules.items()):
-            if (
-                isinstance(module_data, dict)
-                and module_data.get("type") in deprecated_module_types
-            ):
+            if not isinstance(module_data, dict):
+                continue
+
+            module_type = module_data.get("type")
+            is_removed_legacy_type = module_type in deprecated_module_types
+            is_unsupported_type = bool(supported_module_types) and (
+                module_type not in supported_module_types
+            )
+
+            if is_removed_legacy_type or is_unsupported_type:
                 removed_module_ids.add(str(module_id))
                 modules.pop(module_id, None)
 
@@ -510,6 +517,15 @@ def save_config(new_settings: Settings):
     backup_path = os.path.join(base_dir, "config.json.bak")
     temp_path = os.path.join(base_dir, "config.json.tmp")
 
+    def _restrict_file_permissions(path: str):
+        """Keep config files owner-only readable on POSIX systems."""
+        if os.name != "posix":
+            return
+        try:
+            os.chmod(path, 0o600)
+        except Exception:
+            pass
+
     try:
         # Write to temp file first
         with open(temp_path, "w") as f:
@@ -521,6 +537,7 @@ def save_config(new_settings: Settings):
             json.dump(settings_dict, f, indent=4)
             f.flush()
             os.fsync(f.fileno())
+        _restrict_file_permissions(temp_path)
 
         # Backup existing config
         if os.path.exists(config_path):
@@ -528,11 +545,13 @@ def save_config(new_settings: Settings):
                 if os.path.exists(backup_path):
                     os.remove(backup_path)
                 os.rename(config_path, backup_path)
+                _restrict_file_permissions(backup_path)
             except Exception:
                 pass
 
         # Atomic rename
         os.rename(temp_path, config_path)
+        _restrict_file_permissions(config_path)
 
     except Exception:
         if os.path.exists(temp_path):

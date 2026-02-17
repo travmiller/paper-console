@@ -1,8 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { commonClasses } from '../design-tokens';
 import LocationSearch from './widgets/LocationSearch';
 import KeyValueList from './widgets/KeyValueList';
-import Checklist from './widgets/Checklist';
 import PresetSelect from './widgets/PresetSelect';
 import WebhookTest from './widgets/WebhookTest';
 import ActionButton from './widgets/ActionButton';
@@ -15,26 +14,6 @@ import RichTextEditor from './widgets/RichTextEditor';
  */
 const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange, moduleId, onActionComplete }) => {
   if (!schema) return null;
-
-  const handleChange = (path, value) => {
-    // Deep clone to avoid direct mutation
-    const newFormData = JSON.parse(JSON.stringify(formData));
-    
-    // Set value at path
-    let current = newFormData;
-    for (let i = 0; i < path.length - 1; i++) {
-        const key = path[i];
-        if (current[key] === undefined) {
-            // Auto-create missing objects/arrays if needed (simple case)
-            current[key] = {}; 
-        }
-        current = current[key];
-    }
-    const lastKey = path[path.length - 1];
-    current[lastKey] = value;
-    
-    onChange(newFormData);
-  };
 
   return (
     <div className="space-y-4">
@@ -187,17 +166,6 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
         const items = value || [];
         const itemSchema = schema.items;
         const itemUiSchema = uiSchema?.items || {};
-        
-        // Support custom array widgets
-        if (widget === 'checklist') {
-            return (
-                <div className="space-y-2">
-                    {title && <label className={commonClasses.label}>{title}</label>}
-                    <Checklist value={items} onChange={onChange} />
-                    {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
-                </div>
-            );
-        }
 
         const handleAdd = () => {
             const emptyItem = createEmptyValue(itemSchema);
@@ -373,7 +341,7 @@ const createEmptyValue = (schema) => {
         case 'integer': return 0;
         case 'boolean': return false;
         case 'array': return [];
-        case 'object':
+        case 'object': {
             const obj = {};
             if (schema.properties) {
                 Object.keys(schema.properties).forEach(key => {
@@ -381,6 +349,7 @@ const createEmptyValue = (schema) => {
                 });
             }
             return obj;
+        }
         default: return null;
     }
 };

@@ -12,12 +12,9 @@ let loadPromise = null;
 export function useModuleTypes() {
   const [moduleTypes, setModuleTypes] = useState(cachedTypes || []);
   const [loading, setLoading] = useState(!cachedTypes);
-  const [error, setError] = useState(null);
 
   useEffect(() => {
     if (cachedTypes) {
-      setModuleTypes(cachedTypes);
-      setLoading(false);
       return;
     }
 
@@ -44,5 +41,5 @@ export function useModuleTypes() {
     });
   }, []);
 
-  return { moduleTypes, loading, error };
+  return { moduleTypes, loading };
 }

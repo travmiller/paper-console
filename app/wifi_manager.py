@@ -6,6 +6,7 @@ Handles WiFi scanning, connection, and AP mode management.
 import subprocess
 import os
 import logging
+import hashlib
 from typing import List, Dict, Optional
 
 AP_SSID_PREFIX = "PC-1-Setup"
@@ -27,17 +28,46 @@ def get_device_suffix() -> str:
     return "XXXX"
 
 
+def get_device_password_seed() -> str:
+    """Return a stable per-device secret seed for setup password generation."""
+    for path in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
+        try:
+            if os.path.exists(path):
+                with open(path, "r", encoding="utf-8", errors="ignore") as f:
+                    value = f.read().strip()
+                    if value:
+                        return value
+        except Exception:
+            pass
+
+    try:
+        if os.path.exists("/proc/cpuinfo"):
+            with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as f:
+                for line in f:
+                    if line.lower().startswith("serial"):
+                        serial = line.split(":", 1)[1].strip()
+                        if serial:
+                            return serial
+    except Exception:
+        pass
+
+    return os.uname().nodename if hasattr(os, "uname") else "pc1"
+
+
 def get_ap_ssid() -> str:
     """Get setup AP SSID."""
     return f"{AP_SSID_PREFIX}-{get_device_suffix()}"
 
 
 def get_ap_password() -> str:
-    """Get setup AP password (env override or per-device fallback)."""
+    """Get setup AP password (env override or per-device hashed fallback)."""
     env_password = os.environ.get(AP_PASSWORD_ENV, "").strip()
     if len(env_password) >= 8:
         return env_password
-    return f"pc1-{get_device_suffix().lower()}-setup"
+    digest = hashlib.sha256(
+        get_device_password_seed().encode("utf-8", errors="ignore")
+    ).hexdigest()
+    return f"pc1-{digest[:10]}"
 
 
 def run_command(cmd: List[str], check: bool = True) -> subprocess.CompletedProcess:
@@ -289,12 +319,18 @@ def cleanup_dns_hijacking() -> bool:
     try:
         # Remove DNS hijacking config file
         run_command(
-            ["sudo", "-n", "rm", "-f", "/etc/NetworkManager/dnsmasq.d/captive-portal.conf"],
+            [
+                "sudo",
+                "-n",
+                "/usr/bin/rm",
+                "-f",
+                "/etc/NetworkManager/dnsmasq.d/captive-portal.conf",
+            ],
             check=False,
         )
         # Reload dnsmasq to apply changes
         run_command(
-            ["sudo", "-n", "pkill", "-HUP", "-f", "dnsmasq.*NetworkManager"],
+            ["sudo", "-n", "/usr/bin/pkill", "-HUP", "-f", "dnsmasq.*NetworkManager"],
             check=False,
         )
         return True

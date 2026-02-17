@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, Response
@@ -13,17 +13,24 @@ import subprocess
 import platform
 import pytz
 import logging
-import ipaddress
-from urllib.parse import urlparse
 
 # Configure logging
+LOG_LEVEL_NAME = os.environ.get("PC1_LOG_LEVEL", "WARNING").upper()
+LOG_LEVEL = getattr(logging, LOG_LEVEL_NAME, logging.WARNING)
+
 logging.basicConfig(
-    level=logging.INFO,
+    level=LOG_LEVEL,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     handlers=[
         logging.StreamHandler(),  # Console output
     ],
+    force=True,
 )
+
+# Keep noisy dependency logs quiet on embedded deployments.
+for noisy_logger in ("uvicorn.access", "httpx", "urllib3", "asyncio"):
+    logging.getLogger(noisy_logger).setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 
@@ -49,74 +56,7 @@ def _parse_cors_origins() -> List[str]:
     ]
 
 
-def _host_is_private_or_local(host: Optional[str]) -> bool:
-    if not host:
-        return False
-
-    # Handle values like "127.0.0.1:12345"
-    if ":" in host and host.count(":") == 1:
-        host = host.split(":")[0]
-
-    lowered = host.lower()
-    if lowered in {"localhost", "pc-1.local"}:
-        return True
-
-    try:
-        addr = ipaddress.ip_address(host)
-        return addr.is_loopback or addr.is_private or addr.is_link_local
-    except ValueError:
-        return False
-
-
-def _origin_is_local(origin: Optional[str]) -> bool:
-    if not origin:
-        return False
-    try:
-        parsed = urlparse(origin)
-        return _host_is_private_or_local(parsed.hostname)
-    except Exception:
-        return False
-
-
-def require_admin_access(request: Request):
-    """
-    Protect privileged endpoints.
-    - If PC1_ADMIN_TOKEN is set, require X-PC1-Admin-Token.
-    - Otherwise, allow only local/private network requests.
-    """
-    configured_token = os.environ.get("PC1_ADMIN_TOKEN", "").strip()
-    provided_token = request.headers.get("X-PC1-Admin-Token", "").strip()
-
-    if configured_token:
-        if provided_token != configured_token:
-            raise HTTPException(
-                status_code=401,
-                detail="Admin token required or invalid.",
-                headers={"X-PC1-Auth-Required": "true"},
-            )
-        return
-
-    client_host = request.client.host if request.client else None
-    origin = request.headers.get("origin")
-    if not (_host_is_private_or_local(client_host) or _origin_is_local(origin)):
-        raise HTTPException(
-            status_code=403,
-            detail="Privileged endpoint is restricted to local/private networks.",
-        )
-
-
-def get_admin_auth_status() -> Dict[str, object]:
-    """Return current privileged-endpoint auth mode (without exposing secrets)."""
-    token_set = bool(os.environ.get("PC1_ADMIN_TOKEN", "").strip())
-    return {
-        "token_required": token_set,
-        "auth_mode": "token" if token_set else "local_network",
-        "message": (
-            "Admin token required for privileged actions."
-            if token_set
-            else "Privileged actions are limited to local/private network clients."
-        ),
-    }
+from app.auth import require_admin_access, get_admin_auth_status
 
 
 from app.config import (
@@ -1190,16 +1130,21 @@ async def get_status():
 # --- SETTINGS API ---
 
 
-@app.get("/api/settings", response_model=Settings)
+@app.get(
+    "/api/settings",
+    response_model=Settings,
+    dependencies=[Depends(require_admin_access)],
+)
 async def get_settings():
     return settings
 
 
-@app.post("/api/settings")
+@app.post("/api/settings", dependencies=[Depends(require_admin_access)])
 async def update_settings(new_settings: Settings, background_tasks: BackgroundTasks):
     """Updates the configuration and saves it to disk."""
     global settings
     import app.config as config_module
+    validation_warnings: List[str] = []
 
     # Update in-memory - create new settings object
     settings = new_settings
@@ -1222,7 +1167,9 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
 
             # Log warning but allow save to proceed
             # This prevents unrelated module validation errors from blocking global settings updates
-            logging.warning(f"Validation warning: {e}")
+            warning = f"{module_id} ({module.type}): {e}"
+            validation_warnings.append(warning)
+            logging.warning("Validation warning: %s", warning)
 
     # Update module-level reference so modules that access app.config.settings will see the update
     config_module.settings = settings
@@ -1235,10 +1182,13 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
     # Save to disk
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
-    return {"message": "Settings saved", "config": settings}
+    response = {"message": "Settings saved", "config": settings}
+    if validation_warnings:
+        response["validation_warnings"] = validation_warnings
+    return response
 
 
-@app.post("/api/settings/reset")
+@app.post("/api/settings/reset", dependencies=[Depends(require_admin_access)])
 async def reset_settings(background_tasks: BackgroundTasks):
     """Resets all settings to their default values."""
     global settings
@@ -1257,7 +1207,7 @@ async def reset_settings(background_tasks: BackgroundTasks):
     return {"message": "Settings reset to defaults", "config": settings}
 
 
-@app.post("/api/settings/reload")
+@app.post("/api/settings/reload", dependencies=[Depends(require_admin_access)])
 async def reload_settings():
     """Reloads settings from config.json on disk."""
     global settings
@@ -2743,13 +2693,13 @@ async def get_module_types():
     return {"moduleTypes": list_module_types()}
 
 
-@app.get("/api/modules")
+@app.get("/api/modules", dependencies=[Depends(require_admin_access)])
 async def list_modules():
     """List all module instances."""
     return {"modules": settings.modules}
 
 
-@app.post("/api/modules")
+@app.post("/api/modules", dependencies=[Depends(require_admin_access)])
 async def create_module(module: ModuleInstance, background_tasks: BackgroundTasks):
     """Create a new module instance."""
     global settings
@@ -2764,7 +2714,7 @@ async def create_module(module: ModuleInstance, background_tasks: BackgroundTask
     return {"message": "Module created", "module": module}
 
 
-@app.get("/api/modules/{module_id}")
+@app.get("/api/modules/{module_id}", dependencies=[Depends(require_admin_access)])
 async def get_module(module_id: str):
     """Get a specific module instance."""
     module = settings.modules.get(module_id)
@@ -2773,7 +2723,7 @@ async def get_module(module_id: str):
     return module
 
 
-@app.put("/api/modules/{module_id}")
+@app.put("/api/modules/{module_id}", dependencies=[Depends(require_admin_access)])
 async def update_module(
     module_id: str, module: ModuleInstance, background_tasks: BackgroundTasks
 ):
@@ -2795,7 +2745,7 @@ async def update_module(
     return {"message": "Module updated", "module": module}
 
 
-@app.delete("/api/modules/{module_id}")
+@app.delete("/api/modules/{module_id}", dependencies=[Depends(require_admin_access)])
 async def delete_module(module_id: str, background_tasks: BackgroundTasks):
     """Delete a module instance."""
     global settings
@@ -2823,7 +2773,10 @@ async def delete_module(module_id: str, background_tasks: BackgroundTasks):
     return {"message": "Module deleted"}
 
 
-@app.post("/api/modules/{module_id}/actions/{action}")
+@app.post(
+    "/api/modules/{module_id}/actions/{action}",
+    dependencies=[Depends(require_admin_access)],
+)
 async def execute_module_action(module_id: str, action: str):
     """
     Execute a module-specific action.
@@ -2843,7 +2796,7 @@ async def execute_module_action(module_id: str, action: str):
     )
 
 
-@app.post("/api/channels/{position}/modules")
+@app.post("/api/channels/{position}/modules", dependencies=[Depends(require_admin_access)])
 async def assign_module_to_channel(
     position: int,
     module_id: str,
@@ -2886,7 +2839,10 @@ async def assign_module_to_channel(
     return {"message": "Module assigned to channel", "channel": channel}
 
 
-@app.delete("/api/channels/{position}/modules/{module_id}")
+@app.delete(
+    "/api/channels/{position}/modules/{module_id}",
+    dependencies=[Depends(require_admin_access)],
+)
 async def remove_module_from_channel(
     position: int, module_id: str, background_tasks: BackgroundTasks
 ):
@@ -2910,7 +2866,10 @@ async def remove_module_from_channel(
     return {"message": "Module removed from channel", "channel": channel}
 
 
-@app.post("/api/channels/{position}/modules/reorder")
+@app.post(
+    "/api/channels/{position}/modules/reorder",
+    dependencies=[Depends(require_admin_access)],
+)
 async def reorder_channel_modules(
     position: int, module_orders: Dict[str, int], background_tasks: BackgroundTasks
 ):
@@ -2935,7 +2894,10 @@ async def reorder_channel_modules(
     return {"message": "Modules reordered", "channel": channel}
 
 
-@app.post("/api/channels/{position}/schedule")
+@app.post(
+    "/api/channels/{position}/schedule",
+    dependencies=[Depends(require_admin_access)],
+)
 async def update_channel_schedule(
     position: int, schedule: List[str], background_tasks: BackgroundTasks
 ):
@@ -3240,7 +3202,7 @@ async def trigger_current_channel():
     await trigger_channel(position)
 
 
-@app.post("/action/trigger")
+@app.post("/action/trigger", dependencies=[Depends(require_admin_access)])
 async def manual_trigger():
     """Simulates pressing the big brass button."""
     global print_in_progress
@@ -3258,7 +3220,7 @@ async def manual_trigger():
     return {"message": "Triggered"}
 
 
-@app.post("/action/dial/{position}")
+@app.post("/action/dial/{position}", dependencies=[Depends(require_admin_access)])
 async def set_dial(position: int):
     """Simulates turning the physical rotary switch."""
     if position < 1 or position > 8:
@@ -3268,7 +3230,10 @@ async def set_dial(position: int):
     return {"message": f"Dial turned to {position}"}
 
 
-@app.post("/action/print-channel/{position}")
+@app.post(
+    "/action/print-channel/{position}",
+    dependencies=[Depends(require_admin_access)],
+)
 async def print_channel(position: int, background_tasks: BackgroundTasks):
     """Set dial position and trigger print atomically. Returns immediately while print runs in background."""
     global print_in_progress
@@ -3291,7 +3256,10 @@ async def print_channel(position: int, background_tasks: BackgroundTasks):
 # --- DEBUG / VIRTUAL HARDWARE CONTROLS ---
 
 
-@app.post("/debug/print-module/{module_id}")
+@app.post(
+    "/debug/print-module/{module_id}",
+    dependencies=[Depends(require_admin_access)],
+)
 async def print_module(module_id: str, background_tasks: BackgroundTasks):
     """Forces a specific module instance to print (for testing)."""
     global print_in_progress
@@ -3371,7 +3339,7 @@ async def print_module_direct(module_id: str):
             print_in_progress = False
 
 
-@app.post("/debug/test-webhook")
+@app.post("/debug/test-webhook", dependencies=[Depends(require_admin_access)])
 async def test_webhook(action: WebhookConfig):
     """
     Executes a custom webhook immediately for testing.
@@ -3397,7 +3365,7 @@ async def test_webhook(action: WebhookConfig):
     return {"message": "Webhook executed"}
 
 
-@app.post("/api/webhook/test")
+@app.post("/api/webhook/test", dependencies=[Depends(require_admin_access)])
 async def preview_webhook(config: dict):
     """
     Tests a webhook configuration and returns the response without printing.

@@ -12,6 +12,7 @@ import { useModuleTypes } from './hooks/useModuleTypes';
 import GitHubIcon from './assets/GitHubIcon';
 import BorderWidthIcon from './assets/BorderWidthIcon';
 import PreferencesIcon from './assets/PreferencesIcon';
+import { adminAuthFetch } from './lib/adminAuthFetch';
 
 
 function App() {
@@ -66,8 +67,8 @@ function App() {
         if (isFirstLoad) {
           try {
             const [settingsData, modulesData] = await Promise.all([
-              fetch('/api/settings').then((res) => res.json()),
-              fetch('/api/modules').then((res) => res.json()),
+              adminAuthFetch('/api/settings').then((res) => res.json()),
+              adminAuthFetch('/api/modules').then((res) => res.json()),
             ]);
             setSettings(settingsData);
             setModules(modulesData.modules || {});
@@ -160,7 +161,7 @@ function App() {
 
   const updateChannelSchedule = async (position, schedule) => {
     try {
-      const response = await fetch(`/api/channels/${position}/schedule`, {
+      const response = await adminAuthFetch(`/api/channels/${position}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(schedule),
@@ -183,7 +184,7 @@ function App() {
 
   const triggerChannelPrint = async (position) => {
     try {
-      const response = await fetch(`/action/print-channel/${position}`, { method: 'POST' });
+      const response = await adminAuthFetch(`/action/print-channel/${position}`, { method: 'POST' });
 
       if (!response.ok) throw new Error('Failed to trigger print');
 
@@ -197,7 +198,7 @@ function App() {
 
   const triggerModulePrint = async (moduleId) => {
     try {
-      const response = await fetch(`/debug/print-module/${moduleId}`, { method: 'POST' });
+      const response = await adminAuthFetch(`/debug/print-module/${moduleId}`, { method: 'POST' });
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ detail: 'Failed to trigger print' }));
@@ -231,7 +232,7 @@ function App() {
 
       console.log('Auto-saving settings:', updates);
 
-      const response = await fetch('/api/settings', {
+      const response = await adminAuthFetch('/api/settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(settingsToSave),
@@ -283,7 +284,7 @@ function App() {
 
   const createModule = async (moduleType, name = '') => {
     try {
-      const response = await fetch('/api/modules', {
+      const response = await adminAuthFetch('/api/modules', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -348,7 +349,7 @@ function App() {
       const moduleToUpdate = { ...targetModule, ...updates };
       moduleToUpdate.id = moduleId;
 
-      const response = await fetch(`/api/modules/${moduleId}`, {
+      const response = await adminAuthFetch(`/api/modules/${moduleId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(moduleToUpdate),
@@ -363,7 +364,7 @@ function App() {
     } catch (err) {
       console.error('Error updating module:', err);
       setStatus({ type: 'error', message: 'Failed to update module' });
-      const response = await fetch(`/api/modules/${moduleId}`);
+      const response = await adminAuthFetch(`/api/modules/${moduleId}`);
       if (response.ok) {
         const data = await response.json();
         setModules((prev) => ({ ...prev, [moduleId]: data.module }));
@@ -385,12 +386,12 @@ function App() {
       }
 
       for (const pos of assignments) {
-        await fetch(`/api/channels/${pos}/modules/${moduleId}`, {
+        await adminAuthFetch(`/api/channels/${pos}/modules/${moduleId}`, {
           method: 'DELETE',
         });
       }
 
-      const response = await fetch(`/api/modules/${moduleId}`, {
+      const response = await adminAuthFetch(`/api/modules/${moduleId}`, {
         method: 'DELETE',
       });
 
@@ -448,7 +449,7 @@ function App() {
         });
       }
 
-      const response = await fetch(`/api/channels/${position}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`, {
+      const response = await adminAuthFetch(`/api/channels/${position}/modules?module_id=${moduleId}${order !== null ? `&order=${order}` : ''}`, {
         method: 'POST',
       });
 
@@ -491,7 +492,7 @@ function App() {
         });
       }
 
-      const response = await fetch(`/api/channels/${position}/modules/${moduleId}`, {
+      const response = await adminAuthFetch(`/api/channels/${position}/modules/${moduleId}`, {
         method: 'DELETE',
       });
 
@@ -540,7 +541,7 @@ function App() {
         });
       }
 
-      const response = await fetch(`/api/channels/${position}/modules/reorder`, {
+      const response = await adminAuthFetch(`/api/channels/${position}/modules/reorder`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(moduleOrders),
@@ -599,7 +600,8 @@ function App() {
 
   const triggerAPMode = async () => {
     try {
-      await fetch('/api/wifi/ap-mode', { method: 'POST' });
+      const response = await adminAuthFetch('/api/wifi/ap-mode', { method: 'POST' });
+      if (!response.ok) throw new Error('Failed to activate AP mode');
       setStatus({ type: 'success', message: 'AP mode activating...' });
       setShowAPInstructions(true);
     } catch {

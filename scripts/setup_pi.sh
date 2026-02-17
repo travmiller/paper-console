@@ -51,6 +51,97 @@ echo "Installing dependencies..."
 apt-get update
 apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager dnsmasq-base rfkill dnsutils
 
+# Configure journald to stay bounded and SD-card friendly
+echo "Configuring systemd journal limits for SD-card longevity..."
+mkdir -p /etc/systemd/journald.conf.d
+cat > /etc/systemd/journald.conf.d/pc-1.conf <<'EOL'
+[Journal]
+# Keep logs in RAM by default to reduce SD wear.
+Storage=volatile
+SystemMaxUse=16M
+SystemMaxFileSize=2M
+RuntimeMaxUse=16M
+RuntimeMaxFileSize=2M
+RuntimeKeepFree=32M
+MaxRetentionSec=3day
+Compress=yes
+ForwardToSyslog=no
+RateLimitIntervalSec=30s
+RateLimitBurst=200
+SyncIntervalSec=5m
+EOL
+systemctl restart systemd-journald
+
+# Disable persistent core dumps (can consume significant space after crashes)
+echo "Disabling persistent coredumps..."
+mkdir -p /etc/systemd/coredump.conf.d
+cat > /etc/systemd/coredump.conf.d/pc-1.conf <<'EOL'
+[Coredump]
+Storage=none
+ProcessSizeMax=0
+EOL
+
+# Install storage guard to auto-trim logs/cache if disk usage rises
+echo "Installing storage guard timer..."
+cat > /usr/local/bin/pc1-storage-guard.sh <<'EOL'
+#!/bin/bash
+set -euo pipefail
+
+WARN_THRESHOLD="${PC1_STORAGE_WARN_PERCENT:-85}"
+ACTION_THRESHOLD="${PC1_STORAGE_ACTION_PERCENT:-90}"
+
+usage_percent() {
+    df --output=pcent / | awk 'NR==2 {gsub(/%/, "", $1); print int($1)}'
+}
+
+ROOT_USAGE="$(usage_percent)"
+if [ "$ROOT_USAGE" -lt "$WARN_THRESHOLD" ]; then
+    exit 0
+fi
+
+logger -t pc1-storage-guard "Root usage at ${ROOT_USAGE}% (warn=${WARN_THRESHOLD}%). Running cleanup."
+journalctl --vacuum-size=8M >/dev/null 2>&1 || true
+journalctl --vacuum-time=2d >/dev/null 2>&1 || true
+apt-get clean >/dev/null 2>&1 || true
+find /tmp -xdev -type f -mtime +3 -delete >/dev/null 2>&1 || true
+find /var/tmp -xdev -type f -mtime +7 -delete >/dev/null 2>&1 || true
+
+ROOT_USAGE_AFTER="$(usage_percent)"
+if [ "$ROOT_USAGE_AFTER" -ge "$ACTION_THRESHOLD" ]; then
+    logger -t pc1-storage-guard "Root usage remains high after cleanup: ${ROOT_USAGE_AFTER}%"
+fi
+EOL
+chmod 0755 /usr/local/bin/pc1-storage-guard.sh
+
+cat > /etc/systemd/system/pc1-storage-guard.service <<'EOL'
+[Unit]
+Description=PC-1 storage guard cleanup
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/pc1-storage-guard.sh
+Nice=10
+IOSchedulingClass=idle
+EOL
+
+cat > /etc/systemd/system/pc1-storage-guard.timer <<'EOL'
+[Unit]
+Description=Run PC-1 storage guard periodically
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=6h
+RandomizedDelaySec=2min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
+EOL
+
+systemctl daemon-reload
+systemctl enable --now pc1-storage-guard.timer
+systemctl start pc1-storage-guard.service || true
+
 # Stop and disable standalone dnsmasq service if it exists (we use NM's internal dnsmasq)
 systemctl stop dnsmasq 2>/dev/null || true
 systemctl disable dnsmasq 2>/dev/null || true
@@ -148,10 +239,30 @@ $USER_NAME ALL=(ALL) NOPASSWD: $PROJECT_DIR/scripts/wifi_ap_nmcli.sh
 $USER_NAME ALL=(ALL) NOPASSWD: /bin/bash $PROJECT_DIR/scripts/wifi_ap_nmcli.sh
 $USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/bash $PROJECT_DIR/scripts/wifi_ap_nmcli.sh
 $USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/nmcli
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/rm -f /etc/NetworkManager/dnsmasq.d/captive-portal.conf
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/pkill -HUP -f dnsmasq.*NetworkManager
 $USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl restart pc-1.service
 $USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl start pc-1.service
 $USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl stop pc-1.service
 $USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl status pc-1.service
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl restart pc-1.service
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl start pc-1.service
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop pc-1.service
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl status pc-1.service
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/timedatectl *
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/date -s *
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/hwclock --systohc
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/chpasswd
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/sbin/ntpdate -s *
+$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl enable ssh
+$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl disable ssh
+$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl start ssh
+$USER_NAME ALL=(ALL) NOPASSWD: /bin/systemctl stop ssh
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl enable ssh
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl disable ssh
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl start ssh
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/systemctl stop ssh
+$USER_NAME ALL=(ALL) NOPASSWD: /usr/bin/raspi-config nonint do_ssh *
 EOL
 chmod 0440 /etc/sudoers.d/pc-1-wifi
 
@@ -181,6 +292,11 @@ RestartSec=10
 KillSignal=SIGINT
 TimeoutStopSec=10
 Environment=PYTHONUNBUFFERED=1
+Environment=PC1_LOG_LEVEL=WARNING
+Environment=UVICORN_LOG_LEVEL=warning
+Environment=UVICORN_ACCESS_LOG=0
+LogRateLimitIntervalSec=30s
+LogRateLimitBurst=200
 # Memory limits to prevent runaway processes (256MB is generous for this app)
 MemoryMax=256M
 

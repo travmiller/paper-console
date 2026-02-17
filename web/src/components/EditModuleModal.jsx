@@ -5,6 +5,7 @@ import { commonClasses } from '../design-tokens';
 import CloseButton from './CloseButton';
 import PrimaryButton from './PrimaryButton';
 import BinIcon from '../assets/BinIcon';
+import { adminAuthFetch } from '../lib/adminAuthFetch';
 
 
 const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelete }) => {
@@ -72,7 +73,7 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
             onRefresh={async () => {
               // Fetch fresh settings and update the module state
               try {
-                const res = await fetch('/api/settings');
+                const res = await adminAuthFetch('/api/settings');
                 const data = await res.json();
                 const freshModule = data.modules?.[moduleId];
                 if (freshModule) {

@@ -334,7 +334,7 @@ function htmlToMarkdown(html) {
         return children;
       case 'ol':
         return children;
-      case 'li':
+      case 'li': {
         const parent = node.parentElement;
         // Check if this is a task item
         if (node.dataset?.type === 'taskItem' || node.getAttribute('data-type') === 'taskItem') {
@@ -351,6 +351,7 @@ function htmlToMarkdown(html) {
           return `${index}. ${children}\n`;
         }
         return `- ${children}\n`;
+      }
       case 'hr':
         return '---\n';
       case 'br':

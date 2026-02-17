@@ -25,12 +25,35 @@ get_ap_ip() {
     ip -4 addr show "$AP_INTERFACE" 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -1
 }
 
+get_password_seed() {
+    if [ -f /etc/machine-id ]; then
+        tr -d '\r\n' < /etc/machine-id
+        return
+    fi
+    if [ -f /var/lib/dbus/machine-id ]; then
+        tr -d '\r\n' < /var/lib/dbus/machine-id
+        return
+    fi
+    if [ -f /proc/cpuinfo ]; then
+        local serial
+        serial=$(awk -F': ' '/^[Ss]erial[[:space:]]*:/ {s=$2} END {print s}' /proc/cpuinfo | tr -d '\r\n')
+        if [ -n "$serial" ]; then
+            echo "$serial"
+            return
+        fi
+    fi
+    hostname
+}
+
 get_ap_password() {
-    local device_id="$1"
+    local seed
+    local digest
     if [ -n "$AP_PASSWORD" ] && [ "${#AP_PASSWORD}" -ge 8 ]; then
         echo "$AP_PASSWORD"
     else
-        echo "pc1-${device_id,,}-setup"
+        seed=$(get_password_seed)
+        digest=$(printf '%s' "$seed" | sha256sum | awk '{print $1}' | cut -c1-10)
+        echo "pc1-${digest}"
     fi
 }
 
@@ -39,7 +62,7 @@ start_ap() {
     
     DEVICE_ID=$(get_device_id)
     SSID="${AP_SSID_PREFIX}-${DEVICE_ID}"
-    AP_PASS=$(get_ap_password "$DEVICE_ID")
+    AP_PASS=$(get_ap_password)
     
     # 1. CLEANUP: Delete any existing hotspot connection to avoid conflicts
     nmcli connection delete "PC-1-Hotspot" 2>/dev/null || true
@@ -120,7 +143,7 @@ status() {
     if nmcli connection show --active 2>/dev/null | grep -q "PC-1-Hotspot"; then
         echo "AP Mode: ACTIVE"
         DEVICE_ID=$(get_device_id)
-        AP_PASS=$(get_ap_password "$DEVICE_ID")
+        AP_PASS=$(get_ap_password)
         AP_IP=$(get_ap_ip)
         echo "SSID: ${AP_SSID_PREFIX}-${DEVICE_ID}"
         echo "Password: $AP_PASS"

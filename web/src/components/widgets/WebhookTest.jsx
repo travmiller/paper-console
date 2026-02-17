@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { commonClasses } from '../../design-tokens';
 import GCheckIcon from '../../assets/GCheckIcon';
 import WarningIcon from '../../assets/WarningIcon';
+import { adminAuthFetch } from '../../lib/adminAuthFetch';
 
 /**
  * A button widget that tests a webhook configuration and shows the response.
@@ -16,7 +16,7 @@ const WebhookTest = ({ formData = {} }) => {
     setResult(null);
 
     try {
-      const response = await fetch('/api/webhook/test', {
+      const response = await adminAuthFetch('/api/webhook/test', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(formData)
