@@ -60,7 +60,7 @@ When a user unboxes a PC-1 and powers it on for the first time, the expected flo
    - It includes:
      - Setup SSID: `PC-1-Setup-XXXX` (device-specific suffix)
      - Setup password (device-specific by default, or overridden by `PC1_SETUP_PASSWORD`)
-     - Setup URL: `http://10.42.0.1` (and `http://pc-1.local`)
+     - Setup URL: `http://10.42.0.1` (setup mode) and `https://pc-1.local` (normal mode)
 
 2. **User connects to setup WiFi**
    - On phone/computer, connect to the printed SSID.
@@ -77,7 +77,8 @@ When a user unboxes a PC-1 and powers it on for the first time, the expected flo
    - User reconnects their phone/computer to home WiFi.
 
 5. **User opens settings**
-   - Visit `http://pc-1.local`
+   - Visit `https://pc-1.local`
+   - If prompted the first time, install/trust the local PC-1 certificate profile.
    - Configure channels/modules and print behavior.
 
 6. **Normal daily usage**
@@ -132,17 +133,24 @@ If WiFi setup fails, PC-1 returns to setup mode so the user can try again.
    The script will:
    - Set hostname (default: `pc-1`)
    - Install Nginx (web proxy) and Avahi (mDNS)
+   - Generate local TLS certs for `https://<hostname>.local`
    - Configure systemd service
    - Add user to `lp` group for printer access
 
+   It also exposes the local root cert at `http://<hostname>.local/pc1-local-ca.crt` for first-time trust install on phones/laptops.
+
 3. **Access the Device:**
-   Open your browser and go to `http://pc-1.local` (or your chosen hostname).
+   Open your browser and go to `https://pc-1.local` (or your chosen hostname).
+
+   On first connection, install the local trust profile from:
+   `http://pc-1.local/pc1-local-ca.crt`
+   Then reload `https://pc-1.local` and the browser security warning should be removed.
 
 ---
 
 ## 3. Configuration
 
-Configuration is handled entirely via the **Web UI** at `http://pc-1.local` (or `http://localhost:8000` if running locally).
+Configuration is handled entirely via the **Web UI** at `https://pc-1.local` (or `http://localhost:8000` if running locally).
 
 ### Global Settings
 * **Location:** City name, Latitude, Longitude, Timezone (with search functionality)

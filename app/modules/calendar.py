@@ -177,33 +177,44 @@ def parse_events(
 
 
 def _print_calendar_timeline_view(printer, sorted_dates, all_events):
-    """Detailed timeline view for 1 day - shows full day with hour markers and event bars."""
+    """Single-day agenda view optimized for receipt readability."""
     if not sorted_dates:
+        printer.print_body("No events found.")
         return
-    
-    d = sorted_dates[0]
-    events = all_events[d]
-    events.sort(key=lambda x: x["sort_key"])
-    
-    # Day header
-    day_name = d.strftime("%A").upper()
-    if d == date.today():
-        day_name = "TODAY"
-    
+
+    today = date.today()
+    d = today if today in all_events else sorted_dates[0]
+    events = sorted(all_events.get(d, []), key=lambda x: x.get("sort_key", ""))
+
+    day_name = "TODAY" if d == today else d.strftime("%A").upper()
     printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
-    
-    # Print timeline visualization
-    # Print timeline visualization
-    width = printer.width
-    font = getattr(printer, "_get_font", lambda s: None)("regular")
-    font_sm = getattr(printer, "_get_font", lambda s: None)("regular_sm")
-    
-    # Generate image
-    img = draw_calendar_day_timeline_image(
-        width - 20, 120, d, events, False, font, font_sm
-    )
-    printer.print_image(img)
-    printer.feed(1)
+
+    if not events:
+        printer.print_body("No events.")
+        return
+
+    previous_bucket = None
+    for evt in events:
+        is_all_day = bool(evt.get("is_all_day", False))
+        evt_dt = evt.get("datetime")
+        time_str = evt.get("time", "")
+        summary = evt.get("summary", "")
+        max_len = max(10, printer.width - 8)
+        if len(summary) > max_len:
+            summary = summary[: max_len - 2] + ".."
+
+        if is_all_day:
+            bucket = "all-day"
+        elif evt_dt is not None and hasattr(evt_dt, "hour"):
+            bucket = f"hour-{evt_dt.hour}"
+        else:
+            bucket = f"time-{time_str}"
+
+        if previous_bucket is not None and bucket != previous_bucket:
+            printer.print_line()
+
+        printer.print_body(f"{time_str:<8}{summary}")
+        previous_bucket = bucket
 
 
 def _calendar_grid_cell_size(printer) -> int:

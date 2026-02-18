@@ -88,8 +88,10 @@ def print_setup_instructions_sync():
         printer.print_caption(f"  Password: {ap_password}")
         printer.print_line()
         printer.print_body("Then visit:")
-        printer.print_bold("  http://pc-1.local")
-        printer.print_caption("  or http://10.42.0.1")
+        printer.print_bold("  http://10.42.0.1")
+        printer.print_caption("  (setup mode)")
+        printer.print_caption("After setup:")
+        printer.print_bold("  https://pc-1.local")
         printer.feed(1)
 
         # Flush buffer to print

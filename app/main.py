@@ -49,10 +49,13 @@ def _parse_cors_origins() -> List[str]:
         "http://localhost",
         "http://localhost:5173",
         "http://localhost:8000",
+        "https://localhost",
         "http://127.0.0.1",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:8000",
+        "https://127.0.0.1",
         "http://pc-1.local",
+        "https://pc-1.local",
     ]
 
 
@@ -365,7 +368,7 @@ def _print_channel_config_summary(position: int):
             printer.print_caption("Schedule: none")
 
     printer.print_line()
-    printer.print_caption("Visit http://pc-1.local")
+    printer.print_caption("Visit https://pc-1.local")
     printer.print_caption("to edit this channel.")
     printer.feed(1)
 
@@ -722,7 +725,7 @@ async def check_first_boot():
                 printer.print_body("Visit in your browser:")
                 printer.print_line()
                 printer.print_bold("  http://10.42.0.1")
-                printer.print_caption("  (or http://pc-1.local)")
+                printer.print_caption("  (after setup: https://pc-1.local)")
                 printer.print_line()
 
                 # Step 3
@@ -750,7 +753,7 @@ async def check_first_boot():
                 printer.print_line()
 
                 printer.print_caption("Customize channels at:")
-                printer.print_bold("  http://pc-1.local")
+                printer.print_bold("  https://pc-1.local")
                 printer.print_line()
 
                 printer.print_subheader("QUICK HELP")
@@ -3068,7 +3071,7 @@ async def trigger_channel(position: int):
             printer.print_line()
             printer.print_text("This channel is empty.")
             printer.print_text("")
-            printer.print_text("Visit http://pc-1.local")
+            printer.print_text("Visit https://pc-1.local")
             printer.print_text("to set it up.")
             printer.feed(1)
 

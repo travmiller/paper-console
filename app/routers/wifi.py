@@ -54,7 +54,7 @@ def do_wifi_connect(ssid: str, password: Optional[str]):
         printer.print_text(f"IP Addr: {ip_address}")
         printer.print_text("")
         printer.print_text("Manage device at:")
-        printer.print_text("  http://pc-1.local")
+        printer.print_text("  https://pc-1.local")
         printer.feed(2)
 
         if hasattr(printer, "flush_buffer"):
@@ -106,7 +106,7 @@ async def connect_wifi(request: WiFiConnectRequest, background_tasks: Background
     # Return immediately - the client will lose connection anyway
     return {
         "success": True,
-        "message": f"Connecting to {request.ssid}... Device will be available at http://pc-1.local in ~30 seconds",
+        "message": f"Connecting to {request.ssid}... Device will be available at https://pc-1.local in ~30 seconds",
         "connecting": True,
     }
 
