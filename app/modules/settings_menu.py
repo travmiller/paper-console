@@ -58,7 +58,7 @@ def _print_channels(printer):
             printer.print_caption(f"[{channel_num}] (empty)")
     
     printer.print_line()
-    printer.print_caption("Visit https://pc-1.local")
+    printer.print_caption("Visit http://pc-1.local")
     printer.print_caption("to configure channels")
     printer.feed(1)
 

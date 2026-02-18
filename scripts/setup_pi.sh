@@ -49,7 +49,7 @@ echo "Serial port configured for printer use."
 # 3. Install dependencies
 echo "Installing dependencies..."
 apt-get update
-apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager dnsmasq-base rfkill dnsutils openssl
+apt-get install -y nginx avahi-daemon python3-venv python3-pip network-manager dnsmasq-base rfkill dnsutils
 
 # Configure journald to stay bounded and SD-card friendly
 echo "Configuring systemd journal limits for SD-card longevity..."
@@ -165,59 +165,12 @@ systemctl restart NetworkManager
 echo "Adding $SUDO_USER to 'lp' and 'dialout' groups for printer access..."
 usermod -a -G lp,dialout "$SUDO_USER"
 
-# 4. Configure local TLS certificates for hostname.local
-echo "Generating local TLS certificates..."
-TLS_DIR="/etc/ssl/pc1"
-LOCAL_FQDN="${HOSTNAME}.local"
-CA_KEY="$TLS_DIR/local-ca.key"
-CA_CERT="$TLS_DIR/local-ca.crt"
-SERVER_KEY="$TLS_DIR/server.key"
-SERVER_CSR="$TLS_DIR/server.csr"
-SERVER_CERT="$TLS_DIR/server.crt"
-SERVER_EXT="$TLS_DIR/server.ext"
-
-mkdir -p "$TLS_DIR"
-chmod 700 "$TLS_DIR"
-
-if [ ! -f "$CA_KEY" ] || [ ! -f "$CA_CERT" ]; then
-    openssl genrsa -out "$CA_KEY" 4096
-    openssl req -x509 -new -nodes -key "$CA_KEY" -sha256 -days 3650 \
-        -subj "/CN=PC-1 Local Root CA/O=PC-1" \
-        -out "$CA_CERT"
-fi
-
-openssl genrsa -out "$SERVER_KEY" 2048
-openssl req -new -key "$SERVER_KEY" \
-    -subj "/CN=$LOCAL_FQDN" \
-    -out "$SERVER_CSR"
-
-cat > "$SERVER_EXT" <<EOL
-basicConstraints=CA:FALSE
-keyUsage=digitalSignature,keyEncipherment
-extendedKeyUsage=serverAuth
-subjectAltName=DNS:$LOCAL_FQDN,DNS:$HOSTNAME,IP:127.0.0.1,IP:10.42.0.1
-EOL
-
-openssl x509 -req -in "$SERVER_CSR" \
-    -CA "$CA_CERT" -CAkey "$CA_KEY" -CAcreateserial \
-    -out "$SERVER_CERT" -days 825 -sha256 -extfile "$SERVER_EXT"
-
-chmod 600 "$SERVER_KEY"
-chmod 644 "$SERVER_CERT" "$CA_CERT"
-
-# 5. Configure Nginx Reverse Proxy
+# 4. Configure Nginx Reverse Proxy
 echo "Configuring Nginx..."
 cat > /etc/nginx/sites-available/paper-console <<EOL
-# Default HTTP server for setup mode and captive portal (10.42.0.1).
 server {
     listen 80 default_server;
     server_name _;
-
-    location = /pc1-local-ca.crt {
-        alias /etc/ssl/pc1/local-ca.crt;
-        default_type application/x-x509-ca-cert;
-        add_header Content-Disposition "attachment; filename=pc1-local-ca.crt";
-    }
 
     location / {
         proxy_pass http://127.0.1.1:8000;
@@ -232,58 +185,6 @@ server {
         proxy_set_header Connection "upgrade";
     }
 }
-
-# Redirect normal hostname access to HTTPS.
-server {
-    listen 80;
-    server_name $LOCAL_FQDN;
-
-    # Allow certificate download over HTTP for first-time trust setup.
-    location = /pc1-local-ca.crt {
-        alias /etc/ssl/pc1/local-ca.crt;
-        default_type application/x-x509-ca-cert;
-        add_header Content-Disposition "attachment; filename=pc1-local-ca.crt";
-    }
-
-    location / {
-        return 301 https://\$host\$request_uri;
-    }
-}
-
-# HTTPS endpoint for normal operation.
-server {
-    listen 443 ssl;
-    http2 on;
-    server_name $LOCAL_FQDN;
-
-    ssl_certificate /etc/ssl/pc1/server.crt;
-    ssl_certificate_key /etc/ssl/pc1/server.key;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_session_timeout 1d;
-    ssl_session_cache shared:PC1SSL:10m;
-    ssl_prefer_server_ciphers off;
-
-    add_header Strict-Transport-Security "max-age=31536000" always;
-
-    location = /pc1-local-ca.crt {
-        alias /etc/ssl/pc1/local-ca.crt;
-        default_type application/x-x509-ca-cert;
-        add_header Content-Disposition "attachment; filename=pc1-local-ca.crt";
-    }
-
-    location / {
-        proxy_pass http://127.0.1.1:8000;
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-
-        # WebSocket support
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection "upgrade";
-    }
-}
 EOL
 
 # Link and reload
@@ -291,7 +192,7 @@ ln -sf /etc/nginx/sites-available/paper-console /etc/nginx/sites-enabled/
 rm -f /etc/nginx/sites-enabled/default
 nginx -t && systemctl restart nginx
 
-# 6. Create Systemd Service
+# 5. Create Systemd Service
 # Attempt to locate the project directory based on script location
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 PROJECT_DIR=$(dirname "$SCRIPT_DIR")
@@ -434,11 +335,7 @@ echo "=========================================="
 echo "         SETUP COMPLETE"
 echo "=========================================="
 echo ""
-echo "Your device will be accessible at: https://$HOSTNAME.local"
-echo "Setup mode remains available at: http://10.42.0.1"
-echo ""
-echo "To remove browser warnings on phones/laptops, install:"
-echo "  http://$HOSTNAME.local/pc1-local-ca.crt"
+echo "Your device will be accessible at: http://$HOSTNAME.local"
 echo ""
 echo "A reboot is required for serial port changes"
 echo "to take effect (required for printing)."

@@ -99,7 +99,7 @@ export default function WiFiSetup({ wifiStatus }) {
               </li>
               <li className='flex items-start gap-2'>
                 <span className='bg-black text-white rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0 text-sm font-bold'>4</span>
-                <span>Visit <strong className='text-black'>https://pc-1.local</strong> to access settings</span>
+                <span>Visit <strong className='text-black'>http://pc-1.local</strong> to access settings</span>
               </li>
             </ol>
           </div>
