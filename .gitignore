@@ -69,6 +69,7 @@ raspberry_pi/*.img
 *.tmp
 testing/tmp/
 testing/print_gallery/
+testing/ui_gallery/
 *.temp
 .cache/
 nul

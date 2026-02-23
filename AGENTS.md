@@ -81,3 +81,20 @@ Rules:
   - `PC1_TEST_WEBHOOK_URL`
   - `PC1_TEST_WEBHOOK_METHOD`
   - `PC1_TEST_WEBHOOK_JSON_PATH`
+
+## Settings UI Snapshot Gallery
+
+Use `testing/render_settings_ui.py` as the unified settings UI visual regression helper.
+
+```bash
+./.venv/bin/python testing/render_settings_ui.py
+./.venv/bin/python testing/render_settings_ui.py --reuse-servers
+./.venv/bin/python testing/render_settings_ui.py --install-browser
+```
+
+Rules:
+- This workflow refreshes the target screenshot folder each run.
+- It captures the main settings tabs/modals and module editor screens.
+- It seeds temporary modules (`UI TEST :: ...`) so every module-type editor is covered, then cleans them up.
+- It writes run artifacts (`manifest.txt`, `failures.txt`, `notes.txt`) in the output folder.
+- If Playwright reports missing Linux libs, use `npx --yes -p playwright playwright install-deps chromium` (requires sudo).

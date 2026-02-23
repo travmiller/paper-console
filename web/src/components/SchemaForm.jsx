@@ -12,7 +12,17 @@ import RichTextEditor from './widgets/RichTextEditor';
  * Supports: string, number, boolean, object, array.
  * Supports ui:widget: "textarea", "location-search".
  */
-const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange, moduleId, onActionComplete }) => {
+const SchemaForm = ({
+  schema,
+  uiSchema = {},
+  formData = {},
+  onChange,
+  moduleId,
+  onActionComplete,
+  validationErrors = {},
+  showValidation = false,
+  onUserInteraction = () => {},
+}) => {
   if (!schema) return null;
 
   return (
@@ -27,15 +37,40 @@ const SchemaForm = ({ schema, uiSchema = {}, formData = {}, onChange, moduleId, 
         onRootChange={onChange}
         moduleId={moduleId}
         onActionComplete={onActionComplete}
+        validationErrors={validationErrors}
+        showValidation={showValidation}
+        onUserInteraction={onUserInteraction}
       />
     </div>
   );
 };
 
-const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required, compact, rootValue, onRootChange, moduleId, onActionComplete }) => {
+const SchemaField = ({
+  schema,
+  uiSchema,
+  value,
+  onChange,
+  path,
+  label,
+  required,
+  compact,
+  rootValue,
+  onRootChange,
+  moduleId,
+  onActionComplete,
+  validationErrors = {},
+  showValidation = false,
+  onUserInteraction = () => {},
+}) => {
     const type = schema.type;
     const title = schema.title || label;
     const description = schema.description;
+    const fieldPath = path.join('.');
+    const fieldError = showValidation && fieldPath ? validationErrors[fieldPath] : '';
+    const hasError = Boolean(fieldError);
+    const errorId = hasError
+      ? `schema-error-${fieldPath.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+      : undefined;
     
     // Handle UI Options
     const uiOptions = uiSchema?.['ui:options'] || {};
@@ -46,8 +81,15 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
         return (
             <div className="mb-4">
                 {title && <label className={commonClasses.label}>{title}</label>}
-                <LocationSearch value={value} onChange={onChange} />
+                <LocationSearch
+                    value={value}
+                    onChange={(next) => {
+                        onUserInteraction();
+                        onChange(next);
+                    }}
+                />
                 {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+                {hasError && <p id={errorId} className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{fieldError}</p>}
             </div>
         );
     }
@@ -56,8 +98,15 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
         return (
             <div className="mb-4">
                 {title && <label className={commonClasses.label}>{title}</label>}
-                <KeyValueList value={value} onChange={onChange} />
+                <KeyValueList
+                    value={value}
+                    onChange={(next) => {
+                        onUserInteraction();
+                        onChange(next);
+                    }}
+                />
                 {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+                {hasError && <p id={errorId} className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{fieldError}</p>}
             </div>
         );
     }
@@ -69,16 +118,21 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 {title && <label className={commonClasses.label}>{title}</label>}
                 <PresetSelect 
                     value={value} 
-                    onChange={onChange} 
+                    onChange={(next) => {
+                        onUserInteraction();
+                        onChange(next);
+                    }} 
                     presets={presets}
                     onPresetSelect={(presetValues) => {
                         // Merge preset values with root form data
                         if (onRootChange && rootValue) {
+                            onUserInteraction();
                             onRootChange({ ...rootValue, ...presetValues });
                         }
                     }}
                 />
                 {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+                {hasError && <p id={errorId} className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{fieldError}</p>}
             </div>
         );
     }
@@ -106,7 +160,13 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
         return (
             <div className="mb-4">
                 {title && <label className={commonClasses.label}>{title}</label>}
-                <RichTextEditor value={value} onChange={onChange} />
+                <RichTextEditor
+                    value={value}
+                    onChange={(next) => {
+                        onUserInteraction();
+                        onChange(next);
+                    }}
+                />
                 {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
             </div>
         );
@@ -153,6 +213,9 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                                 onRootChange={onRootChange}
                                 moduleId={moduleId}
                                 onActionComplete={onActionComplete}
+                                validationErrors={validationErrors}
+                                showValidation={showValidation}
+                                onUserInteraction={onUserInteraction}
                             />
                         </div>
                     );
@@ -169,18 +232,21 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
 
         const handleAdd = () => {
             const emptyItem = createEmptyValue(itemSchema);
+            onUserInteraction();
             onChange([...items, emptyItem]);
         };
 
         const handleRemove = (index) => {
             const newItems = [...items];
             newItems.splice(index, 1);
+            onUserInteraction();
             onChange(newItems);
         };
 
         const handleChangeItem = (index, val) => {
             const newItems = [...items];
             newItems[index] = val;
+            onUserInteraction();
             onChange(newItems);
         };
 
@@ -207,6 +273,9 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                                     onChange={(val) => handleChangeItem(index, val)}
                                     path={[...path, index]}
                                     moduleId={moduleId}
+                                    validationErrors={validationErrors}
+                                    showValidation={showValidation}
+                                    onUserInteraction={onUserInteraction}
                                 />
                              </div>
                              <button 
@@ -214,6 +283,7 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                                 onClick={() => handleRemove(index)}
                                 className="text-gray-400 hover:text-red-500 transition-colors p-1"
                                 title="Remove Item"
+                                aria-label={`Remove item ${index + 1}`}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" fill="currentColor" viewBox="0 0 256 256">
                                     <path d="M205.66,194.34a8,8,0,0,1-11.32,11.32L128,139.31,61.66,205.66a8,8,0,0,1-11.32-11.32L116.69,128,50.34,61.66A8,8,0,0,1,61.66,50.34L128,116.69l66.34-66.35a8,8,0,0,1,11.32,11.32L139.31,128Z"></path>
@@ -248,11 +318,19 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
                 <input 
                     type="checkbox"
                     checked={value || false}
-                    onChange={(e) => onChange(e.target.checked)}
+                    onChange={(e) => {
+                        onUserInteraction();
+                        onChange(e.target.checked);
+                    }}
                     className="w-4 h-4 text-black rounded border-2 border-zinc-300 focus:ring-0 focus:ring-offset-0"
                     style={{ accentColor: 'black' }}
                 />
-                <label className={`text-sm text-black select-none cursor-pointer ${compact ? 'font-medium' : ''}`} onClick={() => onChange(!value)}>
+                <label
+                  className={`text-sm text-black select-none cursor-pointer ${compact ? 'font-medium' : ''}`}
+                  onClick={() => {
+                    onUserInteraction();
+                    onChange(!value);
+                  }}>
                     {title}
                 </label>
             </div>
@@ -296,8 +374,14 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
             {schema.enum ? (
                 <select
                     value={value ?? ''}
-                    onChange={(e) => onChange(e.target.value)}
-                    className={compact ? commonClasses.inputSmall : commonClasses.input}
+                    onChange={(e) => {
+                        onUserInteraction();
+                        onChange(e.target.value);
+                    }}
+                    className={`${compact ? commonClasses.inputSmall : commonClasses.input} ${hasError ? 'border-red-500' : ''}`}
+                    style={hasError ? { borderColor: 'var(--color-error)' } : undefined}
+                    aria-invalid={hasError}
+                    aria-describedby={errorId}
                 >
                     {!required && <option value="">Select...</option>}
                     {schema.enum.map((option) => (
@@ -309,24 +393,35 @@ const SchemaField = ({ schema, uiSchema, value, onChange, path, label, required,
             ) : widget === 'textarea' ? (
                  <textarea
                     value={value || ''}
-                    onChange={(e) => onChange(e.target.value)}
-                    className={`${compact ? commonClasses.inputSmall : commonClasses.input} min-h-[100px] text-sm`}
+                    onChange={(e) => {
+                        onUserInteraction();
+                        onChange(e.target.value);
+                    }}
+                    className={`${compact ? commonClasses.inputSmall : commonClasses.input} min-h-[100px] text-sm ${hasError ? 'border-red-500' : ''}`}
+                    style={hasError ? { borderColor: 'var(--color-error)' } : undefined}
                     placeholder={uiSchema?.['ui:placeholder']}
                     rows={uiOptions.rows || 3}
+                    aria-invalid={hasError}
+                    aria-describedby={errorId}
                 />
             ) : (
                 <input
                     type={widget === 'password' ? 'password' : (type === 'number' || type === 'integer' ? 'number' : 'text')}
                     value={value ?? ''}
                     onChange={(e) => {
+                        onUserInteraction();
                         const val = e.target.value;
                         onChange(type === 'number' || type === 'integer' ? (val === '' ? undefined : parseFloat(val)) : val);
                     }}
-                    className={compact ? commonClasses.inputSmall : commonClasses.input}
+                    className={`${compact ? commonClasses.inputSmall : commonClasses.input} ${hasError ? 'border-red-500' : ''}`}
+                    style={hasError ? { borderColor: 'var(--color-error)' } : undefined}
                     placeholder={uiSchema?.['ui:placeholder']}
+                    aria-invalid={hasError}
+                    aria-describedby={errorId}
                 />
             )}
              {description && !compact && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
+             {hasError && <p id={errorId} className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{fieldError}</p>}
         </div>
     );
 };

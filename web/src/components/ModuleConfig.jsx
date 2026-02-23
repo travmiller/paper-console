@@ -4,7 +4,14 @@ import JsonTextarea from './JsonTextarea';
 import { commonClasses } from '../design-tokens';
 import { useModuleTypes } from '../hooks/useModuleTypes';
 
-const ModuleConfig = ({ module, updateConfig, onRefresh }) => {
+const ModuleConfig = ({
+  module,
+  updateConfig,
+  onRefresh,
+  validationErrors = {},
+  showValidation = false,
+  onUserInteraction = () => {},
+}) => {
   const { moduleTypes, loading } = useModuleTypes();
   const config = module.config || {};
   
@@ -31,6 +38,9 @@ const ModuleConfig = ({ module, updateConfig, onRefresh }) => {
               onChange={handleSchemaChange}
               moduleId={module.id}
               onActionComplete={onRefresh}
+              validationErrors={validationErrors}
+              showValidation={showValidation}
+              onUserInteraction={onUserInteraction}
           />
       );
   }

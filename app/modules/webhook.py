@@ -75,8 +75,14 @@ WEBHOOK_PRESETS = {
     },
     ui_schema={
         "preset": {"ui:widget": "preset-select", "ui:options": {"presets": WEBHOOK_PRESETS}},
+        "url": {"ui:placeholder": "https://example.com/api"},
         "headers": {"ui:widget": "key-value-list"},
-        "body": {"ui:widget": "textarea", "ui:showWhen": {"field": "method", "value": "POST"}},
+        "body": {
+            "ui:widget": "textarea",
+            "ui:placeholder": "{\"message\":\"hello\"}",
+            "ui:showWhen": {"field": "method", "value": "POST"}
+        },
+        "json_path": {"ui:placeholder": "data.message"},
         "test_button": {"ui:widget": "webhook-test"}
     },
 )

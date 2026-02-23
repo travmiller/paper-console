@@ -354,11 +354,14 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
             "email_port": {"type": "integer", "title": "IMAP Port", "default": 993},
             "email_use_ssl": {"type": "boolean", "title": "Use SSL", "default": True},
             "auto_print_new": {"type": "boolean", "title": "Auto Print New Emails", "default": False}
-        }
+        },
+        "required": ["email_user", "email_password"]
     },
     ui_schema={
+        "email_user": {"ui:placeholder": "you@example.com"},
         "email_password": {"ui:widget": "password"},
         "email_host": {
+            "ui:placeholder": "imap.example.com",
             "ui:showWhen": {"field": "email_service", "value": "Custom"}
         },
         "email_port": {

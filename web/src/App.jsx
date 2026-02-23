@@ -609,6 +609,26 @@ function App() {
     }
   };
 
+  const handleTabKeyDown = (event, currentTab) => {
+    const orderedTabs = ['general', 'channels'];
+    const currentIndex = orderedTabs.indexOf(currentTab);
+    if (currentIndex === -1) return;
+
+    if (event.key === 'ArrowRight') {
+      event.preventDefault();
+      setActiveTab(orderedTabs[(currentIndex + 1) % orderedTabs.length]);
+    } else if (event.key === 'ArrowLeft') {
+      event.preventDefault();
+      setActiveTab(orderedTabs[(currentIndex - 1 + orderedTabs.length) % orderedTabs.length]);
+    } else if (event.key === 'Home') {
+      event.preventDefault();
+      setActiveTab(orderedTabs[0]);
+    } else if (event.key === 'End') {
+      event.preventDefault();
+      setActiveTab(orderedTabs[orderedTabs.length - 1]);
+    }
+  };
+
   if (loading) {
     return <div className='max-w-[800px] w-full p-8 text-center'>Loading settings...</div>;
   }
@@ -628,10 +648,16 @@ function App() {
       </div>
 
       {/* Tabs */}
-      <div className='flex gap-2 mb-8 border-b-2 border-dashed' style={{ borderColor: 'var(--color-border-main)' }}>
+      <div className='flex gap-2 mb-8 border-b-2 border-dashed' style={{ borderColor: 'var(--color-border-main)' }} role='tablist' aria-label='Settings sections'>
         <button
+          id='settings-tab-general'
+          role='tab'
+          aria-selected={activeTab === 'general'}
+          aria-controls='settings-panel-general'
+          tabIndex={activeTab === 'general' ? 0 : -1}
           type='button'
           onClick={() => setActiveTab('general')}
+          onKeyDown={(e) => handleTabKeyDown(e, 'general')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
             activeTab === 'general' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
           }`}
@@ -646,12 +672,18 @@ function App() {
           onMouseLeave={(e) => {
             if (activeTab !== 'general') e.currentTarget.style.color = 'var(--color-text-muted)';
           }}>
-          <PreferencesIcon className='w-4 h-4' />
+          <PreferencesIcon className='w-4 h-4' aria-hidden='true' />
           GENERAL
         </button>
         <button
+          id='settings-tab-channels'
+          role='tab'
+          aria-selected={activeTab === 'channels'}
+          aria-controls='settings-panel-channels'
+          tabIndex={activeTab === 'channels' ? 0 : -1}
           type='button'
           onClick={() => setActiveTab('channels')}
+          onKeyDown={(e) => handleTabKeyDown(e, 'channels')}
           className={`px-6 py-2 font-bold tracking-wider transition-all text-sm flex items-center gap-2 ${
             activeTab === 'channels' ? 'border-b-2 translate-y-[2px]' : 'border-b-2 border-transparent'
           }`}
@@ -666,14 +698,20 @@ function App() {
           onMouseLeave={(e) => {
             if (activeTab !== 'channels') e.currentTarget.style.color = 'var(--color-text-muted)';
           }}>
-          <BorderWidthIcon className='w-4 h-4' />
+          <BorderWidthIcon className='w-4 h-4' aria-hidden='true' />
           CHANNELS
         </button>
       </div>
 
       <div className='contents'>
-        {activeTab === 'general' && (
-          <>
+        <div
+          id='settings-panel-general'
+          role='tabpanel'
+          aria-labelledby='settings-tab-general'
+          hidden={activeTab !== 'general'}
+          className={activeTab === 'general' ? 'contents' : 'hidden'}>
+          {activeTab === 'general' && (
+            <>
             <GeneralSettings
               searchTerm={searchTerm}
               searchResults={searchResults}
@@ -699,28 +737,36 @@ function App() {
               {/* Reset Button */}
               <ResetSettingsButton setSettings={setSettings} setModules={setModules} setStatus={setStatus} />
             </div>
-          </>
-        )}
+            </>
+          )}
+        </div>
 
-        {activeTab === 'channels' && (
-          <ChannelList
-            settings={settings}
-            modules={modules}
-            triggerChannelPrint={triggerChannelPrint}
-            triggerModulePrint={triggerModulePrint}
-            setShowScheduleModal={setShowScheduleModal}
-            swapChannels={swapChannels}
-            setShowEditModuleModal={setShowEditModuleModal}
-            setEditingModule={setEditingModule}
-            moveModuleInChannel={moveModuleInChannel}
-            assignModuleToChannel={assignModuleToChannel}
-            reorderChannelModules={reorderChannelModules}
-            removeModuleFromChannel={removeModuleFromChannel}
-            setShowAddModuleModal={setShowAddModuleModal}
-            setShowCreateUnassignedModal={setShowCreateUnassignedModal}
-            wifiStatus={wifiStatus}
-          />
-        )}
+        <div
+          id='settings-panel-channels'
+          role='tabpanel'
+          aria-labelledby='settings-tab-channels'
+          hidden={activeTab !== 'channels'}
+          className={activeTab === 'channels' ? 'contents' : 'hidden'}>
+          {activeTab === 'channels' && (
+            <ChannelList
+              settings={settings}
+              modules={modules}
+              triggerChannelPrint={triggerChannelPrint}
+              triggerModulePrint={triggerModulePrint}
+              setShowScheduleModal={setShowScheduleModal}
+              swapChannels={swapChannels}
+              setShowEditModuleModal={setShowEditModuleModal}
+              setEditingModule={setEditingModule}
+              moveModuleInChannel={moveModuleInChannel}
+              assignModuleToChannel={assignModuleToChannel}
+              reorderChannelModules={reorderChannelModules}
+              removeModuleFromChannel={removeModuleFromChannel}
+              setShowAddModuleModal={setShowAddModuleModal}
+              setShowCreateUnassignedModal={setShowCreateUnassignedModal}
+              wifiStatus={wifiStatus}
+            />
+          )}
+        </div>
 
 
         <AddModuleModal

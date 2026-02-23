@@ -41,3 +41,25 @@ Notes:
 - Full sweep mode clears existing `*.png` files in the target folder and rewrites them.
 - Targeted mode writes a single image (default path under `testing/tmp/` unless `--output` is provided).
 - Full sweep also renders all registered module types (including unassigned ones) and writes `failures.txt`.
+
+Settings UI snapshot renderer:
+
+```bash
+# Full UI sweep (starts backend + frontend, rewrites gallery)
+./.venv/bin/python testing/render_settings_ui.py
+
+# Reuse already-running servers
+./.venv/bin/python testing/render_settings_ui.py --reuse-servers
+
+# Optional output folder (still rewritten each run)
+./.venv/bin/python testing/render_settings_ui.py --output-dir testing/ui_gallery
+
+# First run: install Playwright Chromium
+./.venv/bin/python testing/render_settings_ui.py --install-browser
+```
+
+Notes:
+- This workflow captures key UI states (tabs, modals) and module edit screens.
+- It creates temporary `UI TEST :: ...` modules to capture every module-type editor, then cleans them up.
+- Output includes `manifest.txt`, `failures.txt`, `notes.txt`, and optional `runtime_warnings.txt`.
+- If Linux runtime libraries are missing (e.g. `libnspr4.so`), run `npx --yes -p playwright playwright install-deps chromium` with sudo.

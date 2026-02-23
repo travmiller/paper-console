@@ -7,6 +7,8 @@ import PrintIcon from '../assets/PrintIcon';
 import ScheduleIcon from '../assets/ScheduleIcon';
 import ArrowUpIcon from '../assets/ArrowUpIcon';
 import ArrowDownIcon from '../assets/ArrowDownIcon';
+import WarningIcon from '../assets/WarningIcon';
+import { getModuleValidationIssueCount } from '../lib/moduleValidation';
 
 const ChannelList = ({
   settings,
@@ -402,6 +404,7 @@ const ChannelList = ({
                       type='button'
                       onClick={() => triggerChannelPrint(pos)}
                       className='group flex items-center justify-center px-2 py-1 rounded border-2 bg-transparent border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
+                      aria-label={`Print channel ${pos}`}
                       title='Print Channel'>
                       <PrintIcon className='w-3.5 h-3.5 text-gray-400 group-hover:text-black transition-all' />
                     </button>
@@ -416,6 +419,7 @@ const ChannelList = ({
                       style={channel.schedule && channel.schedule.length > 0 ? { color: 'var(--color-brass)', borderColor: 'var(--color-brass)' } : {}}
                       onMouseEnter={(e) => { if (channel.schedule && channel.schedule.length > 0) e.currentTarget.style.backgroundColor = 'var(--color-brass-10)'; }}
                       onMouseLeave={(e) => { if (channel.schedule && channel.schedule.length > 0) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      aria-label={`Configure schedule for channel ${pos}`}
                       title='Configure Schedule'>
                       <ScheduleIcon className={`w-3.5 h-3.5 transition-all ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: 'var(--color-brass)' } : {}} />
                       <span className={`text-xs font-bold ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: 'var(--color-brass)' } : {}}>{channel.schedule?.length || 0}</span>
@@ -431,6 +435,7 @@ const ChannelList = ({
                     }}
                     disabled={pos === 1}
                     className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-gray-600 hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white'
+                    aria-label={`Move channel ${pos} up`}
                     title='Move channel up'>
                     <ArrowUpIcon className='w-3 h-3' />
                   </button>
@@ -442,6 +447,7 @@ const ChannelList = ({
                     }}
                     disabled={pos === 8}
                     className='px-2 py-1 text-xs  border-2 border-gray-300 hover:border-black rounded text-gray-600 hover:text-black transition-colors disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer hover:bg-white'
+                    aria-label={`Move channel ${pos} down`}
                     title='Move channel down'>
                     <ArrowDownIcon className='w-3 h-3' />
                   </button>
@@ -486,6 +492,9 @@ const ChannelList = ({
                         const configured = moduleIsConfigured(item.module);
                         const showState = isOnline;
                         const needsSetup = showState && !configured;
+                        const validationIssueCount = getModuleValidationIssueCount(item.module);
+                        const hasMalformedConfig = validationIssueCount > 0;
+                        const displayName = item.module.name?.trim() || '(unnamed module)';
                         const hasWifi = wifiStatus?.connected;
                         
                         // Determine icon color:
@@ -501,7 +510,18 @@ const ChannelList = ({
 
                         return (
                           <>
-                      <div className='text-sm font-bold text-gray-700 group-hover:text-black  truncate transition-colors'>{item.module.name}</div>
+                      <div className='flex items-center gap-1 min-w-0'>
+                        <div className='text-sm font-bold text-gray-700 group-hover:text-black truncate transition-colors flex-1 min-w-0'>{displayName}</div>
+                        {hasMalformedConfig && (
+                          <span
+                            className='inline-flex items-center gap-0.5 text-[9px] font-bold tracking-wide uppercase shrink-0'
+                            style={{ color: 'var(--color-error)' }}
+                            title={`Malformed config: ${validationIssueCount} issue${validationIssueCount === 1 ? '' : 's'}`}>
+                            <WarningIcon className='w-3 h-3' />
+                            Malformed
+                          </span>
+                        )}
+                      </div>
                       <div
                         className={`text-[10px]  truncate flex items-baseline gap-1 ${
                           needsSetup ? '' : 'text-gray-700'
@@ -525,6 +545,7 @@ const ChannelList = ({
                         type='button'
                         onClick={() => triggerModulePrint(item.module_id)}
                         className='px-1.5 py-1 rounded border border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
+                        aria-label={`Print module ${item.module.name}`}
                         title='Print this module'>
                         <PrintIcon className='w-3 h-3 text-gray-400 hover:text-black transition-colors' />
                       </button>
@@ -534,6 +555,7 @@ const ChannelList = ({
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'up')}
                           disabled={idx === 0}
                           className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                          aria-label={`Move module ${item.module.name} up in channel ${pos}`}
                           onMouseEnter={(e) => {
                             const icon = e.currentTarget.querySelector('svg');
                             if (icon) icon.style.color = 'var(--color-text-main)';
@@ -549,6 +571,7 @@ const ChannelList = ({
                           onClick={() => moveModuleInChannel(pos, item.module_id, 'down')}
                           disabled={idx === channelModules.length - 1}
                           className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                          aria-label={`Move module ${item.module.name} down in channel ${pos}`}
                           onMouseEnter={(e) => {
                             const icon = e.currentTarget.querySelector('svg');
                             if (icon) icon.style.color = 'var(--color-text-main)';
@@ -611,6 +634,9 @@ const ChannelList = ({
               const isOnline = typeMeta ? !typeMeta.offline : false;
               const configured = moduleIsConfigured(module);
               const needsSetup = isOnline && !configured;
+              const validationIssueCount = getModuleValidationIssueCount(module);
+              const hasMalformedConfig = validationIssueCount > 0;
+              const displayName = module.name?.trim() || '(unnamed module)';
               const hasWifi = wifiStatus?.connected;
               
               let iconColor = 'var(--color-text-muted)';
@@ -642,7 +668,18 @@ const ChannelList = ({
                   onDragEnd={handleDragEnd}
                   role='listitem'>
                   <div className='flex-1 min-w-0 mr-2'>
-                    <div className='text-sm font-bold text-gray-700 group-hover:text-black truncate transition-colors'>{module.name}</div>
+                    <div className='flex items-center gap-1 min-w-0'>
+                      <div className='text-sm font-bold text-gray-700 group-hover:text-black truncate transition-colors flex-1 min-w-0'>{displayName}</div>
+                      {hasMalformedConfig && (
+                        <span
+                          className='inline-flex items-center gap-0.5 text-[9px] font-bold tracking-wide uppercase shrink-0'
+                          style={{ color: 'var(--color-error)' }}
+                          title={`Malformed config: ${validationIssueCount} issue${validationIssueCount === 1 ? '' : 's'}`}>
+                          <WarningIcon className='w-3 h-3' />
+                          Malformed
+                        </span>
+                      )}
+                    </div>
                     <div
                       className={`text-[10px] truncate flex items-baseline gap-1 ${
                         needsSetup ? '' : 'text-gray-700'
@@ -663,6 +700,7 @@ const ChannelList = ({
                       type='button'
                       onClick={() => triggerModulePrint(module.id)}
                       className='px-1.5 py-1 rounded border border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
+                      aria-label={`Print module ${module.name}`}
                       title='Print this module'>
                       <PrintIcon className='w-3 h-3 text-gray-400 hover:text-black transition-colors' />
                     </button>
@@ -672,6 +710,7 @@ const ChannelList = ({
                         onClick={() => moveUnassignedModule(module.id, 'up')}
                         disabled={unassignedModules.findIndex(m => m.id === module.id) === 0}
                         className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                        aria-label={`Move unassigned module ${module.name} up`}
                         onMouseEnter={(e) => {
                           const icon = e.currentTarget.querySelector('svg');
                           if (icon) icon.style.color = 'var(--color-text-main)';
@@ -687,6 +726,7 @@ const ChannelList = ({
                         onClick={() => moveUnassignedModule(module.id, 'down')}
                         disabled={unassignedModules.findIndex(m => m.id === module.id) === unassignedModules.length - 1}
                         className='px-1 py-0.5 text-[10px] leading-none disabled:opacity-30 disabled:cursor-not-allowed cursor-pointer'
+                        aria-label={`Move unassigned module ${module.name} down`}
                         onMouseEnter={(e) => {
                           const icon = e.currentTarget.querySelector('svg');
                           if (icon) icon.style.color = 'var(--color-text-main)';

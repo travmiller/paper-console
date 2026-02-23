@@ -1,5 +1,6 @@
 import os
 import requests
+from collections import Counter
 from datetime import datetime
 from typing import Dict, Any, Optional
 from PIL import Image, ImageDraw
@@ -365,6 +366,111 @@ def _format_temperature(value: Any, include_unit: bool = False) -> str:
         return str(value)
 
     return f"{temp_int}F" if include_unit else f"{temp_int}"
+
+
+def _describe_precipitation(condition: str) -> str:
+    """Map forecast condition text to a simple precipitation label."""
+    condition_lower = (condition or "").lower()
+    if "thunder" in condition_lower:
+        return "storms"
+    if "snow" in condition_lower:
+        return "snow"
+    if "freezing" in condition_lower:
+        return "mixed precipitation"
+    if "rain" in condition_lower or "drizzle" in condition_lower or "showers" in condition_lower:
+        return "rain"
+    return "precipitation"
+
+
+def _build_24_hour_summary(weather: Dict[str, Any]) -> str:
+    """Build a short, plain-language summary for the next 24 hours."""
+    hourly = weather.get("hourly_forecast") or []
+    if not hourly:
+        return "Next 24 hours: Forecast details are currently unavailable."
+
+    temps = []
+    conditions = Counter()
+    peak_precip = None
+    peak_precip_hour = ""
+    peak_precip_condition = ""
+
+    for hour in hourly:
+        temp = hour.get("temperature")
+        if isinstance(temp, (int, float)):
+            temps.append(int(round(temp)))
+
+        condition = str(hour.get("condition") or "").strip()
+        if condition and condition.lower() not in {"unknown", "unavailable"}:
+            conditions[condition] += 1
+
+        precip = hour.get("precipitation")
+        if isinstance(precip, (int, float)):
+            precip_int = int(round(precip))
+            if peak_precip is None or precip_int > peak_precip:
+                peak_precip = precip_int
+                peak_precip_hour = str(hour.get("time") or "")
+                peak_precip_condition = condition
+
+    start_temp = None
+    end_temp = None
+    for hour in hourly:
+        temp = hour.get("temperature")
+        if isinstance(temp, (int, float)):
+            if start_temp is None:
+                start_temp = int(round(temp))
+            end_temp = int(round(temp))
+
+    dominant_condition = ""
+    if conditions:
+        dominant_condition = conditions.most_common(1)[0][0].lower()
+    elif weather.get("condition"):
+        dominant_condition = str(weather.get("condition")).lower()
+
+    if dominant_condition in {"clear", "mainly clear", "partly cloudy"}:
+        lead = "Next 24 hours: Fair overall"
+    elif dominant_condition:
+        lead = f"Next 24 hours: Mostly {dominant_condition}"
+    else:
+        lead = "Next 24 hours: Mixed conditions"
+
+    if temps:
+        low = min(temps)
+        high = max(temps)
+        trend = ""
+        if start_temp is not None and end_temp is not None:
+            delta = end_temp - start_temp
+            if delta >= 4:
+                trend = " Temperatures trend warmer through the day."
+            elif delta <= -4:
+                trend = " Temperatures trend cooler through the day."
+            else:
+                trend = " Temperatures stay fairly steady."
+        lead = f"{lead}, with temperatures between {low}F and {high}F.{trend}"
+    else:
+        lead = f"{lead}."
+
+    if peak_precip is None:
+        precip_line = "Precipitation details are unavailable."
+    elif peak_precip < 20:
+        precip_line = "Little to no precipitation expected."
+    else:
+        precip_type = _describe_precipitation(peak_precip_condition or dominant_condition)
+        if peak_precip >= 60:
+            chance = "likely"
+        elif peak_precip >= 35:
+            chance = "possible"
+        else:
+            chance = "a slight chance"
+
+        if peak_precip_hour:
+            precip_line = (
+                f"Expect {precip_type} {chance} around {peak_precip_hour} "
+                f"(up to {peak_precip}% chance)."
+            )
+        else:
+            precip_line = f"Expect {precip_type} {chance} (up to {peak_precip}% chance)."
+
+    return f"{lead} {precip_line}"
 
 
 def draw_current_conditions_panel(
@@ -761,6 +867,7 @@ def format_weather_receipt(
             f"High {_format_temperature(weather.get('high'), include_unit=True)} | "
             f"Low {_format_temperature(weather.get('low'), include_unit=True)}"
         )
+    printer.print_body(_build_24_hour_summary(weather))
     printer.feed(1)
 
     # 12-Hour Forecast
