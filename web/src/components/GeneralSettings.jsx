@@ -113,7 +113,7 @@ const GeneralSettings = ({
   }, []);
 
   const getApiError = (data, fallback) => {
-    return data?.detail || data?.message || data?.error || fallback;
+    return data?.detail || data?.error || data?.message || fallback;
   };
 
   // Auto sync time
