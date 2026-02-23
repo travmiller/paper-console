@@ -11,6 +11,10 @@ Rules:
 - If instructions conflict, prefer: explicit user chat instructions, then `AGENTS.md`, then `readme.md`.
 - Do not copy large sections of `readme.md` into responses unless explicitly requested; summarize relevant parts.
 
+## Production Release Workflow
+
+For production OTA artifacts (non-git device updates), use `scripts/release_build.py` and follow `scripts/RELEASE.md`.
+
 ## Console Raster Preview for Print Debugging
 
 When validating printer output (layout, clipping, alignment, density, or black/white dot rendering), run this feedback loop:

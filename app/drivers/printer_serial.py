@@ -4,6 +4,7 @@ import platform
 import random
 import time
 import unicodedata
+import logging
 from datetime import datetime, date
 from typing import List, Optional, Any
 
@@ -11,6 +12,8 @@ import serial
 from PIL import Image, ImageDraw, ImageFont
 import app.config
 import app.selection_mode
+
+logger = logging.getLogger(__name__)
 
 
 class PrinterDriver:
@@ -70,6 +73,8 @@ class PrinterDriver:
     ):
         self.width = width
         self.ser = None
+        self.port = port
+        self.last_init_error = None
         # Buffer for print operations (prints are always inverted/reversed)
         # Each item is a tuple: ('text', line) or ('feed', count) or ('qr', data).
         self.print_buffer = []
@@ -117,6 +122,8 @@ class PrinterDriver:
                 possible_ports = ["/dev/tty.usbserial", "/dev/ttyUSB0"]
                 port = possible_ports[0]
 
+        self.port = port
+
         # Initialize serial connection
         try:
             self.ser = serial.Serial(
@@ -135,8 +142,18 @@ class PrinterDriver:
             time.sleep(0.5)
             self._initialize_printer()
 
-        except serial.SerialException:
+        except serial.SerialException as e:
             self.ser = None
+            self.last_init_error = str(e)
+            logger.warning(
+                "Printer serial initialization failed on port %s: %s",
+                self.port,
+                e,
+            )
+
+    def is_available(self) -> bool:
+        """Return True if the serial printer is initialized and open."""
+        return bool(self.ser and self.ser.is_open)
 
     def _load_font_family(self) -> dict:
         """Load IBM Plex Mono font family with multiple weights.

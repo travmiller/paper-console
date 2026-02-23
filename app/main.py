@@ -111,6 +111,21 @@ scheduler_task = None
 task_monitor_task = None
 
 
+def _printer_is_available() -> bool:
+    """Best-effort hardware printer availability check."""
+    if not printer:
+        return False
+    checker = getattr(printer, "is_available", None)
+    if callable(checker):
+        try:
+            return bool(checker())
+        except Exception:
+            logger.debug("Printer availability probe failed", exc_info=True)
+            return False
+    # Mock drivers generally have no explicit availability method.
+    return True
+
+
 async def task_watchdog():
     """Monitor background tasks and restart them if they die unexpectedly."""
     global email_polling_task, scheduler_task
@@ -181,9 +196,13 @@ async def email_polling_loop():
                         await loop.run_in_executor(executor, _fetch_and_print_email)
 
                 except Exception:
-                    pass  # Silently skip failed email checks
+                    logger.exception(
+                        "Email polling iteration failed for module_id=%s",
+                        getattr(module, "id", "unknown"),
+                    )
 
         except Exception:
+            logger.exception("Email polling loop encountered an unexpected error")
             await asyncio.sleep(60)  # Wait before retrying on error
 
 
@@ -329,7 +348,7 @@ def on_button_long_press_ready_threadsafe():
         elif hasattr(printer, "blip"):
             printer.blip()
     except Exception:
-        pass
+        logger.debug("Long-press ready tactile cue failed", exc_info=True)
 
 
 def _print_channel_config_summary(position: int):
@@ -785,7 +804,11 @@ async def check_first_boot():
                     with open(marker_path, "w") as f:
                         f.write("1")
                 except Exception:
-                    pass
+                    logger.warning(
+                        "Could not write first-boot marker file at %s",
+                        marker_path,
+                        exc_info=True,
+                    )
         except Exception as e:
             logger.error(f"System Ready print error: {e}", exc_info=True)
 
@@ -901,7 +924,10 @@ async def factory_reset_trigger():
         with ThreadPoolExecutor() as executor:
             await loop.run_in_executor(executor, _print_reset_message)
     except Exception:
-        pass  # Continue with reset even if print fails
+        logger.warning(
+            "Factory reset pre-reboot receipt failed to print",
+            exc_info=True,
+        )  # Continue reset flow even if print fails
 
     # Wait for print to complete
     await asyncio.sleep(3)
@@ -924,20 +950,20 @@ async def factory_reset_trigger():
         if os.path.exists(welcome_marker):
             os.remove(welcome_marker)
     except Exception:
-        pass
+        logger.warning("Factory reset could not clear all local config files", exc_info=True)
 
     # Forget all saved WiFi networks
     try:
         wifi_manager.forget_all_wifi()
     except Exception:
-        pass
+        logger.warning("Factory reset could not forget saved WiFi networks", exc_info=True)
 
     # Reboot the device
     await asyncio.sleep(1)
     try:
         subprocess.run(["sudo", "reboot"], check=False)
     except Exception:
-        pass
+        logger.warning("Factory reset reboot command failed", exc_info=True)
 
 
 def on_factory_reset_threadsafe():
@@ -978,7 +1004,13 @@ async def lifespan(app: FastAPI):
         with ThreadPoolExecutor() as executor:
             await loop.run_in_executor(executor, _init_printer)
     except Exception:
-        pass  # Non-critical, continue startup even if printer init fails
+        logger.exception(
+            "Printer startup initialization failed (continuing without blocking startup)"
+        )
+    if _is_raspberry_pi and not _printer_is_available():
+        logger.warning(
+            "Printer driver is unavailable at startup; hardware printing may fail until serial is restored."
+        )
 
     # Check for first boot and print welcome message
     asyncio.create_task(check_first_boot())
@@ -1013,7 +1045,7 @@ async def lifespan(app: FastAPI):
             except asyncio.CancelledError:
                 pass
             except Exception:
-                pass
+                logger.exception("Background task shutdown failed")
 
     # Cleanup hardware drivers
     if hasattr(printer, "close"):
@@ -1104,7 +1136,9 @@ async def health_check():
         health["components"]["wifi"] = f"error: {e}"
 
     # Check hardware drivers
-    health["components"]["printer"] = "available" if printer else "unavailable"
+    health["components"]["printer"] = (
+        "available" if _printer_is_available() else "unavailable"
+    )
     health["components"]["dial"] = "available" if dial else "unavailable"
     health["components"]["button"] = "available" if button else "unavailable"
     health["components"]["gpio"] = "available" if _is_raspberry_pi else "mock"
@@ -1124,6 +1158,8 @@ async def health_check():
         critical_issues.append("email_polling stopped")
     if health["components"]["scheduler"] == "stopped":
         critical_issues.append("scheduler stopped")
+    if _is_raspberry_pi and health["components"]["printer"] == "unavailable":
+        critical_issues.append("printer unavailable")
 
     if critical_issues:
         health["status"] = "degraded"
@@ -1266,7 +1302,7 @@ async def get_system_timezone():
                         "found": True,
                     }
             except Exception:
-                pass
+                logger.debug("timedatectl timezone lookup failed", exc_info=True)
 
             # Fallback to /etc/timezone
             try:
@@ -1278,7 +1314,7 @@ async def get_system_timezone():
                             "found": True,
                         }
             except Exception:
-                pass
+                logger.debug("/etc/timezone fallback lookup failed", exc_info=True)
 
         # Fallback to environment variable
         timezone = os.environ.get("TZ")
@@ -1559,7 +1595,7 @@ async def set_system_time(request: SetTimeRequest):
             try:
                 subprocess.run(["sudo", "hwclock", "--systohc"], timeout=5, check=False)
             except Exception:
-                pass  # Ignore hwclock errors
+                logger.debug("Ignoring hwclock sync failure after manual time set", exc_info=True)
 
             return {
                 "success": True,
@@ -1686,7 +1722,7 @@ async def sync_system_time():
                             "message": "Time synchronized with NTP servers",
                         }
                 except Exception:
-                    pass
+                    logger.debug("ntpdate fallback failed", exc_info=True)
 
                 return {
                     "success": False,
@@ -1698,7 +1734,7 @@ async def sync_system_time():
             try:
                 subprocess.run(["sudo", "hwclock", "--systohc"], timeout=5, check=False)
             except Exception:
-                pass
+                logger.debug("Ignoring hwclock sync failure after NTP enable", exc_info=True)
 
             return {
                 "success": True,
@@ -1754,7 +1790,7 @@ async def sync_system_time():
 @app.get("/api/system/version")
 async def get_current_version():
     """
-    Get the current version (git commit hash) without checking for updates.
+    Get the current version identifier without checking for updates.
     """
     try:
         import subprocess
@@ -1763,12 +1799,16 @@ async def get_current_version():
         # Get the project root directory (parent of app/)
         project_root = Path(__file__).parent.parent
 
-        # Check if we're in a git repository
+        # Prefer explicit release version for production installs
+        version_file = project_root / ".version"
+        if version_file.exists():
+            version_text = version_file.read_text(encoding="utf-8").strip()
+            if version_text:
+                return {"version": version_text}
+
+        # Fall back to git commit hash in development clones
         if not (project_root / ".git").exists():
-            return {
-                "version": "unknown",
-                "error": "Not a git repository",
-            }
+            return {"version": "unknown"}
 
         # Get current commit hash (short)
         current_commit_result = subprocess.run(
@@ -1809,99 +1849,93 @@ async def check_for_updates():
         # Get the project root directory (parent of app/)
         project_root = Path(__file__).parent.parent
 
-        # Check if we're in a git repository
-        if not (project_root / ".git").exists():
-            return {
-                "available": False,
-                "message": "Not a git repository",
-                "error": "This installation doesn't appear to be a git repository.",
-            }
+        # Development mode: use git-based compare
+        if (project_root / ".git").exists():
+            # Get current branch
+            branch_result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
 
-        # Get current branch
-        branch_result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+            if branch_result.returncode != 0:
+                return {
+                    "available": False,
+                    "message": "Could not determine current branch",
+                    "error": branch_result.stderr,
+                }
 
-        if branch_result.returncode != 0:
-            return {
-                "available": False,
-                "message": "Could not determine current branch",
-                "error": branch_result.stderr,
-            }
+            current_branch = branch_result.stdout.strip()
 
-        current_branch = branch_result.stdout.strip()
+            # Get current commit hash (short)
+            current_commit_result = subprocess.run(
+                ["git", "rev-parse", "--short", "HEAD"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
 
-        # Get current commit hash (short)
-        current_commit_result = subprocess.run(
-            ["git", "rev-parse", "--short", "HEAD"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+            current_commit = (
+                current_commit_result.stdout.strip()
+                if current_commit_result.returncode == 0
+                else "unknown"
+            )
 
-        current_commit = (
-            current_commit_result.stdout.strip()
-            if current_commit_result.returncode == 0
-            else "unknown"
-        )
+            # Fetch from origin (without pulling)
+            fetch_result = subprocess.run(
+                ["git", "fetch", "origin", current_branch],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=30,
+            )
 
-        # Fetch from origin (without pulling)
-        fetch_result = subprocess.run(
-            ["git", "fetch", "origin", current_branch],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            timeout=30,
-        )
+            if fetch_result.returncode != 0:
+                return {
+                    "available": False,
+                    "message": "Could not check for updates",
+                    "error": "Unable to connect to the update server. Check your internet connection.",
+                    "current_commit": current_commit,
+                }
 
-        if fetch_result.returncode != 0:
-            return {
-                "available": False,
-                "message": "Could not check for updates",
-                "error": "Unable to connect to the update server. Check your internet connection.",
-                "current_commit": current_commit,
-            }
+            # Compare local vs remote
+            local_commit_result = subprocess.run(
+                ["git", "rev-parse", "HEAD"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            remote_commit_result = subprocess.run(
+                ["git", "rev-parse", f"origin/{current_branch}"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
 
-        # Compare local vs remote
-        local_commit_result = subprocess.run(
-            ["git", "rev-parse", "HEAD"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
-        remote_commit_result = subprocess.run(
-            ["git", "rev-parse", f"origin/{current_branch}"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+            if local_commit_result.returncode != 0 or remote_commit_result.returncode != 0:
+                return {
+                    "available": False,
+                    "message": "Could not compare versions",
+                    "error": "Unable to determine version information.",
+                }
 
-        if local_commit_result.returncode != 0 or remote_commit_result.returncode != 0:
-            return {
-                "available": False,
-                "message": "Could not compare versions",
-                "error": "Unable to determine version information.",
-            }
+            local_commit = local_commit_result.stdout.strip()
+            remote_commit = remote_commit_result.stdout.strip()
 
-        local_commit = local_commit_result.stdout.strip()
-        remote_commit = remote_commit_result.stdout.strip()
+            # Check if there are updates
+            if local_commit == remote_commit:
+                return {
+                    "available": False,
+                    "up_to_date": True,
+                    "message": "You're on the latest version",
+                    "current_version": current_commit,
+                }
 
-        # Check if there are updates
-        if local_commit == remote_commit:
-            return {
-                "available": False,
-                "up_to_date": True,
-                "message": "You're on the latest version",
-                "current_version": current_commit,
-            }
-        else:
             # Count commits behind
             behind_result = subprocess.run(
                 [
@@ -1921,7 +1955,6 @@ async def check_for_updates():
                 else 0
             )
 
-            # Get the latest version (short commit hash)
             latest_version_result = subprocess.run(
                 ["git", "rev-parse", "--short", f"origin/{current_branch}"],
                 cwd=project_root,
@@ -1948,6 +1981,57 @@ async def check_for_updates():
                 "latest_version": latest_version,
             }
 
+        # Production mode: use GitHub releases and .version marker
+        import requests
+
+        release_repo = os.environ.get("PC1_UPDATE_GITHUB_REPO", "travmiller/paper-console")
+        current_version = "unknown"
+        version_file = project_root / ".version"
+        if version_file.exists():
+            version_text = version_file.read_text(encoding="utf-8").strip()
+            if version_text:
+                current_version = version_text
+
+        release_resp = requests.get(
+            f"https://api.github.com/repos/{release_repo}/releases/latest",
+            headers={"User-Agent": "PC-1-OTA-Updater"},
+            timeout=8,
+        )
+        if release_resp.status_code != 200:
+            return {
+                "available": False,
+                "message": "Could not check for updates",
+                "error": "Unable to reach the release server.",
+                "current_version": current_version,
+            }
+
+        release_data = release_resp.json()
+        latest_version = (release_data.get("tag_name") or "").strip() or "unknown"
+        if latest_version == "unknown":
+            return {
+                "available": False,
+                "message": "Could not compare versions",
+                "error": "Unable to determine version information.",
+                "current_version": current_version,
+            }
+
+        if current_version == latest_version:
+            return {
+                "available": False,
+                "up_to_date": True,
+                "message": "You're on the latest version",
+                "current_version": current_version,
+            }
+
+        return {
+            "available": True,
+            "up_to_date": False,
+            "message": "New update available!",
+            "commits_behind": 1,
+            "current_version": current_version,
+            "latest_version": latest_version,
+        }
+
     except subprocess.TimeoutExpired:
         return {
             "available": False,
@@ -1965,48 +2049,221 @@ async def check_for_updates():
 @app.post("/api/system/updates/install", dependencies=[Depends(require_admin_access)])
 async def install_updates():
     """
-    Install available updates by pulling from the remote repository and restarting the service.
+    Install available updates and restart the service.
     """
     try:
         import subprocess
+        import hashlib
+        import requests
+        import tarfile
+        import shutil
+        import tempfile
         from pathlib import Path
 
         # Get the project root directory
         project_root = Path(__file__).parent.parent
 
-        # Get current branch
-        branch_result = subprocess.run(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            timeout=5,
-        )
+        # Check if we're running from a git clone (dev mode)
+        is_dev = (project_root / ".git").exists()
 
-        if branch_result.returncode != 0:
-            return {
-                "success": False,
-                "message": "Could not determine current branch",
-                "error": branch_result.stderr,
-            }
+        # If in dev mode, keep the old git pull logic for convenience
+        if is_dev:
+            # Get current branch
+            branch_result = subprocess.run(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
 
-        current_branch = branch_result.stdout.strip()
+            if branch_result.returncode != 0:
+                return {
+                    "success": False,
+                    "message": "Could not determine current branch",
+                    "error": branch_result.stderr,
+                }
 
-        # Pull latest changes
-        pull_result = subprocess.run(
-            ["git", "pull", "origin", current_branch],
-            cwd=project_root,
-            capture_output=True,
-            text=True,
-            timeout=60,
-        )
+            current_branch = branch_result.stdout.strip()
 
-        if pull_result.returncode != 0:
-            return {
-                "success": False,
-                "message": "Update failed",
-                "error": pull_result.stderr or "Could not pull latest changes",
-            }
+            # Pull latest changes
+            pull_result = subprocess.run(
+                ["git", "pull", "origin", current_branch],
+                cwd=project_root,
+                capture_output=True,
+                text=True,
+                timeout=60,
+            )
+
+            if pull_result.returncode != 0:
+                return {
+                    "success": False,
+                    "message": "Update failed",
+                    "error": pull_result.stderr or "Could not pull latest changes",
+                }
+        else:
+            # Production OTA flow (release tarball download)
+            release_repo = os.environ.get(
+                "PC1_UPDATE_GITHUB_REPO", "travmiller/paper-console"
+            ).strip()
+            expected_sha = os.environ.get("PC1_UPDATE_TARBALL_SHA256", "").strip().lower()
+
+            try:
+                release_resp = requests.get(
+                    f"https://api.github.com/repos/{release_repo}/releases/latest",
+                    headers={"User-Agent": "PC-1-OTA-Updater"},
+                    timeout=10,
+                )
+                release_resp.raise_for_status()
+                release_data = release_resp.json()
+
+                tag_name = (release_data.get("tag_name") or "unknown").strip()
+                assets = release_data.get("assets") or []
+
+                # Prefer an explicit release artifact produced by scripts/release_build.py.
+                preferred_asset_name = f"pc1-{tag_name}.tar.gz"
+                tar_asset = next(
+                    (
+                        asset
+                        for asset in assets
+                        if asset.get("name") == preferred_asset_name
+                    ),
+                    None,
+                )
+                if tar_asset is None:
+                    tar_asset = next(
+                        (
+                            asset
+                            for asset in assets
+                            if str(asset.get("name", "")).endswith(".tar.gz")
+                        ),
+                        None,
+                    )
+
+                tarball_url = ""
+                tarball_name = ""
+                if tar_asset:
+                    tarball_url = (tar_asset.get("browser_download_url") or "").strip()
+                    tarball_name = str(tar_asset.get("name") or "").strip()
+                else:
+                    # Fallback for older releases without explicit artifact assets.
+                    tarball_url = (release_data.get("tarball_url") or "").strip()
+                    tarball_name = f"pc1-{tag_name}.tar.gz"
+
+                if not tarball_url:
+                    raise ValueError("No update package URL found in latest release")
+
+                with tempfile.TemporaryDirectory(prefix="pc1-update-") as tmp_dir:
+                    tar_path = Path(tmp_dir) / "update.tar.gz"
+                    sha256 = hashlib.sha256()
+
+                    with requests.get(
+                        tarball_url,
+                        headers={"User-Agent": "PC-1-OTA-Updater"},
+                        timeout=20,
+                        stream=True,
+                    ) as download_resp:
+                        download_resp.raise_for_status()
+                        with open(tar_path, "wb") as tar_file:
+                            for chunk in download_resp.iter_content(chunk_size=65536):
+                                if not chunk:
+                                    continue
+                                tar_file.write(chunk)
+                                sha256.update(chunk)
+
+                    if not expected_sha:
+                        # Optional auto-check: parse checksum from release asset.
+                        checksum_asset = next(
+                            (
+                                asset
+                                for asset in assets
+                                if str(asset.get("name", "")).lower()
+                                in {"sha256sums", "sha256sums.txt"}
+                            ),
+                            None,
+                        )
+                        if checksum_asset and checksum_asset.get("browser_download_url"):
+                            sums_resp = requests.get(
+                                checksum_asset["browser_download_url"],
+                                headers={"User-Agent": "PC-1-OTA-Updater"},
+                                timeout=10,
+                            )
+                            if sums_resp.ok:
+                                for raw_line in sums_resp.text.splitlines():
+                                    line = raw_line.strip()
+                                    if not line:
+                                        continue
+                                    parts = line.split()
+                                    if len(parts) >= 2 and parts[-1].lstrip("*") == tarball_name:
+                                        expected_sha = parts[0].strip().lower()
+                                        break
+
+                    actual_sha = sha256.hexdigest().lower()
+                    if expected_sha and actual_sha != expected_sha:
+                        return {
+                            "success": False,
+                            "message": "Update package verification failed",
+                            "error": "SHA256 mismatch for downloaded update package",
+                        }
+
+                    extract_dir = Path(tmp_dir) / "extract"
+                    extract_dir.mkdir(parents=True, exist_ok=True)
+
+                    with tarfile.open(tar_path, "r:gz") as tar:
+                        def _is_within_directory(directory: Path, target: Path) -> bool:
+                            abs_directory = directory.resolve()
+                            abs_target = target.resolve()
+                            return str(abs_target).startswith(str(abs_directory))
+
+                        for member in tar.getmembers():
+                            member_path = extract_dir / member.name
+                            if not _is_within_directory(extract_dir, member_path):
+                                raise ValueError(
+                                    "Update package contains invalid file paths"
+                                )
+                        tar.extractall(extract_dir)
+
+                    extracted_items = [p for p in extract_dir.iterdir()]
+                    source_dir = (
+                        extracted_items[0]
+                        if len(extracted_items) == 1 and extracted_items[0].is_dir()
+                        else extract_dir
+                    )
+
+                    config_backup = project_root / "config.json.bak"
+                    env_backup = project_root / ".env.bak"
+                    config_path = project_root / "config.json"
+                    env_path = project_root / ".env"
+
+                    if config_path.exists():
+                        shutil.copy2(config_path, config_backup)
+                    if env_path.exists():
+                        shutil.copy2(env_path, env_backup)
+
+                    excluded = {".git", ".github", "__pycache__", ".venv"}
+                    for item in source_dir.iterdir():
+                        if item.name in excluded:
+                            continue
+                        dest = project_root / item.name
+                        if item.is_dir():
+                            shutil.copytree(item, dest, dirs_exist_ok=True)
+                        else:
+                            shutil.copy2(item, dest)
+
+                    if config_backup.exists():
+                        shutil.copy2(config_backup, config_path)
+                    if env_backup.exists():
+                        shutil.copy2(env_backup, env_path)
+
+                    (project_root / ".version").write_text(tag_name, encoding="utf-8")
+
+            except Exception as e:
+                logger.exception("Production OTA install failed")
+                return {
+                    "success": False,
+                    "message": "OTA Download/Extract failed",
+                    "error": str(e),
+                }
 
         # Install Python dependencies
         import sys
@@ -2021,9 +2278,10 @@ async def install_updates():
         )
 
         if install_result.returncode != 0:
-            # We log the error but try to continue, as sometimes it's just a warning or minor issue
-            # Using logger would be better but simple logging here:
-            pass
+            logger.warning(
+                "Dependency install after update returned non-zero exit code: %s",
+                (install_result.stderr or install_result.stdout or "").strip()[:500],
+            )
 
         # Rebuild UI if web directory exists
         web_dir = project_root / "web"
@@ -2045,7 +2303,7 @@ async def install_updates():
                     check=False,
                 )
             except Exception:
-                pass  # UI rebuild is optional
+                logger.exception("Optional UI rebuild failed during update")
 
         # Restart the service
         if platform.system() == "Linux":
@@ -2157,7 +2415,7 @@ async def get_ssh_status():
                 # raspi-config returns 0 if enabled, 1 if disabled
                 raspi_ssh_enabled = result_raspi.returncode == 0
             except Exception:
-                pass
+                logger.debug("raspi-config SSH status probe failed", exc_info=True)
 
         return {
             "enabled": service_enabled,
@@ -2222,7 +2480,7 @@ async def enable_ssh():
                     timeout=10,
                 )
             except Exception:
-                pass
+                logger.debug("raspi-config SSH enable command failed", exc_info=True)
 
         return {
             "success": True,
@@ -2282,7 +2540,7 @@ async def disable_ssh():
                     timeout=10,
                 )
             except Exception:
-                pass
+                logger.debug("raspi-config SSH disable command failed", exc_info=True)
 
         return {
             "success": True,
@@ -2381,7 +2639,7 @@ async def get_system_default_location():
                 if result.returncode == 0 and result.stdout.strip():
                     system_timezone = result.stdout.strip()
             except Exception:
-                pass
+                logger.debug("timedatectl system-default lookup failed", exc_info=True)
 
             # Fallback to /etc/timezone
             if not system_timezone:
@@ -2389,7 +2647,7 @@ async def get_system_default_location():
                     with open("/etc/timezone", "r") as f:
                         system_timezone = f.read().strip()
                 except Exception:
-                    pass
+                    logger.debug("/etc/timezone system-default lookup failed", exc_info=True)
 
         # Fallback to environment variable
         if not system_timezone:

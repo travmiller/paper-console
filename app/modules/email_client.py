@@ -328,7 +328,7 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
                 mail.close()
                 mail.logout()
             except Exception:
-                pass
+                logger.debug("Failed to close/logout IMAP session cleanly", exc_info=True)
 
 
 # --- FORMATTER ---

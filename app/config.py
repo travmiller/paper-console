@@ -5,10 +5,14 @@ import json
 import os
 import uuid
 import re
+import logging
 from pathlib import Path
 
 # Constants
 PRINTER_WIDTH = 42
+logger = logging.getLogger(__name__)
+_warned_non_posix_sensitive_config = False
+_warned_non_posix_sensitive_data = False
 
 
 class WebhookConfig(BaseModel):
@@ -23,6 +27,8 @@ class WebhookConfig(BaseModel):
 class NewsConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
     news_api_key: Optional[str] = None
+    country: str = "us"
+    page_size: int = 3
 
 
 class RSSConfig(BaseModel):
@@ -52,7 +58,7 @@ class QRCodeConfig(BaseModel):
     """Configuration for QR code generation."""
     model_config = ConfigDict(extra="ignore")
     qr_type: str = "url"  # text, url, wifi, contact, phone, sms, email
-    content: str = "https://www.youtube.com/watch?v=dQw4w9WgXcQ"  # Main content (URL, text, phone number, etc.)
+    content: str = "https://pc-1.local"  # Main content (URL, text, phone number, etc.)
     
     # WiFi-specific fields
     wifi_ssid: str = ""
@@ -572,14 +578,40 @@ def save_config(new_settings: Settings):
     backup_path = os.path.join(base_dir, "config.json.bak")
     temp_path = os.path.join(base_dir, "config.json.tmp")
 
+    def _contains_sensitive_config_values(value: Any) -> bool:
+        """Best-effort scan for likely secrets in config payloads."""
+        sensitive_markers = ("password", "token", "secret", "api_key", "apikey")
+
+        if isinstance(value, dict):
+            for key, subval in value.items():
+                key_text = str(key).lower()
+                if any(marker in key_text for marker in sensitive_markers):
+                    if isinstance(subval, str) and subval.strip():
+                        return True
+                if _contains_sensitive_config_values(subval):
+                    return True
+            return False
+
+        if isinstance(value, list):
+            return any(_contains_sensitive_config_values(item) for item in value)
+
+        return False
+
     def _restrict_file_permissions(path: str):
         """Keep config files owner-only readable on POSIX systems."""
+        global _warned_non_posix_sensitive_config
         if os.name != "posix":
+            # We cannot enforce chmod semantics on non-POSIX from here.
+            if not _warned_non_posix_sensitive_config:
+                logger.warning(
+                    "Config permission hardening (chmod 600) is only enforced on POSIX systems."
+                )
+                _warned_non_posix_sensitive_config = True
             return
         try:
             os.chmod(path, 0o600)
         except Exception:
-            pass
+            logger.warning("Failed to apply secure permissions to %s", path, exc_info=True)
 
     try:
         # Write to temp file first
@@ -589,6 +621,16 @@ def save_config(new_settings: Settings):
             # Explicitly ensure time_sync_mode is present (for backward compatibility)
             if "time_sync_mode" not in settings_dict:
                 settings_dict["time_sync_mode"] = "manual"
+            global _warned_non_posix_sensitive_data
+            if (
+                _contains_sensitive_config_values(settings_dict)
+                and os.name != "posix"
+                and not _warned_non_posix_sensitive_data
+            ):
+                logger.warning(
+                    "Config includes sensitive fields but OS-level file mode hardening is unavailable on this platform."
+                )
+                _warned_non_posix_sensitive_data = True
             json.dump(settings_dict, f, indent=4)
             f.flush()
             os.fsync(f.fileno())

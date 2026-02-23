@@ -29,6 +29,12 @@ def get_newsapi_articles(config: Dict[str, Any] = None):
         config = {}
 
     news_api_key = config.get("news_api_key")
+    country = str(config.get("country", "us")).strip().lower()[:2] or "us"
+    try:
+        page_size = int(config.get("page_size", 3))
+    except (TypeError, ValueError):
+        page_size = 3
+    page_size = max(1, min(page_size, 10))
 
     if not news_api_key:
         return []
@@ -38,9 +44,9 @@ def get_newsapi_articles(config: Dict[str, Any] = None):
     try:
         url = "https://newsapi.org/v2/top-headlines"
         params = {
-            "country": "us",
+            "country": country,
             "apiKey": news_api_key,
-            "pageSize": 3,
+            "pageSize": page_size,
         }
         response = requests.get(url, params=params, timeout=10)
         data = response.json()
@@ -81,12 +87,27 @@ from app.utils import wrap_text
                 "type": "string", 
                 "title": "NewsAPI Key",
                 "description": "Get a free API key at https://newsapi.org/"
+            },
+            "country": {
+                "type": "string",
+                "title": "Country Code",
+                "description": "Two-letter ISO country code (example: us, gb, ca)",
+                "default": "us"
+            },
+            "page_size": {
+                "type": "integer",
+                "title": "Articles per Print",
+                "description": "How many top headlines to fetch",
+                "default": 3,
+                "minimum": 1,
+                "maximum": 10
             }
         },
         "required": ["news_api_key"]
     },
     ui_schema={
-        "news_api_key": {"ui:widget": "password"}
+        "news_api_key": {"ui:widget": "password"},
+        "country": {"ui:placeholder": "us"},
     }
 )
 def format_news_receipt(

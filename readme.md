@@ -174,9 +174,21 @@ For production deployments, configure these environment variables:
 * **`PC1_CORS_ORIGINS`**: Comma-separated CORS origins (default is local/dev origins only).
 * **`PC1_SETUP_PASSWORD`**: Optional override for setup AP password (must be at least 8 chars).  
   If unset, PC-1 generates a per-device setup password automatically.
+* **`PC1_UPDATE_GITHUB_REPO`**: GitHub repo slug used by OTA release checks/install (default: `travmiller/paper-console`).
+* **`PC1_UPDATE_TARBALL_SHA256`**: Optional expected SHA256 for OTA tarball verification.
 * **`PC1_LOG_LEVEL`**: Backend log level (default: `WARNING` on device builds).
 * **`UVICORN_LOG_LEVEL`**: Uvicorn log level for `run.sh` (default: `warning`).
 * **`UVICORN_ACCESS_LOG`**: Set to `1` to enable HTTP access logs (default: `0` for lower log volume).
+
+### Production Release Artifacts
+
+For non-git production units, build versioned release artifacts with:
+
+```bash
+./.venv/bin/python scripts/release_build.py --version v1.2.3 --build-web
+```
+
+See `scripts/RELEASE.md` for the full release/tag/publish workflow.
 
 ---
 

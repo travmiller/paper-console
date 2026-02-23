@@ -84,27 +84,19 @@ def parse_events(
                 else:
                     start = start.astimezone(local_tz)
 
-            # Simple logic: Just check if the start date matches our range
-            # TODO: Handle recurring events properly using rrule?
-            # For V1, we only look at the primary instance.
-            # Complex recurrence expansion is heavy, but we can try simple expansion if 'RRULE' exists.
-
             event_instances = []
 
             if "RRULE" in component:
-                # Attempt simple expansion
+                # Expand recurring events (RRULE + optional EXDATE/RDATE) inside the view window.
                 try:
-                    # Convert dtstart to proper datetime for rrule if it's a date
                     rrule_start = start
                     if is_all_day:
                         rrule_start = datetime.combine(start, datetime.min.time())
 
-                    # Create rule
                     rule = rrulestr(
                         component["RRULE"].to_ical().decode(), dtstart=rrule_start
                     )
 
-                    # Ensure query window is timezone-aware if rule is
                     query_start = start_dt
                     query_end = end_dt
 
@@ -121,17 +113,59 @@ def parse_events(
                         if query_end.tzinfo is None:
                             query_end = local_tz.localize(query_end)
 
-                    # Get instances in our small window
-                    # strict=True raises error if tz mismatch, so be careful
+                    exdate_keys = set()
+                    exdate_prop = component.get("EXDATE")
+                    if exdate_prop:
+                        exdate_props = (
+                            exdate_prop if isinstance(exdate_prop, list) else [exdate_prop]
+                        )
+                        for ex in exdate_props:
+                            for ex_dt_val in getattr(ex, "dts", []):
+                                ex_dt = ex_dt_val.dt
+                                if isinstance(ex_dt, datetime):
+                                    if ex_dt.tzinfo is None and rrule_start.tzinfo is not None:
+                                        ex_dt = local_tz.localize(ex_dt)
+                                    elif (
+                                        ex_dt.tzinfo is not None
+                                        and rrule_start.tzinfo is not None
+                                    ):
+                                        ex_dt = ex_dt.astimezone(local_tz)
+                                    exdate_keys.add(ex_dt)
+                                else:
+                                    exdate_keys.add(ex_dt)
+
                     for dt in rule.between(query_start, query_end, inc=True):
-                        # convert back to localized if needed
+                        if dt in exdate_keys or dt.date() in exdate_keys:
+                            continue
+
                         if is_all_day:
                             event_instances.append((dt.date(), True))
                         else:
-                            # if rule generates naive, localize it
                             if dt.tzinfo is None and local_tz:
                                 dt = local_tz.localize(dt)
                             event_instances.append((dt, False))
+
+                    # Include RDATE manual additions that may not be part of RRULE expansion.
+                    rdate_prop = component.get("RDATE")
+                    if rdate_prop:
+                        rdate_props = (
+                            rdate_prop
+                            if isinstance(rdate_prop, list)
+                            else [rdate_prop]
+                        )
+                        for rdate_entry in rdate_props:
+                            for rdate_dt_val in getattr(rdate_entry, "dts", []):
+                                rdt = rdate_dt_val.dt
+                                if isinstance(rdt, datetime):
+                                    if rdt.tzinfo is None:
+                                        rdt = local_tz.localize(rdt)
+                                    else:
+                                        rdt = rdt.astimezone(local_tz)
+                                    if query_start <= rdt <= query_end:
+                                        event_instances.append((rdt, False))
+                                elif isinstance(rdt, date):
+                                    if today <= rdt < end_date:
+                                        event_instances.append((rdt, True))
                 except Exception:
                     # Fallback to just the main event
                     if is_all_day:
@@ -142,8 +176,22 @@ def parse_events(
                 # Single event
                 event_instances.append((start, is_all_day))
 
-            # Process instances
+            # Deduplicate recurring instances (can happen with overlapping RRULE/RDATE).
+            deduped_instances = []
+            seen_instance_keys = set()
             for evt_dt, evt_is_all_day in event_instances:
+                key = (
+                    evt_dt.isoformat()
+                    if isinstance(evt_dt, datetime)
+                    else str(evt_dt)
+                )
+                if key in seen_instance_keys:
+                    continue
+                seen_instance_keys.add(key)
+                deduped_instances.append((evt_dt, evt_is_all_day))
+
+            # Process instances
+            for evt_dt, evt_is_all_day in deduped_instances:
                 # Check bounds
                 evt_date = (
                     evt_dt

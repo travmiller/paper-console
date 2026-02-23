@@ -1,12 +1,15 @@
 import shutil
 import socket
 import os
+import logging
 from datetime import datetime
 from typing import Dict, Any
 from app.wifi_manager import get_wifi_status
 from app.utils import wrap_text
 from app.module_registry import register_module
 from PIL import Image, ImageDraw
+
+logger = logging.getLogger(__name__)
 
 
 @register_module(
@@ -35,6 +38,7 @@ def format_system_monitor_receipt(
     try:
         hostname = socket.gethostname()
     except Exception:
+        logger.debug("Hostname lookup failed in system monitor", exc_info=True)
         hostname = "unknown"
 
     wifi_status = get_wifi_status()
@@ -72,6 +76,7 @@ def format_system_monitor_receipt(
         printer.print_body(f"{used_gb}GB / {total_gb}GB")
         printer.print_caption(f"{free_gb}GB free")
     except Exception:
+        logger.debug("Disk usage probe failed in system monitor", exc_info=True)
         printer.print_caption("Disk info unavailable")
 
     printer.print_line()
@@ -111,7 +116,7 @@ def format_system_monitor_receipt(
             printer.print_body(f"{mem_used}MB / {mem_total}MB")
             has_system_info = True
     except Exception:
-        pass
+        logger.debug("/proc/meminfo probe failed in system monitor", exc_info=True)
 
     try:
         with open("/proc/uptime", "r") as f:
@@ -121,7 +126,7 @@ def format_system_monitor_receipt(
             printer.print_body(f"Uptime: {hours}h {minutes}m")
             has_system_info = True
     except Exception:
-        pass
+        logger.debug("/proc/uptime probe failed in system monitor", exc_info=True)
 
     try:
         with open("/proc/loadavg", "r") as f:
@@ -130,7 +135,7 @@ def format_system_monitor_receipt(
             printer.print_body(f"Load: {load_1min}")
             has_system_info = True
     except Exception:
-        pass
+        logger.debug("/proc/loadavg probe failed in system monitor", exc_info=True)
 
     try:
         with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
@@ -139,7 +144,7 @@ def format_system_monitor_receipt(
             printer.print_body(f"CPU: {temp_c:.1f}°C")
             has_system_info = True
     except Exception:
-        pass
+        logger.debug("CPU temp probe failed in system monitor", exc_info=True)
 
     # Throttle warnings
     try:
@@ -163,7 +168,7 @@ def format_system_monitor_receipt(
                                 printer.print_bold(f"⚠ {', '.join(warnings)}")
                         break
     except Exception:
-        pass
+        logger.debug("CPU throttle probe failed in system monitor", exc_info=True)
 
     try:
         with open("/proc/stat", "r") as f:
@@ -175,7 +180,7 @@ def format_system_monitor_receipt(
                     printer.print_caption(f"Boot: {boot_str}")
                     break
     except Exception:
-        pass
+        logger.debug("Boot time probe failed in system monitor", exc_info=True)
 
     printer.print_line()
 
