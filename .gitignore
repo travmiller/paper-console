@@ -68,6 +68,7 @@ raspberry_pi/*.img
 # Temporary files
 *.tmp
 testing/tmp/
+testing/print_gallery/
 *.temp
 .cache/
 nul

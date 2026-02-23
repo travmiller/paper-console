@@ -662,11 +662,11 @@ async def check_first_boot():
 
                 import app.config as config_module
 
-                settings = config_module.settings
+                configured_settings = config_module.settings
 
                 # Show all 8 channels
                 for channel_num in range(1, 9):
-                    channel = settings.channels.get(channel_num)
+                    channel = configured_settings.channels.get(channel_num)
                     if channel and channel.modules:
                         # Get module names
                         module_names = []
@@ -674,8 +674,8 @@ async def check_first_boot():
                             channel.modules, key=lambda m: m.order
                         ):
                             module_id = mod_assignment.module_id
-                            if module_id in settings.modules:
-                                module = settings.modules[module_id]
+                            if module_id in configured_settings.modules:
+                                module = configured_settings.modules[module_id]
                                 module_names.append(module.name)
 
                         if module_names:
@@ -744,12 +744,26 @@ async def check_first_boot():
                 printer.print_body("button to print!")
                 printer.print_line()
 
-                printer.print_bold("Example Channels:")
-                printer.print_body("  • Weather forecast")
-                printer.print_body("  • News headlines")
-                printer.print_body("  • Moon & sunrise")
-                printer.print_body("  • Sudoku puzzle")
-                printer.print_body("  • Calendar events")
+                printer.print_bold("Default Channels:")
+                for channel_num in range(1, 9):
+                    channel = settings.channels.get(channel_num)
+                    if channel and channel.modules:
+                        module_names = []
+                        for mod_assignment in sorted(
+                            channel.modules, key=lambda m: m.order
+                        ):
+                            module_id = mod_assignment.module_id
+                            if module_id in settings.modules:
+                                module = settings.modules[module_id]
+                                module_names.append(module.name)
+
+                        if module_names:
+                            modules_str = " + ".join(module_names)
+                            printer.print_body(f"  {channel_num}. {modules_str}")
+                        else:
+                            printer.print_caption(f"  {channel_num}. (empty)")
+                    else:
+                        printer.print_caption(f"  {channel_num}. (empty)")
                 printer.print_line()
 
                 printer.print_caption("Customize channels at:")

@@ -56,7 +56,6 @@ def format_system_monitor_receipt(
         percent = (used / total) * 100 if total > 0 else 0
 
         printer.print_subheader("STORAGE")
-        printer.print_subheader("STORAGE")
         
         width = getattr(printer, "PRINTER_WIDTH_DOTS", 384)
         font = getattr(printer, "_get_font", lambda s: None)("regular")
@@ -70,7 +69,6 @@ def format_system_monitor_receipt(
         )
         printer.print_image(img)
         
-        printer.print_body(f"{used_gb}GB / {total_gb}GB")
         printer.print_body(f"{used_gb}GB / {total_gb}GB")
         printer.print_caption(f"{free_gb}GB free")
     except Exception:
@@ -97,7 +95,6 @@ def format_system_monitor_receipt(
             mem_used = mem_total - mem_available
             mem_percent = (mem_used / mem_total) * 100
             printer.print_subheader("MEMORY")
-            printer.print_subheader("MEMORY")
             
             width = getattr(printer, "PRINTER_WIDTH_DOTS", 384)
             font = getattr(printer, "_get_font", lambda s: None)("regular")
@@ -111,7 +108,6 @@ def format_system_monitor_receipt(
             )
             printer.print_image(img)
             
-            printer.print_body(f"{mem_used}MB / {mem_total}MB")
             printer.print_body(f"{mem_used}MB / {mem_total}MB")
             has_system_info = True
     except Exception:

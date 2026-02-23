@@ -3,8 +3,11 @@ import email
 import socket
 import logging
 from email.header import decode_header
+from email.utils import parseaddr
 from bs4 import BeautifulSoup
 from typing import Dict, Any, List
+from urllib.parse import urlsplit
+import re
 from app.config import EmailConfig, PRINTER_WIDTH
 import app.config
 from app.module_registry import register_module
@@ -13,6 +16,7 @@ from app.module_registry import register_module
 IMAP_TIMEOUT = 30
 
 logger = logging.getLogger(__name__)
+_LAST_FETCH_ERROR = None
 
 def clean_text(text):
     """Decodes headers/body to a printable string, removing newlines."""
@@ -56,6 +60,92 @@ def strip_html(html_content):
         logger.error(f"Error stripping HTML: {e}")
         return html_content
 
+
+def format_sender(sender_raw: str) -> str:
+    """Normalize sender field to a compact printable representation."""
+    sender_raw = clean_text(sender_raw or "")
+    name, addr = parseaddr(sender_raw)
+    name = clean_text(name)
+    addr = clean_text(addr)
+    if name and addr:
+        return f"{name} <{addr}>"
+    if addr:
+        return addr
+    return sender_raw or "Unknown"
+
+
+def _shorten_url(url: str, max_len: int = 56) -> str:
+    try:
+        parts = urlsplit(url)
+        if not parts.scheme or not parts.netloc:
+            return url[:max_len]
+        base = f"{parts.scheme}://{parts.netloc}{parts.path or ''}"
+        if len(base) > max_len:
+            return base[: max_len - 3] + "..."
+        return base
+    except Exception:
+        return url[:max_len]
+
+
+def sanitize_email_body_for_print(body: str, max_lines: int = 10, max_chars: int = 700) -> str:
+    """Reduce email body noise for thermal print readability."""
+    if not body:
+        return "No content."
+
+    text = body.replace("\r\n", "\n").replace("\r", "\n")
+
+    # Common quoted-printable artifacts in security alert emails.
+    text = text.replace("=\n", "").replace("=3D", "=")
+
+    # Collapse long URLs into compact form.
+    def _url_repl(match):
+        return _shorten_url(match.group(0), max_len=42)
+
+    text = re.sub(r"https?://\S+", _url_repl, text)
+
+    # Normalize excessive whitespace while preserving paragraph breaks.
+    lines = [re.sub(r"[ \t]+", " ", ln).strip() for ln in text.split("\n")]
+    lines = [ln for ln in lines if ln]
+
+    if not lines:
+        return "No content."
+
+    clipped_lines = []
+    char_count = 0
+    for line in lines:
+        if len(clipped_lines) >= max_lines:
+            break
+        next_count = char_count + len(line)
+        if next_count > max_chars:
+            remaining = max(0, max_chars - char_count)
+            if remaining > 12:
+                clipped_lines.append(line[: remaining - 3] + "...")
+            break
+        clipped_lines.append(line)
+        char_count = next_count
+
+    if len(lines) > len(clipped_lines):
+        clipped_lines.append("... (message truncated)")
+
+    return "\n".join(clipped_lines)
+
+
+def clip_wrapped_text(text: str, width: int, max_lines: int) -> str:
+    """Wrap then clip text to a fixed line count, adding ellipsis if clipped."""
+    wrapped = wrap_text(text or "", width=width)
+    if not wrapped:
+        return ""
+    if len(wrapped) <= max_lines:
+        return "\n".join(wrapped)
+
+    clipped = wrapped[:max_lines]
+    tail = clipped[-1]
+    if len(tail) >= width - 3:
+        tail = tail[: width - 3]
+    clipped[-1] = tail + "..."
+    return "\n".join(clipped)
+
+
 # Use wrap_text from utils instead of duplicating
 from app.utils import wrap_text
 
@@ -66,6 +156,9 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
     Returns a list of dicts: {'from', 'subject', 'body'}
     """
 
+    global _LAST_FETCH_ERROR
+    _LAST_FETCH_ERROR = None
+
     # Backwards compatibility / Direct Call support
     if config is None:
         for _, chan in app.config.settings.channels.items():
@@ -74,11 +167,13 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
                 break
         if config is None:
             logger.warning("fetch_emails called but no email configuration found")
+            _LAST_FETCH_ERROR = "config_missing"
             return []
 
     try:
         if not config.get("email_user") or not config.get("email_password"):
             logger.warning("Missing email_user or email_password in config")
+            _LAST_FETCH_ERROR = "auth_config_missing"
             return []
 
         # Provider Mapping
@@ -103,9 +198,11 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
         email_config = EmailConfig(**config)
     except Exception as e:
         logger.error(f"Invalid email configuration: {e}")
+        _LAST_FETCH_ERROR = "config_invalid"
         return []
 
     if not email_config.email_user or not email_config.email_password:
+        _LAST_FETCH_ERROR = "auth_config_missing"
         return []
 
     mail = None
@@ -154,7 +251,7 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
                         msg = email.message_from_bytes(response_part[1])
 
                         subject = clean_text(msg["Subject"])
-                        sender = clean_text(msg["From"])
+                        sender = format_sender(msg["From"])
                         
                         logger.info(f"Processing email from: {sender}, subject: {subject}")
 
@@ -188,19 +285,13 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
                             except Exception as e:
                                 logger.warning(f"Error extracting message body: {e}")
 
-                        # Preserve newlines in body text - let printer handle wrapping
-                        # Only normalize excessive whitespace (multiple spaces/tabs to single space)
-                        # but preserve newlines for paragraph structure
-                        import re
-                        body = re.sub(r'[ \t]+', ' ', body)  # Normalize spaces/tabs
-                        body = re.sub(r'[ \t]*\n[ \t]*', '\n', body)  # Normalize newlines
-                        body = body.strip()
+                        body = sanitize_email_body_for_print(body)
 
                         results.append(
                             {
                                 "from": sender,
                                 "subject": subject,
-                                "body": body[:500],  # Truncate to prevent huge prints
+                                "body": body,
                             }
                         )
                         fetched_msg_ids.append(num)
@@ -217,7 +308,16 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
                 logger.error(f"Error marking messages as seen: {e}")
 
         return results
+    except imaplib.IMAP4.error as e:
+        err = str(e).upper()
+        if "AUTHENTICATIONFAILED" in err or "AUTH FAILED" in err:
+            _LAST_FETCH_ERROR = "auth_failed"
+        else:
+            _LAST_FETCH_ERROR = "imap_error"
+        logger.error(f"IMAP error: {e}")
+        return []
     except Exception as e:
+        _LAST_FETCH_ERROR = "imap_error"
         logger.error(f"IMAP error: {e}")
         return []
     finally:
@@ -291,7 +391,14 @@ def format_email_receipt(
         printer.print_header(header_name, icon="envelope")
         printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
         printer.print_line()
-        printer.print_body("No new messages.")
+        if _LAST_FETCH_ERROR == "auth_failed":
+            printer.print_body("Authentication failed.")
+            printer.print_caption("Check email and app password.")
+        elif _LAST_FETCH_ERROR == "auth_config_missing":
+            printer.print_body("Email credentials missing.")
+            printer.print_caption("Set email and app password.")
+        else:
+            printer.print_body("No new messages.")
         return
 
     printer.print_header(f"{header_name} ({len(messages)})", icon="envelope-open")
@@ -299,20 +406,26 @@ def format_email_receipt(
     printer.print_line()
 
     for i, msg in enumerate(messages):
-        # Sender - pass directly, printer will handle wrapping
-        printer.print_subheader(msg['from'] or "Unknown")
-        
-        # Subject in bold - pass directly, printer will handle wrapping
-        printer.print_bold(msg['subject'])
-        
-        # Small whitespace between header and body
-        printer.print_text("")
+        raw_sender = msg.get("from", "")
+        sender_name, sender_addr = parseaddr(raw_sender)
+        sender_name = clean_text(sender_name)
+        sender_addr = clean_text(sender_addr)
+        if sender_addr and sender_name:
+            printer.print_subheader(f"From: {sender_name}")
+            printer.print_caption(f"  <{sender_addr}>")
+        elif sender_addr:
+            printer.print_subheader(f"From: {sender_addr}")
+        else:
+            sender = format_sender(raw_sender)
+            printer.print_subheader(f"From: {sender or 'Unknown'}")
 
-        # Body in regular text - pass with newlines preserved, printer will handle wrapping
-        printer.print_body(msg["body"])
+        subject = clean_text(msg.get("subject", "")) or "(No subject)"
+        subject = clip_wrapped_text(subject, width=34, max_lines=2)
+        body = sanitize_email_body_for_print(msg.get("body", ""), max_lines=6, max_chars=420)
+
+        printer.print_bold(f"Subject: {subject}")
+        printer.print_body(body)
 
         # Add separator line ONLY if this is not the last message
         if i < len(messages) - 1:
-            printer.print_text("") # Spacing before line
             printer.print_line()
-            printer.print_text("") # Spacing after line

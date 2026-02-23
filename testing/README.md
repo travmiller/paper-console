@@ -19,25 +19,25 @@ python testing/console_raster_preview.py --pattern bars --dots-height 300 --cols
 python testing/console_raster_preview.py --image ./some_print_bitmap.png --cols 100
 ```
 
-Render full module/channel print jobs to receipt bitmap PNGs:
+Unified print snapshot renderer:
 
 ```bash
-./.venv/bin/python testing/render_full_print.py --module-type astronomy --output testing/tmp/astronomy_full_module.png
-./.venv/bin/python testing/render_full_print.py --channel 3 --output testing/tmp/channel3_full.png
-./.venv/bin/python testing/console_raster_preview.py --image testing/tmp/channel3_full.png --cols 96
+# Full sweep (overwrites output-dir PNGs)
+./.venv/bin/python testing/render_all_prints.py
+./.venv/bin/python testing/render_all_prints.py --output-dir testing/print_gallery
+
+# Targeted renders (single PNG)
+./.venv/bin/python testing/render_all_prints.py --channel 3
+./.venv/bin/python testing/render_all_prints.py --module-id default-weather-001
+./.venv/bin/python testing/render_all_prints.py --module-type astronomy
+./.venv/bin/python testing/render_all_prints.py --system setup
+./.venv/bin/python testing/render_all_prints.py --module-type astronomy --output testing/tmp/astronomy_debug.png
+
+# Optional
+./.venv/bin/python testing/render_all_prints.py --exclude-interactive
 ```
 
-Discover targets:
-
-```bash
-./.venv/bin/python testing/render_full_print.py --list-modules
-./.venv/bin/python testing/render_full_print.py --list-channels
-```
-
-Close the loop (render full print + immediate console dot-map preview):
-
-```bash
-./.venv/bin/python testing/print_feedback_loop.py --module-type astronomy
-./.venv/bin/python testing/print_feedback_loop.py --channel 3
-./.venv/bin/python testing/print_feedback_loop.py --channel 3 --cols 120 --density-threshold 0.10
-```
+Notes:
+- Full sweep mode clears existing `*.png` files in the target folder and rewrites them.
+- Targeted mode writes a single image (default path under `testing/tmp/` unless `--output` is provided).
+- Full sweep also renders all registered module types (including unassigned ones) and writes `failures.txt`.
