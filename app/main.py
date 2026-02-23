@@ -887,9 +887,9 @@ async def factory_reset_trigger():
     """Factory reset (button hold 15+ seconds) - deletes config and reboots.
     Runs blocking printer operations in a thread pool to avoid blocking the event loop.
     """
-    import subprocess
     from concurrent.futures import ThreadPoolExecutor
     from app.selection_mode import exit_selection_mode
+    from app.factory_reset import perform_factory_reset
 
     exit_selection_mode()
 
@@ -932,38 +932,19 @@ async def factory_reset_trigger():
     # Wait for print to complete
     await asyncio.sleep(3)
 
-    # Delete config file and welcome marker
-    try:
-        import app.config as config_module
-
-        base_dir = os.path.dirname(
-            os.path.dirname(os.path.abspath(config_module.__file__))
+    reset_result = perform_factory_reset()
+    if not reset_result.get("reboot_requested", False):
+        logger.error(
+            "Factory reset finished but reboot could not be requested: %s",
+            "; ".join(reset_result.get("errors", [])),
         )
-        config_path = os.path.join(base_dir, "config.json")
-        backup_path = os.path.join(base_dir, "config.json.bak")
-        welcome_marker = os.path.join(base_dir, ".welcome_printed")
-
-        if os.path.exists(config_path):
-            os.remove(config_path)
-        if os.path.exists(backup_path):
-            os.remove(backup_path)
-        if os.path.exists(welcome_marker):
-            os.remove(welcome_marker)
-    except Exception:
-        logger.warning("Factory reset could not clear all local config files", exc_info=True)
-
-    # Forget all saved WiFi networks
-    try:
-        wifi_manager.forget_all_wifi()
-    except Exception:
-        logger.warning("Factory reset could not forget saved WiFi networks", exc_info=True)
-
-    # Reboot the device
-    await asyncio.sleep(1)
-    try:
-        subprocess.run(["sudo", "reboot"], check=False)
-    except Exception:
-        logger.warning("Factory reset reboot command failed", exc_info=True)
+        # Fallback: try to make the device recoverable without reboot.
+        try:
+            if wifi_manager.start_ap_mode(retries=2):
+                await asyncio.sleep(1)
+                await print_setup_instructions()
+        except Exception:
+            logger.exception("Factory reset fallback AP-mode recovery failed")
 
 
 def on_factory_reset_threadsafe():

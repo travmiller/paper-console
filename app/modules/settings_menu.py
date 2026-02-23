@@ -149,8 +149,9 @@ def _confirm_factory_reset(printer, module_id: str):
 
 def _do_factory_reset(printer):
     """Actually perform factory reset."""
-    import os
-    import subprocess
+    import app.wifi_manager as wifi_manager
+    from app.utils import print_setup_instructions_sync
+    from app.factory_reset import perform_factory_reset
     
     printer.print_header("RESETTING...", icon="alert")
     printer.print_line()
@@ -162,32 +163,28 @@ def _do_factory_reset(printer):
     if hasattr(printer, "flush_buffer"):
         printer.flush_buffer()
     
-    # Delete config files
-    try:
-        import app.config as config_module
-        base_dir = os.path.dirname(os.path.dirname(os.path.abspath(config_module.__file__)))
-        config_path = os.path.join(base_dir, "config.json")
-        backup_path = os.path.join(base_dir, "config.json.bak")
-        welcome_marker = os.path.join(base_dir, ".welcome_printed")
-        
-        for path in [config_path, backup_path, welcome_marker]:
-            if os.path.exists(path):
-                os.remove(path)
-    except Exception as e:
-        logger.error(f"Error deleting config: {e}")
-    
-    # Forget WiFi networks
-    try:
-        import app.wifi_manager as wifi_manager
-        wifi_manager.forget_all_wifi()
-    except Exception as e:
-        logger.error(f"Error forgetting WiFi: {e}")
-    
-    # Reboot
-    try:
-        subprocess.run(["sudo", "reboot"], check=False)
-    except Exception as e:
-        logger.error(f"Error rebooting: {e}")
+    result = perform_factory_reset()
+    if not result.get("reboot_requested", False):
+        logger.error(
+            "Factory reset from settings menu failed to request reboot: %s",
+            "; ".join(result.get("errors", [])),
+        )
+        # Provide recoverability in-session if reboot is unavailable.
+        try:
+            if wifi_manager.start_ap_mode(retries=2):
+                print_setup_instructions_sync()
+                if hasattr(printer, "reset_buffer"):
+                    printer.reset_buffer()
+                printer.print_header("RESET COMPLETE", icon="check")
+                printer.print_body("Reboot failed.")
+                printer.print_body("Setup mode started.")
+                printer.print_bold("Connect to PC-1-Setup-XXXX")
+                printer.print_caption("Then open: http://10.42.0.1")
+                printer.print_line()
+                if hasattr(printer, "flush_buffer"):
+                    printer.flush_buffer()
+        except Exception:
+            logger.exception("Factory reset fallback AP-mode recovery failed")
 
 
 # --- Main Menu Logic ---

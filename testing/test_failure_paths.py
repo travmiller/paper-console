@@ -9,6 +9,7 @@ from app.drivers.printer_serial import PrinterDriver
 from app.modules import email_client
 from app.modules import news as news_module
 from app.modules import calendar as calendar_module
+from app import factory_reset as factory_reset_module
 from datetime import datetime, timedelta, timezone
 
 
@@ -147,3 +148,49 @@ def test_calendar_rrule_respects_exdate_in_window():
     assert start.date() in event_days
     assert skip.date() not in event_days
     assert (start + timedelta(days=2)).date() in event_days
+
+
+def test_factory_reset_reports_reboot_failure(monkeypatch):
+    deleted = []
+
+    monkeypatch.setattr(factory_reset_module.os.path, "exists", lambda _p: True)
+    monkeypatch.setattr(factory_reset_module.os, "remove", lambda p: deleted.append(p))
+    monkeypatch.setattr(
+        factory_reset_module.wifi_manager, "forget_all_wifi", lambda: True
+    )
+    monkeypatch.setattr(
+        factory_reset_module.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=["sudo", "reboot"], returncode=1, stdout="", stderr="sudo denied"
+        ),
+    )
+
+    result = factory_reset_module.perform_factory_reset()
+
+    assert result["config_cleared"] is True
+    assert result["wifi_cleared"] is True
+    assert result["reboot_requested"] is False
+    assert any("Reboot command failed" in e for e in result["errors"])
+    assert len(deleted) == 3
+
+
+def test_factory_reset_success_path(monkeypatch):
+    monkeypatch.setattr(factory_reset_module.os.path, "exists", lambda _p: False)
+    monkeypatch.setattr(
+        factory_reset_module.wifi_manager, "forget_all_wifi", lambda: True
+    )
+    monkeypatch.setattr(
+        factory_reset_module.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=["sudo", "reboot"], returncode=0, stdout="", stderr=""
+        ),
+    )
+
+    result = factory_reset_module.perform_factory_reset()
+
+    assert result["config_cleared"] is True
+    assert result["wifi_cleared"] is True
+    assert result["reboot_requested"] is True
+    assert result["errors"] == []
