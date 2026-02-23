@@ -77,6 +77,13 @@ def print_setup_instructions_sync():
     This function is safe to call from background tasks.
     """
     try:
+        # Start from a known-good printer state to avoid carrying over
+        # partial commands or mode flags from previous/reboot transitions.
+        if hasattr(printer, "clear_hardware_buffer"):
+            printer.clear_hardware_buffer()
+        if hasattr(printer, "reset_buffer"):
+            printer.reset_buffer()
+
         printer.print_header("SETUP INSTRUCTIONS", icon="wifi")
         printer.print_line()
         printer.print_body("Connect to WiFi:")

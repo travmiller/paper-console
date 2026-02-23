@@ -639,6 +639,9 @@ async def check_first_boot():
     def _do_print():
         """Synchronous function that does the actual printing work."""
         try:
+            # Force hardware printer into a clean baseline before startup receipts.
+            if hasattr(printer, "clear_hardware_buffer"):
+                printer.clear_hardware_buffer()
             if hasattr(printer, "reset_buffer"):
                 printer.reset_buffer()
 
@@ -854,6 +857,9 @@ async def factory_reset_trigger():
     exit_selection_mode()
 
     def _print_reset_message():
+        # Start from a clean transport state before sending reset notice.
+        if hasattr(printer, "clear_hardware_buffer"):
+            printer.clear_hardware_buffer()
         # Reset printer buffer
         if hasattr(printer, "reset_buffer"):
             printer.reset_buffer()
