@@ -8,7 +8,7 @@
 
 * **No screens:** output is physical thermal paper.
 * **No subscriptions:** user-owned API keys or local algorithms.
-* **Heirloom quality:** walnut, brass, and archival-grade paper.
+* **Quality materials:** walnut, brass, and archival-grade paper.
 * **Universal channels:** fully configurable channels (Astronomy, Calendar Integration, Email Integration, On This Day in History, Maze Generator, News, Quote of the Day, RSS Feeds, Sudoku Generator, System Monitor, Text/Note, Weather, Custom Webhooks)
 
 ![PC-1 Front View](images/pc-1_front.jpg)
