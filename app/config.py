@@ -210,10 +210,10 @@ def _default_channels() -> Dict[int, ChannelConfig]:
     """Create default channel assignments for out-of-box experience."""
     return {
         1: ChannelConfig(
-            modules=[ChannelModuleAssignment(module_id=DEFAULT_HISTORY_ID, order=0)]
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_QUOTES_ID, order=0)]
         ),
         2: ChannelConfig(
-            modules=[ChannelModuleAssignment(module_id=DEFAULT_QUOTES_ID, order=0)]
+            modules=[ChannelModuleAssignment(module_id=DEFAULT_HISTORY_ID, order=0)]
         ),
         3: ChannelConfig(
             modules=[ChannelModuleAssignment(module_id=DEFAULT_ASTRONOMY_ID, order=0)]
