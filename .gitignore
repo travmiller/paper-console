@@ -36,8 +36,8 @@ config.json.bak
 .env.*.local
 .welcome_printed
 
-# Manufacturing (internal production tools & images)
-manufacturing/
+# Development (internal production tools & images)
+development/
 
 # IDE
 .vscode/
