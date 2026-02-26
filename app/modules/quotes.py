@@ -1,10 +1,8 @@
 import json
 import random
-import os
 import requests
-from typing import Dict, Any, List
+from typing import Dict, Any
 from pathlib import Path
-from app.utils import wrap_text
 from app.module_registry import register_module
 
 # Curated list of quotes (approx 5k) - clean and reliable source
@@ -14,11 +12,10 @@ QUOTES_DB_URL = (
 )
 
 
-# Resolve path relative to project root (same pattern as config.py)
+# Resolve path relative to the app package directory.
 def _get_quotes_db_path() -> Path:
-    """Get the path to the quotes database file, resolving relative to project root."""
-    base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    return Path(base_dir) / "app" / "data" / "quotes.json"
+    """Get the quotes database path relative to the app package."""
+    return Path(__file__).resolve().parent.parent / "data" / "quotes.json"
 
 
 LOCAL_DB_PATH = _get_quotes_db_path()

@@ -16,4 +16,4 @@ source .venv/bin/activate
 python -m pip install --upgrade pip >/dev/null
 python -m pip install -r requirements-dev.txt >/dev/null
 
-python -m pytest -q -s ./testing/test_core.py "$@"
+python -m pytest -q -s ./testing "$@"

@@ -22,7 +22,7 @@ HISTORY_DB_URL = (
 # Note: The above repo structure is: {"1": {"1": ["event1", "event2"], "2": [...]}, "2": {...}}
 # i.e. {"Month": {"Day": ["list", "of", "events"]}}
 
-LOCAL_DB_PATH = Path("app/data/history.json")
+LOCAL_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "history.json"
 
 
 def ensure_history_db():
