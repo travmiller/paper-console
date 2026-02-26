@@ -55,6 +55,9 @@ Optional hardening:
 - Ship units from artifacts (no `.git` folder).
 - Include `.version` file containing the shipped release tag.
 - Keep `config.json` user-owned and not baked with secrets.
+- Before capturing the golden SD image, run:
+  - `sudo ./scripts/prepare_golden_image.sh --yes`
+  - Optional size optimization: `sudo ./scripts/prepare_golden_image.sh --yes --zero-free-space`
 
 ## OTA expectations
 
