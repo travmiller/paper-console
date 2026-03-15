@@ -45,8 +45,6 @@ def format_text_receipt(printer: PrinterDriver, config: TextConfig, module_name:
         _print_rich_doc(printer, content_doc)
     else:
         printer.print_body("No content.")
-    
-    printer.print_line()
 
 
 def _normalize_content_doc(content_doc: Any) -> Dict[str, Any]:

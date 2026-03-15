@@ -124,8 +124,6 @@ def format_history_receipt(
         )
         printer.print_image(img)
 
-    printer.print_line()
-
 
 def draw_timeline_image(
     width: int, 

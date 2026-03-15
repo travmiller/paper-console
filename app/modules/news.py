@@ -138,4 +138,5 @@ def format_news_receipt(
                 summary_width=28,
                 max_summary_lines=2,
             )
-            printer.print_line()
+            if i < len(news_data) - 1:
+                printer.print_line()

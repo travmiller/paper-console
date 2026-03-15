@@ -85,4 +85,3 @@ def format_journal_prompt_receipt(
     printer.print_caption(datetime.now().strftime("%A, %B %d, %Y"))
     printer.print_line()
     printer.print_body(prompt)
-    printer.print_line()

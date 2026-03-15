@@ -19,7 +19,6 @@ Example usage:
     def format_my_module_receipt(printer, config, module_name):
         printer.print_header(module_name or "MY MODULE")
         printer.print_body("Hello from my module!")
-        printer.print_line()
 """
 
 from dataclasses import dataclass, field

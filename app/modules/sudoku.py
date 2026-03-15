@@ -223,7 +223,7 @@ def draw_sudoku_image(grid: List[List[int]], cell_size: int, font) -> Image.Imag
 
 
 @register_module(
-    type_id="games",
+    type_id="sudoku",
     label="Sudoku",
     description="Generate printable Sudoku puzzles in medium or hard difficulty",
     icon="grid-nine",

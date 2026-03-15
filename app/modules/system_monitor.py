@@ -182,8 +182,6 @@ def format_system_monitor_receipt(
     except Exception:
         logger.debug("Boot time probe failed in system monitor", exc_info=True)
 
-    printer.print_line()
-
 
 def draw_progress_bar_image(
     width: int,

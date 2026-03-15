@@ -112,7 +112,7 @@ class ModuleInstance(BaseModel):
     model_config = ConfigDict(extra="ignore")
 
     id: str = Field(default_factory=lambda: str(uuid.uuid4()))
-    type: str  # e.g., "news", "games" (Sudoku), "calendar"
+    type: str  # e.g., "news", "sudoku", "calendar"
     name: str = ""  # User-friendly name for the module instance
     config: Dict[str, Any] = {}
 
@@ -170,7 +170,7 @@ def _default_modules() -> Dict[str, ModuleInstance]:
         ),
         DEFAULT_SUDOKU_ID: ModuleInstance(
             id=DEFAULT_SUDOKU_ID,
-            type="games",
+            type="sudoku",
             name="Sudoku",
             config={"difficulty": "Medium"},
         ),
@@ -407,6 +407,17 @@ def migrate_old_config(data: dict) -> dict:
     return data
 
 
+def migrate_games_module_type_to_sudoku(data: dict) -> dict:
+    """Legacy type_id was ``games``; Sudoku is now its own module type ``sudoku``."""
+    modules = data.get("modules")
+    if not isinstance(modules, dict):
+        return data
+    for module_data in modules.values():
+        if isinstance(module_data, dict) and module_data.get("type") == "games":
+            module_data["type"] = "sudoku"
+    return data
+
+
 def migrate_text_module_content(data: dict) -> dict:
     """Migrate legacy text module markdown strings to TipTap doc JSON."""
     modules = data.get("modules")
@@ -533,6 +544,7 @@ def _try_load_config_file(config_path: str) -> Settings | None:
 
             # Migrate old format to new format if needed
             data = migrate_old_config(data)
+            data = migrate_games_module_type_to_sudoku(data)
             data = remove_deprecated_features(data)
             data = migrate_text_module_content(data)
 

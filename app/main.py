@@ -707,8 +707,6 @@ async def check_first_boot():
                     else:
                         printer.print_caption(f"  {channel_num}. (empty)")
 
-                printer.print_line()
-
                 # Flush buffer (spacing is built into bitmap)
                 if hasattr(printer, "flush_buffer"):
                     printer.flush_buffer()
@@ -796,7 +794,6 @@ async def check_first_boot():
                 printer.print_subheader("QUICK HELP")
                 printer.print_body("Button 5s = Quick actions")
                 printer.print_body("Button 15s = Reset all")
-                printer.print_line()
                 printer.feed(1)
 
                 # Flush buffer to print (spacing is built into bitmap)

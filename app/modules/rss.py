@@ -174,4 +174,5 @@ def format_rss_receipt(printer, config: Dict[str, Any] = None, module_name: str 
                 summary_width=28,
                 max_summary_lines=2,
             )
-            printer.print_line()
+            if i < len(articles) - 1:
+                printer.print_line()

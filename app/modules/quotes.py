@@ -92,5 +92,3 @@ def format_quotes_receipt(
     # Attribution
     if author:
         printer.print_caption(f"— {author}")
-
-    printer.print_line()

@@ -273,7 +273,7 @@ function App() {
       rss: { rss_feeds: [] },
       weather: {},
       email: { email_host: 'imap.gmail.com', email_user: '', email_password: '', polling_interval: 60 },
-      games: { difficulty: 'medium' },
+      sudoku: { difficulty: 'Medium' },
       astronomy: {},
       calendar: { ical_sources: [], view_mode: 'month' },
       webhook: { url: '', method: 'GET', headers: {}, json_path: '' },

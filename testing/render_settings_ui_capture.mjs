@@ -133,7 +133,7 @@ function configForType(typeId) {
         email_password: "",
         polling_interval: 60,
       };
-    case "games":
+    case "sudoku":
     case "maze":
       return { difficulty: "Medium" };
     case "calendar":
