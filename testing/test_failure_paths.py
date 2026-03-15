@@ -1,18 +1,22 @@
 """Regression tests for hardware/network failure paths."""
 
 import asyncio
+import importlib.util
 import subprocess
 import sys
 import time
 import imaplib
 import types
+from pathlib import Path
 
 import app.main as main_module
 import app.wifi_manager as wifi_manager
 from app.drivers.printer_serial import PrinterDriver
 from app.modules import email_client
+from app.modules import quotes as quotes_module
 from app.modules import news as news_module
 from app.modules import calendar as calendar_module
+from app.modules import history as history_module
 from app import factory_reset as factory_reset_module
 from datetime import datetime, timedelta, timezone
 
@@ -345,3 +349,37 @@ def test_install_updates_requires_explicit_production_release_asset(
 
     assert result["success"] is False
     assert "required production bundle asset" in result["error"]
+
+
+def test_quotes_module_does_not_download_when_local_db_is_missing(monkeypatch):
+    missing_path = Path("/tmp/pc1-missing-quotes.json")
+    monkeypatch.setattr(quotes_module, "_get_quotes_db_path", lambda: missing_path)
+
+    quote = quotes_module.get_random_quote()
+
+    assert quote["quoteText"] == "Offline quotes database is missing."
+    assert quote["quoteAuthor"] == "System"
+
+
+def test_history_module_does_not_download_when_local_db_is_missing(monkeypatch):
+    monkeypatch.setattr(history_module, "LOCAL_DB_PATH", Path("/tmp/pc1-missing-history.json"))
+
+    events = history_module.get_events_for_today()
+
+    assert events == ["Offline history database is missing."]
+
+
+def test_release_build_validates_required_runtime_assets(monkeypatch):
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "release_build.py"
+    spec = importlib.util.spec_from_file_location("release_build_test_module", script_path)
+    release_build = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(release_build)
+
+    monkeypatch.setattr(release_build, "REQUIRED_RUNTIME_PATHS", ["missing/offline.json"])
+
+    try:
+        release_build.validate_runtime_assets()
+        raise AssertionError("Expected runtime asset validation to fail")
+    except FileNotFoundError as exc:
+        assert "missing/offline.json" in str(exc)

@@ -1,15 +1,8 @@
 import json
 import random
-import requests
 from typing import Dict, Any
 from pathlib import Path
 from app.module_registry import register_module
-
-# Curated list of quotes (approx 5k) - clean and reliable source
-# Using JamesFT/Database-Quotes-JSON
-QUOTES_DB_URL = (
-    "https://raw.githubusercontent.com/JamesFT/Database-Quotes-JSON/master/quotes.json"
-)
 
 
 # Resolve path relative to the app package directory.
@@ -21,50 +14,8 @@ def _get_quotes_db_path() -> Path:
 LOCAL_DB_PATH = _get_quotes_db_path()
 
 
-def ensure_quotes_db():
-    """Downloads the quotes database if it doesn't exist."""
-    quotes_path = _get_quotes_db_path()
-
-    if not quotes_path.exists():
-        try:
-            print(f"Downloading quotes database from {QUOTES_DB_URL}...")
-            response = requests.get(QUOTES_DB_URL, timeout=10)
-            response.raise_for_status()
-
-            # Ensure data directory exists
-            quotes_path.parent.mkdir(parents=True, exist_ok=True)
-
-            with open(quotes_path, "w", encoding="utf-8") as f:
-                f.write(response.text)
-
-            print("Quotes database downloaded successfully.")
-        except Exception as e:
-            print(f"Failed to download quotes database: {e}")
-            # Fallback for offline/error: Create a tiny local DB
-            fallback_data = [
-                {
-                    "quoteText": "The only way to do great work is to love what you do.",
-                    "quoteAuthor": "Steve Jobs",
-                },
-                {
-                    "quoteText": "Innovation distinguishes between a leader and a follower.",
-                    "quoteAuthor": "Steve Jobs",
-                },
-                {
-                    "quoteText": "Stay hungry, stay foolish.",
-                    "quoteAuthor": "Steve Jobs",
-                },
-                {"quoteText": "Code is poetry.", "quoteAuthor": "WordPress"},
-            ]
-            quotes_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(quotes_path, "w", encoding="utf-8") as f:
-                json.dump(fallback_data, f)
-
-
 def get_random_quote() -> Dict[str, str]:
     """Reads a random quote from the local database."""
-    ensure_quotes_db()
-
     try:
         quotes_path = _get_quotes_db_path()
         with open(quotes_path, "r", encoding="utf-8") as f:
@@ -78,7 +29,10 @@ def get_random_quote() -> Dict[str, str]:
                 }
             return random.choice(quotes)
     except FileNotFoundError:
-        return {"quoteText": "Quotes database file not found.", "quoteAuthor": "System"}
+        return {
+            "quoteText": "Offline quotes database is missing.",
+            "quoteAuthor": "System",
+        }
     except json.JSONDecodeError as e:
         return {
             "quoteText": f"Invalid JSON in quotes database: {e}",

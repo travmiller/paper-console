@@ -45,6 +45,14 @@ INCLUDE_PATHS = [
 # Exclusions within included directories.
 EXCLUDED_DIRS = {".git", ".github", "__pycache__", ".pytest_cache", ".mypy_cache", ".venv"}
 EXCLUDED_SUFFIXES = {".pyc", ".pyo"}
+REQUIRED_RUNTIME_PATHS = [
+    "app/data/quotes.json",
+    "app/data/history.json",
+    "app/data/geonames_cities.csv",
+    "app/data/journal_prompts.json",
+    "app/data/adventure_story.json",
+    "web/dist/index.html",
+]
 
 
 def parse_args() -> argparse.Namespace:
@@ -100,6 +108,16 @@ def maybe_build_web(build_web: bool) -> None:
         return
     run_command(["npm", "ci"], ROOT / "web")
     run_command(["npm", "run", "build"], ROOT / "web")
+
+
+def validate_runtime_assets() -> None:
+    missing = [rel for rel in REQUIRED_RUNTIME_PATHS if not (ROOT / rel).exists()]
+    if missing:
+        missing_list = ", ".join(missing)
+        raise FileNotFoundError(
+            "Missing required runtime assets for offline production bundle: "
+            f"{missing_list}"
+        )
 
 
 def copytree_filtered(src: Path, dst: Path) -> None:
@@ -188,6 +206,7 @@ def main() -> int:
 
     maybe_run_tests(args.skip_tests)
     maybe_build_web(args.build_web)
+    validate_runtime_assets()
 
     tmp_dir = None
     try:
