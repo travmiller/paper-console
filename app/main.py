@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, Response
@@ -60,7 +60,13 @@ def _parse_cors_origins() -> List[str]:
     ]
 
 
-from app.auth import require_admin_access, get_admin_auth_status
+from app.auth import (
+    require_admin_access,
+    get_admin_auth_status,
+    verify_admin_password,
+    set_admin_session_cookie,
+    clear_admin_session_cookie,
+)
 
 
 from app.config import (
@@ -965,12 +971,7 @@ async def lifespan(app: FastAPI):
     global_loop = asyncio.get_running_loop()
 
     admin_auth = get_admin_auth_status()
-    if admin_auth["token_required"]:
-        logger.info("Admin protection mode: token")
-    else:
-        logger.warning(
-            "PC1_ADMIN_TOKEN not set. Privileged endpoints are restricted to local/private networks only."
-        )
+    logger.info("Settings auth mode: %s", admin_auth["auth_mode"])
 
     # Clear printer hardware buffer first to prevent startup garbage
     # Run in thread pool to avoid blocking event loop
@@ -1082,10 +1083,46 @@ async def read_root():
     }
 
 
+class AuthLoginRequest(BaseModel):
+    password: str
+    remember: bool = False
+
+
 @app.get("/api/system/auth/status")
-async def get_auth_status():
+async def get_auth_status(request: Request):
     """Return privileged endpoint auth mode for UI guidance."""
-    return get_admin_auth_status()
+    return get_admin_auth_status(request)
+
+
+@app.post("/api/system/auth/login")
+async def login_auth(request: Request, payload: AuthLoginRequest, response: Response):
+    """Authenticate a settings session and set a signed cookie."""
+    if not verify_admin_password(payload.password):
+        detail = "Invalid admin token." if os.environ.get("PC1_ADMIN_TOKEN", "").strip() else "Invalid device password."
+        raise HTTPException(
+            status_code=401,
+            detail=detail,
+            headers={"X-PC1-Auth-Required": "true"},
+        )
+
+    set_admin_session_cookie(
+        response,
+        remember=bool(payload.remember),
+        secure=request.url.scheme == "https",
+    )
+    auth_status = get_admin_auth_status()
+    auth_status["authenticated"] = True
+    return {
+        "message": "Authenticated",
+        "auth": auth_status,
+    }
+
+
+@app.post("/api/system/auth/logout")
+async def logout_auth(request: Request, response: Response):
+    """Clear any saved settings session cookie."""
+    clear_admin_session_cookie(response, secure=request.url.scheme == "https")
+    return {"message": "Logged out"}
 
 
 @app.get("/api/health")

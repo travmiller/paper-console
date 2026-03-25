@@ -8,11 +8,16 @@ import ScheduleModal from './components/ScheduleModal';
 import APInstructionsModal from './components/APInstructionsModal';
 import StatusMessage from './components/StatusMessage';
 import ResetSettingsButton from './components/ResetSettingsButton';
+import SettingsLogin from './components/SettingsLogin';
 import { useModuleTypes } from './hooks/useModuleTypes';
 import GitHubIcon from './assets/GitHubIcon';
 import BorderWidthIcon from './assets/BorderWidthIcon';
 import PreferencesIcon from './assets/PreferencesIcon';
-import { adminAuthFetch } from './lib/adminAuthFetch';
+import {
+  adminAuthFetch,
+  fetchAdminAuthStatus,
+  loginAdminSession,
+} from './lib/adminAuthFetch';
 
 
 function App() {
@@ -41,10 +46,28 @@ function App() {
   const [editingModule, setEditingModule] = useState(null); // Local copy of module being edited
   const [showScheduleModal, setShowScheduleModal] = useState(null); // channel position or null
   const [showAPInstructions, setShowAPInstructions] = useState(false);
+  const [authInfo, setAuthInfo] = useState(null);
+  const [authError, setAuthError] = useState('');
+  const [isAuthenticating, setIsAuthenticating] = useState(false);
 
   // Debounce timers for module updates
   // Debounce timer for location search (respects Nominatim 1 req/sec limit)
   const locationSearchTimer = useRef(null);
+
+  const loadProtectedData = async () => {
+    const [settingsData, modulesData] = await Promise.all([
+      adminAuthFetch('/api/settings').then(async (res) => {
+        if (!res.ok) throw new Error('Failed to load settings');
+        return res.json();
+      }),
+      adminAuthFetch('/api/modules').then(async (res) => {
+        if (!res.ok) throw new Error('Failed to load modules');
+        return res.json();
+      }),
+    ]);
+    setSettings(settingsData);
+    setModules(modulesData.modules || {});
+  };
 
   // Check WiFi status on mount
   useEffect(() => {
@@ -66,12 +89,17 @@ function App() {
         // On first load, fetch settings
         if (isFirstLoad) {
           try {
-            const [settingsData, modulesData] = await Promise.all([
-              adminAuthFetch('/api/settings').then((res) => res.json()),
-              adminAuthFetch('/api/modules').then((res) => res.json()),
-            ]);
-            setSettings(settingsData);
-            setModules(modulesData.modules || {});
+            const auth = await fetchAdminAuthStatus();
+            setAuthInfo(auth);
+
+            if (auth?.login_required && !auth?.authenticated) {
+              setLoading(false);
+              isFirstLoad = false;
+              return;
+            }
+
+            await loadProtectedData();
+            setAuthError('');
             setLoading(false);
           } catch (err) {
             console.error('Error fetching data:', err);
@@ -88,16 +116,39 @@ function App() {
 
     fetchWifiStatus();
 
+    const handleAuthRequired = () => {
+      setAuthInfo((prev) => ({ ...(prev || {}), authenticated: false, login_required: true }));
+      setAuthError('Your session expired. Enter the password again.');
+    };
+    window.addEventListener('pc1-auth-required', handleAuthRequired);
+
     // Update WiFi status every 10 seconds
     const interval = setInterval(fetchWifiStatus, 10000);
     return () => {
       clearInterval(interval);
+      window.removeEventListener('pc1-auth-required', handleAuthRequired);
       // Cleanup location search timer
       if (locationSearchTimer.current) {
         clearTimeout(locationSearchTimer.current);
       }
     };
   }, []);
+
+  const handleLogin = async (password, remember) => {
+    setIsAuthenticating(true);
+    setAuthError('');
+    try {
+      const auth = await loginAdminSession(password, remember);
+      setAuthInfo({ ...(auth || {}), authenticated: true, login_required: true });
+      await loadProtectedData();
+      setLoading(false);
+    } catch (err) {
+      console.error('Error authenticating:', err);
+      setAuthError(err.message || 'Failed to unlock settings');
+    } finally {
+      setIsAuthenticating(false);
+    }
+  };
 
   const handleSearch = async (term) => {
     setSearchTerm(term);
@@ -635,6 +686,17 @@ function App() {
 
   if (wifiMode === 'ap') {
     return <WiFiSetup wifiStatus={wifiStatus} />;
+  }
+
+  if (authInfo?.login_required && !authInfo?.authenticated) {
+    return (
+      <SettingsLogin
+        authInfo={authInfo}
+        onLogin={handleLogin}
+        isSubmitting={isAuthenticating}
+        error={authError}
+      />
+    );
   }
 
   return (

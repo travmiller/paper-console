@@ -183,8 +183,9 @@ These workflows use mock/local paths and do not require Raspberry Pi GPIO packag
 ### Security & Network Environment Variables
 For production deployments, configure these environment variables:
 
-* **`PC1_ADMIN_TOKEN`**: Optional admin token for privileged system APIs (time/SSH/update install).  
-  When set, clients must send header `X-PC1-Admin-Token`.
+* **`PC1_ADMIN_TOKEN`**: Optional override for the settings password and privileged system APIs.  
+  If unset, the web UI uses the device's printed setup password by default. Clients may also send header `X-PC1-Admin-Token` for scripted access.
+* **Settings Login Sessions**: The web UI can remember a browser with a signed `HttpOnly` session cookie so users do not need to re-enter the password on every visit.
 * **`PC1_CORS_ORIGINS`**: Comma-separated CORS origins (default is local/dev origins only).
 * **`PC1_SETUP_PASSWORD`**: Optional override for setup AP password (must be at least 8 chars).  
   If unset, PC-1 generates a per-device setup password automatically.

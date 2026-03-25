@@ -773,7 +773,7 @@ class PrinterDriver:
              
         # QR
         if qr_img:
-            current_offset += self.SPACING_SMALL
+            current_offset += self.SPACING_MEDIUM
             if not dry_run and img:
                  # Center QR in content area? Or maintain simple center?
                  # Let's simple center in content width

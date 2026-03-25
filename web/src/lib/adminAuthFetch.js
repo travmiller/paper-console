@@ -24,30 +24,51 @@ function withToken(headers = {}, token = '') {
   return { ...headers, [TOKEN_HEADER]: token };
 }
 
+function buildRequest(url, options = {}) {
+  const token = getAdminToken();
+  return fetch(url, {
+    ...options,
+    headers: withToken(options.headers || {}, token),
+    credentials: options.credentials || 'same-origin',
+  });
+}
+
+export async function fetchAdminAuthStatus() {
+  const response = await buildRequest('/api/system/auth/status');
+  if (!response.ok) {
+    throw new Error('Failed to load auth status');
+  }
+  return response.json();
+}
+
+export async function loginAdminSession(password, remember = false) {
+  const response = await buildRequest('/api/system/auth/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ password, remember }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => ({}));
+    throw new Error(data.detail || 'Invalid password');
+  }
+
+  const data = await response.json().catch(() => ({}));
+  return data.auth || null;
+}
+
+export async function logoutAdminSession() {
+  await buildRequest('/api/system/auth/logout', { method: 'POST' });
+}
+
 export async function adminAuthFetch(url, options = {}) {
-  const initialToken = getAdminToken();
-  const initialHeaders = withToken(options.headers || {}, initialToken);
-
-  let response = await fetch(url, { ...options, headers: initialHeaders });
-  const authRequired = response.headers.get(AUTH_REQUIRED_HEADER) === 'true';
-
-  if (response.status !== 401 || !authRequired) {
-    return response;
+  const response = await buildRequest(url, options);
+  if (isAuthRequiredResponse(response) && typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('pc1-auth-required'));
   }
-
-  const prompted = window.prompt('Enter PC-1 admin token');
-  if (!prompted) {
-    return response;
-  }
-
-  const token = prompted.trim();
-  if (!token) {
-    return response;
-  }
-
-  setAdminToken(token);
-  const retryHeaders = withToken(options.headers || {}, token);
-  response = await fetch(url, { ...options, headers: retryHeaders });
-
   return response;
+}
+
+export function isAuthRequiredResponse(response) {
+  return response.status === 401 && response.headers.get(AUTH_REQUIRED_HEADER) === 'true';
 }
