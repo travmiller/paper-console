@@ -364,19 +364,19 @@ function App() {
       const targetModule = modules[moduleId];
       if (!targetModule) {
         console.error(`[UPDATE] Module ${moduleId} not found`);
-        return;
+        throw new Error('Module not found');
       }
 
       if (updates.type && updates.type !== targetModule.type) {
         console.error(
           `[UPDATE] Type mismatch! Target module is ${targetModule.type}, but update has type ${updates.type}. Rejecting update.`,
         );
-        return;
+        throw new Error('Module type mismatch');
       }
 
       if (updates.id && updates.id !== moduleId) {
         console.error(`[UPDATE] ID mismatch! Target module ID is ${moduleId}, but update has ID ${updates.id}. Rejecting update.`);
-        return;
+        throw new Error('Module ID mismatch');
       }
 
       if (updates.config) {
@@ -412,6 +412,7 @@ function App() {
       setModules((prev) => ({ ...prev, [moduleId]: data.module }));
       setStatus({ type: 'success', message: 'Module updated successfully!' });
       setTimeout(() => setStatus({ type: '', message: '' }), 3000);
+      return data.module;
     } catch (err) {
       console.error('Error updating module:', err);
       setStatus({ type: 'error', message: 'Failed to update module' });
@@ -420,6 +421,7 @@ function App() {
         const data = await response.json();
         setModules((prev) => ({ ...prev, [moduleId]: data.module }));
       }
+      throw err;
     }
   };
 

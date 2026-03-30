@@ -3,7 +3,6 @@ import ModuleConfig from './ModuleConfig';
 import { useModuleTypes } from '../hooks/useModuleTypes';
 import { commonClasses } from '../design-tokens';
 import CloseButton from './CloseButton';
-import PrimaryButton from './PrimaryButton';
 import BinIcon from '../assets/BinIcon';
 import { adminAuthFetch } from '../lib/adminAuthFetch';
 import { getModuleValidationErrors } from '../lib/moduleValidation';
@@ -52,26 +51,31 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
   }, [module, hasUserEdited]);
 
   const validationErrors = useMemo(() => getModuleValidationErrors(module), [module]);
+  const validationIssueCount = Object.keys(validationErrors).length;
 
   const isDirty = stableSerialize(module) !== initialSnapshotRef.current;
-  const canSave = hasUserEdited && isDirty && !isSaving;
 
-  const handleRequestClose = () => {
+  const handleRequestClose = async () => {
     if (isSaving) return;
-    if (hasUserEdited && isDirty && !window.confirm('Discard unsaved changes?')) {
+    if (!hasUserEdited || !isDirty) {
+      onClose();
       return;
     }
-    onClose();
-  };
 
-  const handleSave = async () => {
     setShowValidation(true);
-    if (!canSave) return;
+
+    if (validationIssueCount > 0) {
+      if (!window.confirm('This module has validation errors and cannot be saved yet. Discard your changes and close it?')) {
+        return;
+      }
+      onClose();
+      return;
+    }
 
     try {
       setIsSaving(true);
-      await Promise.resolve(onSave(moduleId, module, true));
-      initialSnapshotRef.current = stableSerialize(module);
+      const savedModule = await Promise.resolve(onSave(moduleId, module));
+      initialSnapshotRef.current = stableSerialize(savedModule || module);
       setHasUserEdited(false);
       onClose();
     } finally {
@@ -104,7 +108,7 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
             </div>
             {hasUserEdited && isDirty && (
               <div className='mt-2 text-xs font-bold' style={{ color: 'var(--color-brass)' }}>
-                Unsaved changes
+                Changes will save when you close
               </div>
             )}
           </div>
@@ -178,6 +182,7 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
             <button
               type='button'
               onClick={() => onDelete(moduleId)}
+              disabled={isSaving}
               className='px-1 py-1 bg-transparent border-0 rounded-lg transition-all cursor-pointer flex items-center gap-2'
               style={{ color: 'var(--color-error-light)' }}
               onMouseEnter={(e) => {
@@ -190,12 +195,8 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
               Delete Module
             </button>
           </div>
-          <div className='flex items-center'>
-            <PrimaryButton
-              onClick={handleSave}
-              disabled={!canSave}>
-              {isSaving ? 'Saving...' : 'Save'}
-            </PrimaryButton>
+          <div className='text-xs text-right' style={{ color: 'var(--color-text-muted)' }}>
+            {isSaving ? 'Saving changes...' : 'Changes save automatically when you close.'}
           </div>
         </div>
       </div>
