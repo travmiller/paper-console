@@ -7,7 +7,8 @@ set +e
 
 AP_SSID_PREFIX="PC-1-Setup"
 AP_INTERFACE="wlan0"
-AP_PASSWORD="${PC1_SETUP_PASSWORD:-}"
+DEVICE_PASSWORD="${PC1_DEVICE_PASSWORD:-}"
+DEVICE_PASSWORD_FILE="${PC1_DEVICE_PASSWORD_FILE:-/etc/pc1/device_password}"
 
 # Generate unique SSID suffix from CPU serial
 get_device_id() {
@@ -45,16 +46,24 @@ get_password_seed() {
     hostname
 }
 
-get_ap_password() {
+get_device_password() {
     local seed
     local digest
-    if [ -n "$AP_PASSWORD" ] && [ "${#AP_PASSWORD}" -ge 8 ]; then
-        echo "$AP_PASSWORD"
-    else
-        seed=$(get_password_seed)
-        digest=$(printf '%s' "$seed" | sha256sum | awk '{print $1}' | cut -c1-10)
-        echo "pc1-${digest}"
+    if [ -n "$DEVICE_PASSWORD" ] && [ "${#DEVICE_PASSWORD}" -ge 8 ]; then
+        echo "$DEVICE_PASSWORD"
+        return
     fi
+    if [ -f "$DEVICE_PASSWORD_FILE" ]; then
+        local stored_password
+        stored_password=$(tr -d '\r\n' < "$DEVICE_PASSWORD_FILE")
+        if [ "${#stored_password}" -ge 8 ]; then
+            echo "$stored_password"
+            return
+        fi
+    fi
+    seed=$(get_password_seed)
+    digest=$(printf '%s' "$seed" | sha256sum | awk '{print $1}' | cut -c1-10)
+    echo "pc1-${digest}"
 }
 
 start_ap() {
@@ -62,7 +71,7 @@ start_ap() {
     
     DEVICE_ID=$(get_device_id)
     SSID="${AP_SSID_PREFIX}-${DEVICE_ID}"
-    AP_PASS=$(get_ap_password)
+    AP_PASS=$(get_device_password)
     
     # 1. CLEANUP: Delete any existing hotspot connection to avoid conflicts
     nmcli connection delete "PC-1-Hotspot" 2>/dev/null || true
@@ -143,7 +152,7 @@ status() {
     if nmcli connection show --active 2>/dev/null | grep -q "PC-1-Hotspot"; then
         echo "AP Mode: ACTIVE"
         DEVICE_ID=$(get_device_id)
-        AP_PASS=$(get_ap_password)
+        AP_PASS=$(get_device_password)
         AP_IP=$(get_ap_ip)
         echo "SSID: ${AP_SSID_PREFIX}-${DEVICE_ID}"
         echo "Password: $AP_PASS"

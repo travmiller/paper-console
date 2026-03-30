@@ -1,34 +1,8 @@
-const TOKEN_STORAGE_KEY = 'pc1_admin_token';
 const AUTH_REQUIRED_HEADER = 'X-PC1-Auth-Required';
-const TOKEN_HEADER = 'X-PC1-Admin-Token';
-
-export function getAdminToken() {
-  return window.localStorage.getItem(TOKEN_STORAGE_KEY) || '';
-}
-
-export function setAdminToken(token) {
-  const normalized = (token || '').trim();
-  if (!normalized) {
-    window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-    return;
-  }
-  window.localStorage.setItem(TOKEN_STORAGE_KEY, normalized);
-}
-
-export function clearAdminToken() {
-  window.localStorage.removeItem(TOKEN_STORAGE_KEY);
-}
-
-function withToken(headers = {}, token = '') {
-  if (!token) return headers;
-  return { ...headers, [TOKEN_HEADER]: token };
-}
 
 function buildRequest(url, options = {}) {
-  const token = getAdminToken();
   return fetch(url, {
     ...options,
-    headers: withToken(options.headers || {}, token),
     credentials: options.credentials || 'same-origin',
   });
 }
@@ -50,7 +24,7 @@ export async function loginAdminSession(password, remember = false) {
 
   if (!response.ok) {
     const data = await response.json().catch(() => ({}));
-    throw new Error(data.detail || 'Invalid password');
+    throw new Error(data.detail || 'Invalid Device Password');
   }
 
   const data = await response.json().catch(() => ({}));

@@ -31,13 +31,13 @@ export default function SettingsLogin({ authInfo, onLogin, isSubmitting = false,
         }}>
         <h2 className='text-lg font-bold mb-2'>Unlock Settings</h2>
         <p className='text-sm mb-4' style={{ color: 'var(--color-text-muted)' }}>
-          {authInfo?.message || 'Enter your device password to access settings.'}
+          {authInfo?.message || 'Enter your Device Password to access settings.'}
         </p>
 
         <form onSubmit={submit} className='space-y-4'>
           <div>
             <label className='block mb-2 font-bold text-sm'>
-              {authInfo?.password_label || 'Device password'}
+              {authInfo?.password_label || 'Device Password'}
             </label>
             <input
               type='password'

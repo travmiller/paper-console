@@ -6,6 +6,7 @@ from contextlib import asynccontextmanager
 import asyncio
 import uuid
 import os
+import hmac
 from typing import Dict, Optional, List
 from datetime import datetime
 from pathlib import Path
@@ -100,6 +101,7 @@ from app.module_registry import (
 from app.modules import email_client, webhook, text, calendar
 
 from app.routers import wifi
+import app.device_password as device_password
 import app.wifi_manager as wifi_manager
 import app.hardware as hardware
 from app.hardware import printer, dial, button, _is_raspberry_pi
@@ -1098,10 +1100,9 @@ async def get_auth_status(request: Request):
 async def login_auth(request: Request, payload: AuthLoginRequest, response: Response):
     """Authenticate a settings session and set a signed cookie."""
     if not verify_admin_password(payload.password):
-        detail = "Invalid admin token." if os.environ.get("PC1_ADMIN_TOKEN", "").strip() else "Invalid device password."
         raise HTTPException(
             status_code=401,
-            detail=detail,
+            detail="Invalid Device Password.",
             headers={"X-PC1-Auth-Required": "true"},
         )
 
@@ -2499,7 +2500,7 @@ async def get_ssh_status():
         )
 
         # Get current username
-        username = os.environ.get("USER") or os.environ.get("USERNAME") or "admin"
+        username = _get_system_username()
 
         # Check if raspi-config SSH is enabled (if on Raspberry Pi)
         raspi_ssh_enabled = None
@@ -2654,63 +2655,179 @@ async def disable_ssh():
         }
 
 
-class SSHPasswordChange(BaseModel):
-    current_password: Optional[str] = None
+def _get_system_username() -> str:
+    return os.environ.get("USER") or os.environ.get("USERNAME") or "admin"
+
+
+def _sync_device_password_to_system_user(new_password: str) -> Dict[str, object]:
+    if platform.system() != "Linux":
+        return {
+            "synced": False,
+            "username": None,
+            "message": "System password sync is only available on Linux systems",
+        }
+
+    if not device_password.is_device_managed():
+        return {
+            "synced": False,
+            "username": None,
+            "message": "System password sync is disabled for unmanaged builds",
+        }
+
+    username = _get_system_username()
+    password_input = f"{username}:{new_password}\n"
+    result = subprocess.run(
+        ["sudo", "chpasswd"],
+        input=password_input,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    if result.returncode != 0:
+        raise RuntimeError(
+            "Failed to sync the Linux login password. Ensure the application has sudo privileges."
+        )
+
+    return {
+        "synced": True,
+        "username": username,
+        "message": f"SSH login for '{username}' now uses the Device Password",
+    }
+
+
+def _restart_ap_mode_after_device_password_change() -> None:
+    try:
+        time.sleep(1)
+        wifi_manager.stop_ap_mode()
+        time.sleep(1)
+        wifi_manager.start_ap_mode(retries=2)
+    except Exception:
+        logger.exception("Failed to restart AP mode after Device Password change")
+
+
+class DevicePasswordChange(BaseModel):
+    current_password: str
     new_password: str
 
 
-@app.post("/api/system/ssh/password", dependencies=[Depends(require_admin_access)])
-async def change_ssh_password(password_data: SSHPasswordChange):
-    """
-    Change SSH user password.
-    Requires current password for verification (if set).
-    """
+@app.get("/api/system/device-password/status")
+async def get_device_password_status():
+    managed = device_password.is_device_managed()
+
+    return {
+        "managed": managed,
+        "can_change": managed,
+        "source": device_password.get_device_password_source(),
+        "password_label": "Device Password",
+        "ssh_sync_enabled": platform.system() == "Linux" and managed,
+        "ssh_username": _get_system_username() if platform.system() == "Linux" else None,
+        "message": (
+            "Changing the Device Password updates settings login, setup WiFi, printed setup instructions, and SSH access."
+            if managed
+            else "This build uses a development override or fallback Device Password. Change it via environment or local development config."
+        ),
+    }
+
+
+@app.post("/api/system/device-password", dependencies=[Depends(require_admin_access)])
+async def change_device_password(
+    password_data: DevicePasswordChange,
+    request: Request,
+    response: Response,
+    background_tasks: BackgroundTasks,
+):
+    """Change the canonical Device Password used by settings, setup WiFi, and SSH."""
     try:
-        if platform.system() != "Linux":
+        if not device_password.can_change_device_password():
             return {
                 "success": False,
-                "message": "SSH password change is only available on Linux systems",
+                "message": "Device Password changes are only available on managed PC-1 devices",
             }
 
-        username = os.environ.get("USER") or os.environ.get("USERNAME") or "admin"
-        new_password = password_data.new_password
+        current_password = (password_data.current_password or "").strip()
+        new_password = (password_data.new_password or "").strip()
 
-        if not new_password or len(new_password) < 8:
+        if not current_password or not verify_admin_password(current_password):
             return {
                 "success": False,
-                "message": "Password must be at least 8 characters long",
+                "message": "Current Device Password is incorrect",
             }
 
-        # Use chpasswd to change password (requires sudo)
-        # Format: username:password
-        password_input = f"{username}:{new_password}\n"
+        if len(new_password) < 8:
+            return {
+                "success": False,
+                "message": "Device Password must be at least 8 characters long",
+            }
 
-        result = subprocess.run(
-            ["sudo", "chpasswd"],
-            input=password_input,
-            capture_output=True,
-            text=True,
-            timeout=10,
+        if hmac.compare_digest(current_password, new_password):
+            return {
+                "success": False,
+                "message": "New Device Password must be different from the current one",
+            }
+
+        previous_password = device_password.get_device_password()
+        ap_mode_was_active = wifi_manager.is_ap_mode_active()
+
+        try:
+            device_password.set_device_password(new_password)
+        except Exception as exc:
+            return {
+                "success": False,
+                "error": str(exc),
+                "message": "Failed to persist the new Device Password",
+            }
+
+        try:
+            sync_result = _sync_device_password_to_system_user(new_password)
+        except Exception as exc:
+            try:
+                device_password.set_device_password(previous_password)
+            except Exception:
+                logger.exception(
+                    "Failed to restore the previous Device Password after SSH sync failure"
+                )
+                return {
+                    "success": False,
+                    "error": str(exc),
+                    "message": "Failed to sync SSH access and could not restore the previous Device Password",
+                }
+            return {
+                "success": False,
+                "error": str(exc),
+                "message": str(exc),
+            }
+
+        if ap_mode_was_active:
+            background_tasks.add_task(_restart_ap_mode_after_device_password_change)
+
+        clear_admin_session_cookie(
+            response,
+            secure=request.url.scheme == "https",
         )
 
-        if result.returncode != 0:
-            return {
-                "success": False,
-                "error": result.stderr,
-                "message": "Failed to change password. Ensure the application has sudo privileges.",
-            }
+        message_parts = ["Device Password changed successfully."]
+        if sync_result.get("synced") and sync_result.get("message"):
+            message_parts.append(sync_result["message"] + ".")
+        if ap_mode_was_active:
+            message_parts.append(
+                "Setup WiFi is restarting. Reconnect using the new Device Password."
+            )
 
         return {
             "success": True,
-            "message": f"Password changed successfully for user '{username}'",
-            "username": username,
+            "message": " ".join(message_parts),
+            "reauth_required": True,
+            "ssh_password_synced": bool(sync_result.get("synced")),
+            "username": sync_result.get("username"),
+            "ap_mode_restarting": ap_mode_was_active,
         }
 
     except Exception as e:
         return {
             "success": False,
             "error": str(e),
-            "message": "Error changing SSH password",
+            "message": "Error changing Device Password",
         }
 
 

@@ -121,15 +121,6 @@ def _python_exec() -> str:
     return sys.executable
 
 
-def _child_env() -> dict[str, str]:
-    env = dict(os.environ)
-    device_password = env.get("PC1_DEVICE_PASSWORD", "").strip()
-    setup_password = env.get("PC1_SETUP_PASSWORD", "").strip()
-    if device_password and not setup_password:
-        env["PC1_SETUP_PASSWORD"] = device_password
-    return env
-
-
 def parse_args() -> argparse.Namespace:
     _load_dotenv(PROJECT_ROOT / ".env")
     parser = argparse.ArgumentParser(
@@ -168,14 +159,9 @@ def parse_args() -> argparse.Namespace:
         help="Startup wait timeout in seconds.",
     )
     parser.add_argument(
-        "--admin-token",
-        default=os.getenv("PC1_ADMIN_TOKEN", ""),
-        help="Optional admin token for privileged API calls.",
-    )
-    parser.add_argument(
         "--settings-password",
-        default=os.getenv("PC1_DEVICE_PASSWORD", "") or os.getenv("PC1_SETUP_PASSWORD", ""),
-        help="Optional settings password for session-based auth.",
+        default=os.getenv("PC1_DEVICE_PASSWORD", ""),
+        help="Optional Device Password for session-based auth.",
     )
     parser.add_argument(
         "--skip-module-seeding",
@@ -208,7 +194,7 @@ def main() -> int:
     frontend_proc = None
 
     log_stream = None if args.show_server_logs else subprocess.DEVNULL
-    child_env = _child_env()
+    child_env = dict(os.environ)
 
     try:
         if not args.reuse_servers:
@@ -290,8 +276,6 @@ def main() -> int:
         ]
         if args.headful:
             capture_script_cmd.append("--headful")
-        if args.admin_token.strip():
-            capture_script_cmd.extend(["--admin-token", args.admin_token.strip()])
         if args.settings_password.strip():
             capture_script_cmd.extend(["--settings-password", args.settings_password.strip()])
         if args.skip_module_seeding:

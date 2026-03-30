@@ -7,9 +7,7 @@ import process from "node:process";
 const require = createRequire(import.meta.url);
 const { chromium } = require("playwright");
 
-const ADMIN_HEADER = "X-PC1-Admin-Token";
 const SESSION_COOKIE_NAME = "pc1_admin_session";
-const TOKEN_STORAGE_KEY = "pc1_admin_token";
 const DEFAULT_OUTPUT_DIR = "testing/ui_gallery";
 const DEFAULT_BASE_URL = "http://127.0.0.1:5173";
 const DEFAULT_TIMEOUT_MS = 45_000;
@@ -23,7 +21,6 @@ function parseArgs(argv) {
     outputDir: DEFAULT_OUTPUT_DIR,
     timeoutMs: DEFAULT_TIMEOUT_MS,
     headful: false,
-    adminToken: "",
     settingsPassword: "",
     skipModuleSeeding: false,
     modulePrefix: DEFAULT_MODULE_PREFIX,
@@ -50,9 +47,6 @@ function parseArgs(argv) {
         break;
       case "--timeout-ms":
         args.timeoutMs = Number(next());
-        break;
-      case "--admin-token":
-        args.adminToken = next();
         break;
       case "--settings-password":
         args.settingsPassword = next();
@@ -164,9 +158,6 @@ function extractErrorDetail(status, json, text) {
 
 async function apiRequest(method, url, { auth = null, data, expected = [200] } = {}) {
   const headers = { Accept: "application/json" };
-  if (auth?.token) {
-    headers[ADMIN_HEADER] = auth.token;
-  }
   if (auth?.cookie) {
     headers.Cookie = auth.cookie;
   }
@@ -199,14 +190,14 @@ async function apiRequest(method, url, { auth = null, data, expected = [200] } =
   };
 }
 
-async function ensureAuthCompatibility(baseUrl, adminToken, settingsPassword) {
+async function ensureAuthCompatibility(baseUrl, settingsPassword) {
   const auth = await apiRequest("GET", `${baseUrl}/api/system/auth/status`, {
     expected: [200],
   });
 
-  if (auth.json?.login_required && !adminToken && !settingsPassword) {
+  if (auth.json?.login_required && !settingsPassword) {
     throw new Error(
-      "Settings password is required by backend. Re-run with --settings-password <password> or --admin-token <token>."
+      "Device Password is required by backend. Re-run with --settings-password <password>."
     );
   }
 
@@ -314,7 +305,7 @@ async function ensureBrowserAuthenticated(page, args) {
   const needsLogin = await unlockHeading.isVisible().catch(() => false);
   if (!needsLogin) return;
 
-  const password = String(args.settingsPassword || args.adminToken || "").trim();
+  const password = String(args.settingsPassword || "").trim();
   if (!password) {
     throw new Error("Settings login screen is visible but no password was provided.");
   }
@@ -560,24 +551,18 @@ async function main() {
 
   let createdModules = [];
   let browser = null;
-  const apiAuth = {
-    token: String(args.adminToken || "").trim(),
-    cookie: "",
-  };
+  const apiAuth = { cookie: "" };
   try {
     console.log("[settings-ui] checking auth compatibility");
     const authStatus = await ensureAuthCompatibility(
       args.baseUrl,
-      apiAuth.token,
       String(args.settingsPassword || "").trim()
     );
     notes.push(`auth_mode=${authStatus.auth_mode || "unknown"}`);
 
-    if (!apiAuth.token && authStatus.login_required && args.settingsPassword) {
+    if (authStatus.login_required && args.settingsPassword) {
       apiAuth.cookie = (await createSessionAuth(args.baseUrl, args.settingsPassword)).cookie;
       notes.push("auth_strategy=session_cookie");
-    } else if (apiAuth.token) {
-      notes.push("auth_strategy=admin_token");
     } else {
       notes.push("auth_strategy=none");
     }
@@ -618,13 +603,6 @@ async function main() {
       viewport: { width: args.viewportWidth, height: args.viewportHeight },
     });
 
-    if (args.adminToken) {
-      await context.addInitScript(
-        (token, key) => window.localStorage.setItem(key, token),
-        args.adminToken,
-        TOKEN_STORAGE_KEY
-      );
-    }
     if (apiAuth.cookie) {
       await context.addCookies([
         {
@@ -640,7 +618,7 @@ async function main() {
     const page = await context.newPage();
 
     page.on("dialog", async (dialog) => {
-      const promptSecret = String(args.adminToken || args.settingsPassword || "").trim();
+      const promptSecret = String(args.settingsPassword || "").trim();
       if (dialog.type() === "prompt" && promptSecret) {
         await dialog.accept(promptSecret);
       } else if (dialog.type() === "confirm") {

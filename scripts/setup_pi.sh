@@ -230,6 +230,40 @@ else
     echo "Warning: No venv found. Using system python3."
 fi
 
+echo "Provisioning Device Password..."
+DEVICE_CONFIG_DIR="/etc/pc1"
+DEVICE_PASSWORD_FILE="$DEVICE_CONFIG_DIR/device_password"
+DEVICE_MANAGED_FILE="$DEVICE_CONFIG_DIR/device_managed"
+
+mkdir -p "$DEVICE_CONFIG_DIR"
+chown root:"$USER_NAME" "$DEVICE_CONFIG_DIR"
+chmod 0750 "$DEVICE_CONFIG_DIR"
+
+if [ -f "$DEVICE_PASSWORD_FILE" ]; then
+    DEVICE_PASSWORD=$(tr -d '\r\n' < "$DEVICE_PASSWORD_FILE")
+else
+    DEVICE_PASSWORD=""
+fi
+
+if [ "${#DEVICE_PASSWORD}" -lt 8 ]; then
+    DEVICE_PASSWORD=$("$PYTHON_EXEC" - <<'PY'
+import secrets
+
+alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
+print("".join(secrets.choice(alphabet) for _ in range(12)))
+PY
+)
+    printf '%s\n' "$DEVICE_PASSWORD" > "$DEVICE_PASSWORD_FILE"
+fi
+
+touch "$DEVICE_MANAGED_FILE"
+chown root:"$USER_NAME" "$DEVICE_PASSWORD_FILE" "$DEVICE_MANAGED_FILE"
+chmod 0660 "$DEVICE_PASSWORD_FILE"
+chmod 0640 "$DEVICE_MANAGED_FILE"
+
+echo "Syncing Linux login password with Device Password..."
+printf '%s:%s\n' "$USER_NAME" "$DEVICE_PASSWORD" | chpasswd
+
 # Make WiFi script executable
 echo "Setting up WiFi AP script..."
 chmod +x "$PROJECT_DIR/scripts/wifi_ap_nmcli.sh"

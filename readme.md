@@ -53,12 +53,12 @@ When a user unboxes a PC-1 and powers it on for the first time, the expected flo
    - The printer automatically outputs onboarding instructions.
    - It includes:
      - Setup SSID: `PC-1-Setup-XXXX` (device-specific suffix)
-     - Setup password (device-specific by default, or overridden by `PC1_SETUP_PASSWORD`)
+     - Device Password (shared across setup WiFi, settings login, printed setup instructions, and SSH)
      - Setup URL: `http://10.42.0.1` (and `http://pc-1.local`)
 
 2. **User connects to setup WiFi**
    - On phone/computer, connect to the printed SSID.
-   - Enter the printed setup password.
+   - Enter the printed Device Password.
 
 3. **User configures home WiFi in the setup web UI**
    - Open `http://10.42.0.1`
@@ -181,12 +181,10 @@ These workflows use mock/local paths and do not require Raspberry Pi GPIO packag
 ### Security & Network Environment Variables
 For production deployments, configure these environment variables:
 
-* **`PC1_ADMIN_TOKEN`**: Optional override for the settings password and privileged system APIs.  
-  If unset, the web UI uses the device's printed setup password by default. Clients may also send header `X-PC1-Admin-Token` for scripted access.
+* **`PC1_DEVICE_PASSWORD`**: Optional override for the unified Device Password used by setup WiFi, settings login, printed setup instructions, and SSH.  
+  On managed PC-1 devices, the runtime password is normally stored in the device-managed credential file instead. For scripted access, clients may send header `X-PC1-Device-Password`.
 * **Settings Login Sessions**: The web UI can remember a browser with a signed `HttpOnly` session cookie so users do not need to re-enter the password on every visit.
 * **`PC1_CORS_ORIGINS`**: Comma-separated CORS origins (default is local/dev origins only).
-* **`PC1_SETUP_PASSWORD`**: Optional override for setup AP password (must be at least 8 chars).  
-  If unset, PC-1 generates a per-device setup password automatically.
 * **`PC1_UPDATE_GITHUB_REPO`**: GitHub repo slug used by OTA release checks/install (default: `travmiller/paper-console`).
 * **`PC1_UPDATE_TARBALL_SHA256`**: Optional expected SHA256 for OTA tarball verification.
 * **`PC1_LOG_LEVEL`**: Backend log level (default: `WARNING` on device builds).

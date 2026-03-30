@@ -106,11 +106,6 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
             <div className={`text-gray-600 text-sm `}>
               <span className="font-mono">Type: {moduleTypes.find((t) => t.id === module?.type)?.label}</span>
             </div>
-            {hasUserEdited && isDirty && (
-              <div className='mt-2 text-xs font-bold' style={{ color: 'var(--color-brass)' }}>
-                Changes will save when you close
-              </div>
-            )}
           </div>
           <CloseButton
             onClick={handleRequestClose}
@@ -141,7 +136,7 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
         </div>
 
         {module && (
-          <div className='pb-28'>
+          <div>
             <ModuleConfig
               module={module}
               validationErrors={validationErrors}
@@ -177,7 +172,7 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
           </div>
         )}
 
-        <div className='sticky bottom-0 -mx-4 sm:-mx-6 mt-6 px-4 sm:px-6 py-4 border-t-2 border-gray-300 bg-bg-card flex items-center justify-between gap-3'>
+        <div className='-mx-4 sm:-mx-6 mt-6 px-4 sm:px-6 py-4 border-t-2 border-gray-300 bg-bg-card flex items-center justify-between gap-3'>
           <div className='flex items-center'>
             <button
               type='button'
@@ -195,9 +190,11 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
               Delete Module
             </button>
           </div>
-          <div className='text-xs text-right' style={{ color: 'var(--color-text-muted)' }}>
-            {isSaving ? 'Saving changes...' : 'Changes save automatically when you close.'}
-          </div>
+          {isSaving && (
+            <div className='text-xs text-right' style={{ color: 'var(--color-text-muted)' }}>
+              Saving changes...
+            </div>
+          )}
         </div>
       </div>
     </div>

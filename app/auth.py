@@ -12,10 +12,11 @@ from urllib.parse import urlparse
 
 from fastapi import HTTPException, Request, Response
 
+import app.device_password as device_password
 import app.wifi_manager as wifi_manager
 
 AUTH_REQUIRED_HEADER = "X-PC1-Auth-Required"
-TOKEN_HEADER = "X-PC1-Admin-Token"
+TOKEN_HEADER = "X-PC1-Device-Password"
 SESSION_COOKIE_NAME = "pc1_admin_session"
 REMEMBER_DURATION_SECONDS = 30 * 24 * 60 * 60
 SESSION_DURATION_SECONDS = 12 * 60 * 60
@@ -60,10 +61,7 @@ def _urlsafe_b64decode(raw: str) -> bytes:
 
 
 def _current_admin_password() -> str:
-    configured_token = os.environ.get("PC1_ADMIN_TOKEN", "").strip()
-    if configured_token:
-        return configured_token
-    return wifi_manager.get_ap_password()
+    return device_password.get_device_password()
 
 
 def _session_secret() -> bytes:
@@ -71,7 +69,7 @@ def _session_secret() -> bytes:
     if explicit_secret:
         seed = explicit_secret
     else:
-        seed = wifi_manager.get_device_password_seed()
+        seed = device_password.get_device_password_seed()
     return hashlib.sha256(f"pc1-session::{seed}".encode("utf-8")).digest()
 
 
@@ -196,7 +194,7 @@ def require_admin_access(request: Request):
 
     raise HTTPException(
         status_code=401,
-        detail="Settings password required or invalid.",
+        detail="Device Password required or invalid.",
         headers={AUTH_REQUIRED_HEADER: "true"},
     )
 
@@ -205,32 +203,29 @@ def get_admin_auth_status(request: Optional[Request] = None) -> Dict[str, object
     """Return privileged endpoint auth mode without exposing secrets."""
     if wifi_manager.is_ap_mode_active():
         return {
-            "token_required": False,
             "login_required": False,
             "authenticated": True,
             "auth_mode": "setup_network",
-            "password_label": "Device password",
+            "password_label": "Device Password",
             "message": "Setup mode is active. Settings login is bypassed on the local setup network.",
             "password_help": "Connect to the printed setup WiFi to continue onboarding.",
             "session_supported": False,
             "remember_supported": False,
+            "device_password_source": device_password.get_device_password_source(),
+            "device_password_managed": device_password.is_device_managed(),
         }
 
-    token_set = bool(os.environ.get("PC1_ADMIN_TOKEN", "").strip())
     return {
-        "token_required": True,
         "login_required": True,
         "authenticated": is_admin_authenticated(request) if request else False,
-        "auth_mode": "admin_token" if token_set else "device_password",
-        "password_label": "Admin token" if token_set else "Device password",
-        "message": (
-            "Enter the configured admin token to access settings."
-            if token_set
-            else "Enter the device password from the printed setup instructions to access settings."
-        ),
+        "auth_mode": "device_password",
+        "password_label": "Device Password",
+        "message": "Enter the Device Password from the printed setup instructions to access settings.",
         "password_help": (
             "This browser can remember your login with a signed secure session cookie."
         ),
         "session_supported": True,
         "remember_supported": True,
+        "device_password_source": device_password.get_device_password_source(),
+        "device_password_managed": device_password.is_device_managed(),
     }

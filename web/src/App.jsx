@@ -116,9 +116,9 @@ function App() {
 
     fetchWifiStatus();
 
-    const handleAuthRequired = () => {
+    const handleAuthRequired = (event) => {
       setAuthInfo((prev) => ({ ...(prev || {}), authenticated: false, login_required: true }));
-      setAuthError('Your session expired. Enter the password again.');
+      setAuthError(event?.detail?.message || 'Your session expired. Enter the Device Password again.');
     };
     window.addEventListener('pc1-auth-required', handleAuthRequired);
 

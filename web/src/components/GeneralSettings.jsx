@@ -27,14 +27,19 @@ const GeneralSettings = ({
   const [timeStatus, setTimeStatus] = useState({ type: '', message: '' });
   const [useAutoTime, setUseAutoTime] = useState(false);
 
+  // Device Password state
+  const [devicePasswordStatus, setDevicePasswordStatus] = useState(null);
+  const [devicePasswordMessage, setDevicePasswordMessage] = useState({ type: '', message: '' });
+  const [showDevicePasswordChange, setShowDevicePasswordChange] = useState(false);
+  const [currentDevicePassword, setCurrentDevicePassword] = useState('');
+  const [newDevicePassword, setNewDevicePassword] = useState('');
+  const [confirmDevicePassword, setConfirmDevicePassword] = useState('');
+  const [changingDevicePassword, setChangingDevicePassword] = useState(false);
+
   // SSH management state
   const [sshStatus, setSshStatus] = useState(null);
   const [sshLoading, setSshLoading] = useState(false);
   const [sshMessage, setSshMessage] = useState({ type: '', message: '' });
-  const [showPasswordChange, setShowPasswordChange] = useState(false);
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [changingPassword, setChangingPassword] = useState(false);
 
   // Update check state
   const [updateStatus, setUpdateStatus] = useState(null);
@@ -95,6 +100,20 @@ const GeneralSettings = ({
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    const fetchDevicePasswordStatus = async () => {
+      try {
+        const response = await fetch('/api/system/device-password/status');
+        const data = await response.json();
+        setDevicePasswordStatus(data);
+      } catch (err) {
+        console.error('Error fetching Device Password status:', err);
+      }
+    };
+
+    fetchDevicePasswordStatus();
+  }, []);
+
   // Fetch current version on mount
   useEffect(() => {
     const fetchCurrentVersion = async () => {
@@ -114,6 +133,76 @@ const GeneralSettings = ({
 
   const getApiError = (data, fallback) => {
     return data?.detail || data?.error || data?.message || fallback;
+  };
+
+  const clearStatusLater = (setter) => {
+    setTimeout(() => setter({ type: '', message: '' }), 5000);
+  };
+
+  const handleDevicePasswordChange = async () => {
+    if (!currentDevicePassword) {
+      setDevicePasswordMessage({ type: 'error', message: 'Enter your current Device Password' });
+      clearStatusLater(setDevicePasswordMessage);
+      return;
+    }
+    if (!newDevicePassword || newDevicePassword.length < 8) {
+      setDevicePasswordMessage({ type: 'error', message: 'New Device Password must be at least 8 characters' });
+      clearStatusLater(setDevicePasswordMessage);
+      return;
+    }
+    if (newDevicePassword !== confirmDevicePassword) {
+      setDevicePasswordMessage({ type: 'error', message: 'New passwords do not match' });
+      clearStatusLater(setDevicePasswordMessage);
+      return;
+    }
+
+    setChangingDevicePassword(true);
+    setDevicePasswordMessage({ type: '', message: '' });
+
+    try {
+      const response = await adminAuthFetch('/api/system/device-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          current_password: currentDevicePassword,
+          new_password: newDevicePassword,
+        }),
+      });
+      const data = await response.json();
+
+      if (data.success) {
+        setDevicePasswordMessage({ type: 'success', message: data.message });
+        setCurrentDevicePassword('');
+        setNewDevicePassword('');
+        setConfirmDevicePassword('');
+        setShowDevicePasswordChange(false);
+
+        if (data.reauth_required) {
+          setTimeout(() => {
+            window.dispatchEvent(
+              new CustomEvent('pc1-auth-required', {
+                detail: {
+                  message: 'Device Password changed. Enter the new Device Password to continue.',
+                },
+              }),
+            );
+          }, 1200);
+        } else {
+          clearStatusLater(setDevicePasswordMessage);
+        }
+      } else {
+        setDevicePasswordMessage({
+          type: 'error',
+          message: getApiError(data, 'Failed to change Device Password'),
+        });
+        clearStatusLater(setDevicePasswordMessage);
+      }
+    } catch (err) {
+      setDevicePasswordMessage({ type: 'error', message: `Error changing Device Password: ${err.message}` });
+      clearStatusLater(setDevicePasswordMessage);
+    } finally {
+      setChangingDevicePassword(false);
+    }
   };
 
   // Auto sync time
@@ -747,12 +836,121 @@ const GeneralSettings = ({
         </div>
       </div>
 
-      {/* SSH Management */}
+      {/* Device Password */}
       <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[4] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
+          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Device Password</h3>
+          <p className='text-sm text-gray-600 mb-4 '>
+            The Device Password is shared across settings login, setup WiFi, printed setup instructions, and SSH access.
+          </p>
+
+          <div className='space-y-4'>
+            <div className='p-4 border-2 border-gray-300 rounded-lg'>
+              <div className='flex items-center justify-between mb-2 gap-3'>
+                <span className='text-sm font-medium text-black  font-bold'>Password Storage</span>
+                <span
+                  className={`px-3 py-1 rounded-full text-xs font-medium border-2 ${
+                    devicePasswordStatus?.managed ? 'bg-white text-black border-black' : 'bg-white text-gray-500 border-gray-300'
+                  }`}>
+                  {devicePasswordStatus?.managed ? 'Managed on Device' : 'Development Override'}
+                </span>
+              </div>
+              <p className='text-xs text-gray-600 mt-1 '>
+                {devicePasswordStatus?.message || 'Loading Device Password status...'}
+              </p>
+            </div>
+
+            {devicePasswordStatus?.can_change ? (
+              <>
+                <button
+                  type='button'
+                  onClick={() => setShowDevicePasswordChange(!showDevicePasswordChange)}
+                  className='w-full py-2.5 px-4 bg-transparent border-2 border-gray-400 text-black rounded-lg  font-bold hover:border-black hover:bg-white transition-all cursor-pointer'>
+                  {showDevicePasswordChange ? 'Cancel' : 'Change Device Password'}
+                </button>
+
+                {showDevicePasswordChange && (
+                  <div className='p-4 border-2 border-gray-300 rounded-lg'>
+                    <h4 className='text-sm font-medium text-black mb-3  font-bold'>Change Device Password</h4>
+                    <div className='space-y-3'>
+                      <div>
+                        <label className='block mb-2 text-sm text-black  font-bold'>Current Device Password</label>
+                        <input
+                          type='password'
+                          value={currentDevicePassword}
+                          onChange={(e) => setCurrentDevicePassword(e.target.value)}
+                          placeholder='Enter current password'
+                          className={inputClass}
+                          minLength={8}
+                        />
+                      </div>
+                      <div>
+                        <label className='block mb-2 text-sm text-black  font-bold'>New Device Password</label>
+                        <input
+                          type='password'
+                          value={newDevicePassword}
+                          onChange={(e) => setNewDevicePassword(e.target.value)}
+                          placeholder='Minimum 8 characters'
+                          className={inputClass}
+                          minLength={8}
+                        />
+                      </div>
+                      <div>
+                        <label className='block mb-2 text-sm text-black  font-bold'>Confirm New Password</label>
+                        <input
+                          type='password'
+                          value={confirmDevicePassword}
+                          onChange={(e) => setConfirmDevicePassword(e.target.value)}
+                          placeholder='Re-enter new password'
+                          className={inputClass}
+                          minLength={8}
+                        />
+                      </div>
+                      <PrimaryButton
+                        onClick={handleDevicePasswordChange}
+                        disabled={
+                          changingDevicePassword ||
+                          !currentDevicePassword ||
+                          !newDevicePassword ||
+                          !confirmDevicePassword
+                        }
+                        loading={changingDevicePassword}
+                        className='w-full'>
+                        Change Device Password
+                      </PrimaryButton>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className='p-4 border-2 border-gray-300 rounded-lg'>
+                <p className='text-sm text-gray-500 '>
+                  Device Password changes are only available on managed PC-1 builds.
+                </p>
+              </div>
+            )}
+
+            {devicePasswordMessage.message && (
+              <div
+                className={`p-3 rounded-lg text-sm  border-2 ${
+                  devicePasswordMessage.type === 'success'
+                    ? 'bg-gray-100 text-black border-black'
+                    : 'bg-white text-black border-black border-dashed'
+                }`}>
+                {devicePasswordMessage.type === 'error' && <span className='font-bold mr-2'>ERROR:</span>}
+                {devicePasswordMessage.message}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* SSH Management */}
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[5] || inkGradients[4] }}>
         <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
           <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>SSH Access</h3>
           <p className='text-sm text-gray-600 mb-4 '>
-            Manage SSH (Secure Shell) access to your PC-1 device. SSH allows advanced users to access the device via command line.
+            Manage SSH (Secure Shell) service access to your PC-1 device. When SSH is enabled, it uses the same Device Password shown on setup instructions.
           </p>
 
           {sshStatus && sshStatus.available ? (
@@ -788,6 +986,9 @@ const GeneralSettings = ({
                     Connect via: <span className='text-black '>ssh {sshStatus.username || 'admin'}@pc-1.local</span>
                   </p>
                 )}
+                <p className='text-xs text-gray-600 mt-2 '>
+                  Password: <span className='text-black '>Uses your Device Password</span>
+                </p>
               </div>
 
               {/* Enable/Disable SSH */}
@@ -861,87 +1062,7 @@ const GeneralSettings = ({
                     {sshLoading ? 'Disabling...' : 'Disable SSH'}
                   </button>
                 )}
-                {sshStatus.enabled && (
-                  <button
-                    type='button'
-                    onClick={() => setShowPasswordChange(!showPasswordChange)}
-                    className='flex-1 py-2.5 px-4 bg-transparent border-2 border-gray-400 text-black rounded-lg  font-bold hover:border-black hover:bg-white transition-all cursor-pointer'>
-                    {showPasswordChange ? 'Cancel' : 'Change Password'}
-                  </button>
-                )}
               </div>
-
-              {/* Change Password Form */}
-              {showPasswordChange && sshStatus.enabled && (
-                <div className='p-4 border-2 border-gray-300 rounded-lg'>
-                  <h4 className='text-sm font-medium text-black mb-3  font-bold'>Change SSH Password</h4>
-                  <div className='space-y-3'>
-                    <div>
-                      <label className='block mb-2 text-sm text-black  font-bold'>New Password</label>
-                      <input
-                        type='password'
-                        value={newPassword}
-                        onChange={(e) => setNewPassword(e.target.value)}
-                        placeholder='Minimum 8 characters'
-                        className={inputClass}
-                        minLength={8}
-                      />
-                    </div>
-                    <div>
-                      <label className='block mb-2 text-sm text-black  font-bold'>Confirm Password</label>
-                      <input
-                        type='password'
-                        value={confirmPassword}
-                        onChange={(e) => setConfirmPassword(e.target.value)}
-                        placeholder='Re-enter password'
-                        className={inputClass}
-                        minLength={8}
-                      />
-                    </div>
-                    <PrimaryButton
-                      onClick={async () => {
-                        if (!newPassword || newPassword.length < 8) {
-                          setSshMessage({ type: 'error', message: 'Password must be at least 8 characters' });
-                          setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
-                          return;
-                        }
-                        if (newPassword !== confirmPassword) {
-                          setSshMessage({ type: 'error', message: 'Passwords do not match' });
-                          setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
-                          return;
-                        }
-                        setChangingPassword(true);
-                        setSshMessage({ type: '', message: '' });
-                        try {
-                          const response = await adminAuthFetch('/api/system/ssh/password', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ new_password: newPassword }),
-                          });
-                          const data = await response.json();
-                          if (data.success) {
-                            setSshMessage({ type: 'success', message: data.message });
-                            setNewPassword('');
-                            setConfirmPassword('');
-                            setShowPasswordChange(false);
-                          } else {
-                            setSshMessage({ type: 'error', message: getApiError(data, 'Failed to change password') });
-                          }
-                        } catch {
-                          setSshMessage({ type: 'error', message: 'Error changing password' });
-                        } finally {
-                          setChangingPassword(false);
-                          setTimeout(() => setSshMessage({ type: '', message: '' }), 5000);
-                        }
-                      }}
-                      disabled={changingPassword || !newPassword || !confirmPassword}
-                      loading={changingPassword}
-                      className='w-full'>
-                      Change Password
-                    </PrimaryButton>
-                  </div>
-                </div>
-              )}
 
               {/* SSH Status Messages */}
               {sshMessage.message && (

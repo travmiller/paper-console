@@ -6,11 +6,11 @@ Handles WiFi scanning, connection, and AP mode management.
 import subprocess
 import os
 import logging
-import hashlib
 from typing import List, Dict, Optional
 
+import app.device_password as device_password
+
 AP_SSID_PREFIX = "PC-1-Setup"
-AP_PASSWORD_ENV = "PC1_SETUP_PASSWORD"
 
 
 def get_device_suffix() -> str:
@@ -29,29 +29,8 @@ def get_device_suffix() -> str:
 
 
 def get_device_password_seed() -> str:
-    """Return a stable per-device secret seed for setup password generation."""
-    for path in ("/etc/machine-id", "/var/lib/dbus/machine-id"):
-        try:
-            if os.path.exists(path):
-                with open(path, "r", encoding="utf-8", errors="ignore") as f:
-                    value = f.read().strip()
-                    if value:
-                        return value
-        except Exception:
-            pass
-
-    try:
-        if os.path.exists("/proc/cpuinfo"):
-            with open("/proc/cpuinfo", "r", encoding="utf-8", errors="ignore") as f:
-                for line in f:
-                    if line.lower().startswith("serial"):
-                        serial = line.split(":", 1)[1].strip()
-                        if serial:
-                            return serial
-    except Exception:
-        pass
-
-    return os.uname().nodename if hasattr(os, "uname") else "pc1"
+    """Return a stable per-device secret seed for fallback password derivation."""
+    return device_password.get_device_password_seed()
 
 
 def get_ap_ssid() -> str:
@@ -60,14 +39,8 @@ def get_ap_ssid() -> str:
 
 
 def get_ap_password() -> str:
-    """Get setup AP password (env override or per-device hashed fallback)."""
-    env_password = os.environ.get(AP_PASSWORD_ENV, "").strip()
-    if len(env_password) >= 8:
-        return env_password
-    digest = hashlib.sha256(
-        get_device_password_seed().encode("utf-8", errors="ignore")
-    ).hexdigest()
-    return f"pc1-{digest[:10]}"
+    """Get setup AP password, which now matches the unified Device Password."""
+    return device_password.get_device_password()
 
 
 def run_command(cmd: List[str], check: bool = True) -> subprocess.CompletedProcess:

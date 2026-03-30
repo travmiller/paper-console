@@ -182,7 +182,9 @@ run_as_root rm -f \
     "$PROJECT_DIR/config.json.bak.tmp" \
     "$PROJECT_DIR/.env" \
     "$PROJECT_DIR/.env.bak" \
-    "$PROJECT_DIR/.deploy_config"
+    "$PROJECT_DIR/.deploy_config" \
+    "/etc/pc1/device_password" \
+    "/etc/pc1/device_managed"
 
 log "Clearing cached artifacts and Python bytecode"
 run_as_root find "$PROJECT_DIR" -type d -name "__pycache__" -prune -exec rm -rf {} + 2>/dev/null || true
@@ -249,4 +251,3 @@ echo "2. Capture the SD card image on your host machine"
 echo "3. Flash that image to production cards"
 echo ""
 warn "WiFi profiles were removed. Remote SSH sessions may disconnect after this run."
-
