@@ -2,6 +2,7 @@
 
 import asyncio
 import importlib.util
+import json
 import subprocess
 import sys
 import time
@@ -359,6 +360,15 @@ def test_quotes_module_does_not_download_when_local_db_is_missing(monkeypatch):
 
     assert quote["quoteText"] == "Offline quotes database is missing."
     assert quote["quoteAuthor"] == "System"
+
+
+def test_bundled_quotes_db_is_valid_utf8():
+    bundled_path = quotes_module._get_quotes_db_path()
+    with bundled_path.open("r", encoding="utf-8") as f:
+        quotes = json.load(f)
+
+    assert isinstance(quotes, list)
+    assert quotes
 
 
 def test_history_module_does_not_download_when_local_db_is_missing(monkeypatch):
