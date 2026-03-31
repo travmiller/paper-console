@@ -16,12 +16,6 @@ const GeneralSettings = ({
 }) => {
   const inputClass = 'w-full p-3 text-base border-2 border-gray-300 rounded-lg focus:outline-none box-border';
   const labelClass = 'block mb-2 font-bold';
-  const devicePasswordSource = devicePasswordStatus?.source;
-  const devicePasswordBadgeMuted = !['managed_file', 'managed_fallback'].includes(devicePasswordSource || '');
-  const devicePasswordUnavailableMessage =
-    devicePasswordSource === 'managed_fallback'
-      ? 'Password changes will be available after managed device credential storage is provisioned on this unit.'
-      : 'Device Password changes are only available on managed PC-1 builds.';
 
   // Use shared ink gradients
   const inkGradients = INK_GRADIENTS;
@@ -41,6 +35,12 @@ const GeneralSettings = ({
   const [newDevicePassword, setNewDevicePassword] = useState('');
   const [confirmDevicePassword, setConfirmDevicePassword] = useState('');
   const [changingDevicePassword, setChangingDevicePassword] = useState(false);
+  const devicePasswordSource = devicePasswordStatus?.source;
+  const devicePasswordBadgeMuted = !['managed_file', 'managed_fallback'].includes(devicePasswordSource || '');
+  const devicePasswordUnavailableMessage =
+    devicePasswordSource === 'managed_fallback'
+      ? 'Password changes will be available after managed device credential storage is provisioned on this unit.'
+      : 'Device Password changes are only available on managed PC-1 builds.';
 
   // SSH management state
   const [sshStatus, setSshStatus] = useState(null);
