@@ -12,12 +12,14 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+from copy import deepcopy
 import os
 import sys
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 from typing import Optional
+from datetime import date, datetime, timedelta
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -36,7 +38,132 @@ from app.module_registry import get_all_modules, get_module
 from app.drivers.printer_serial import PrinterDriver as SerialPrinterDriver
 from app.modules import webhook, text, calendar, email_client
 
-
+SNAPSHOT_HISTORY_DATE = "1969-07-20"
+SNAPSHOT_NOTE_DOC = {
+    "type": "doc",
+    "content": [
+        {
+            "type": "heading",
+            "attrs": {"level": 2},
+            "content": [{"type": "text", "text": "Grocery List"}],
+        },
+        {
+            "type": "taskList",
+            "content": [
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Milk"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Eggs"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Bananas"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Coffee beans"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Sourdough bread"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Peanut butter"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Strawberries"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Spinach"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Tomatoes"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Pasta"}],
+                        }
+                    ],
+                },
+                {
+                    "type": "taskItem",
+                    "attrs": {"checked": False},
+                    "content": [
+                        {
+                            "type": "paragraph",
+                            "content": [{"type": "text", "text": "Olive oil"}],
+                        }
+                    ],
+                },
+            ],
+        },
+    ],
+}
 class CapturePrinter(SerialPrinterDriver):
     """Serial printer driver that captures raster bitmaps instead of sending."""
 
@@ -65,9 +192,64 @@ class CapturePrinter(SerialPrinterDriver):
         self._max_lines_hit = False
 
 
+def _build_snapshot_calendar_ics(reference_day: Optional[date] = None) -> str:
+    today = reference_day or date.today()
+    timed_one = datetime.combine(today, datetime.min.time()).replace(hour=9, minute=30)
+    timed_two = datetime.combine(today + timedelta(days=1), datetime.min.time()).replace(
+        hour=18, minute=0
+    )
+    all_day = today + timedelta(days=3)
+    return "\r\n".join(
+        [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//PC-1//Snapshot Calendar//EN",
+            "BEGIN:VEVENT",
+            f"DTSTART:{timed_one.strftime('%Y%m%dT%H%M%S')}",
+            "SUMMARY:Farmer's market run",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            f"DTSTART:{timed_two.strftime('%Y%m%dT%H%M%S')}",
+            "SUMMARY:Grandma birthday dinner",
+            "END:VEVENT",
+            "BEGIN:VEVENT",
+            f"DTSTART;VALUE=DATE:{all_day.strftime('%Y%m%d')}",
+            "SUMMARY:Library pickup day",
+            "END:VEVENT",
+            "END:VCALENDAR",
+            "",
+        ]
+    )
+
+
+def _apply_snapshot_defaults(type_id: str, config: dict) -> dict:
+    out = deepcopy(config or {})
+
+    if type_id == "history":
+        out.setdefault("reference_date", SNAPSHOT_HISTORY_DATE)
+
+    elif type_id == "text":
+        content_doc = text._normalize_content_doc(out.get("content_doc"))
+        if not text._doc_has_visible_content(content_doc):
+            out["content_doc"] = deepcopy(SNAPSHOT_NOTE_DOC)
+
+    elif type_id == "calendar":
+        sources = out.get("ical_sources") or []
+        mock_ics = (out.get("mock_ics_content") or "").strip()
+        if not sources and not mock_ics:
+            out["mock_ics_content"] = _build_snapshot_calendar_ics()
+            out.setdefault("view_mode", "month")
+
+    elif type_id == "email":
+        if "mock_messages" not in out:
+            out["mock_messages"] = email_client.get_default_mock_messages()
+
+    return out
+
+
 def _execute_module(module, printer: CapturePrinter, include_interactive: bool) -> bool:
     module_type = module.type
-    config = module.config or {}
+    config = _apply_snapshot_defaults(module_type, module.config or {})
     module_name = module.name or module_type.upper()
 
     # Ensure interactive state from prior modules does not leak into this render.
@@ -274,7 +456,10 @@ def _default_config_for_module_type(type_id: str, defn) -> dict:
     # Prefer an existing configured instance to get realistic defaults.
     for module in settings.modules.values():
         if module.type == type_id:
-            return _overlay_env_test_config(type_id, dict(module.config or {}))
+            return _apply_snapshot_defaults(
+                type_id,
+                _overlay_env_test_config(type_id, dict(module.config or {})),
+            )
 
     # Fall back to config class defaults when available.
     config_class = getattr(defn, "config_class", None)
@@ -282,13 +467,19 @@ def _default_config_for_module_type(type_id: str, defn) -> dict:
         try:
             cfg = config_class()
             if hasattr(cfg, "model_dump"):
-                return _overlay_env_test_config(type_id, cfg.model_dump())
+                return _apply_snapshot_defaults(
+                    type_id,
+                    _overlay_env_test_config(type_id, cfg.model_dump()),
+                )
             if hasattr(cfg, "dict"):
-                return _overlay_env_test_config(type_id, cfg.dict())
+                return _apply_snapshot_defaults(
+                    type_id,
+                    _overlay_env_test_config(type_id, cfg.dict()),
+                )
         except Exception:
             pass
 
-    return _overlay_env_test_config(type_id, {})
+    return _apply_snapshot_defaults(type_id, _overlay_env_test_config(type_id, {}))
 
 
 def _render_module_type(

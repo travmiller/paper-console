@@ -96,6 +96,7 @@ class CalendarConfig(BaseModel):
     ical_sources: List[CalendarSource] = []
     view_mode: Optional[Literal["day", "week", "month"]] = None
     days_to_show: Optional[int] = None  # Legacy fallback for older saved configs.
+    mock_ics_content: Optional[str] = None
 
 
 

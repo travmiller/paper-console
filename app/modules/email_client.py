@@ -2,6 +2,7 @@ import imaplib
 import email
 import socket
 import logging
+from copy import deepcopy
 from email.header import decode_header
 from email.utils import parseaddr
 from bs4 import BeautifulSoup
@@ -17,6 +18,26 @@ IMAP_TIMEOUT = 30
 
 logger = logging.getLogger(__name__)
 _LAST_FETCH_ERROR = None
+DEFAULT_MOCK_MESSAGES = [
+    {
+        "from": "Maya <maya@example.com>",
+        "subject": "Hi Grandma",
+        "body": (
+            "Hi Grandma,\n"
+            "I wanted to tell you the daffodils are finally blooming and the backyard "
+            "is full of birds this morning.\n"
+            "I will bring you a loaf of banana bread on Sunday.\n"
+            "Love,\n"
+            "Maya"
+        ),
+    }
+]
+
+
+def get_default_mock_messages() -> List[Dict[str, str]]:
+    """Return printable fallback mock messages for offline previews."""
+    return deepcopy(DEFAULT_MOCK_MESSAGES)
+
 
 def clean_text(text):
     """Decodes headers/body to a printable string, removing newlines."""
@@ -169,6 +190,26 @@ def fetch_emails(config: Dict[str, Any] = None) -> List[Dict[str, str]]:
             logger.warning("fetch_emails called but no email configuration found")
             _LAST_FETCH_ERROR = "config_missing"
             return []
+
+    mock_messages = None
+    if isinstance(config, dict):
+        raw_mock_messages = config.get("mock_messages")
+        if isinstance(raw_mock_messages, list):
+            mock_messages = []
+            for msg in raw_mock_messages:
+                if not isinstance(msg, dict):
+                    continue
+                mock_messages.append(
+                    {
+                        "from": format_sender(msg.get("from", "")),
+                        "subject": clean_text(msg.get("subject", "")),
+                        "body": sanitize_email_body_for_print(msg.get("body", "")),
+                    }
+                )
+
+    if mock_messages is not None:
+        _LAST_FETCH_ERROR = None
+        return mock_messages
 
     try:
         if not config.get("email_user") or not config.get("email_password"):

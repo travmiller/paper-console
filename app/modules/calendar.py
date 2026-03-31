@@ -534,11 +534,12 @@ def format_calendar_receipt(
             if src.url:
                 sources.append(src.url)
 
-    if not sources:
+    if not sources and not config.mock_ics_content:
         printer.print_body("No iCal URLs configured.")
         return
 
     all_events = {}
+    calendar_payloads = []
 
     view_mode = _resolve_view_mode(config)
 
@@ -555,16 +556,22 @@ def format_calendar_receipt(
     else:
         parse_days = 7
     
+    if config.mock_ics_content:
+        calendar_payloads.append(config.mock_ics_content)
+
     for url in sources:
         ics_data = fetch_ics(url)
         if ics_data:
-            events = parse_events(
-                ics_data, parse_days, app.config.settings.timezone
-            )
-            for d, evts in events.items():
-                if d not in all_events:
-                    all_events[d] = []
-                all_events[d].extend(evts)
+            calendar_payloads.append(ics_data)
+
+    for ics_data in calendar_payloads:
+        events = parse_events(
+            ics_data, parse_days, app.config.settings.timezone
+        )
+        for d, evts in events.items():
+            if d not in all_events:
+                all_events[d] = []
+            all_events[d].extend(evts)
 
     if not all_events:
         printer.print_body("No upcoming events.")

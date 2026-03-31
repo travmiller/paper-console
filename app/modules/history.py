@@ -1,7 +1,7 @@
 import json
 from typing import Dict, Any, List
 from pathlib import Path
-from datetime import datetime
+from datetime import date, datetime
 from app.utils import wrap_text, wrap_text_pixels
 from PIL import Image, ImageDraw
 from app.module_registry import register_module
@@ -9,11 +9,10 @@ from app.module_registry import register_module
 LOCAL_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "history.json"
 
 
-def get_events_for_today() -> List[str]:
-    """Reads events for the current date from the local database."""
-    now = datetime.now()
-    month = str(now.month)
-    day = str(now.day)
+def get_events_for_date(target_date: date) -> List[str]:
+    """Reads events for a specific date from the local database."""
+    month = str(target_date.month)
+    day = str(target_date.day)
 
     try:
         with open(LOCAL_DB_PATH, "r", encoding="utf-8") as f:
@@ -28,6 +27,31 @@ def get_events_for_today() -> List[str]:
         return ["Offline history database is missing."]
     except Exception:
         return ["Error reading history database."]
+
+
+def get_events_for_today() -> List[str]:
+    """Reads events for the current date from the local database."""
+    return get_events_for_date(datetime.now().date())
+
+
+def _resolve_reference_date(config: Dict[str, Any] | None) -> date:
+    if not config:
+        return datetime.now().date()
+
+    raw_value = config.get("reference_date")
+    if isinstance(raw_value, datetime):
+        return raw_value.date()
+    if isinstance(raw_value, date):
+        return raw_value
+    if isinstance(raw_value, str):
+        try:
+            return datetime.fromisoformat(raw_value).date()
+        except ValueError:
+            try:
+                return date.fromisoformat(raw_value)
+            except ValueError:
+                pass
+    return datetime.now().date()
 
 
 @register_module(
@@ -49,7 +73,8 @@ def format_history_receipt(
 ):
     """Prints 'On This Day' historical events."""
 
-    events = get_events_for_today()
+    target_date = _resolve_reference_date(config)
+    events = get_events_for_date(target_date)
 
     # Filter/Select events
     count = 1
@@ -61,13 +86,16 @@ def format_history_receipt(
 
     import random
     if len(events) > count:
-        selected_events = random.sample(events, count)
+        if config and config.get("reference_date"):
+            selected_events = events[:count]
+        else:
+            selected_events = random.sample(events, count)
     else:
         selected_events = events
 
     # Header
     printer.print_header(module_name or "ON THIS DAY", icon="hourglass")
-    printer.print_caption(datetime.now().strftime("%B %d, %Y"))
+    printer.print_caption(target_date.strftime("%B %d, %Y"))
     printer.print_line()
 
     if not selected_events:
