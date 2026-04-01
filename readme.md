@@ -17,7 +17,7 @@
 ## 1. Quick Start (Software)
 
 Run the entire system on your PC without hardware to test logic and see "printer" output in the terminal.
-Use a Unix-like shell for project commands: Linux, macOS, or WSL on Windows.
+Use a Unix-like shell for project commands: Linux, macOS, or WSL on Windows
 
 **Backend:**
 
