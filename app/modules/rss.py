@@ -85,6 +85,12 @@ def get_rss_articles(config: Dict[str, Any] = None):
 
     rss_feeds = config.get("rss_feeds", [])
 
+    try:
+        num_articles = int(config.get("num_articles", 2))
+    except (TypeError, ValueError):
+        num_articles = 2
+    num_articles = max(1, min(num_articles, 10))
+
     # Filter out empty strings
     rss_feeds = [feed for feed in rss_feeds if feed and feed.strip()]
 
@@ -95,9 +101,14 @@ def get_rss_articles(config: Dict[str, Any] = None):
 
     for feed_url in rss_feeds:
         try:
+            # Some websites require a user agent to be set
+            headers = {
+                "User-Agent": "Paper Console/1"
+            }
+            
             # Use requests with timeout instead of feedparser directly
             # This prevents hanging on slow/unresponsive feeds
-            response = requests.get(feed_url, timeout=10)
+            response = requests.get(feed_url, headers=headers, timeout=10)
             response.raise_for_status()
 
             # Limit response size to prevent memory issues
@@ -109,8 +120,8 @@ def get_rss_articles(config: Dict[str, Any] = None):
             if not feed.entries:
                 continue
 
-            # Get top 2 entries from each feed
-            for entry in feed.entries[:2]:
+            # Get top num_articles entries from each feed
+            for entry in feed.entries[:num_articles]:
                 title = clean_text(entry.get("title", "No Title"))
                 summary = clean_text(
                     entry.get("summary", entry.get("description", "No summary."))
@@ -123,7 +134,7 @@ def get_rss_articles(config: Dict[str, Any] = None):
             # Silently skip failed feeds
             continue
 
-    return articles[:10]  # Cap at 10 items total
+    return articles
 
 
 @register_module(
@@ -136,6 +147,13 @@ def get_rss_articles(config: Dict[str, Any] = None):
     config_schema={
         "type": "object",
         "properties": {
+            "num_articles": {
+                "type": "integer",
+                "title": "Articles to print from each feed",
+                "default": 2,
+                "minimum": 1,
+                "maximum": 10
+            },
             "rss_feeds": {
                 "type": "array", 
                 "title": "RSS Feed URLs",
