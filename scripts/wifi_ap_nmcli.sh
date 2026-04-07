@@ -49,7 +49,6 @@ get_password_seed() {
 
 get_device_password() {
     local seed
-    local digest
     if [ -n "$DEVICE_PASSWORD" ] && [ "${#DEVICE_PASSWORD}" -ge 8 ]; then
         echo "$DEVICE_PASSWORD"
         return
@@ -63,8 +62,15 @@ get_device_password() {
         fi
     fi
     seed=$(get_password_seed)
-    digest=$(printf '%s' "$seed" | sha256sum | awk '{print $1}' | cut -c1-8)
-    echo "${digest:0:4}-${digest:4:4}"
+    python3 - "$seed" <<'PY'
+import hashlib
+import sys
+
+alphabet = "abcdefghijklmnopqrstuvwxyz"
+seed = sys.argv[1]
+digest = hashlib.sha256(seed.encode("utf-8", errors="ignore")).digest()
+print("".join(alphabet[byte % len(alphabet)] for byte in digest[:8]))
+PY
 }
 
 start_ap() {

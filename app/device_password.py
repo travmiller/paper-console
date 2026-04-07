@@ -15,7 +15,7 @@ DEVICE_MANAGED_FILE_ENV = "PC1_DEVICE_MANAGED_FILE"
 DEVICE_MANAGED_FILE_DEFAULT = "/etc/pc1/device_managed"
 MIN_DEVICE_PASSWORD_LENGTH = 8
 DEFAULT_DEVICE_PASSWORD_LENGTH = 8
-DEFAULT_DEVICE_PASSWORD_GROUP_SIZE = 4
+DEFAULT_DEVICE_PASSWORD_ALPHABET = "abcdefghijklmnopqrstuvwxyz"
 TRUTHY_VALUES = {"1", "true", "yes", "on"}
 
 
@@ -80,23 +80,19 @@ def _device_password_store_writable() -> bool:
         return False
 
 
-def _format_default_device_password(raw_password: str) -> str:
-    normalized = "".join(
-        ch for ch in (raw_password or "").strip().lower() if ch.isalnum()
-    )[:DEFAULT_DEVICE_PASSWORD_LENGTH]
-    if len(normalized) <= DEFAULT_DEVICE_PASSWORD_GROUP_SIZE:
-        return normalized
-    return "-".join(
-        normalized[i : i + DEFAULT_DEVICE_PASSWORD_GROUP_SIZE]
-        for i in range(0, len(normalized), DEFAULT_DEVICE_PASSWORD_GROUP_SIZE)
+def _format_default_device_password(source_bytes: bytes) -> str:
+    alphabet = DEFAULT_DEVICE_PASSWORD_ALPHABET
+    return "".join(
+        alphabet[byte % len(alphabet)]
+        for byte in source_bytes[:DEFAULT_DEVICE_PASSWORD_LENGTH]
     )
 
 
 def _fallback_device_password() -> str:
     digest = hashlib.sha256(
         get_device_password_seed().encode("utf-8", errors="ignore")
-    ).hexdigest()
-    # Keep the fallback deterministic, lowercase, and easy to read as 4-4.
+    ).digest()
+    # Keep the fallback deterministic, lowercase, and letters-only.
     return _format_default_device_password(digest)
 
 
