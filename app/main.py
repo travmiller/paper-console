@@ -673,7 +673,7 @@ async def long_press_menu_trigger():
     asyncio.create_task(_auto_exit_quick_actions_after_timeout(quick_actions_id))
 
 
-from app.utils import print_setup_instructions_sync
+from app.utils import print_setup_instructions_sync, print_setup_wifi_access_details
 
 
 async def print_setup_instructions():
@@ -797,8 +797,11 @@ async def check_first_boot():
                 printer.print_body("On your phone or computer,")
                 printer.print_body("connect to WiFi network:")
                 printer.print_line()
-                printer.print_bold(f"  {ssid}")
-                printer.print_caption(f"  Password: {ap_password}")
+                print_setup_wifi_access_details(
+                    printer,
+                    ssid=ssid,
+                    password=ap_password,
+                )
                 printer.print_line()
 
                 # Step 2

@@ -250,7 +250,7 @@ if [ "${#DEVICE_PASSWORD}" -lt 8 ]; then
 import secrets
 
 alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789"
-print("".join(secrets.choice(alphabet) for _ in range(12)))
+print("".join(secrets.choice(alphabet) for _ in range(8)))
 PY
 )
     printf '%s\n' "$DEVICE_PASSWORD" > "$DEVICE_PASSWORD_FILE"

@@ -15,20 +15,7 @@ from app.config import QRCodeConfig
 from app.drivers.printer_mock import PrinterDriver
 from datetime import datetime
 from app.module_registry import register_module
-
-
-def _generate_wifi_string(ssid: str, password: str, security: str = "WPA", hidden: bool = False) -> str:
-    """Generate WiFi QR code string format."""
-    # WIFI:T:WPA;S:mynetwork;P:mypass;H:false;;
-    hidden_str = "true" if hidden else "false"
-    # Escape special characters in SSID and password
-    ssid = ssid.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace(":", "\\:")
-    password = password.replace("\\", "\\\\").replace(";", "\\;").replace(",", "\\,").replace(":", "\\:")
-    
-    if security.upper() == "NOPASS":
-        return f"WIFI:T:nopass;S:{ssid};H:{hidden_str};;"
-    else:
-        return f"WIFI:T:{security};S:{ssid};P:{password};H:{hidden_str};;"
+from app.wifi_manager import generate_wifi_qr_payload
 
 
 def _generate_vcard(first_name: str, last_name: str = "", phone: str = "", email: str = "") -> str:
@@ -178,7 +165,7 @@ def format_qrcode_receipt(printer: PrinterDriver, config: dict, module_name: str
     description = ""
     
     if qr_type == "wifi":
-        qr_data = _generate_wifi_string(
+        qr_data = generate_wifi_qr_payload(
             ssid=qr_config.wifi_ssid,
             password=qr_config.wifi_password,
             security=qr_config.wifi_security,

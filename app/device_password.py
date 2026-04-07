@@ -14,6 +14,7 @@ DEVICE_MANAGED_ENV = "PC1_DEVICE_MANAGED"
 DEVICE_MANAGED_FILE_ENV = "PC1_DEVICE_MANAGED_FILE"
 DEVICE_MANAGED_FILE_DEFAULT = "/etc/pc1/device_managed"
 MIN_DEVICE_PASSWORD_LENGTH = 8
+DEFAULT_DEVICE_PASSWORD_LENGTH = 8
 TRUTHY_VALUES = {"1", "true", "yes", "on"}
 
 
@@ -82,7 +83,9 @@ def _fallback_device_password() -> str:
     digest = hashlib.sha256(
         get_device_password_seed().encode("utf-8", errors="ignore")
     ).hexdigest()
-    return f"pc1-{digest[:10]}"
+    # Keep the fallback at the shortest valid WPA passphrase length so the
+    # printed default stays easy to type while remaining deterministic.
+    return digest[:DEFAULT_DEVICE_PASSWORD_LENGTH]
 
 
 def get_device_password_seed() -> str:

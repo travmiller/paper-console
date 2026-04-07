@@ -62,8 +62,8 @@ get_device_password() {
         fi
     fi
     seed=$(get_password_seed)
-    digest=$(printf '%s' "$seed" | sha256sum | awk '{print $1}' | cut -c1-10)
-    echo "pc1-${digest}"
+    digest=$(printf '%s' "$seed" | sha256sum | awk '{print $1}' | cut -c1-8)
+    echo "$digest"
 }
 
 start_ap() {
