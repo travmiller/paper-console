@@ -180,6 +180,13 @@ async def email_polling_loop():
             # Check each email module silently
             for module in email_modules:
                 try:
+                    if not _try_begin_print_job(debounce=False):
+                        logger.info(
+                            "Skipping auto-print email poll for module_id=%s because printer is busy or reserved.",
+                            getattr(module, "id", "unknown"),
+                        )
+                        continue
+
                     # Run email fetching and printing in thread pool to avoid blocking event loop
                     from concurrent.futures import ThreadPoolExecutor
 
@@ -212,6 +219,8 @@ async def email_polling_loop():
                         "Email polling iteration failed for module_id=%s",
                         getattr(module, "id", "unknown"),
                     )
+                finally:
+                    _clear_print_reservation(clear_hold=False)
 
         except Exception:
             logger.exception("Email polling loop encountered an unexpected error")
@@ -240,6 +249,12 @@ async def scheduler_loop():
             # Check all channels for matching schedule
             for pos, channel in settings.channels.items():
                 if channel.schedule and current_time in channel.schedule:
+                    if not _try_begin_print_job(debounce=False):
+                        logger.info(
+                            "Skipping scheduled print for channel %s because printer is busy or reserved.",
+                            pos,
+                        )
+                        continue
                     await trigger_channel(pos)
 
         except Exception:
@@ -253,6 +268,7 @@ import threading
 
 print_lock = threading.Lock()
 print_in_progress = False
+hold_action_in_progress = False
 last_print_time = 0.0
 PRINT_DEBOUNCE_SECONDS = 3.0  # Minimum time between print jobs
 
@@ -260,24 +276,74 @@ PRINT_DEBOUNCE_SECONDS = 3.0  # Minimum time between print jobs
 global_loop = None
 
 
-def on_button_press_threadsafe():
-    """Callback that schedules the trigger on the main event loop."""
-    global global_loop, print_in_progress, last_print_time
+def _printer_reserved_locked() -> bool:
+    """Return True when the printer is reserved for a print or hold action."""
+    return print_in_progress or hold_action_in_progress
+
+
+def _try_begin_print_job(*, debounce: bool = False) -> bool:
+    """Reserve the printer for a new print job."""
+    global print_in_progress, last_print_time
     import time
 
     with print_lock:
-        # Check if print is already in progress
-        if print_in_progress:
-            return
+        if _printer_reserved_locked():
+            return False
 
-        # Debounce: ignore presses that come too quickly after the last one
         current_time = time.time()
-        if (current_time - last_print_time) < PRINT_DEBOUNCE_SECONDS:
-            return
+        if debounce and (current_time - last_print_time) < PRINT_DEBOUNCE_SECONDS:
+            return False
 
-        # Set flag immediately to prevent multiple clicks
         print_in_progress = True
         last_print_time = current_time
+        return True
+
+
+def _reserve_hold_action() -> bool:
+    """Reserve the printer once the user crosses a long-hold threshold."""
+    global hold_action_in_progress, last_print_time
+    import time
+
+    with print_lock:
+        if print_in_progress:
+            return False
+
+        hold_action_in_progress = True
+        last_print_time = time.time()
+        return True
+
+
+def _promote_hold_to_print_job() -> bool:
+    """Convert a hold reservation into an active print job."""
+    global print_in_progress, hold_action_in_progress, last_print_time
+    import time
+
+    with print_lock:
+        if print_in_progress:
+            return False
+
+        hold_action_in_progress = False
+        print_in_progress = True
+        last_print_time = time.time()
+        return True
+
+
+def _clear_print_reservation(*, clear_hold: bool = True):
+    """Release active print/hold reservations."""
+    global print_in_progress, hold_action_in_progress
+
+    with print_lock:
+        print_in_progress = False
+        if clear_hold:
+            hold_action_in_progress = False
+
+
+def on_button_press_threadsafe():
+    """Callback that schedules the trigger on the main event loop."""
+    global global_loop
+
+    if not _try_begin_print_job(debounce=True):
+        return
 
     try:
         if global_loop and global_loop.is_running():
@@ -295,12 +361,10 @@ def on_button_press_threadsafe():
                 asyncio.run_coroutine_threadsafe(trigger_current_channel(), global_loop)
         else:
             # Loop not running, reset flag
-            with print_lock:
-                print_in_progress = False
+            _clear_print_reservation(clear_hold=False)
     except Exception:
         # Failed to schedule, reset flag
-        with print_lock:
-            print_in_progress = False
+        _clear_print_reservation(clear_hold=False)
 
 
 async def handle_selection_async(dial_position: int):
@@ -308,7 +372,6 @@ async def handle_selection_async(dial_position: int):
     Async wrapper to handle selection mode input.
     Runs blocking operations in a thread pool.
     """
-    global print_in_progress
     from concurrent.futures import ThreadPoolExecutor
     from app.selection_mode import handle_selection
 
@@ -324,36 +387,29 @@ async def handle_selection_async(dial_position: int):
             await loop.run_in_executor(executor, _do_selection)
     finally:
         # Always mark print as complete
-        with print_lock:
-            print_in_progress = False
+        _clear_print_reservation(clear_hold=False)
 
 
 def on_button_long_press_threadsafe():
     """Callback for long press (5 seconds) - opens quick actions menu."""
-    global global_loop, print_in_progress, last_print_time
-    import time
+    global global_loop
 
-    with print_lock:
-        # Don't interrupt active print jobs.
-        if print_in_progress:
-            return
-        print_in_progress = True
-        last_print_time = time.time()
+    if not _promote_hold_to_print_job() and not _try_begin_print_job(debounce=False):
+        return
 
     try:
         if global_loop and global_loop.is_running():
             asyncio.run_coroutine_threadsafe(long_press_menu_trigger(), global_loop)
         else:
-            with print_lock:
-                print_in_progress = False
+            _clear_print_reservation()
     except Exception:
-        with print_lock:
-            print_in_progress = False
+        _clear_print_reservation()
 
 
 def on_button_long_press_ready_threadsafe():
     """Callback fired at 5s hold threshold to signal 'you can release now'."""
     try:
+        _reserve_hold_action()
         # Half-line tactile feed cue.
         if hasattr(printer, "feed_dots"):
             printer.feed_dots(12)
@@ -504,8 +560,6 @@ async def long_press_menu_trigger():
     from concurrent.futures import ThreadPoolExecutor
     from app.selection_mode import enter_selection_mode, exit_selection_mode
 
-    global print_in_progress
-
     # Cancel any existing interactive mode before opening quick actions
     exit_selection_mode()
 
@@ -527,8 +581,7 @@ async def long_press_menu_trigger():
         return
     finally:
         # Release lock so normal button presses can drive selection mode.
-        with print_lock:
-            print_in_progress = False
+        _clear_print_reservation(clear_hold=False)
 
     def _handle_quick_action(dial_position: int):
         from app.selection_mode import exit_selection_mode
@@ -620,7 +673,7 @@ async def long_press_menu_trigger():
     asyncio.create_task(_auto_exit_quick_actions_after_timeout(quick_actions_id))
 
 
-from app.utils import print_setup_instructions_sync
+from app.utils import print_setup_instructions_sync, print_setup_wifi_access_details
 
 
 async def print_setup_instructions():
@@ -744,8 +797,11 @@ async def check_first_boot():
                 printer.print_body("On your phone or computer,")
                 printer.print_body("connect to WiFi network:")
                 printer.print_line()
-                printer.print_bold(f"  {ssid}")
-                printer.print_caption(f"  Password: {ap_password}")
+                print_setup_wifi_access_details(
+                    printer,
+                    ssid=ssid,
+                    password=ap_password,
+                )
                 printer.print_line()
 
                 # Step 2
@@ -934,40 +990,49 @@ async def factory_reset_trigger():
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
 
-    # Run blocking printer operations in thread pool to avoid blocking event loop
     try:
-        loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            await loop.run_in_executor(executor, _print_reset_message)
-    except Exception:
-        logger.warning(
-            "Factory reset pre-reboot receipt failed to print",
-            exc_info=True,
-        )  # Continue reset flow even if print fails
-
-    # Wait for print to complete
-    await asyncio.sleep(3)
-
-    reset_result = perform_factory_reset()
-    if not reset_result.get("reboot_requested", False):
-        logger.error(
-            "Factory reset finished but reboot could not be requested: %s",
-            "; ".join(reset_result.get("errors", [])),
-        )
-        # Fallback: try to make the device recoverable without reboot.
+        # Run blocking printer operations in thread pool to avoid blocking event loop
         try:
-            if wifi_manager.start_ap_mode(retries=2):
-                await asyncio.sleep(1)
-                await print_setup_instructions()
+            loop = asyncio.get_event_loop()
+            with ThreadPoolExecutor() as executor:
+                await loop.run_in_executor(executor, _print_reset_message)
         except Exception:
-            logger.exception("Factory reset fallback AP-mode recovery failed")
+            logger.warning(
+                "Factory reset pre-reboot receipt failed to print",
+                exc_info=True,
+            )  # Continue reset flow even if print fails
+
+        # Wait for print to complete
+        await asyncio.sleep(3)
+
+        reset_result = perform_factory_reset()
+        if not reset_result.get("reboot_requested", False):
+            logger.error(
+                "Factory reset finished but reboot could not be requested: %s",
+                "; ".join(reset_result.get("errors", [])),
+            )
+            # Fallback: try to make the device recoverable without reboot.
+            try:
+                if wifi_manager.start_ap_mode(retries=2):
+                    await asyncio.sleep(1)
+                    await print_setup_instructions()
+            except Exception:
+                logger.exception("Factory reset fallback AP-mode recovery failed")
+    finally:
+        _clear_print_reservation()
 
 
 def on_factory_reset_threadsafe():
     """Callback for factory reset press (15+ seconds)."""
     global global_loop
+    if not _promote_hold_to_print_job() and not _try_begin_print_job(debounce=False):
+        logger.info("Ignoring factory reset hold because printer is already busy.")
+        return
+
     if global_loop and global_loop.is_running():
         asyncio.run_coroutine_threadsafe(factory_reset_trigger(), global_loop)
+    else:
+        _clear_print_reservation()
 
 
 @asynccontextmanager
@@ -987,9 +1052,6 @@ async def lifespan(app: FastAPI):
     def _init_printer():
         if hasattr(printer, "clear_hardware_buffer"):
             printer.clear_hardware_buffer()
-        if hasattr(printer, "set_cutter_feed"):
-            cutter_lines = getattr(settings, "cutter_feed_lines", 7)
-            printer.set_cutter_feed(cutter_lines)
 
     try:
         loop = asyncio.get_event_loop()
@@ -1257,11 +1319,6 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
     # Update module-level reference so modules that access app.config.settings will see the update
     config_module.settings = settings
 
-    # Update printer cutter feed if setting changed
-    if hasattr(printer, "set_cutter_feed"):
-        cutter_lines = getattr(settings, "cutter_feed_lines", 7)
-        printer.set_cutter_feed(cutter_lines)
-
     # Save to disk
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
@@ -1278,11 +1335,6 @@ async def reset_settings(background_tasks: BackgroundTasks):
 
     # Create fresh settings instance (uses defaults from config.py)
     settings = Settings()
-
-    # Update printer cutter feed to default
-    if hasattr(printer, "set_cutter_feed"):
-        cutter_lines = getattr(settings, "cutter_feed_lines", 7)
-        printer.set_cutter_feed(cutter_lines)
 
     # Save to disk (overwriting existing config.json)
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
@@ -1820,24 +1872,27 @@ async def get_current_version():
     Get the current version identifier without checking for updates.
     """
     try:
-        import subprocess
-        from pathlib import Path
+        project_root = _get_project_root()
+        install_mode = _get_install_mode(project_root)
 
-        # Get the project root directory (parent of app/)
-        project_root = Path(__file__).parent.parent
+        if install_mode == "production":
+            version_file = project_root / ".version"
+            if version_file.exists():
+                version_text = version_file.read_text(encoding="utf-8").strip()
+                if version_text:
+                    return {
+                        "version": version_text,
+                        "install_mode": install_mode,
+                        "can_convert_to_production": False,
+                    }
+            return {
+                "version": "unknown",
+                "install_mode": install_mode,
+                "can_convert_to_production": False,
+            }
 
-        # Prefer explicit release version for production installs
-        version_file = project_root / ".version"
-        if version_file.exists():
-            version_text = version_file.read_text(encoding="utf-8").strip()
-            if version_text:
-                return {"version": version_text}
-
-        # Fall back to git commit hash in development clones
-        if not (project_root / ".git").exists():
-            return {"version": "unknown"}
-
-        # Get current commit hash (short)
+        # Development clones report the current git commit.
+        # If a stale .version exists alongside .git, the install still behaves as dev.
         current_commit_result = subprocess.run(
             ["git", "rev-parse", "--short", "HEAD"],
             cwd=project_root,
@@ -1854,13 +1909,272 @@ async def get_current_version():
 
         return {
             "version": current_commit,
+            "install_mode": install_mode,
+            "can_convert_to_production": True,
         }
 
     except Exception as e:
         return {
             "version": "unknown",
+            "install_mode": "unknown",
+            "can_convert_to_production": False,
             "error": str(e),
         }
+
+
+def _get_project_root() -> Path:
+    """Return the project root directory (parent of app/)."""
+    return Path(__file__).parent.parent
+
+
+def _get_install_mode(project_root: Optional[Path] = None) -> str:
+    root = project_root or _get_project_root()
+    return "development" if (root / ".git").exists() else "production"
+
+
+def _get_release_bundle_metadata(
+    release_repo: str,
+    *,
+    release_tag: str = "",
+) -> Dict[str, str]:
+    import requests
+
+    release_path = f"releases/tags/{release_tag}" if release_tag else "releases/latest"
+    release_resp = requests.get(
+        f"https://api.github.com/repos/{release_repo}/{release_path}",
+        headers={"User-Agent": "PC-1-OTA-Updater"},
+        timeout=10,
+    )
+    release_resp.raise_for_status()
+    release_data = release_resp.json()
+
+    tag_name = (release_data.get("tag_name") or "").strip()
+    if not tag_name:
+        raise RuntimeError("Release metadata did not include tag_name")
+
+    assets = release_data.get("assets") or []
+    preferred_asset_name = f"pc1-{tag_name}.tar.gz"
+    checksum_asset_name = f"pc1-{tag_name}.sha256"
+
+    tar_asset = next(
+        (asset for asset in assets if asset.get("name") == preferred_asset_name),
+        None,
+    )
+    if not tar_asset:
+        raise RuntimeError(
+            "Latest release is missing the required production bundle asset "
+            f"'{preferred_asset_name}'."
+        )
+
+    checksum_asset = next(
+        (asset for asset in assets if asset.get("name") == checksum_asset_name),
+        None,
+    )
+    aggregate_checksum_asset = next(
+        (
+            asset
+            for asset in assets
+            if str(asset.get("name", "")).lower() in {"sha256sums", "sha256sums.txt"}
+        ),
+        None,
+    )
+
+    tarball_url = (tar_asset.get("browser_download_url") or "").strip()
+    tarball_name = str(tar_asset.get("name") or "").strip()
+    if not tarball_url:
+        raise RuntimeError("Release bundle metadata did not include a download URL")
+
+    checksum_url = (
+        (checksum_asset.get("browser_download_url") or "").strip()
+        if checksum_asset
+        else ""
+    )
+    aggregate_checksum_url = (
+        (aggregate_checksum_asset.get("browser_download_url") or "").strip()
+        if aggregate_checksum_asset
+        else ""
+    )
+
+    return {
+        "tag_name": tag_name,
+        "tarball_name": tarball_name,
+        "tarball_url": tarball_url,
+        "checksum_url": checksum_url,
+        "aggregate_checksum_url": aggregate_checksum_url,
+    }
+
+
+def _extract_expected_sha_from_checksum_text(
+    checksum_text: str, tarball_name: str
+) -> str:
+    for raw_line in checksum_text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+        parts = line.split()
+        if len(parts) == 1 and len(parts[0]) >= 64:
+            return parts[0].strip().lower()
+        if len(parts) >= 2 and parts[-1].lstrip("*") == tarball_name:
+            return parts[0].strip().lower()
+    return ""
+
+
+def _install_release_bundle(
+    project_root: Path,
+    release_repo: str,
+    *,
+    expected_sha: str = "",
+    release_tag: str = "",
+) -> str:
+    import hashlib
+    import requests
+    import tarfile
+    import tempfile
+
+    release_meta = _get_release_bundle_metadata(release_repo, release_tag=release_tag)
+    tag_name = release_meta["tag_name"]
+    tarball_name = release_meta["tarball_name"]
+    tarball_url = release_meta["tarball_url"]
+
+    with tempfile.TemporaryDirectory(prefix="pc1-update-") as tmp_dir:
+        tar_path = Path(tmp_dir) / tarball_name
+        sha256 = hashlib.sha256()
+
+        with requests.get(
+            tarball_url,
+            headers={"User-Agent": "PC-1-OTA-Updater"},
+            timeout=20,
+            stream=True,
+        ) as download_resp:
+            download_resp.raise_for_status()
+            with open(tar_path, "wb") as tar_file:
+                for chunk in download_resp.iter_content(chunk_size=65536):
+                    if not chunk:
+                        continue
+                    tar_file.write(chunk)
+                    sha256.update(chunk)
+
+        resolved_expected_sha = (expected_sha or "").strip().lower()
+        if not resolved_expected_sha:
+            checksum_candidates = [
+                release_meta["checksum_url"],
+                release_meta["aggregate_checksum_url"],
+            ]
+            for checksum_url in checksum_candidates:
+                if not checksum_url:
+                    continue
+                checksum_resp = requests.get(
+                    checksum_url,
+                    headers={"User-Agent": "PC-1-OTA-Updater"},
+                    timeout=10,
+                )
+                if not checksum_resp.ok:
+                    continue
+                resolved_expected_sha = _extract_expected_sha_from_checksum_text(
+                    checksum_resp.text,
+                    tarball_name,
+                )
+                if resolved_expected_sha:
+                    break
+
+        actual_sha = sha256.hexdigest().lower()
+        if resolved_expected_sha and actual_sha != resolved_expected_sha:
+            raise RuntimeError("SHA256 mismatch for downloaded update package")
+
+        extract_dir = Path(tmp_dir) / "extract"
+        extract_dir.mkdir(parents=True, exist_ok=True)
+
+        with tarfile.open(tar_path, "r:gz") as tar:
+            def _is_within_directory(directory: Path, target: Path) -> bool:
+                abs_directory = directory.resolve()
+                abs_target = target.resolve()
+                return str(abs_target).startswith(str(abs_directory))
+
+            for member in tar.getmembers():
+                member_path = extract_dir / member.name
+                if not _is_within_directory(extract_dir, member_path):
+                    raise ValueError("Update package contains invalid file paths")
+            tar.extractall(extract_dir)
+
+        extracted_items = [p for p in extract_dir.iterdir()]
+        source_dir = (
+            extracted_items[0]
+            if len(extracted_items) == 1 and extracted_items[0].is_dir()
+            else extract_dir
+        )
+        _validate_production_update_bundle(source_dir)
+
+        version_file = project_root / ".version"
+        config_backup = Path(tmp_dir) / "config.json.backup"
+        env_backup = Path(tmp_dir) / ".env.backup"
+        config_path = project_root / "config.json"
+        env_path = project_root / ".env"
+
+        if config_path.exists():
+            shutil.copy2(config_path, config_backup)
+        if env_path.exists():
+            shutil.copy2(env_path, env_backup)
+
+        excluded = {".git", ".github", "__pycache__", ".venv"}
+        for item in source_dir.iterdir():
+            if item.name in excluded:
+                continue
+            dest = project_root / item.name
+            if dest.exists():
+                if dest.is_dir() and not dest.is_symlink():
+                    shutil.rmtree(dest)
+                else:
+                    dest.unlink()
+            if item.is_dir():
+                shutil.copytree(item, dest)
+            else:
+                shutil.copy2(item, dest)
+
+        if config_backup.exists():
+            shutil.copy2(config_backup, config_path)
+        if env_backup.exists():
+            shutil.copy2(env_backup, env_path)
+
+        version_file.write_text(tag_name, encoding="utf-8")
+
+    return tag_name
+
+
+def _restart_pc1_service() -> None:
+    if platform.system() != "Linux":
+        return
+
+    subprocess.run(
+        ["sudo", "systemctl", "reset-failed", "pc-1.service"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+        check=False,
+    )
+    restart_result = subprocess.run(
+        ["sudo", "systemctl", "restart", "pc-1.service"],
+        capture_output=True,
+        text=True,
+        timeout=15,
+    )
+
+    # systemctl restart returns 0 on success, but even if it returns non-zero,
+    # the service might still restart. Check the actual service status instead.
+    if restart_result.returncode != 0:
+        time.sleep(3)
+        status_result = subprocess.run(
+            ["systemctl", "is-active", "pc-1.service"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if (
+            status_result.returncode == 0
+            and status_result.stdout.strip() == "active"
+        ):
+            pass
+
+    time.sleep(1)
 
 
 @app.get("/api/system/updates/check")
@@ -2148,13 +2462,7 @@ async def install_updates():
     Install available updates and restart the service.
     """
     try:
-        import hashlib
-        import requests
-        import tarfile
-        import tempfile
-
-        # Get the project root directory
-        project_root = Path(__file__).parent.parent
+        project_root = _get_project_root()
 
         # Check if we're running from a git clone (dev mode)
         is_dev = (project_root / ".git").exists()
@@ -2202,151 +2510,11 @@ async def install_updates():
             expected_sha = os.environ.get("PC1_UPDATE_TARBALL_SHA256", "").strip().lower()
 
             try:
-                release_resp = requests.get(
-                    f"https://api.github.com/repos/{release_repo}/releases/latest",
-                    headers={"User-Agent": "PC-1-OTA-Updater"},
-                    timeout=10,
+                _install_release_bundle(
+                    project_root,
+                    release_repo,
+                    expected_sha=expected_sha,
                 )
-                release_resp.raise_for_status()
-                release_data = release_resp.json()
-
-                tag_name = (release_data.get("tag_name") or "unknown").strip()
-                assets = release_data.get("assets") or []
-
-                # Prefer an explicit release artifact produced by scripts/release_build.py.
-                preferred_asset_name = f"pc1-{tag_name}.tar.gz"
-                tar_asset = next(
-                    (
-                        asset
-                        for asset in assets
-                        if asset.get("name") == preferred_asset_name
-                    ),
-                    None,
-                )
-
-                tarball_url = ""
-                tarball_name = ""
-                if tar_asset:
-                    tarball_url = (tar_asset.get("browser_download_url") or "").strip()
-                    tarball_name = str(tar_asset.get("name") or "").strip()
-                else:
-                    return {
-                        "success": False,
-                        "message": "Update failed",
-                        "error": (
-                            "Latest release is missing the required production bundle "
-                            f"asset '{preferred_asset_name}'."
-                        ),
-                    }
-
-                if not tarball_url:
-                    raise ValueError("No update package URL found in latest release")
-
-                with tempfile.TemporaryDirectory(prefix="pc1-update-") as tmp_dir:
-                    tar_path = Path(tmp_dir) / "update.tar.gz"
-                    sha256 = hashlib.sha256()
-
-                    with requests.get(
-                        tarball_url,
-                        headers={"User-Agent": "PC-1-OTA-Updater"},
-                        timeout=20,
-                        stream=True,
-                    ) as download_resp:
-                        download_resp.raise_for_status()
-                        with open(tar_path, "wb") as tar_file:
-                            for chunk in download_resp.iter_content(chunk_size=65536):
-                                if not chunk:
-                                    continue
-                                tar_file.write(chunk)
-                                sha256.update(chunk)
-
-                    if not expected_sha:
-                        # Optional auto-check: parse checksum from release asset.
-                        checksum_asset = next(
-                            (
-                                asset
-                                for asset in assets
-                                if str(asset.get("name", "")).lower()
-                                in {"sha256sums", "sha256sums.txt"}
-                            ),
-                            None,
-                        )
-                        if checksum_asset and checksum_asset.get("browser_download_url"):
-                            sums_resp = requests.get(
-                                checksum_asset["browser_download_url"],
-                                headers={"User-Agent": "PC-1-OTA-Updater"},
-                                timeout=10,
-                            )
-                            if sums_resp.ok:
-                                for raw_line in sums_resp.text.splitlines():
-                                    line = raw_line.strip()
-                                    if not line:
-                                        continue
-                                    parts = line.split()
-                                    if len(parts) >= 2 and parts[-1].lstrip("*") == tarball_name:
-                                        expected_sha = parts[0].strip().lower()
-                                        break
-
-                    actual_sha = sha256.hexdigest().lower()
-                    if expected_sha and actual_sha != expected_sha:
-                        return {
-                            "success": False,
-                            "message": "Update package verification failed",
-                            "error": "SHA256 mismatch for downloaded update package",
-                        }
-
-                    extract_dir = Path(tmp_dir) / "extract"
-                    extract_dir.mkdir(parents=True, exist_ok=True)
-
-                    with tarfile.open(tar_path, "r:gz") as tar:
-                        def _is_within_directory(directory: Path, target: Path) -> bool:
-                            abs_directory = directory.resolve()
-                            abs_target = target.resolve()
-                            return str(abs_target).startswith(str(abs_directory))
-
-                        for member in tar.getmembers():
-                            member_path = extract_dir / member.name
-                            if not _is_within_directory(extract_dir, member_path):
-                                raise ValueError(
-                                    "Update package contains invalid file paths"
-                                )
-                        tar.extractall(extract_dir)
-
-                    extracted_items = [p for p in extract_dir.iterdir()]
-                    source_dir = (
-                        extracted_items[0]
-                        if len(extracted_items) == 1 and extracted_items[0].is_dir()
-                        else extract_dir
-                    )
-                    _validate_production_update_bundle(source_dir)
-
-                    config_backup = project_root / "config.json.bak"
-                    env_backup = project_root / ".env.bak"
-                    config_path = project_root / "config.json"
-                    env_path = project_root / ".env"
-
-                    if config_path.exists():
-                        shutil.copy2(config_path, config_backup)
-                    if env_path.exists():
-                        shutil.copy2(env_path, env_backup)
-
-                    excluded = {".git", ".github", "__pycache__", ".venv"}
-                    for item in source_dir.iterdir():
-                        if item.name in excluded:
-                            continue
-                        dest = project_root / item.name
-                        if item.is_dir():
-                            shutil.copytree(item, dest, dirs_exist_ok=True)
-                        else:
-                            shutil.copy2(item, dest)
-
-                    if config_backup.exists():
-                        shutil.copy2(config_backup, config_path)
-                    if env_backup.exists():
-                        shutil.copy2(env_backup, env_path)
-
-                    (project_root / ".version").write_text(tag_name, encoding="utf-8")
-
             except Exception as e:
                 logger.exception("Production OTA install failed")
                 return {
@@ -2408,48 +2576,7 @@ async def install_updates():
                     )
 
         # Restart the service
-        if platform.system() == "Linux":
-            subprocess.run(
-                ["sudo", "systemctl", "reset-failed", "pc-1.service"],
-                capture_output=True,
-                text=True,
-                timeout=15,
-                check=False,
-            )
-            restart_result = subprocess.run(
-                ["sudo", "systemctl", "restart", "pc-1.service"],
-                capture_output=True,
-                text=True,
-                timeout=15,
-            )
-
-            # systemctl restart returns 0 on success, but even if it returns non-zero,
-            # the service might still restart. Check the actual service status instead.
-            if restart_result.returncode != 0:
-                # Give it a moment and check if service is actually running
-                import time
-
-                time.sleep(3)
-                status_result = subprocess.run(
-                    ["systemctl", "is-active", "pc-1.service"],
-                    capture_output=True,
-                    text=True,
-                    timeout=5,
-                )
-                # If service is active, the restart actually worked
-                if (
-                    status_result.returncode == 0
-                    and status_result.stdout.strip() == "active"
-                ):
-                    # Service is running, restart was successful
-                    pass
-                else:
-                    # Service might still be starting, but don't report failure yet
-                    # The frontend will handle the brief downtime
-                    pass
-
-            # Give the service a moment to start up
-            time.sleep(1)
+        _restart_pc1_service()
 
         return {
             "success": True,
@@ -2466,6 +2593,75 @@ async def install_updates():
         return {
             "success": False,
             "message": "Update failed",
+            "error": str(e),
+        }
+
+
+@app.post(
+    "/api/system/updates/convert-to-production",
+    dependencies=[Depends(require_admin_access)],
+)
+async def convert_to_production_updates():
+    """Convert a git-clone install into a production OTA install."""
+    try:
+        project_root = _get_project_root()
+        if not (project_root / ".git").exists():
+            return {
+                "success": False,
+                "message": "This unit already uses production OTA updates.",
+            }
+
+        release_repo = os.environ.get(
+            "PC1_UPDATE_GITHUB_REPO", "travmiller/paper-console"
+        ).strip()
+        expected_sha = os.environ.get("PC1_UPDATE_TARBALL_SHA256", "").strip().lower()
+
+        try:
+            tag_name = _install_release_bundle(
+                project_root,
+                release_repo,
+                expected_sha=expected_sha,
+            )
+        except Exception as e:
+            logger.exception("Production conversion failed")
+            return {
+                "success": False,
+                "message": "Conversion failed",
+                "error": str(e),
+            }
+
+        install_result = _install_update_dependencies(project_root, is_dev=False)
+        if install_result.returncode != 0:
+            logger.error(
+                "Dependency install after production conversion failed: %s",
+                (install_result.stderr or install_result.stdout or "").strip()[:500],
+            )
+            return {
+                "success": False,
+                "message": "Conversion failed",
+                "error": "Dependency installation failed. The running service was left unchanged.",
+            }
+
+        git_dir = project_root / ".git"
+        if git_dir.exists():
+            shutil.rmtree(git_dir)
+
+        _restart_pc1_service()
+
+        return {
+            "success": True,
+            "message": f"Converted to production updates using {tag_name}.",
+        }
+    except subprocess.TimeoutExpired:
+        return {
+            "success": False,
+            "message": "Conversion timed out",
+            "error": "The conversion process took too long. Please try again.",
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "message": "Conversion failed",
             "error": str(e),
         }
 
@@ -3554,7 +3750,6 @@ async def trigger_channel(position: int):
     Executes all modules assigned to a specific channel position.
     Runs blocking printer operations in a thread pool to avoid blocking the event loop.
     """
-    global print_in_progress
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     from app.selection_mode import exit_selection_mode
@@ -3743,8 +3938,8 @@ async def trigger_channel(position: int):
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
 
-        # Flush buffer to actually print (in reverse order for tear-off orientation)
-        # Spacing is built into the bitmap (5 lines at end of each print job)
+        # Flush buffer to actually print. The printer driver applies a fixed
+        # post-print cutter feed after each job.
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
 
@@ -3755,8 +3950,7 @@ async def trigger_channel(position: int):
             await loop.run_in_executor(executor, _do_print)
     finally:
         # Always mark print as complete (thread-safe)
-        with print_lock:
-            print_in_progress = False
+        _clear_print_reservation(clear_hold=False)
 
 
 async def trigger_current_channel():
@@ -3771,18 +3965,13 @@ async def trigger_current_channel():
 @app.post("/action/trigger", dependencies=[Depends(require_admin_access)])
 async def manual_trigger():
     """Simulates pressing the big brass button."""
-    global print_in_progress
-
-    with print_lock:
-        if print_in_progress:
-            raise HTTPException(status_code=409, detail="Print already in progress")
-        print_in_progress = True
+    if not _try_begin_print_job(debounce=False):
+        raise HTTPException(status_code=409, detail="Print already in progress")
 
     try:
         await trigger_current_channel()
     finally:
-        with print_lock:
-            print_in_progress = False
+        _clear_print_reservation(clear_hold=False)
     return {"message": "Triggered"}
 
 
@@ -3802,16 +3991,13 @@ async def set_dial(position: int):
 )
 async def print_channel(position: int, background_tasks: BackgroundTasks):
     """Set dial position and trigger print atomically. Returns immediately while print runs in background."""
-    global print_in_progress
     logger = logging.getLogger(__name__)
 
     if position < 1 or position > 8:
         raise HTTPException(status_code=400, detail="Position must be 1-8")
 
-    with print_lock:
-        if print_in_progress:
-            raise HTTPException(status_code=409, detail="Print already in progress")
-        print_in_progress = True
+    if not _try_begin_print_job(debounce=False):
+        raise HTTPException(status_code=409, detail="Print already in progress")
 
     # Run print in background and return immediately
     # trigger_channel handles errors and clears print_in_progress in its finally block
@@ -3828,16 +4014,12 @@ async def print_channel(position: int, background_tasks: BackgroundTasks):
 )
 async def print_module(module_id: str, background_tasks: BackgroundTasks):
     """Forces a specific module instance to print (for testing)."""
-    global print_in_progress
-
     module = settings.modules.get(module_id)
     if not module:
         raise HTTPException(status_code=404, detail="Module not found")
 
-    with print_lock:
-        if print_in_progress:
-            raise HTTPException(status_code=409, detail="Print already in progress")
-        print_in_progress = True
+    if not _try_begin_print_job(debounce=False):
+        raise HTTPException(status_code=409, detail="Print already in progress")
 
     # Run print in background and return immediately
     # print_module_direct handles errors and clears print_in_progress in its finally block
@@ -3849,7 +4031,6 @@ async def print_module_direct(module_id: str):
     """Internal function to print a single module with proper buffer setup.
     Runs blocking printer operations in a thread pool to avoid blocking the event loop.
     """
-    global print_in_progress
     import asyncio
     from concurrent.futures import ThreadPoolExecutor
     from app.selection_mode import exit_selection_mode
@@ -3889,8 +4070,8 @@ async def print_module_direct(module_id: str):
         # Execute the module
         execute_module(module)
 
-        # Flush buffer to actually print (in reverse order for tear-off orientation)
-        # Spacing is built into the bitmap (5 lines at end of each print job)
+        # Flush buffer to actually print. The printer driver applies a fixed
+        # post-print cutter feed after each job.
         if hasattr(printer, "flush_buffer"):
             printer.flush_buffer()
 
@@ -3901,8 +4082,7 @@ async def print_module_direct(module_id: str):
             await loop.run_in_executor(executor, _do_print)
     finally:
         # Always mark print as complete (thread-safe)
-        with print_lock:
-            print_in_progress = False
+        _clear_print_reservation(clear_hold=False)
 
 
 @app.post("/debug/test-webhook", dependencies=[Depends(require_admin_access)])
@@ -4048,47 +4228,104 @@ async def preview_webhook(config: dict):
 # --- CAPTIVE PORTAL (Auto-launch setup page) ---
 
 
+CAPTIVE_PORTAL_REDIRECT_URL = "http://10.42.0.1/"
+CAPTIVE_PORTAL_CACHE_BYPASS_HEADERS = {
+    "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+    "Pragma": "no-cache",
+    "Expires": "0",
+}
+
+
+def _captive_portal_is_active() -> bool:
+    """Return True when the local setup AP is active."""
+    try:
+        return wifi_manager.is_ap_mode_active()
+    except Exception:
+        return False
+
+
+def _captive_portal_redirect() -> RedirectResponse:
+    """Redirect probe clients to the setup UI with no-cache headers."""
+    response = RedirectResponse(url=CAPTIVE_PORTAL_REDIRECT_URL, status_code=302)
+    for header_name, header_value in CAPTIVE_PORTAL_CACHE_BYPASS_HEADERS.items():
+        response.headers[header_name] = header_value
+    return response
+
+
+def _captive_portal_response(
+    *,
+    content: str = "",
+    status_code: int = 200,
+    media_type: str = "text/plain",
+) -> Response:
+    response = Response(content=content, status_code=status_code, media_type=media_type)
+    for header_name, header_value in CAPTIVE_PORTAL_CACHE_BYPASS_HEADERS.items():
+        response.headers[header_name] = header_value
+    return response
+
+
 @app.get("/hotspot-detect.html")
 @app.get("/library/test/success.html")
+@app.get("/success.html")
 async def captive_apple():
     """iOS/macOS captive portal detection - redirect to setup page."""
-    # Check if we're in AP mode
-    status = wifi_manager.get_wifi_status()
-    if status.get("mode") == "ap":
-        return RedirectResponse(url="/", status_code=302)
-    # If not in AP mode, return success (device has internet)
-    return {"status": "success"}
+    if _captive_portal_is_active():
+        return _captive_portal_redirect()
+    return _captive_portal_response(
+        content="<!DOCTYPE html><html><head><title>Success</title></head><body>Success</body></html>",
+        media_type="text/html",
+    )
 
 
 @app.get("/generate_204")
 @app.get("/gen_204")
+@app.get("/mobile/status.php")
 async def captive_android():
     """Android captive portal detection - redirect to setup page."""
-    status = wifi_manager.get_wifi_status()
-    if status.get("mode") == "ap":
-        return RedirectResponse(url="/", status_code=302)
-    # Return 204 No Content if not in AP mode (device has internet)
-    return Response(status_code=204)
+    if _captive_portal_is_active():
+        return _captive_portal_redirect()
+    return _captive_portal_response(status_code=204)
 
 
 @app.get("/connecttest.txt")
+async def captive_windows_connect_test():
+    """Windows 10+ captive portal detection."""
+    if _captive_portal_is_active():
+        return _captive_portal_redirect()
+    return _captive_portal_response(content="Microsoft Connect Test")
+
+
 @app.get("/ncsi.txt")
-async def captive_windows():
-    """Windows captive portal detection - redirect to setup page."""
-    status = wifi_manager.get_wifi_status()
-    if status.get("mode") == "ap":
-        return RedirectResponse(url="/", status_code=302)
-    # Return success text if not in AP mode
-    return Response(content="Microsoft Connect Test", media_type="text/plain")
+async def captive_windows_ncsi():
+    """Windows 8.1 and earlier captive portal detection."""
+    if _captive_portal_is_active():
+        return _captive_portal_redirect()
+    return _captive_portal_response(content="Microsoft NCSI")
+
+
+@app.get("/redirect")
+async def captive_windows_redirect():
+    """Windows passive connectivity redirect target."""
+    if _captive_portal_is_active():
+        return _captive_portal_redirect()
+    return _captive_portal_response(status_code=204)
 
 
 @app.get("/success.txt")
+@app.get("/canonical.html")
 async def captive_other():
-    """Generic captive portal detection."""
-    status = wifi_manager.get_wifi_status()
-    if status.get("mode") == "ap":
-        return RedirectResponse(url="/", status_code=302)
-    return {"status": "success"}
+    """Generic captive portal detection used by various clients."""
+    if _captive_portal_is_active():
+        return _captive_portal_redirect()
+    return _captive_portal_response(content="success\n")
+
+
+@app.get("/check_network_status.txt")
+async def captive_networkmanager():
+    """NetworkManager/Linux captive portal detection."""
+    if _captive_portal_is_active():
+        return _captive_portal_redirect()
+    return _captive_portal_response(content="NetworkManager is online\n")
 
 
 # --- STATIC FILES (FRONTEND) ---

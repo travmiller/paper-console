@@ -54,14 +54,16 @@ When a user unboxes a PC-1 and powers it on for the first time, the expected flo
    - It includes:
      - Setup SSID: `PC-1-Setup-XXXX` (device-specific suffix)
      - Device Password (shared across setup WiFi, settings login, printed setup instructions, and SSH)
+     - A WiFi QR code for quickly joining the setup network on phones
      - Setup URL: `http://10.42.0.1` (and `http://pc-1.local`)
 
 2. **User connects to setup WiFi**
-   - On phone/computer, connect to the printed SSID.
-   - Enter the printed Device Password.
+   - On phone/computer, scan the printed WiFi QR code or connect to the printed SSID manually.
+   - If connecting manually, enter the printed Device Password.
+   - Many phones and laptops should open the setup page automatically as a captive portal after joining.
 
 3. **User configures home WiFi in the setup web UI**
-   - Open `http://10.42.0.1`
+   - If the setup page does not open automatically, open `http://10.42.0.1`
    - Choose home network and enter password.
    - The UI explains that connection may drop while PC-1 switches networks.
 

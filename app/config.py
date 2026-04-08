@@ -8,6 +8,7 @@ import logging
 
 # Constants
 PRINTER_WIDTH = 42
+DEFAULT_CUTTER_FEED_LINES = 7
 logger = logging.getLogger(__name__)
 _warned_non_posix_sensitive_config = False
 _warned_non_posix_sensitive_data = False
@@ -252,9 +253,6 @@ class Settings(BaseModel):
     state: Optional[str] = None
     time_format: str = "12h"  # "12h" for 12-hour format, "24h" for 24-hour format
     time_sync_mode: str = "manual"  # "manual" or "automatic" for time synchronization mode
-    cutter_feed_lines: int = (
-        4  # Number of empty lines to add at end of print job to clear cutter
-    )
     max_print_lines: int = 200  # Maximum lines per print job (0 = no limit)
 
     # Module Instances: Dictionary of module_id -> ModuleInstance
@@ -279,15 +277,6 @@ class Settings(BaseModel):
     def validate_longitude(cls, v):
         if not -180 <= v <= 180:
             raise ValueError("Longitude must be between -180 and 180")
-        return v
-
-    @field_validator("cutter_feed_lines")
-    @classmethod
-    def validate_cutter_feed_lines(cls, v):
-        if v < 0:
-            return 0
-        if v > 20:
-            return 20
         return v
 
     @field_validator("time_format")

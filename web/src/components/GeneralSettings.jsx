@@ -53,6 +53,7 @@ const GeneralSettings = ({
   const [installingUpdate, setInstallingUpdate] = useState(false);
   const [updateMessage, setUpdateMessage] = useState({ type: '', message: '' });
   const [currentVersion, setCurrentVersion] = useState(null);
+  const [installMode, setInstallMode] = useState(null);
   const [updateProgress, setUpdateProgress] = useState({ stage: '', progress: 0 });
 
   // Fetch current system time on mount and periodically
@@ -129,6 +130,9 @@ const GeneralSettings = ({
         if (data.version) {
           setCurrentVersion(data.version);
         }
+        if (data.install_mode) {
+          setInstallMode(data.install_mode);
+        }
       } catch (err) {
         console.error('Error fetching current version:', err);
       }
@@ -143,6 +147,111 @@ const GeneralSettings = ({
 
   const clearStatusLater = (setter) => {
     setTimeout(() => setter({ type: '', message: '' }), 5000);
+  };
+
+  const waitForServiceRestartAndReload = () => {
+    const maxReloadTimeout = setTimeout(() => {
+      window.location.reload();
+    }, 45000);
+
+    setTimeout(() => {
+      setUpdateProgress({ stage: 'Waiting for service to restart...', progress: 75 });
+
+      let attempts = 0;
+      const maxAttempts = 30;
+
+      const checkService = async () => {
+        attempts++;
+
+        const progress = Math.min(75 + Math.floor((attempts / maxAttempts) * 20), 95);
+        setUpdateProgress({ stage: 'Waiting for service to restart...', progress });
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+        try {
+          const healthCheck = await fetch('/api/health', {
+            method: 'GET',
+            signal: controller.signal,
+          });
+          clearTimeout(timeoutId);
+
+          if (healthCheck.ok) {
+            setUpdateProgress({ stage: 'Service ready! Reloading page...', progress: 100 });
+            clearTimeout(maxReloadTimeout);
+            setTimeout(() => window.location.reload(), 500);
+            return;
+          }
+        } catch {
+          clearTimeout(timeoutId);
+        }
+
+        if (attempts < maxAttempts) {
+          setTimeout(checkService, 1000);
+        } else {
+          setUpdateProgress({ stage: 'Reloading page...', progress: 100 });
+          clearTimeout(maxReloadTimeout);
+          setTimeout(() => window.location.reload(), 500);
+        }
+      };
+
+      checkService();
+    }, 5000);
+  };
+
+  const runRestartingUpdateAction = async ({
+    endpoint,
+    confirmMessage,
+    initialStage,
+    successStage,
+    failureFallback,
+  }) => {
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    setInstallingUpdate(true);
+    setUpdateMessage({ type: '', message: '' });
+    setUpdateProgress({ stage: initialStage, progress: 10 });
+
+    let progressInterval = null;
+    try {
+      progressInterval = setInterval(() => {
+        setUpdateProgress((prev) => {
+          if (prev.progress < 50) {
+            return { ...prev, progress: Math.min(prev.progress + 2, 50) };
+          }
+          return prev;
+        });
+      }, 500);
+
+      const response = await adminAuthFetch(endpoint, {
+        method: 'POST',
+      });
+
+      clearInterval(progressInterval);
+      setUpdateProgress({ stage: successStage, progress: 60 });
+
+      const data = await response.json();
+      if (data.success) {
+        setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
+        setUpdateStatus(null);
+      } else {
+        setUpdateProgress({ stage: '', progress: 0 });
+        setUpdateMessage({ type: 'error', message: getApiError(data, failureFallback) });
+        setInstallingUpdate(false);
+        return;
+      }
+    } catch {
+      if (progressInterval) {
+        clearInterval(progressInterval);
+      }
+      // Network error is expected during restart - treat as success
+      setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
+      setUpdateStatus(null);
+    }
+
+    waitForServiceRestartAndReload();
   };
 
   const handleDevicePasswordChange = async () => {
@@ -394,6 +503,36 @@ const GeneralSettings = ({
             </div>
           )}
 
+          {installMode === 'development' && (
+            <div className='mb-4'>
+              <div className='flex items-center justify-between gap-3'>
+                <div className='text-xs text-gray-600'>
+                  This unit is using git-based updates.
+                </div>
+                {!installingUpdate && (
+                  <button
+                    type='button'
+                    onClick={() =>
+                      runRestartingUpdateAction({
+                        endpoint: '/api/system/updates/convert-to-production',
+                        confirmMessage:
+                          'Convert this unit to production mode now? This installs the latest published release, removes git update mode, and restarts the device automatically.',
+                        initialStage: 'Converting to production...',
+                        successStage: 'Production release installed! Restarting service...',
+                        failureFallback: 'Conversion failed. Please try again.',
+                      })
+                    }
+                    className='text-xs font-bold text-black underline underline-offset-2 hover:text-gray-700 transition-colors cursor-pointer'>
+                    Convert to Production
+                  </button>
+                )}
+              </div>
+              <p className='text-xs text-gray-600 mt-2 '>
+                Switch this unit from git-based updates to release-based OTA updates using the latest published release.
+              </p>
+            </div>
+          )}
+
           {updateStatus && !installingUpdate && (
             <div className={`mb-4 p-3 rounded-lg text-sm ${
               updateStatus.up_to_date 
@@ -469,113 +608,16 @@ const GeneralSettings = ({
 
             {updateStatus && updateStatus.available && !installingUpdate && (
               <PrimaryButton
-                onClick={async () => {
-                  if (!confirm('Install the update now? The device will restart automatically. The page will refresh automatically once the update is complete.')) {
-                    return;
-                  }
-                  setInstallingUpdate(true);
-                  setUpdateMessage({ type: '', message: '' });
-                  setUpdateProgress({ stage: 'Installing update...', progress: 10 });
-                  
-                  try {
-                    // Simulate progress during installation
-                    const progressInterval = setInterval(() => {
-                      setUpdateProgress(prev => {
-                        if (prev.progress < 50) {
-                          return { ...prev, progress: Math.min(prev.progress + 2, 50) };
-                        }
-                        return prev;
-                      });
-                    }, 500);
-                    
-                    const response = await adminAuthFetch('/api/system/updates/install', {
-                      method: 'POST',
-                    });
-                    
-                    clearInterval(progressInterval);
-                    setUpdateProgress({ stage: 'Update installed! Restarting service...', progress: 60 });
-                    
-                    const data = await response.json();
-                    if (data.success) {
-                      setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
-                      setUpdateStatus(null);
-                    } else {
-                      setUpdateProgress({ stage: '', progress: 0 });
-                      setUpdateMessage({ type: 'error', message: getApiError(data, 'Update failed. Please try again.') });
-                      setInstallingUpdate(false);
-                      return;
-                    }
-                  } catch {
-                    // Network error is expected during restart - treat as success
-                    setUpdateProgress({ stage: 'Service restarting...', progress: 70 });
-                    setUpdateStatus(null);
-                  }
-                  
-                  // Set a maximum timeout to always reload after 45 seconds
-                  const maxReloadTimeout = setTimeout(() => {
-                    window.location.reload();
-                  }, 45000); // Always reload after 45 seconds maximum
-                  
-                  // Wait a bit, then start checking if service is back up
-                  setTimeout(() => {
-                    setUpdateProgress({ stage: 'Waiting for service to restart...', progress: 75 });
-                    
-                    let attempts = 0;
-                    const maxAttempts = 30; // Try for up to 30 seconds
-                    
-                    const checkService = async () => {
-                      attempts++;
-                      
-                      // Update progress based on attempts
-                      const progress = Math.min(75 + Math.floor((attempts / maxAttempts) * 20), 95);
-                      setUpdateProgress({ stage: 'Waiting for service to restart...', progress });
-                      
-                      // Create abort controller for timeout
-                      const controller = new AbortController();
-                      const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout
-                      
-                      try {
-                        const healthCheck = await fetch('/api/health', { 
-                          method: 'GET',
-                          signal: controller.signal
-                        });
-                        clearTimeout(timeoutId);
-                        
-                        if (healthCheck.ok) {
-                          // Service is back up, clear max timeout and reload the page
-                          setUpdateProgress({ stage: 'Service ready! Reloading page...', progress: 100 });
-                          clearTimeout(maxReloadTimeout);
-                          setTimeout(() => window.location.reload(), 500);
-                          return;
-                        } else {
-                          // Service not ready yet, keep trying
-                          if (attempts < maxAttempts) {
-                            setTimeout(checkService, 1000); // Try again in 1 second
-                          } else {
-                            // Give up and reload anyway
-                            setUpdateProgress({ stage: 'Reloading page...', progress: 100 });
-                            clearTimeout(maxReloadTimeout);
-                            setTimeout(() => window.location.reload(), 500);
-                          }
-                        }
-                      } catch {
-                        clearTimeout(timeoutId);
-                        // Service not ready yet, keep trying
-                        if (attempts < maxAttempts) {
-                          setTimeout(checkService, 1000); // Try again in 1 second
-                        } else {
-                          // Give up and reload anyway after max attempts
-                          setUpdateProgress({ stage: 'Reloading page...', progress: 100 });
-                          clearTimeout(maxReloadTimeout);
-                          setTimeout(() => window.location.reload(), 500);
-                        }
-                      }
-                    };
-                    
-                    // Start checking
-                    checkService();
-                  }, 5000); // Wait 5 seconds before starting checks (give service time to restart)
-                }}
+                onClick={() =>
+                  runRestartingUpdateAction({
+                    endpoint: '/api/system/updates/install',
+                    confirmMessage:
+                      'Install the update now? The device will restart automatically. The page will refresh automatically once the update is complete.',
+                    initialStage: 'Installing update...',
+                    successStage: 'Update installed! Restarting service...',
+                    failureFallback: 'Update failed. Please try again.',
+                  })
+                }
                 disabled={installingUpdate}
                 className='flex-1'>
                 Install Update

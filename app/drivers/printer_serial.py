@@ -86,8 +86,7 @@ class PrinterDriver:
 
         # Cutter feed space in dots (24 dots ~= 1 line).
         # Applied as an explicit post-print feed command for reliability.
-        # Can be updated via set_cutter_feed() method.
-        self.cutter_feed_dots = 12 * 24  # 12 lines * 24 dots/line = 288 dots
+        self.cutter_feed_dots = app.config.DEFAULT_CUTTER_FEED_LINES * 24
 
         # Font settings (fixed values)
         self.font_size = self.FONT_SIZE
@@ -1571,8 +1570,7 @@ class PrinterDriver:
     def set_cutter_feed(self, lines: int):
         """Set the cutter feed space (lines of white space at end of print).
 
-        This space is added to the bitmap itself, ensuring reliable paper feed
-        after bitmap printing regardless of post-print commands.
+        Primarily intended for internal overrides and test helpers.
         """
         self.cutter_feed_dots = lines * 24  # 24 dots per line at 203 DPI
 

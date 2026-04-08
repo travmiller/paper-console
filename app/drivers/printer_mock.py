@@ -1,5 +1,7 @@
 from datetime import datetime
 
+from app.config import DEFAULT_CUTTER_FEED_LINES
+
 class PrinterDriver:
     # Fixed spacing constants (match serial driver)
     FONT_SIZE = 18  # Increased for better readability
@@ -17,6 +19,7 @@ class PrinterDriver:
         self.width = width
         self.lines_printed = 0
         self.max_lines = 0
+        self.cutter_feed_dots = DEFAULT_CUTTER_FEED_LINES * 24
         self.font_size = self.FONT_SIZE
         self.line_spacing = self.LINE_HEIGHT - self.FONT_SIZE
         self.line_height = self.LINE_HEIGHT

@@ -72,15 +72,18 @@ def _print_system_status(printer):
 def _trigger_ap_mode(printer):
     """Enter AP mode for WiFi setup."""
     import app.wifi_manager as wifi_manager
-    import asyncio
+    from app.utils import print_setup_wifi_access_details
     
     printer.print_header("WIFI RESET", icon="wifi")
     printer.print_line()
     printer.print_body("Starting WiFi setup mode...")
     printer.print_body("")
     printer.print_body("Connect to network:")
-    printer.print_bold(f"  {wifi_manager.get_ap_ssid()}")
-    printer.print_caption(f"  Password: {wifi_manager.get_ap_password()}")
+    print_setup_wifi_access_details(
+        printer,
+        ssid=wifi_manager.get_ap_ssid(),
+        password=wifi_manager.get_ap_password(),
+    )
     printer.print_line()
     printer.print_body("Then visit:")
     printer.print_bold("  http://10.42.0.1")

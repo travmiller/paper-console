@@ -43,6 +43,37 @@ def get_ap_password() -> str:
     return device_password.get_device_password()
 
 
+def generate_wifi_qr_payload(
+    ssid: str,
+    password: str,
+    security: str = "WPA",
+    hidden: bool = False,
+) -> str:
+    """Generate a WiFi QR payload compatible with phone camera scanners."""
+
+    def _escape(value: str) -> str:
+        return (
+            value.replace("\\", "\\\\")
+            .replace(";", "\\;")
+            .replace(",", "\\,")
+            .replace(":", "\\:")
+        )
+
+    hidden_str = "true" if hidden else "false"
+    escaped_ssid = _escape(ssid)
+
+    if security.upper() == "NOPASS":
+        return f"WIFI:T:nopass;S:{escaped_ssid};H:{hidden_str};;"
+
+    escaped_password = _escape(password)
+    return f"WIFI:T:{security};S:{escaped_ssid};P:{escaped_password};H:{hidden_str};;"
+
+
+def get_ap_wifi_qr_payload() -> str:
+    """Return the QR payload for the setup AP credentials."""
+    return generate_wifi_qr_payload(get_ap_ssid(), get_ap_password())
+
+
 def run_command(cmd: List[str], check: bool = True) -> subprocess.CompletedProcess:
     """Run a shell command and return the result."""
     try:

@@ -45,6 +45,16 @@ def test_raspberry_pi_host_uses_managed_fallback_without_marker(monkeypatch, tmp
     assert device_password.can_change_device_password() is False
 
 
+def test_device_password_fallback_is_lowercase_letters_only(monkeypatch, tmp_path: Path):
+    password_file = tmp_path / "missing" / "device_password"
+
+    monkeypatch.delenv("PC1_DEVICE_PASSWORD", raising=False)
+    monkeypatch.setenv("PC1_DEVICE_PASSWORD_FILE", str(password_file))
+    monkeypatch.setattr(device_password, "get_device_password_seed", lambda: "seed-value")
+
+    assert device_password.get_device_password() == "vevaibma"
+
+
 def test_set_device_password_updates_managed_file(monkeypatch, tmp_path: Path):
     password_file = tmp_path / "device_password"
     managed_file = tmp_path / "device_managed"

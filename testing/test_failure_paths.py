@@ -130,6 +130,181 @@ def test_check_wifi_startup_prints_setup_receipt_on_regular_boot(monkeypatch):
     assert print_calls == ["setup"]
 
 
+def test_get_current_version_reports_development_install_mode(monkeypatch, tmp_path):
+    (tmp_path / ".git").mkdir()
+
+    monkeypatch.setattr(main_module, "_get_project_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        main_module.subprocess,
+        "run",
+        lambda *args, **kwargs: subprocess.CompletedProcess(
+            args=["git"], returncode=0, stdout="abc123\n", stderr=""
+        ),
+    )
+
+    result = asyncio.run(main_module.get_current_version())
+
+    assert result["version"] == "abc123"
+    assert result["install_mode"] == "development"
+    assert result["can_convert_to_production"] is True
+
+
+def test_get_current_version_reports_production_install_mode(monkeypatch, tmp_path):
+    (tmp_path / ".version").write_text("v0.1.0\n", encoding="utf-8")
+
+    monkeypatch.setattr(main_module, "_get_project_root", lambda: tmp_path)
+
+    result = asyncio.run(main_module.get_current_version())
+
+    assert result["version"] == "v0.1.0"
+    assert result["install_mode"] == "production"
+    assert result["can_convert_to_production"] is False
+
+
+def test_convert_to_production_installs_release_and_removes_git(monkeypatch, tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    restart_calls = []
+    captured = {}
+
+    monkeypatch.setattr(main_module, "_get_project_root", lambda: tmp_path)
+
+    def fake_install_release_bundle(project_root, release_repo, *, expected_sha="", release_tag=""):
+        captured["project_root"] = project_root
+        captured["release_repo"] = release_repo
+        captured["expected_sha"] = expected_sha
+        captured["release_tag"] = release_tag
+        (project_root / ".version").write_text("v0.1.0\n", encoding="utf-8")
+        return "v0.1.0"
+
+    monkeypatch.setattr(main_module, "_install_release_bundle", fake_install_release_bundle)
+    monkeypatch.setattr(
+        main_module,
+        "_install_update_dependencies",
+        lambda project_root, is_dev: subprocess.CompletedProcess(
+            args=["pip"], returncode=0, stdout="", stderr=""
+        ),
+    )
+    monkeypatch.setattr(main_module, "_restart_pc1_service", lambda: restart_calls.append(True))
+
+    result = asyncio.run(main_module.convert_to_production_updates())
+
+    assert result["success"] is True
+    assert captured["project_root"] == tmp_path
+    assert captured["release_repo"] == "travmiller/paper-console"
+    assert captured["expected_sha"] == ""
+    assert captured["release_tag"] == ""
+    assert not git_dir.exists()
+    assert restart_calls == [True]
+
+
+def test_convert_to_production_keeps_git_when_dependency_install_fails(monkeypatch, tmp_path):
+    git_dir = tmp_path / ".git"
+    git_dir.mkdir()
+    restart_calls = []
+
+    monkeypatch.setattr(main_module, "_get_project_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        main_module,
+        "_install_release_bundle",
+        lambda project_root, release_repo, *, expected_sha="", release_tag="": "v0.1.0",
+    )
+    monkeypatch.setattr(
+        main_module,
+        "_install_update_dependencies",
+        lambda project_root, is_dev: subprocess.CompletedProcess(
+            args=["pip"], returncode=1, stdout="", stderr="failed"
+        ),
+    )
+    monkeypatch.setattr(main_module, "_restart_pc1_service", lambda: restart_calls.append(True))
+
+    result = asyncio.run(main_module.convert_to_production_updates())
+
+    assert result["success"] is False
+    assert git_dir.exists()
+    assert restart_calls == []
+
+
+def test_try_begin_print_job_respects_hold_reservation(monkeypatch):
+    monkeypatch.setattr(main_module, "print_in_progress", False)
+    monkeypatch.setattr(main_module, "hold_action_in_progress", True)
+    monkeypatch.setattr(main_module, "last_print_time", 0.0)
+
+    assert main_module._try_begin_print_job(debounce=False) is False
+
+    monkeypatch.setattr(main_module, "hold_action_in_progress", False)
+    assert main_module._try_begin_print_job(debounce=False) is True
+
+    main_module._clear_print_reservation()
+    assert main_module.print_in_progress is False
+    assert main_module.hold_action_in_progress is False
+
+
+def test_on_factory_reset_threadsafe_promotes_hold_reservation(monkeypatch):
+    captured = {}
+
+    class DummyLoop:
+        def is_running(self):
+            return True
+
+    def fake_run_coroutine_threadsafe(coro, loop):
+        captured["coro"] = coro
+        captured["loop"] = loop
+        return None
+
+    monkeypatch.setattr(main_module, "global_loop", DummyLoop())
+    monkeypatch.setattr(main_module, "print_in_progress", False)
+    monkeypatch.setattr(main_module, "hold_action_in_progress", True)
+    monkeypatch.setattr(main_module.asyncio, "run_coroutine_threadsafe", fake_run_coroutine_threadsafe)
+
+    main_module.on_factory_reset_threadsafe()
+
+    assert main_module.print_in_progress is True
+    assert main_module.hold_action_in_progress is False
+    assert captured["loop"] is main_module.global_loop
+    captured["coro"].close()
+
+    main_module._clear_print_reservation()
+
+
+def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
+    triggered = []
+    sleep_calls = {"count": 0}
+
+    class FrozenDateTime:
+        @classmethod
+        def now(cls):
+            return datetime(2026, 4, 3, 12, 0)
+
+    async def fake_sleep(_seconds):
+        sleep_calls["count"] += 1
+        if sleep_calls["count"] == 1:
+            return None
+        raise asyncio.CancelledError
+
+    async def fake_trigger_channel(position):
+        triggered.append(position)
+
+    monkeypatch.setattr(main_module, "datetime", FrozenDateTime)
+    monkeypatch.setattr(main_module.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(main_module, "trigger_channel", fake_trigger_channel)
+    monkeypatch.setattr(
+        main_module.settings,
+        "channels",
+        {1: types.SimpleNamespace(schedule=["12:00"])},
+    )
+    monkeypatch.setattr(main_module, "print_in_progress", False)
+    monkeypatch.setattr(main_module, "hold_action_in_progress", True)
+
+    try:
+        asyncio.run(main_module.scheduler_loop())
+    except asyncio.CancelledError:
+        pass
+
+    assert triggered == []
+    main_module._clear_print_reservation()
+
+
 def test_printer_driver_handles_serial_init_failure(monkeypatch):
     import serial
 

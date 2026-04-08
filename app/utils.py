@@ -1,8 +1,10 @@
 """Shared utility functions for modules."""
 
 from app.hardware import printer
-from app.config import PRINTER_WIDTH
 import app.wifi_manager as wifi_manager
+
+SETUP_WIFI_QR_SIZE = 6
+SETUP_WIFI_QR_ERROR_CORRECTION = "H"
 
 
 def wrap_text(text: str, width: int = 42, indent: int = 0, preserve_line_breaks: bool = False) -> list[str]:
@@ -87,12 +89,7 @@ def print_setup_instructions_sync():
         printer.print_header("SETUP INSTRUCTIONS", icon="wifi")
         printer.print_line()
         printer.print_body("Connect to WiFi:")
-
-        ssid = wifi_manager.get_ap_ssid()
-        ap_password = wifi_manager.get_ap_password()
-
-        printer.print_bold(f"  {ssid}")
-        printer.print_caption(f"  Password: {ap_password}")
+        print_setup_wifi_access_details(printer)
         printer.print_line()
         printer.print_body("Then visit:")
         printer.print_bold("  http://pc-1.local")
@@ -105,6 +102,27 @@ def print_setup_instructions_sync():
 
     except Exception:
         pass
+
+
+def print_setup_wifi_access_details(
+    printer_obj,
+    ssid: str | None = None,
+    password: str | None = None,
+):
+    """Print setup WiFi credentials plus a scannable QR code."""
+    ssid = ssid or wifi_manager.get_ap_ssid()
+    password = password or wifi_manager.get_ap_password()
+
+    printer_obj.print_bold(f"  {ssid}")
+    printer_obj.print_caption(f"  Password: {password}")
+
+    if hasattr(printer_obj, "print_qr"):
+        printer_obj.print_caption("  Scan to join automatically")
+        printer_obj.print_qr(
+            data=wifi_manager.generate_wifi_qr_payload(ssid, password),
+            size=SETUP_WIFI_QR_SIZE,
+            error_correction=SETUP_WIFI_QR_ERROR_CORRECTION,
+        )
 
 
 def wrap_text_pixels(

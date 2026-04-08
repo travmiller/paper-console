@@ -9,6 +9,7 @@ AP_SSID_PREFIX="PC-1-Setup"
 AP_INTERFACE="wlan0"
 DEVICE_PASSWORD="${PC1_DEVICE_PASSWORD:-}"
 DEVICE_PASSWORD_FILE="${PC1_DEVICE_PASSWORD_FILE:-/etc/pc1/device_password}"
+NM_DNSMASQ_DIR="${PC1_NM_DNSMASQ_DIR:-/etc/NetworkManager/dnsmasq.d}"
 
 # Generate unique SSID suffix from CPU serial
 get_device_id() {
@@ -48,7 +49,6 @@ get_password_seed() {
 
 get_device_password() {
     local seed
-    local digest
     if [ -n "$DEVICE_PASSWORD" ] && [ "${#DEVICE_PASSWORD}" -ge 8 ]; then
         echo "$DEVICE_PASSWORD"
         return
@@ -62,8 +62,15 @@ get_device_password() {
         fi
     fi
     seed=$(get_password_seed)
-    digest=$(printf '%s' "$seed" | sha256sum | awk '{print $1}' | cut -c1-10)
-    echo "pc1-${digest}"
+    python3 - "$seed" <<'PY'
+import hashlib
+import sys
+
+alphabet = "abcdefghijklmnopqrstuvwxyz"
+seed = sys.argv[1]
+digest = hashlib.sha256(seed.encode("utf-8", errors="ignore")).digest()
+print("".join(alphabet[byte % len(alphabet)] for byte in digest[:8]))
+PY
 }
 
 start_ap() {
@@ -117,10 +124,16 @@ start_ap() {
         echo "IP: ${AP_IP:-10.42.0.1}"
         echo "========================================"
         
-        # Configure DNS hijacking (Safe version: just address mapping)
-        NM_DNSMASQ_DIR="/etc/NetworkManager/dnsmasq.d"
+        # Configure DNS hijacking for captive portal detection.
+        # The explicit listen/interface binding helps ensure NM's dnsmasq
+        # actually answers on the hotspot network for portal probe domains.
         mkdir -p "$NM_DNSMASQ_DIR"
-        echo "address=/#/${AP_IP:-10.42.0.1}" > "$NM_DNSMASQ_DIR/captive-portal.conf"
+        cat > "$NM_DNSMASQ_DIR/captive-portal.conf" <<EOF
+address=/#/${AP_IP:-10.42.0.1}
+listen-address=${AP_IP:-10.42.0.1}
+interface=${AP_INTERFACE}
+bind-interfaces
+EOF
         # Try to reload DNS, but don't worry if it fails - WiFi is the priority
         pkill -HUP -f "dnsmasq.*NetworkManager" 2>/dev/null || true
         
@@ -136,7 +149,7 @@ stop_ap() {
     echo "Stopping AP Mode..."
     
     # Remove dnsmasq config
-    rm -f /etc/NetworkManager/dnsmasq.d/captive-portal.conf 2>/dev/null || true
+    rm -f "$NM_DNSMASQ_DIR/captive-portal.conf" 2>/dev/null || true
     
     # Deactivate hotspot
     nmcli connection down "PC-1-Hotspot" 2>/dev/null || true
