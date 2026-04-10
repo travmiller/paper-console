@@ -124,7 +124,9 @@ function configForType(typeId) {
     case "news":
       return { news_api_key: "" };
     case "rss":
-      return { rss_feeds: [] };
+      return { rss_feeds: [], num_articles: 2 };
+    case "weather":
+      return { temperature_unit: "fahrenheit" };
     case "email":
       return {
         email_host: "imap.gmail.com",

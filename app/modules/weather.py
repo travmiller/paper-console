@@ -47,6 +47,8 @@ def get_weather_condition(code: int) -> str:
 
 def get_weather(config: Optional[Dict[str, Any]] = None):
     """Fetches weather from Open-Meteo API."""
+    config = config or {}
+
     if config:
         # Support new nested location object
         location = config.get("location", {})
@@ -230,6 +232,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             "city": city_name,
             "forecast": empty_forecast,
             "hourly_forecast": empty_hourly,
+            "temperature_unit": temperature_unit,
         }
 
 

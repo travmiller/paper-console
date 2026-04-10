@@ -134,7 +134,7 @@ def get_rss_articles(config: Dict[str, Any] = None):
             # Silently skip failed feeds
             continue
 
-    return articles
+    return articles[:10]
 
 
 @register_module(
@@ -162,6 +162,7 @@ def get_rss_articles(config: Dict[str, Any] = None):
         }
     },
     ui_schema={
+        "num_articles": {"ui:placeholder": "2"},
         "rss_feeds": {
             "items": {"ui:placeholder": "https://feeds.bbci.co.uk/news/rss.xml"}
         }

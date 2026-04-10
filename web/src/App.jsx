@@ -321,8 +321,8 @@ function App() {
   const getDefaultConfig = (moduleType) => {
     const defaults = {
       news: { news_api_key: '' },
-      rss: { rss_feeds: [] },
-      weather: {},
+      rss: { rss_feeds: [], num_articles: 2 },
+      weather: { temperature_unit: 'fahrenheit' },
       email: { email_host: 'imap.gmail.com', email_user: '', email_password: '', polling_interval: 60 },
       sudoku: { difficulty: 'Medium' },
       astronomy: {},
