@@ -1168,18 +1168,16 @@ class PrinterDriver:
 
             status_byte = response[0]
 
-            # Parse status byte (bits 2-3 indicate paper status)
-            # Bits 2-3: 00 = paper adequate, 0C (12) = paper near end
-            paper_bits = (status_byte >> 2) & 0x03
+            # GS r 1 reports two independent paper sensors:
+            # bits 0-1 = near-end sensor, bits 2-3 = paper-end sensor.
+            near_end_bits = status_byte & 0x03
+            end_bits = (status_byte >> 2) & 0x03
 
-            if paper_bits == 0x03:  # 0C = 12 decimal = 0b1100, bits 2-3 = 0b11
-                result["paper_near_end"] = True
-                result["paper_adequate"] = False
-            elif paper_bits == 0x00:
-                result["paper_adequate"] = True
-            else:
-                # Unknown status, assume adequate
-                result["paper_adequate"] = True
+            result["paper_near_end"] = near_end_bits == 0x03
+            result["paper_out"] = end_bits == 0x03
+            result["paper_adequate"] = not (
+                result["paper_near_end"] or result["paper_out"]
+            )
 
         except Exception:
             result["error"] = True

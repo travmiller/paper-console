@@ -323,6 +323,50 @@ def test_printer_driver_handles_serial_init_failure(monkeypatch):
     assert driver.ser is None
 
 
+def test_printer_driver_reports_paper_near_end(monkeypatch):
+    monkeypatch.setattr(
+        PrinterDriver,
+        "_load_font_family",
+        lambda self: {"regular": None, "bold": None},
+    )
+
+    driver = PrinterDriver(init_serial=False)
+    writes = []
+    monkeypatch.setattr(driver, "_write", lambda data: writes.append(data))
+    monkeypatch.setattr(driver, "_read", lambda size=1, timeout=1.0: b"\x03")  # noqa: ARG005
+
+    result = driver.check_paper_status()
+
+    assert writes == [b"\x1d\x72\x01"]
+    assert result == {
+        "paper_adequate": False,
+        "paper_near_end": True,
+        "paper_out": False,
+        "error": False,
+    }
+
+
+def test_printer_driver_reports_paper_out(monkeypatch):
+    monkeypatch.setattr(
+        PrinterDriver,
+        "_load_font_family",
+        lambda self: {"regular": None, "bold": None},
+    )
+
+    driver = PrinterDriver(init_serial=False)
+    monkeypatch.setattr(driver, "_write", lambda data: None)  # noqa: ARG005
+    monkeypatch.setattr(driver, "_read", lambda size=1, timeout=1.0: b"\x0c")  # noqa: ARG005
+
+    result = driver.check_paper_status()
+
+    assert result == {
+        "paper_adequate": False,
+        "paper_near_end": False,
+        "paper_out": True,
+        "error": False,
+    }
+
+
 def test_fetch_emails_sets_auth_failed_on_imap_auth_error(monkeypatch):
     config = {
         "email_service": "Custom",
