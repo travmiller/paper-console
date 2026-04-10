@@ -674,3 +674,43 @@ def test_release_build_validates_required_runtime_assets(monkeypatch):
         raise AssertionError("Expected runtime asset validation to fail")
     except FileNotFoundError as exc:
         assert "missing/offline.json" in str(exc)
+
+
+def test_release_build_normalizes_mounted_windows_temp_env(monkeypatch):
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "release_build.py"
+    spec = importlib.util.spec_from_file_location("release_build_test_module", script_path)
+    release_build = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(release_build)
+
+    monkeypatch.setattr(release_build.os, "name", "posix", raising=False)
+    monkeypatch.setenv("TEMP", "/mnt/c/Users/test/AppData/Local/Temp")
+    monkeypatch.setenv("TMP", "/mnt/c/Users/test/AppData/Local/Temp")
+    monkeypatch.delenv("TMPDIR", raising=False)
+
+    env, normalized = release_build.build_subprocess_env()
+
+    assert normalized is True
+    assert env["TMPDIR"] == "/tmp"
+    assert env["TEMP"] == "/tmp"
+    assert env["TMP"] == "/tmp"
+
+
+def test_release_build_preserves_local_temp_env(monkeypatch):
+    script_path = Path(__file__).resolve().parents[1] / "scripts" / "release_build.py"
+    spec = importlib.util.spec_from_file_location("release_build_test_module", script_path)
+    release_build = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(release_build)
+
+    monkeypatch.setattr(release_build.os, "name", "posix", raising=False)
+    monkeypatch.setenv("TMPDIR", "/tmp/pc1-tests")
+    monkeypatch.setenv("TEMP", "/tmp/pc1-tests")
+    monkeypatch.setenv("TMP", "/tmp/pc1-tests")
+
+    env, normalized = release_build.build_subprocess_env()
+
+    assert normalized is False
+    assert env["TMPDIR"] == "/tmp/pc1-tests"
+    assert env["TEMP"] == "/tmp/pc1-tests"
+    assert env["TMP"] == "/tmp/pc1-tests"

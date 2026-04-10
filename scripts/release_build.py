@@ -87,10 +87,33 @@ def validate_version(version: str) -> None:
         )
 
 
+def build_subprocess_env() -> tuple[dict[str, str], bool]:
+    env = os.environ.copy()
+
+    if os.name != "posix":
+        return env, False
+
+    inherited_temp = next((env.get(name) for name in ("TMPDIR", "TEMP", "TMP") if env.get(name)), "")
+    active_temp_root = inherited_temp or tempfile.gettempdir()
+    mounted_windows_temp = active_temp_root.startswith("/mnt/")
+    usable_tmp = Path("/tmp").is_dir() and os.access("/tmp", os.W_OK)
+
+    if not (mounted_windows_temp and usable_tmp):
+        return env, False
+
+    for name in ("TMPDIR", "TEMP", "TMP"):
+        env[name] = "/tmp"
+
+    return env, True
+
+
 def run_command(cmd: list[str], cwd: Path) -> None:
     pretty = " ".join(cmd)
     print(f"[*] {pretty}")
-    subprocess.run(cmd, cwd=str(cwd), check=True)
+    env, normalized_temp_env = build_subprocess_env()
+    if normalized_temp_env:
+        print("[i] Using /tmp for subprocess temp files to avoid mounted-temp capture issues")
+    subprocess.run(cmd, cwd=str(cwd), check=True, env=env)
 
 
 def maybe_run_tests(skip_tests: bool) -> None:
