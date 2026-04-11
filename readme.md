@@ -167,7 +167,7 @@ Configuration is handled entirely via the **Web UI** at `http://pc-1.local` (or 
 
 Each module is an independent instance with its own configuration. See [Architecture & Modules](#4-architecture--modules) for detailed information.
 
-Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **Sudoku**, **Maze**, **Adventure**, **Astronomy**, **Calendar**, **Webhook**, **QR Code**, **Text / Note**, **Quotes**, **Journal Prompt**, **History**, **System Monitor**.
+Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **Sudoku**, **Maze**, **Adventure**, **Astronomy**, **Calendar**, **Webhook**, **QR Code**, **Text / Note**, **Quotes**, **Journal Prompt**, **History**, **System Monitor**, **Word of the Day**
 
 ### Settings Storage
 * **Settings File:** `config.json` (auto-saved, gitignored)
@@ -325,6 +325,8 @@ paper-console/
 **History:** Offline “on this day” events; optional event count in config.
 
 **System Monitor:** Hostname, IP, WiFi, disk/memory bars, uptime, load, CPU temp (where available).
+
+**Word of the Day:** Merriam Webster's word of the day
 
 ---
 
