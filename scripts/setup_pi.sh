@@ -171,6 +171,7 @@ cat > /etc/nginx/sites-available/paper-console <<EOL
 server {
     listen 80 default_server;
     server_name _;
+    client_max_body_size 3M;
 
     location / {
         proxy_pass http://127.0.1.1:8000;

@@ -244,6 +244,10 @@ def _apply_snapshot_defaults(type_id: str, config: dict) -> dict:
         if "mock_messages" not in out:
             out["mock_messages"] = email_client.get_default_mock_messages()
 
+    elif type_id == "image":
+        if not out.get("image_data"):
+            out["image_data"] = open(PROJECT_ROOT / "testing/test_image.txt").read()
+
     return out
 
 
