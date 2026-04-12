@@ -9,6 +9,7 @@ import logging
 # Constants
 PRINTER_WIDTH = 42
 DEFAULT_CUTTER_FEED_LINES = 7
+MAX_WIDTH = 384
 logger = logging.getLogger(__name__)
 _warned_non_posix_sensitive_config = False
 _warned_non_posix_sensitive_data = False

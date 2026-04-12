@@ -30,10 +30,14 @@ DEFAULT_CONTENT_DOC = {"type": "doc", "content": [{"type": "paragraph"}]}
         }
     },
 )
-def format_text_receipt(printer: PrinterDriver, config: TextConfig, module_name: str = None):
+def format_text_receipt(printer: PrinterDriver, config: TextConfig, module_name: str = None, caption: str = None):
     """Prints a static text note from a TipTap JSON document."""
     header_label = module_name or "NOTE"
     printer.print_header(header_label, icon="note")
+    
+    if caption:
+        printer.print_caption(caption)
+
     printer.print_caption(format_print_datetime())
     printer.print_line()
     
