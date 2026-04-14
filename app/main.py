@@ -1305,6 +1305,7 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
             # but we definitely validate the configured ones.
             # Note: module.type is reliable, module.config is what we check.
             validate_module_config(module.type, module.config or {})
+
         except ValueError as e:
             # Revert in-memory settings on failure
             # config_module.settings = load_config()  # Reload old config
@@ -3421,6 +3422,13 @@ async def list_modules():
     """List all module instances."""
     return {"modules": settings.modules}
 
+def _convert_and_resize_image(module: ModuleInstance) -> None:
+    # Process image uploads: convert raw data-urls into compact printer-ready format
+    if module.type == "image" and module.config:
+        image_data = module.config.get("image_data")
+        if image_data and image_data.startswith("data:"):
+            from app.modules.print_image import resize_and_convert_image
+            module.config["image_data"] = resize_and_convert_image(image_data)
 
 def _normalize_text_module_config(module: ModuleInstance) -> None:
     """Ensure text modules use content_doc and strip legacy markdown content."""
@@ -3469,6 +3477,8 @@ async def create_module(module: ModuleInstance, background_tasks: BackgroundTask
         module.id = str(uuid.uuid4())
 
     _normalize_text_module_config(module)
+    _convert_and_resize_image(module)
+
     settings.modules[module.id] = module
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
@@ -3498,6 +3508,8 @@ async def update_module(
     # Ensure ID matches
     module.id = module_id
     _normalize_text_module_config(module)
+    _convert_and_resize_image(module)
+
     settings.modules[module_id] = module
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 

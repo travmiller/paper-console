@@ -6,6 +6,7 @@ import PresetSelect from './widgets/PresetSelect';
 import WebhookTest from './widgets/WebhookTest';
 import ActionButton from './widgets/ActionButton';
 import RichTextEditor from './widgets/RichTextEditor';
+import ImageWidget from './widgets/ImageWidget';
 
 /**
  * A lightweight JSON Schema form renderer.
@@ -154,6 +155,31 @@ const SchemaField = ({
                 onActionComplete={onActionComplete}
             />
         );
+    }
+    
+    if (widget === 'image') {
+      return (
+        <div className='mb-4'>
+          {title && <label className={commonClasses.label}>{title}</label>}
+          <ImageWidget
+            value={value}
+            onChange={(next) => {
+              onUserInteraction();
+              onChange(next);
+            }}
+            schema={schema}
+            uiSchema={uiSchema}
+          />
+          {description && (
+            <p className='text-xs text-zinc-500 mt-1'>{description}</p>
+          )}
+          {hasError && (
+            <p id={errorId} className='text-xs mt-1' style={{ color: 'var(--color-error)' }}>
+              {fieldError}
+            </p>
+          )}
+        </div>
+      );
     }
     
     if (widget === 'richtext') {
