@@ -253,6 +253,7 @@ class Settings(BaseModel):
     state: Optional[str] = None
     time_format: str = "12h"  # "12h" for 12-hour format, "24h" for 24-hour format
     time_sync_mode: str = "manual"  # "manual" or "automatic" for time synchronization mode
+    release_channel: Literal["stable", "beta"] = "stable"
     max_print_lines: int = 200  # Maximum lines per print job (0 = no limit)
 
     # Module Instances: Dictionary of module_id -> ModuleInstance

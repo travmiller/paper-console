@@ -9,7 +9,7 @@
 * **Quality materials:** walnut, brass, and archival-grade paper.
 * **Universal channels:** fully configurable channels (Adventure, Astronomy, Calendar, Email, History, Journal Prompt, Maze, News, QR Code, Quotes, RSS, Sudoku, System Monitor, Text / Note, Weather, Webhook)
 
-For more information and build photos, visit [travismiller.design/paperconsole](https://travismiller.design/paperconsole).
+For more information and build photos, visit [travismiller.design/paper-console](https://travismiller.design/paper-console).
 
 ![PC-1 Front View](images/pc-1_front2.jpg)
 *Front view showing the brass rotary dial, push button, and thermal paper output*
@@ -203,7 +203,8 @@ For non-git production units, build versioned release artifacts with:
 ./.venv/bin/python scripts/release_build.py --version v1.2.3 --build-web
 ```
 
-See `scripts/RELEASE.md` for the full release/tag/publish workflow.
+Devices can opt into beta OTA builds from **General Settings → Updates → Beta Releases**.
+See `scripts/RELEASE.md` for the full stable/beta release and publishing workflow.
 
 ---
 

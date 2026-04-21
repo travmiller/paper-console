@@ -47,6 +47,35 @@ Optional hardening:
 - Upload `SHA256SUMS` and include `pc1-v1.2.3.tar.gz` checksum line.
 - Set `PC1_UPDATE_TARBALL_SHA256` on devices as a pinned expected hash.
 
+## Beta releases
+
+Use normal semver prerelease tags for beta/RC builds, for example:
+
+- `v1.2.3-beta.1`
+- `v1.2.3-beta.2`
+- `v1.2.3-rc.1`
+
+Build and publish them the same way as stable releases:
+
+```bash
+./.venv/bin/python scripts/release_build.py --version v1.2.3-beta.1 --build-web
+git tag v1.2.3-beta.1
+git push origin v1.2.3-beta.1
+```
+
+Then create the GitHub release for that tag and mark it as a **pre-release**.
+
+OTA behavior:
+
+- Devices on the default `stable` channel only check GitHub's latest stable release.
+- Devices with **General Settings → Updates → Beta Releases** enabled opt into prerelease OTA behavior.
+
+Current implementation note:
+
+- The beta channel currently follows the newest published non-draft release returned by GitHub's full releases list, not a separately labeled "latest beta" concept.
+- If you publish a newer stable release after a beta release, beta-enabled devices may follow that newer stable release.
+- If you need a strictly isolated beta lane, use a separate beta release repo until update-channel behavior becomes more specific.
+
 ## Factory image guidance
 
 - Ship units from artifacts (no `.git` folder).

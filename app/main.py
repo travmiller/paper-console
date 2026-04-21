@@ -1932,21 +1932,73 @@ def _get_install_mode(project_root: Optional[Path] = None) -> str:
     return "development" if (root / ".git").exists() else "production"
 
 
-def _get_release_bundle_metadata(
+def _get_release_channel() -> str:
+    channel = str(getattr(settings, "release_channel", "stable") or "stable").strip().lower()
+    return "beta" if channel == "beta" else "stable"
+
+
+def _should_include_prereleases() -> bool:
+    return _get_release_channel() == "beta"
+
+
+def _fetch_release_data(
     release_repo: str,
     *,
     release_tag: str = "",
-) -> Dict[str, str]:
+    include_prerelease: bool = False,
+) -> Dict[str, object]:
     import requests
 
-    release_path = f"releases/tags/{release_tag}" if release_tag else "releases/latest"
+    if release_tag:
+        release_path = f"releases/tags/{release_tag}"
+        release_resp = requests.get(
+            f"https://api.github.com/repos/{release_repo}/{release_path}",
+            headers={"User-Agent": "PC-1-OTA-Updater"},
+            timeout=10,
+        )
+        release_resp.raise_for_status()
+        return release_resp.json()
+
+    if include_prerelease:
+        release_resp = requests.get(
+            f"https://api.github.com/repos/{release_repo}/releases",
+            headers={"User-Agent": "PC-1-OTA-Updater"},
+            timeout=10,
+        )
+        release_resp.raise_for_status()
+        releases = release_resp.json()
+        if not isinstance(releases, list):
+            raise RuntimeError("Release server returned an unexpected response.")
+
+        for release_data in releases:
+            if not isinstance(release_data, dict):
+                continue
+            if release_data.get("draft"):
+                continue
+            return release_data
+
+        raise RuntimeError("No published releases are available.")
+
     release_resp = requests.get(
-        f"https://api.github.com/repos/{release_repo}/{release_path}",
+        f"https://api.github.com/repos/{release_repo}/releases/latest",
         headers={"User-Agent": "PC-1-OTA-Updater"},
         timeout=10,
     )
     release_resp.raise_for_status()
-    release_data = release_resp.json()
+    return release_resp.json()
+
+
+def _get_release_bundle_metadata(
+    release_repo: str,
+    *,
+    release_tag: str = "",
+    include_prerelease: bool = False,
+) -> Dict[str, str]:
+    release_data = _fetch_release_data(
+        release_repo,
+        release_tag=release_tag,
+        include_prerelease=include_prerelease,
+    )
 
     tag_name = (release_data.get("tag_name") or "").strip()
     if not tag_name:
@@ -2025,13 +2077,18 @@ def _install_release_bundle(
     *,
     expected_sha: str = "",
     release_tag: str = "",
+    include_prerelease: bool = False,
 ) -> str:
     import hashlib
     import requests
     import tarfile
     import tempfile
 
-    release_meta = _get_release_bundle_metadata(release_repo, release_tag=release_tag)
+    release_meta = _get_release_bundle_metadata(
+        release_repo,
+        release_tag=release_tag,
+        include_prerelease=include_prerelease,
+    )
     tag_name = release_meta["tag_name"]
     tarball_name = release_meta["tarball_name"]
     tarball_url = release_meta["tarball_url"]
@@ -2323,9 +2380,8 @@ async def check_for_updates():
             }
 
         # Production mode: use GitHub releases and .version marker
-        import requests
-
         release_repo = os.environ.get("PC1_UPDATE_GITHUB_REPO", "travmiller/paper-console")
+        release_channel = _get_release_channel()
         current_version = "unknown"
         version_file = project_root / ".version"
         if version_file.exists():
@@ -2333,20 +2389,20 @@ async def check_for_updates():
             if version_text:
                 current_version = version_text
 
-        release_resp = requests.get(
-            f"https://api.github.com/repos/{release_repo}/releases/latest",
-            headers={"User-Agent": "PC-1-OTA-Updater"},
-            timeout=8,
-        )
-        if release_resp.status_code != 200:
+        try:
+            release_data = _fetch_release_data(
+                release_repo,
+                include_prerelease=_should_include_prereleases(),
+            )
+        except Exception:
             return {
                 "available": False,
                 "message": "Could not check for updates",
                 "error": "Unable to reach the release server.",
                 "current_version": current_version,
+                "release_channel": release_channel,
             }
 
-        release_data = release_resp.json()
         latest_version = (release_data.get("tag_name") or "").strip() or "unknown"
         if latest_version == "unknown":
             return {
@@ -2354,6 +2410,7 @@ async def check_for_updates():
                 "message": "Could not compare versions",
                 "error": "Unable to determine version information.",
                 "current_version": current_version,
+                "release_channel": release_channel,
             }
 
         if current_version == latest_version:
@@ -2362,6 +2419,7 @@ async def check_for_updates():
                 "up_to_date": True,
                 "message": "You're on the latest version",
                 "current_version": current_version,
+                "release_channel": release_channel,
             }
 
         return {
@@ -2371,6 +2429,7 @@ async def check_for_updates():
             "commits_behind": 1,
             "current_version": current_version,
             "latest_version": latest_version,
+            "release_channel": release_channel,
         }
 
     except subprocess.TimeoutExpired:
@@ -2514,6 +2573,7 @@ async def install_updates():
                     project_root,
                     release_repo,
                     expected_sha=expected_sha,
+                    include_prerelease=_should_include_prereleases(),
                 )
             except Exception as e:
                 logger.exception("Production OTA install failed")
@@ -2621,6 +2681,7 @@ async def convert_to_production_updates():
                 project_root,
                 release_repo,
                 expected_sha=expected_sha,
+                include_prerelease=_should_include_prereleases(),
             )
         except Exception as e:
             logger.exception("Production conversion failed")

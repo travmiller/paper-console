@@ -161,6 +161,81 @@ def test_get_current_version_reports_production_install_mode(monkeypatch, tmp_pa
     assert result["can_convert_to_production"] is False
 
 
+def test_fetch_release_data_prefers_latest_published_release_when_beta_enabled(monkeypatch):
+    captured = {}
+
+    class DummyResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {"tag_name": "v0.2.0-beta.1", "draft": False, "prerelease": True},
+                {"tag_name": "v0.1.9", "draft": False, "prerelease": False},
+            ]
+
+    def fake_requests_get(url, headers=None, timeout=None):  # noqa: ARG001
+        captured["url"] = url
+        return DummyResponse()
+
+    monkeypatch.setitem(
+        sys.modules,
+        "requests",
+        types.SimpleNamespace(get=fake_requests_get),
+    )
+
+    result = main_module._fetch_release_data(
+        "travmiller/paper-console",
+        include_prerelease=True,
+    )
+
+    assert captured["url"].endswith("/releases")
+    assert result["tag_name"] == "v0.2.0-beta.1"
+
+
+def test_check_for_updates_uses_beta_channel_in_production(monkeypatch, tmp_path):
+    project_root = tmp_path / "project"
+    app_dir = project_root / "app"
+    app_dir.mkdir(parents=True)
+    fake_main_path = app_dir / "main.py"
+    fake_main_path.write_text("# test stub\n", encoding="utf-8")
+    (project_root / ".version").write_text("v0.1.0\n", encoding="utf-8")
+
+    class DummyResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {"tag_name": "v0.2.0-beta.1", "draft": False, "prerelease": True},
+                {"tag_name": "v0.1.9", "draft": False, "prerelease": False},
+            ]
+
+    def fake_requests_get(url, headers=None, timeout=None):  # noqa: ARG001
+        assert url.endswith("/releases")
+        return DummyResponse()
+
+    monkeypatch.setattr(main_module, "__file__", str(fake_main_path))
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        types.SimpleNamespace(release_channel="beta"),
+        raising=False,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "requests",
+        types.SimpleNamespace(get=fake_requests_get),
+    )
+
+    result = asyncio.run(main_module.check_for_updates())
+
+    assert result["available"] is True
+    assert result["current_version"] == "v0.1.0"
+    assert result["latest_version"] == "v0.2.0-beta.1"
+    assert result["release_channel"] == "beta"
+
+
 def test_convert_to_production_installs_release_and_removes_git(monkeypatch, tmp_path):
     git_dir = tmp_path / ".git"
     git_dir.mkdir()
@@ -168,12 +243,26 @@ def test_convert_to_production_installs_release_and_removes_git(monkeypatch, tmp
     captured = {}
 
     monkeypatch.setattr(main_module, "_get_project_root", lambda: tmp_path)
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        types.SimpleNamespace(release_channel="stable"),
+        raising=False,
+    )
 
-    def fake_install_release_bundle(project_root, release_repo, *, expected_sha="", release_tag=""):
+    def fake_install_release_bundle(
+        project_root,
+        release_repo,
+        *,
+        expected_sha="",
+        release_tag="",
+        include_prerelease=False,
+    ):
         captured["project_root"] = project_root
         captured["release_repo"] = release_repo
         captured["expected_sha"] = expected_sha
         captured["release_tag"] = release_tag
+        captured["include_prerelease"] = include_prerelease
         (project_root / ".version").write_text("v0.1.0\n", encoding="utf-8")
         return "v0.1.0"
 
@@ -194,6 +283,7 @@ def test_convert_to_production_installs_release_and_removes_git(monkeypatch, tmp
     assert captured["release_repo"] == "travmiller/paper-console"
     assert captured["expected_sha"] == ""
     assert captured["release_tag"] == ""
+    assert captured["include_prerelease"] is False
     assert not git_dir.exists()
     assert restart_calls == [True]
 
@@ -207,7 +297,7 @@ def test_convert_to_production_keeps_git_when_dependency_install_fails(monkeypat
     monkeypatch.setattr(
         main_module,
         "_install_release_bundle",
-        lambda project_root, release_repo, *, expected_sha="", release_tag="": "v0.1.0",
+        lambda project_root, release_repo, *, expected_sha="", release_tag="", include_prerelease=False: "v0.1.0",
     )
     monkeypatch.setattr(
         main_module,
@@ -223,6 +313,54 @@ def test_convert_to_production_keeps_git_when_dependency_install_fails(monkeypat
     assert result["success"] is False
     assert git_dir.exists()
     assert restart_calls == []
+
+
+def test_install_updates_uses_beta_release_channel_in_production(monkeypatch, tmp_path):
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    captured = {}
+
+    monkeypatch.setattr(main_module, "_get_project_root", lambda: project_root)
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        types.SimpleNamespace(release_channel="beta"),
+        raising=False,
+    )
+
+    def fake_install_release_bundle(
+        current_project_root,
+        release_repo,
+        *,
+        expected_sha="",
+        release_tag="",
+        include_prerelease=False,
+    ):
+        captured["project_root"] = current_project_root
+        captured["release_repo"] = release_repo
+        captured["expected_sha"] = expected_sha
+        captured["release_tag"] = release_tag
+        captured["include_prerelease"] = include_prerelease
+        return "v0.2.0-beta.1"
+
+    monkeypatch.setattr(main_module, "_install_release_bundle", fake_install_release_bundle)
+    monkeypatch.setattr(
+        main_module,
+        "_install_update_dependencies",
+        lambda current_project_root, is_dev: subprocess.CompletedProcess(
+            args=["pip"], returncode=0, stdout="", stderr=""
+        ),
+    )
+    monkeypatch.setattr(main_module, "_restart_pc1_service", lambda: None)
+
+    result = asyncio.run(main_module.install_updates())
+
+    assert result["success"] is True
+    assert captured["project_root"] == project_root
+    assert captured["release_repo"] == "travmiller/paper-console"
+    assert captured["expected_sha"] == ""
+    assert captured["release_tag"] == ""
+    assert captured["include_prerelease"] is True
 
 
 def test_try_begin_print_job_respects_hold_reservation(monkeypatch):

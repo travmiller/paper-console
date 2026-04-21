@@ -23,6 +23,11 @@ def test_default_settings_exclude_removed_module_types():
     )
 
 
+def test_default_settings_use_stable_release_channel():
+    settings = Settings()
+    assert settings.release_channel == "stable"
+
+
 def test_default_module_configs_are_registered_and_valid():
     settings = Settings()
     registry = get_all_modules()

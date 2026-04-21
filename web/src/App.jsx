@@ -30,6 +30,7 @@ function App() {
     longitude: 0,
     city_name: '',
     time_format: '12h',
+    release_channel: 'stable',
     modules: {},
     channels: {},
   });
