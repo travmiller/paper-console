@@ -84,6 +84,11 @@ docs/raspberry-pi-config-full.md
 # Cursor IDE files
 .cursorrules
 
+# Local agent tool state
+.claude/
+.codex
+.codex/
+
 # Deployment scripts (local use only)
 deploy.bat
 deploy.sh
