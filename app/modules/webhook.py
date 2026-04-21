@@ -25,7 +25,10 @@ WEBHOOK_PRESETS = {
         "method": "GET",
         "headers": {},
         "body": "",
-        "json_path": ""
+        "json_path": "",
+        "auth_type": "none",
+        "auth_username": "",
+        "auth_password": ""
     },
     "dad_jokes": {
         "label": "Dad Jokes",
@@ -33,7 +36,10 @@ WEBHOOK_PRESETS = {
         "method": "GET",
         "headers": {"Accept": "application/json"},
         "body": "",
-        "json_path": "joke"
+        "json_path": "joke",
+        "auth_type": "none",
+        "auth_username": "",
+        "auth_password": ""
     },
     "chuck_norris": {
         "label": "Chuck Norris Facts",
@@ -41,7 +47,10 @@ WEBHOOK_PRESETS = {
         "method": "GET",
         "headers": {},
         "body": "",
-        "json_path": "value"
+        "json_path": "value",
+        "auth_type": "none",
+        "auth_username": "",
+        "auth_password": ""
     },
     "cat_facts": {
         "label": "Cat Facts",
@@ -49,7 +58,10 @@ WEBHOOK_PRESETS = {
         "method": "GET",
         "headers": {},
         "body": "",
-        "json_path": "fact"
+        "json_path": "fact",
+        "auth_type": "none",
+        "auth_username": "",
+        "auth_password": ""
     },
     "sample_image": {
         "label": "Sample Image",
@@ -57,7 +69,10 @@ WEBHOOK_PRESETS = {
         "method": "GET",
         "headers": {},
         "body": "",
-        "json_path": ""
+        "json_path": "",
+        "auth_type": "none",
+        "auth_username": "",
+        "auth_password": ""
     }
 }
 
@@ -91,6 +106,37 @@ def _print_image_response(response, printer: PrinterDriver) -> bool:
         return False
 
 
+def _webhook_auth(action: WebhookConfig):
+    auth_type = (action.auth_type or "none").strip().lower()
+    username = action.auth_username or ""
+    password = action.auth_password or ""
+
+    if auth_type == "basic":
+        return requests.auth.HTTPBasicAuth(username, password)
+    if auth_type == "digest":
+        return requests.auth.HTTPDigestAuth(username, password)
+    return None
+
+
+def request_webhook_response(action: WebhookConfig):
+    headers = action.headers or {}
+    auth = _webhook_auth(action)
+
+    if action.method.upper() == "POST":
+        json_body = None
+        if action.body:
+            try:
+                json_body = json.loads(action.body)
+            except json.JSONDecodeError:
+                json_body = {}
+
+        return requests.post(
+            action.url, json=json_body, headers=headers, auth=auth, timeout=10
+        )
+
+    return requests.get(action.url, headers=headers, auth=auth, timeout=10)
+
+
 @register_module(
     type_id="webhook",
     label="Webhook",
@@ -117,6 +163,14 @@ def _print_image_response(response, printer: PrinterDriver) -> bool:
              },
              "body": {"type": "string", "title": "Body (JSON)"},
              "json_path": {"type": "string", "title": "JSON Path"},
+             "auth_type": {
+                 "type": "string",
+                 "title": "Auth Type",
+                 "enum": ["none", "basic", "digest"],
+                 "default": "none"
+             },
+             "auth_username": {"type": "string", "title": "Username"},
+             "auth_password": {"type": "string", "title": "Password"},
              "test_button": {"type": "null", "title": ""}
         },
         "required": ["url"]
@@ -131,6 +185,14 @@ def _print_image_response(response, printer: PrinterDriver) -> bool:
             "ui:showWhen": {"field": "method", "value": "POST"}
         },
         "json_path": {"ui:placeholder": "data.message"},
+        "auth_username": {
+            "ui:placeholder": "admin",
+            "ui:showWhen": {"field": "auth_type", "values": ["basic", "digest"]}
+        },
+        "auth_password": {
+            "ui:widget": "password",
+            "ui:showWhen": {"field": "auth_type", "values": ["basic", "digest"]}
+        },
         "test_button": {"ui:widget": "webhook-test"}
     },
 )
@@ -147,22 +209,7 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
     printer.print_line()
 
     try:
-        response = None
-        headers = action.headers or {}
-
-        if action.method.upper() == "POST":
-            json_body = None
-            if action.body:
-                try:
-                    json_body = json.loads(action.body)
-                except json.JSONDecodeError:
-                    json_body = {}
-
-            response = requests.post(
-                action.url, json=json_body, headers=headers, timeout=10
-            )
-        else:
-            response = requests.get(action.url, headers=headers, timeout=10)
+        response = request_webhook_response(action)
 
         if response.status_code >= 400:
             printer.print_bold(f"Error: {response.status_code}")

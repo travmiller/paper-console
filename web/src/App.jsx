@@ -328,7 +328,15 @@ function App() {
       sudoku: { difficulty: 'Medium' },
       astronomy: {},
       calendar: { ical_sources: [], view_mode: 'month' },
-      webhook: { url: '', method: 'GET', headers: {}, json_path: '' },
+      webhook: {
+        url: '',
+        method: 'GET',
+        headers: {},
+        json_path: '',
+        auth_type: 'none',
+        auth_username: '',
+        auth_password: '',
+      },
       text: { content_doc: { type: 'doc', content: [{ type: 'paragraph' }] } },
     };
     return defaults[moduleType] || {};

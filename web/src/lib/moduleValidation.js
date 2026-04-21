@@ -37,6 +37,9 @@ export const getModuleValidationErrors = (module) => {
     const url = String(config.url || '').trim();
     const method = String(config.method || 'GET').toUpperCase();
     const body = String(config.body || '').trim();
+    const authType = String(config.auth_type || 'none').toLowerCase();
+    const authUsername = String(config.auth_username || '').trim();
+    const authPassword = String(config.auth_password || '');
 
     if (!url) {
       errors.url = 'URL is required.';
@@ -56,6 +59,19 @@ export const getModuleValidationErrors = (module) => {
         JSON.parse(body);
       } catch {
         errors.body = 'Body must be valid JSON.';
+      }
+    }
+
+    if (!['none', 'basic', 'digest'].includes(authType)) {
+      errors.auth_type = 'Choose a valid auth type.';
+    }
+
+    if (['basic', 'digest'].includes(authType)) {
+      if (!authUsername) {
+        errors.auth_username = 'Username is required for this auth type.';
+      }
+      if (!authPassword) {
+        errors.auth_password = 'Password is required for this auth type.';
       }
     }
   }

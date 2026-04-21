@@ -21,6 +21,9 @@ class WebhookConfig(BaseModel):
     headers: Dict[str, str] = {}
     body: Optional[str] = None
     json_path: Optional[str] = None
+    auth_type: str = "none"
+    auth_username: Optional[str] = None
+    auth_password: Optional[str] = None
 
 
 class NewsConfig(BaseModel):

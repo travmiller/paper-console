@@ -4215,27 +4215,15 @@ def _preview_webhook_sync(config: dict):
     import requests
     import json
 
-    url = config.get("url")
-    method = config.get("method", "GET").upper()
-    headers = config.get("headers") or {}
-    body = config.get("body")
-    json_path = config.get("json_path")
+    action = WebhookConfig(**config)
+    url = action.url
+    json_path = action.json_path
 
     if not url:
         return {"success": False, "error": "URL is required"}
 
     try:
-        response = None
-        if method == "POST":
-            json_body = None
-            if body:
-                try:
-                    json_body = json.loads(body)
-                except json.JSONDecodeError:
-                    json_body = {}
-            response = requests.post(url, json=json_body, headers=headers, timeout=10)
-        else:
-            response = requests.get(url, headers=headers, timeout=10)
+        response = webhook.request_webhook_response(action)
 
         if response.status_code >= 400:
             return {

@@ -216,7 +216,10 @@ const SchemaField = ({
                     const showWhen = propUiSchema['ui:showWhen'];
                     if (showWhen) {
                         const siblingValue = value?.[showWhen.field];
-                        if (siblingValue !== showWhen.value) {
+                        const allowedValues = Array.isArray(showWhen.values)
+                            ? showWhen.values
+                            : (Object.prototype.hasOwnProperty.call(showWhen, 'value') ? [showWhen.value] : []);
+                        if (!allowedValues.includes(siblingValue)) {
                             return null; // Hide this field
                         }
                     }
@@ -399,7 +402,7 @@ const SchemaField = ({
             )}
             {schema.enum ? (
                 <select
-                    value={value ?? ''}
+                    value={value ?? schema.default ?? ''}
                     onChange={(e) => {
                         onUserInteraction();
                         onChange(e.target.value);
@@ -418,7 +421,7 @@ const SchemaField = ({
                 </select>
             ) : widget === 'textarea' ? (
                  <textarea
-                    value={value || ''}
+                    value={value ?? schema.default ?? ''}
                     onChange={(e) => {
                         onUserInteraction();
                         onChange(e.target.value);
@@ -433,7 +436,7 @@ const SchemaField = ({
             ) : (
                 <input
                     type={widget === 'password' ? 'password' : (type === 'number' || type === 'integer' ? 'number' : 'text')}
-                    value={value ?? ''}
+                    value={value ?? schema.default ?? ''}
                     onChange={(e) => {
                         onUserInteraction();
                         const val = e.target.value;

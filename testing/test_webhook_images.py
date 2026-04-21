@@ -56,7 +56,9 @@ def test_webhook_prints_image_responses(monkeypatch):
     monkeypatch.setattr(
         webhook.requests,
         "get",
-        lambda url, headers=None, timeout=None: _ImageResponse(payload),  # noqa: ARG005
+        lambda url, headers=None, timeout=None, auth=None: _ImageResponse(  # noqa: ARG005
+            payload
+        ),
     )
 
     webhook.run_webhook(
@@ -79,7 +81,9 @@ def test_webhook_image_response_has_generous_height_cap(monkeypatch):
     monkeypatch.setattr(
         webhook.requests,
         "get",
-        lambda url, headers=None, timeout=None: _ImageResponse(payload),  # noqa: ARG005
+        lambda url, headers=None, timeout=None, auth=None: _ImageResponse(  # noqa: ARG005
+            payload
+        ),
     )
 
     webhook.run_webhook(
@@ -100,7 +104,9 @@ def test_webhook_preview_reports_image_response(monkeypatch):
     monkeypatch.setattr(
         requests,
         "get",
-        lambda url, headers=None, timeout=None: _ImageResponse(payload),  # noqa: ARG005
+        lambda url, headers=None, timeout=None, auth=None: _ImageResponse(  # noqa: ARG005
+            payload
+        ),
     )
 
     result = main_module._preview_webhook_sync(
@@ -121,7 +127,9 @@ def test_webhook_preview_caps_image_data_url(monkeypatch):
     monkeypatch.setattr(
         requests,
         "get",
-        lambda url, headers=None, timeout=None: _ImageResponse(payload),  # noqa: ARG005
+        lambda url, headers=None, timeout=None, auth=None: _ImageResponse(  # noqa: ARG005
+            payload
+        ),
     )
 
     result = main_module._preview_webhook_sync(
@@ -144,3 +152,26 @@ def test_webhook_presets_include_sample_image():
     assert preset["url"] == webhook.SAMPLE_IMAGE_WEBHOOK_URL
     assert preset["method"] == "GET"
     assert preset["json_path"] == ""
+
+
+def test_webhook_request_uses_digest_auth(monkeypatch):
+    captured = {}
+
+    def fake_get(url, headers=None, timeout=None, auth=None):  # noqa: ARG001
+        captured["auth"] = auth
+        return _ImageResponse(_png_bytes())
+
+    monkeypatch.setattr(webhook.requests, "get", fake_get)
+
+    webhook.request_webhook_response(
+        WebhookConfig(
+            url="http://camera.local/cgi-bin/snapshot.cgi",
+            auth_type="digest",
+            auth_username="admin",
+            auth_password="secret",
+        )
+    )
+
+    assert isinstance(captured["auth"], requests.auth.HTTPDigestAuth)
+    assert captured["auth"].username == "admin"
+    assert captured["auth"].password == "secret"
