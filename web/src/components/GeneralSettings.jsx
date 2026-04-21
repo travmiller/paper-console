@@ -506,33 +506,38 @@ const GeneralSettings = ({
 
           <div className='mb-4 flex items-start justify-between gap-4'>
             <div className='flex-1'>
-              <div className='text-sm font-bold text-black'>Beta Releases</div>
-              <div className='text-xs text-gray-600 mt-1 '>
-                Current channel: <span className='font-mono text-black'>{releaseChannel}</span>
-              </div>
+              <div className='text-sm font-bold text-black'>Release Channel</div>
               {installMode === 'development' && (
                 <p className='text-xs text-gray-600 mt-1 '>
                   This takes effect after converting this unit to production OTA updates.
                 </p>
               )}
             </div>
-            <label className='flex items-center gap-2 cursor-pointer select-none'>
-              <span className='text-xs font-bold text-black'>
-                {releaseChannel === 'beta' ? 'ON' : 'OFF'}
-              </span>
-              <input
-                type='checkbox'
-                className='h-5 w-5 accent-black cursor-pointer'
-                checked={releaseChannel === 'beta'}
-                onChange={(e) => {
-                  setUpdateStatus(null);
-                  setUpdateMessage({ type: '', message: '' });
-                  saveGlobalSettings({
-                    release_channel: e.target.checked ? 'beta' : 'stable',
-                  });
-                }}
-              />
-            </label>
+            <div className='inline-flex rounded-full border-2 border-black bg-white p-1 shadow-sm'>
+              {['stable', 'beta'].map((channel) => {
+                const selected = releaseChannel === channel;
+                return (
+                  <button
+                    key={channel}
+                    type='button'
+                    className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide transition ${
+                      selected
+                        ? 'bg-black text-white'
+                        : 'bg-transparent text-black hover:bg-gray-100'
+                    }`}
+                    aria-pressed={selected}
+                    onClick={() => {
+                      if (selected) return;
+                      setUpdateStatus(null);
+                      setUpdateMessage({ type: '', message: '' });
+                      saveGlobalSettings({ release_channel: channel });
+                    }}
+                  >
+                    {channel}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           {installMode === 'development' && (

@@ -4211,142 +4211,140 @@ async def test_webhook(action: WebhookConfig):
     return {"message": "Webhook executed"}
 
 
+def _preview_webhook_sync(config: dict):
+    import requests
+    import json
+
+    url = config.get("url")
+    method = config.get("method", "GET").upper()
+    headers = config.get("headers") or {}
+    body = config.get("body")
+    json_path = config.get("json_path")
+
+    if not url:
+        return {"success": False, "error": "URL is required"}
+
+    try:
+        response = None
+        if method == "POST":
+            json_body = None
+            if body:
+                try:
+                    json_body = json.loads(body)
+                except json.JSONDecodeError:
+                    json_body = {}
+            response = requests.post(url, json=json_body, headers=headers, timeout=10)
+        else:
+            response = requests.get(url, headers=headers, timeout=10)
+
+        if response.status_code >= 400:
+            return {
+                "success": False,
+                "error": f"HTTP {response.status_code}: {response.text[:200]}",
+                "status_code": response.status_code,
+            }
+
+        content_type = (response.headers.get("content-type") or "").split(";", 1)[
+            0
+        ].strip().lower()
+        if content_type.startswith("image/"):
+            try:
+                import base64
+                import io
+                from PIL import Image
+
+                with Image.open(io.BytesIO(response.content)) as image:
+                    dimensions = f"{image.width}x{image.height}"
+                    preview_image = webhook._prepare_image_for_print(image)
+                    preview_buffer = io.BytesIO()
+                    preview_image.save(preview_buffer, format="PNG")
+                preview_data_url = (
+                    "data:image/png;base64,"
+                    f"{base64.b64encode(preview_buffer.getvalue()).decode('ascii')}"
+                )
+            except Exception:
+                dimensions = "unknown size"
+                preview_data_url = ""
+            return {
+                "success": True,
+                "content": f"Image response: {content_type} ({dimensions})",
+                "content_type": "image",
+                "preview_data_url": preview_data_url,
+                "status_code": response.status_code,
+            }
+
+        # Parse response
+        try:
+            data = response.json()
+        except Exception:
+            # Not JSON, return as text
+            return {
+                "success": True,
+                "content": response.text[:500],
+                "content_type": "text",
+                "status_code": response.status_code,
+            }
+
+        # Extract value at json_path if specified
+        if json_path:
+            keys = json_path.split(".")
+            value = data
+            for k in keys:
+                if isinstance(value, dict):
+                    value = value.get(k, {})
+                elif isinstance(value, list) and k.isdigit():
+                    idx = int(k)
+                    if 0 <= idx < len(value):
+                        value = value[idx]
+                    else:
+                        value = None
+                else:
+                    value = None
+                    break
+
+            if value and not isinstance(value, (dict, list)):
+                return {
+                    "success": True,
+                    "content": str(value),
+                    "content_type": "extracted",
+                    "json_path": json_path,
+                    "status_code": response.status_code,
+                }
+            return {
+                "success": False,
+                "error": f"Path '{json_path}' not found in response",
+                "raw_response": json.dumps(data, indent=2)[:500],
+                "status_code": response.status_code,
+            }
+
+        # Return full JSON response
+        return {
+            "success": True,
+            "content": json.dumps(data, indent=2)[:500],
+            "content_type": "json",
+            "status_code": response.status_code,
+        }
+
+    except requests.exceptions.Timeout:
+        return {"success": False, "error": "Request timed out (10s limit)"}
+    except requests.exceptions.ConnectionError:
+        return {
+            "success": False,
+            "error": "Could not connect to server. Check the URL.",
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 @app.post("/api/webhook/test", dependencies=[Depends(require_admin_access)])
 async def preview_webhook(config: dict):
     """
     Tests a webhook configuration and returns the response without printing.
     Useful for validating webhook setup before actual use.
     """
-    import requests
-    import json
-    from concurrent.futures import ThreadPoolExecutor
-
-    def _test_webhook():
-        url = config.get("url")
-        method = config.get("method", "GET").upper()
-        headers = config.get("headers") or {}
-        body = config.get("body")
-        json_path = config.get("json_path")
-
-        if not url:
-            return {"success": False, "error": "URL is required"}
-
-        try:
-            response = None
-            if method == "POST":
-                json_body = None
-                if body:
-                    try:
-                        json_body = json.loads(body)
-                    except json.JSONDecodeError:
-                        json_body = {}
-                response = requests.post(
-                    url, json=json_body, headers=headers, timeout=10
-                )
-            else:
-                response = requests.get(url, headers=headers, timeout=10)
-
-            if response.status_code >= 400:
-                return {
-                    "success": False,
-                    "error": f"HTTP {response.status_code}: {response.text[:200]}",
-                    "status_code": response.status_code,
-                }
-
-            content_type = (response.headers.get("content-type") or "").split(";", 1)[
-                0
-            ].strip().lower()
-            if content_type.startswith("image/"):
-                try:
-                    import base64
-                    import io
-                    from PIL import Image
-
-                    with Image.open(io.BytesIO(response.content)) as image:
-                        dimensions = f"{image.width}x{image.height}"
-                    preview_data_url = (
-                        f"data:{content_type};base64,"
-                        f"{base64.b64encode(response.content).decode('ascii')}"
-                    )
-                except Exception:
-                    dimensions = "unknown size"
-                    preview_data_url = ""
-                return {
-                    "success": True,
-                    "content": f"Image response: {content_type} ({dimensions})",
-                    "content_type": "image",
-                    "preview_data_url": preview_data_url,
-                    "status_code": response.status_code,
-                }
-
-            # Parse response
-            try:
-                data = response.json()
-            except:
-                # Not JSON, return as text
-                return {
-                    "success": True,
-                    "content": response.text[:500],
-                    "content_type": "text",
-                    "status_code": response.status_code,
-                }
-
-            # Extract value at json_path if specified
-            if json_path:
-                keys = json_path.split(".")
-                value = data
-                for k in keys:
-                    if isinstance(value, dict):
-                        value = value.get(k, {})
-                    elif isinstance(value, list) and k.isdigit():
-                        idx = int(k)
-                        if 0 <= idx < len(value):
-                            value = value[idx]
-                        else:
-                            value = None
-                    else:
-                        value = None
-                        break
-
-                if value and not isinstance(value, (dict, list)):
-                    return {
-                        "success": True,
-                        "content": str(value),
-                        "content_type": "extracted",
-                        "json_path": json_path,
-                        "status_code": response.status_code,
-                    }
-                else:
-                    return {
-                        "success": False,
-                        "error": f"Path '{json_path}' not found in response",
-                        "raw_response": json.dumps(data, indent=2)[:500],
-                        "status_code": response.status_code,
-                    }
-
-            # Return full JSON response
-            return {
-                "success": True,
-                "content": json.dumps(data, indent=2)[:500],
-                "content_type": "json",
-                "status_code": response.status_code,
-            }
-
-        except requests.exceptions.Timeout:
-            return {"success": False, "error": "Request timed out (10s limit)"}
-        except requests.exceptions.ConnectionError:
-            return {
-                "success": False,
-                "error": "Could not connect to server. Check the URL.",
-            }
-        except Exception as e:
-            return {"success": False, "error": str(e)}
 
     try:
-        loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            result = await loop.run_in_executor(executor, _test_webhook)
-        return result
+        return await asyncio.to_thread(_preview_webhook_sync, config)
     except Exception as e:
         return {"success": False, "error": str(e)}
 
