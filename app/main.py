@@ -4253,6 +4253,25 @@ async def preview_webhook(config: dict):
                     "status_code": response.status_code,
                 }
 
+            content_type = (response.headers.get("content-type") or "").split(";", 1)[
+                0
+            ].strip().lower()
+            if content_type.startswith("image/"):
+                try:
+                    import io
+                    from PIL import Image
+
+                    with Image.open(io.BytesIO(response.content)) as image:
+                        dimensions = f"{image.width}x{image.height}"
+                except Exception:
+                    dimensions = "unknown size"
+                return {
+                    "success": True,
+                    "content": f"Image response: {content_type} ({dimensions})",
+                    "content_type": "image",
+                    "status_code": response.status_code,
+                }
+
             # Parse response
             try:
                 data = response.json()

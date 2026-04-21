@@ -1,6 +1,8 @@
 import requests
 import json
+import io
 from typing import Optional
+from PIL import Image
 from app.drivers.printer_mock import PrinterDriver
 from app.config import WebhookConfig
 from app.module_registry import register_module
@@ -41,6 +43,25 @@ WEBHOOK_PRESETS = {
         "json_path": "fact"
     }
 }
+
+
+def _response_content_type(response) -> str:
+    return (response.headers.get("content-type") or "").split(";", 1)[0].strip().lower()
+
+
+def _response_is_image(response) -> bool:
+    return _response_content_type(response).startswith("image/")
+
+
+def _print_image_response(response, printer: PrinterDriver) -> bool:
+    try:
+        with Image.open(io.BytesIO(response.content)) as image:
+            printer.print_image(image.copy())
+        return True
+    except Exception as exc:
+        logger.error("Failed to print webhook image response: %s", exc)
+        printer.print_body("Error: Could not load image.")
+        return False
 
 
 @register_module(
@@ -119,6 +140,10 @@ def run_webhook(action: WebhookConfig, printer: PrinterDriver, module_name: str 
         if response.status_code >= 400:
             printer.print_bold(f"Error: {response.status_code}")
             printer.print_caption(response.text[:100])
+            return
+
+        if _response_is_image(response):
+            _print_image_response(response, printer)
             return
 
         # Success - Parse Content
