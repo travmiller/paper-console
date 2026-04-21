@@ -522,12 +522,9 @@ const GeneralSettings = ({
                     type='button'
                     className={`rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide transition ${
                       selected
-                        ? 'bg-black text-white'
+                        ? 'active-inverted'
                         : 'bg-transparent text-black hover:bg-gray-100'
                     }`}
-                    style={{
-                      color: selected ? 'var(--color-bg-card)' : 'var(--color-text-main)',
-                    }}
                     aria-pressed={selected}
                     onClick={() => {
                       if (selected) return;
