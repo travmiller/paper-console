@@ -1,6 +1,6 @@
 # PC-1 Release Workflow
 
-This workflow creates deterministic production artifacts for non-git devices and publishes files the OTA updater can consume.
+This workflow creates deterministic production artifacts for non-git devices and publishes the GitHub releases the OTA updater consumes.
 
 ## What gets published
 
@@ -15,7 +15,7 @@ For each release version (example: `v1.2.3`), publish:
 
 - Ensure `web/` builds successfully (`npm ci && npm run build`)
 - Ensure backend tests pass
-- Decide semantic version tag (`vX.Y.Z`)
+- Decide whether this is a stable tag (`vX.Y.Z`) or prerelease tag (`vX.Y.Z-beta.N`, `vX.Y.Z-rc.N`)
 - On Raspberry Pi devices, install `requirements-pi.txt` during provisioning
 
 ## Build artifacts locally
@@ -28,26 +28,51 @@ On Windows, run this command from WSL.
 
 Artifacts are written to `release-artifacts/` by default.
 
-## Publish to GitHub release
+## Release automation
 
-1. Create and push tag:
+The canonical publish path is a Git tag push.
+
+- Pushing any tag that matches `v*` triggers `.github/workflows/release-artifacts.yml`.
+- The workflow runs tests, clears `release-artifacts/`, builds the OTA bundle, generates `SHA256SUMS`, and publishes a GitHub release automatically.
+- Tags with a hyphen, such as `v1.2.3-beta.1`, are published as GitHub prereleases.
+- Tags without a hyphen, such as `v1.2.3`, are published as normal stable releases.
+
+You can also run the workflow manually with `workflow_dispatch`, but normal day-to-day releases should use tag pushes so the Git tag and published release stay aligned.
+
+## Stable release path
+
+Use this path for the normal customer-facing OTA lane.
+
+1. Build locally and sanity-check the bundle:
+
+```bash
+./.venv/bin/python scripts/release_build.py --version v1.2.3 --build-web
+```
+
+2. Create and push the stable tag:
 
 ```bash
 git tag v1.2.3
 git push origin v1.2.3
 ```
 
-2. Create a GitHub release for `v1.2.3`.
-3. Upload these files as release assets:
+3. Wait for the GitHub Actions release workflow to finish.
+
+4. Verify the release page for `v1.2.3` contains:
    - `pc1-v1.2.3.tar.gz`
    - `pc1-v1.2.3.sha256`
    - `release-manifest-v1.2.3.json`
+   - `SHA256SUMS`
+
+Stable OTA behavior:
+
+- Production devices on the default `stable` channel check GitHub's `releases/latest` endpoint.
+- A newly published stable release becomes the update target for stable devices automatically.
 
 Optional hardening:
-- Upload `SHA256SUMS` and include `pc1-v1.2.3.tar.gz` checksum line.
 - Set `PC1_UPDATE_TARBALL_SHA256` on devices as a pinned expected hash.
 
-## Beta releases
+## Beta release path
 
 Use normal semver prerelease tags for beta/RC builds, for example:
 
@@ -55,26 +80,58 @@ Use normal semver prerelease tags for beta/RC builds, for example:
 - `v1.2.3-beta.2`
 - `v1.2.3-rc.1`
 
-Build and publish them the same way as stable releases:
+Use this path when you want the release to be available only to devices that explicitly opt into beta updates.
+
+1. Build locally and sanity-check the bundle:
 
 ```bash
 ./.venv/bin/python scripts/release_build.py --version v1.2.3-beta.1 --build-web
+```
+
+2. Create and push the prerelease tag:
+
+```bash
 git tag v1.2.3-beta.1
 git push origin v1.2.3-beta.1
 ```
 
-Then create the GitHub release for that tag and mark it as a **pre-release**.
+3. Wait for the GitHub Actions release workflow to finish.
+
+4. Verify GitHub published `v1.2.3-beta.1` as a **pre-release** and uploaded:
+   - `pc1-v1.2.3-beta.1.tar.gz`
+   - `pc1-v1.2.3-beta.1.sha256`
+   - `release-manifest-v1.2.3-beta.1.json`
+   - `SHA256SUMS`
 
 OTA behavior:
 
-- Devices on the default `stable` channel only check GitHub's latest stable release.
-- Devices with **General Settings → Updates → Beta Releases** enabled opt into prerelease OTA behavior.
+- Devices on the default `stable` channel do not see prereleases.
+- Devices with **General Settings → Updates → Beta Releases** enabled opt into the beta lane.
+- The beta toggle only affects production OTA installs. Development installs still use git-based updates until converted to production.
 
 Current implementation note:
 
 - The beta channel currently follows the newest published non-draft release returned by GitHub's full releases list, not a separately labeled "latest beta" concept.
 - If you publish a newer stable release after a beta release, beta-enabled devices may follow that newer stable release.
 - If you need a strictly isolated beta lane, use a separate beta release repo until update-channel behavior becomes more specific.
+
+## Day-to-day release checklist
+
+For a stable release:
+
+1. Merge the intended changes to `main`.
+2. Run local tests and build checks.
+3. Push `vX.Y.Z`.
+4. Confirm the GitHub release published successfully.
+5. Confirm a production device on the stable channel sees the update in General Settings.
+
+For a beta release:
+
+1. Merge the intended changes to `main`.
+2. Run local tests and build checks.
+3. Push `vX.Y.Z-beta.N` or `vX.Y.Z-rc.N`.
+4. Confirm GitHub marked the release as a prerelease.
+5. Confirm a production device with **Beta Releases** enabled sees the update in General Settings.
 
 ## Factory image guidance
 

@@ -204,7 +204,7 @@ For non-git production units, build versioned release artifacts with:
 ```
 
 Devices can opt into beta OTA builds from **General Settings → Updates → Beta Releases**.
-See `scripts/RELEASE.md` for the full stable/beta release and publishing workflow.
+See `scripts/RELEASE.md` for the current stable and beta release paths, including the tag-driven GitHub publish workflow and OTA channel behavior.
 
 ---
 
