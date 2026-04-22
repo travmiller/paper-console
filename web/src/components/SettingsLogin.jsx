@@ -59,7 +59,7 @@ export default function SettingsLogin({ authInfo, onLogin, isSubmitting = false,
               disabled={isSubmitting}
             />
             <span style={{ color: 'var(--color-text-muted)' }}>
-              Remember this browser for 30 days with a secure session cookie.
+              Remember this browser for 1 year with a secure session cookie.
             </span>
           </label>
 

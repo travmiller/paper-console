@@ -10,16 +10,24 @@ AP_INTERFACE="wlan0"
 DEVICE_PASSWORD="${PC1_DEVICE_PASSWORD:-}"
 DEVICE_PASSWORD_FILE="${PC1_DEVICE_PASSWORD_FILE:-/etc/pc1/device_password}"
 NM_DNSMASQ_DIR="${PC1_NM_DNSMASQ_DIR:-/etc/NetworkManager/dnsmasq.d}"
+CPUINFO_FILE="${PC1_CPUINFO_FILE:-/proc/cpuinfo}"
 
-# Generate unique SSID suffix from CPU serial
-get_device_id() {
-    if [ -f /proc/cpuinfo ]; then
+# Generate unique SSID suffix from CPU serial.
+get_device_id_from_file() {
+    local cpuinfo_file="$1"
+    if [ -f "$cpuinfo_file" ]; then
         # Return the last 4 hex chars of the CPU serial (no newline).
+        # Match app.wifi_manager.get_device_suffix(), which uppercases the
+        # printed setup SSID and QR payload.
         # Important: avoid trailing newlines/whitespace in SSID which can make it "disappear" on clients.
-        awk -F': ' '/^[Ss]erial[[:space:]]*:/ {s=$2} END { if (length(s) >= 4) print substr(s, length(s)-3); else print "XXXX" }' /proc/cpuinfo | tr -d '\r\n'
+        awk -F': ' '/^[Ss]erial[[:space:]]*:/ {s=$2} END { if (length(s) >= 4) print substr(s, length(s)-3); else print "XXXX" }' "$cpuinfo_file" | tr -d '\r\n' | tr '[:lower:]' '[:upper:]'
     else
         echo "XXXX"
     fi
+}
+
+get_device_id() {
+    get_device_id_from_file "$CPUINFO_FILE"
 }
 
 get_ap_ip() {
@@ -175,21 +183,27 @@ status() {
     fi
 }
 
-case "$1" in
-    start)
-        start_ap
-        exit $?
-        ;;
-    stop)
-        stop_ap
-        exit $?
-        ;;
-    status)
-        status
-        exit 0
-        ;;
-    *)
-        echo "Usage: $0 {start|stop|status}"
-        exit 1
-        ;;
-esac
+main() {
+    case "$1" in
+        start)
+            start_ap
+            exit $?
+            ;;
+        stop)
+            stop_ap
+            exit $?
+            ;;
+        status)
+            status
+            exit 0
+            ;;
+        *)
+            echo "Usage: $0 {start|stop|status}"
+            exit 1
+            ;;
+    esac
+}
+
+if [ "${BASH_SOURCE[0]}" = "$0" ]; then
+    main "$@"
+fi

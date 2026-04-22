@@ -1,7 +1,10 @@
 """Pytest suite for PC-1 core behaviors."""
 
 import hashlib
+import shlex
+import subprocess
 from datetime import datetime
+from pathlib import Path
 
 import app.device_password as device_password
 import app.modules  # noqa: F401 - triggers module auto-registration
@@ -75,11 +78,45 @@ def test_ap_password_fallback_uses_device_hash(monkeypatch, tmp_path):
 
 def test_wifi_qr_payload_escapes_reserved_characters():
     payload = wifi_manager.generate_wifi_qr_payload(
-        ssid=r"PC-1;Setup:ABCD",
-        password=r"pa:ss;wo\rd,1",
+        ssid='PC-1;Setup:AB"CD',
+        password='pa:ss;wo\\rd,1"',
     )
 
-    assert payload == r"WIFI:T:WPA;S:PC-1\;Setup\:ABCD;P:pa\:ss\;wo\\rd\,1;H:false;;"
+    assert payload == r'WIFI:S:PC-1\;Setup\:AB\"CD;T:WPA;P:pa\:ss\;wo\\rd\,1\";;'
+
+
+def test_wifi_qr_payload_marks_hidden_networks_only_when_needed():
+    visible_payload = wifi_manager.generate_wifi_qr_payload("PC-1-Setup-ABCD", "pass1234")
+    hidden_payload = wifi_manager.generate_wifi_qr_payload(
+        "PC-1-Setup-ABCD",
+        "pass1234",
+        hidden=True,
+    )
+
+    assert visible_payload == "WIFI:S:PC-1-Setup-ABCD;T:WPA;P:pass1234;;"
+    assert hidden_payload == "WIFI:S:PC-1-Setup-ABCD;T:WPA;P:pass1234;H:true;;"
+
+
+def test_ap_script_device_id_matches_printed_uppercase_suffix(tmp_path):
+    cpuinfo = tmp_path / "cpuinfo"
+    cpuinfo.write_text("Serial\t\t: 10000000abcd\n", encoding="utf-8")
+    script = Path(__file__).resolve().parents[1] / "scripts" / "wifi_ap_nmcli.sh"
+
+    result = subprocess.run(
+        [
+            "bash",
+            "-c",
+            (
+                f"source {shlex.quote(str(script))}; "
+                f"get_device_id_from_file {shlex.quote(str(cpuinfo))}"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.stdout.strip() == "ABCD"
 
 
 class _RecordingPrinter:
@@ -131,7 +168,7 @@ def test_setup_instructions_include_wifi_qr(monkeypatch):
     assert "  Scan to join automatically" in printer.captions
     assert printer.qr_calls == [
         {
-            "data": "WIFI:T:WPA;S:PC-1-Setup-ABCD;P:pass1234;H:false;;",
+            "data": "WIFI:S:PC-1-Setup-ABCD;T:WPA;P:pass1234;;",
             "size": utils.SETUP_WIFI_QR_SIZE,
             "error_correction": utils.SETUP_WIFI_QR_ERROR_CORRECTION,
         }

@@ -18,7 +18,7 @@ import app.wifi_manager as wifi_manager
 AUTH_REQUIRED_HEADER = "X-PC1-Auth-Required"
 TOKEN_HEADER = "X-PC1-Device-Password"
 SESSION_COOKIE_NAME = "pc1_admin_session"
-REMEMBER_DURATION_SECONDS = 30 * 24 * 60 * 60
+REMEMBER_DURATION_SECONDS = 365 * 24 * 60 * 60
 SESSION_DURATION_SECONDS = 12 * 60 * 60
 
 

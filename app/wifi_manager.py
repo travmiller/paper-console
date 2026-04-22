@@ -57,16 +57,17 @@ def generate_wifi_qr_payload(
             .replace(";", "\\;")
             .replace(",", "\\,")
             .replace(":", "\\:")
+            .replace('"', '\\"')
         )
 
-    hidden_str = "true" if hidden else "false"
     escaped_ssid = _escape(ssid)
+    hidden_field = ";H:true" if hidden else ""
 
     if security.upper() == "NOPASS":
-        return f"WIFI:T:nopass;S:{escaped_ssid};H:{hidden_str};;"
+        return f"WIFI:S:{escaped_ssid};T:nopass{hidden_field};;"
 
     escaped_password = _escape(password)
-    return f"WIFI:T:{security};S:{escaped_ssid};P:{escaped_password};H:{hidden_str};;"
+    return f"WIFI:S:{escaped_ssid};T:{security};P:{escaped_password}{hidden_field};;"
 
 
 def get_ap_wifi_qr_payload() -> str:
