@@ -1138,52 +1138,6 @@ class PrinterDriver:
         except Exception:
             return False  # On error, assume ready
 
-    def check_paper_status(self) -> dict:
-        """Check paper sensor status using GS r 1 command.
-
-        Returns:
-            dict with keys:
-                - 'paper_adequate': bool (True if paper is adequate)
-                - 'paper_near_end': bool (True if paper is near end)
-                - 'paper_out': bool (True if paper is out)
-                - 'error': bool (True if error reading status)
-        """
-        result = {
-            "paper_adequate": True,
-            "paper_near_end": False,
-            "paper_out": False,
-            "error": False,
-        }
-
-        try:
-            # Send GS r 1 - Transmit paper sensor status
-            self._write(b"\x1d\x72\x01")  # GS r 1
-
-            # Read response (1 byte)
-            response = self._read(1, timeout=0.5)
-
-            if len(response) == 0:
-                result["error"] = True
-                return result
-
-            status_byte = response[0]
-
-            # GS r 1 reports two independent paper sensors:
-            # bits 0-1 = near-end sensor, bits 2-3 = paper-end sensor.
-            near_end_bits = status_byte & 0x03
-            end_bits = (status_byte >> 2) & 0x03
-
-            result["paper_near_end"] = near_end_bits == 0x03
-            result["paper_out"] = end_bits == 0x03
-            result["paper_adequate"] = not (
-                result["paper_near_end"] or result["paper_out"]
-            )
-
-        except Exception:
-            result["error"] = True
-
-        return result
-
     def clear_hardware_buffer(self):
         """Clear the printer's hardware buffer - call at startup to prevent garbage."""
         import time
