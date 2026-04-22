@@ -2,9 +2,13 @@
 
 from app.hardware import printer
 import app.wifi_manager as wifi_manager
+from PIL import Image
+
 
 SETUP_WIFI_QR_SIZE = 6
 SETUP_WIFI_QR_ERROR_CORRECTION = "H"
+IMAGE_MAX_WIDTH_DOTS = 384
+IMAGE_MAX_HEIGHT_DOTS = 4096
 
 
 def wrap_text(text: str, width: int = 42, indent: int = 0, preserve_line_breaks: bool = False) -> list[str]:
@@ -225,3 +229,13 @@ def wrap_text_pixels(
             lines.append(current_line)
 
     return lines if lines else [""]
+
+def prepare_image_for_print(image: Image.Image) -> Image.Image:
+    """Resize and convert image to 1-bit dithered for optimal printing on thermal printers."""
+    image = image.copy()
+    image.thumbnail(
+        (IMAGE_MAX_WIDTH_DOTS, IMAGE_MAX_HEIGHT_DOTS),
+        Image.Resampling.LANCZOS,
+    )
+    # Convert to 1-bit dithered
+    return image.convert("1")

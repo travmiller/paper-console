@@ -5,10 +5,9 @@ import io
 from PIL import Image
 from app.drivers.printer_mock import PrinterDriver
 from app.module_registry import register_module
+from app.utils import prepare_image_for_print
 
 logger = logging.getLogger(__name__)
-
-MAX_WIDTH = 384  # Max width for most thermal printers in pixels
 
 @register_module(
     type_id="image",
@@ -65,14 +64,7 @@ def resize_and_convert_image(raw_data_uri):
     img_bytes = base64.b64decode(raw_data_uri)
 
     with Image.open(io.BytesIO(img_bytes)) as img:
-        # Resize to printer width (384px) to save space in config.json
-        if img.width > MAX_WIDTH:
-            ratio = MAX_WIDTH / float(img.width)
-            img = img.resize((MAX_WIDTH, int(img.height * ratio)), Image.LANCZOS)
-        
-        # Convert to 1-bit dithered
-        img = img.convert("1")
-        
+        img = prepare_image_for_print(img)
         buf = io.BytesIO()
         img.save(buf, format="PNG")
 

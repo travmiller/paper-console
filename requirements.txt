@@ -14,3 +14,7 @@ beautifulsoup4
 pyserial
 qrcode[pil]
 jsonschema
+
+# Only needed if using the slack integration
+slack_bolt
+aiohttp

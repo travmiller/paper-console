@@ -18,6 +18,7 @@ import logging
 import shutil
 import sys
 import time
+from app import utils
 
 # Configure logging
 LOG_LEVEL_NAME = os.environ.get("PC1_LOG_LEVEL", "WARNING").upper()
@@ -4179,7 +4180,7 @@ def _preview_webhook_sync(config: dict):
 
                 with Image.open(io.BytesIO(response.content)) as image:
                     dimensions = f"{image.width}x{image.height}"
-                    preview_image = webhook._prepare_image_for_print(image)
+                    preview_image = utils.prepare_image_for_print(image)
                     preview_buffer = io.BytesIO()
                     preview_image.save(preview_buffer, format="PNG")
                 preview_data_url = (

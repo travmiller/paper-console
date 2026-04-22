@@ -13,16 +13,15 @@ im:history, reactions:write, users:read, files:read
 4. In your Slack app settings, under Features -> Event Subscriptions -> Subscribe to bot events add a subscription
 to message.im events
 
-Any messages sent to your bot will now be printed!
+Any messages sent to your bot (including images and links) will now be printed!
 """
-from datetime import datetime
 from io import BytesIO
 import os
 import asyncio
 import logging
 import aiohttp
 
-from app.config import MAX_WIDTH, TextConfig, settings
+from app.config import TextConfig, settings
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 
@@ -31,8 +30,11 @@ from app.hardware import try_begin_print_job, clear_print_reservation
 
 from PIL import Image
 
-# Initializes your app with your bot token and socket mode handler
-slackApp = AsyncApp(token=os.environ.get("SLACK_BOT_TOKEN"))
+from app.utils import prepare_image_for_print
+
+# Use a placeholder token to allow the module to be imported during tests 
+# without requiring a live SLACK_BOT_TOKEN in the environment.
+slackApp = AsyncApp(token=os.environ.get("SLACK_BOT_TOKEN", "xoxb-dummy-token"))
 printerRef = None
 
 logger = logging.getLogger(__name__)
@@ -68,9 +70,6 @@ async def print_message(body, client, ack):
         # Convert Slack blocks to Tiptap format for printing
         content_doc = slack_to_tiptap(blocks, urls)
 
-        # Run printing in a thread pool to avoid blocking the event loop
-        from concurrent.futures import ThreadPoolExecutor
-
         def _do_slack_print():
             # Prepare printer for new job
             if hasattr(printerRef, "reset_buffer"):
@@ -89,12 +88,11 @@ async def print_message(body, client, ack):
                     qr_url = "https://" + qr_url
                 
                 # Print the index and URL as text above the QR code
-                printerRef.print_body(f"[{i}] {url}")
+                printerRef.print_body(f"[{i}]")
 
                 # Print the QR code
                 printerRef.print_qr(
                     data=qr_url,
-                    size=6,
                     error_correction="H" # Highest level of error correction to maximize scanability from print
                 )
             
@@ -107,9 +105,9 @@ async def print_message(body, client, ack):
             if hasattr(printerRef, "flush_buffer"):
                 printerRef.flush_buffer()
 
-        loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            await loop.run_in_executor(executor, _do_slack_print)
+        # Use the default executor for CPU/IO-bound printing tasks to avoid blocking the loop
+        loop = asyncio.get_running_loop()
+        await loop.run_in_executor(None, _do_slack_print)
     finally:
         clear_print_reservation(clear_hold=False)
 
@@ -152,27 +150,21 @@ async def get_slack_user_name(client, user_id):
 async def extract_images(event, token):
     """Downloads and processes any image attachments from a Slack message event."""
     images = []
-    for file in event.get("files", []):
-        if file.get("mimetype", "").startswith("image/"):
+    image_files = [f for f in event.get("files", []) if f.get("mimetype", "").startswith("image/")]
+    
+    if not image_files:
+        return images
+
+    async with aiohttp.ClientSession(headers={"Authorization": f"Bearer {token}"}) as session:
+        for file in image_files:
             try:
-                async with aiohttp.ClientSession() as session:
-                    headers = {"Authorization": f"Bearer {token}"}
-                    async with session.get(file.get("url_private_download"), headers=headers) as resp:
-                        if resp.status != 200:
-                            raise Exception(f"Download failed with status {resp.status}")
+                async with session.get(file.get("url_private_download")) as resp:
+                    if resp.status != 200:
+                        raise Exception(f"Download failed with status {resp.status}")
 
-                        image_data = await resp.read()
-                        image = Image.open(BytesIO(image_data))
-
-                        # Resize image if it's too wide for the printer
-                        if image.width > MAX_WIDTH:
-                            ratio = MAX_WIDTH / float(image.width)
-                            image = image.resize((MAX_WIDTH, int(image.height * ratio)), Image.LANCZOS)
-                        
-                        # Convert to 1-bit dithered
-                        image = image.convert("1")
-
-                        images.append(image)
+                    image_data = await resp.read()
+                    image = Image.open(BytesIO(image_data))
+                    images.append(prepare_image_for_print(image))
             except Exception as e:
                 logger.error(f"Unable to download and process image: {e}")
                 continue

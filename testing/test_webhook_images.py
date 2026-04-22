@@ -7,6 +7,7 @@ import requests
 import app.main as main_module
 from app.config import WebhookConfig
 from app.modules import webhook
+from app import utils
 
 
 def _png_bytes(width: int = 16, height: int = 8) -> bytes:
@@ -73,7 +74,7 @@ def test_webhook_prints_image_responses(monkeypatch):
 
 
 def test_webhook_image_response_has_generous_height_cap(monkeypatch):
-    monkeypatch.setattr(webhook, "WEBHOOK_IMAGE_MAX_HEIGHT_DOTS", 64)
+    monkeypatch.setattr(utils, "IMAGE_MAX_HEIGHT_DOTS", 64)
 
     payload = _png_bytes(width=100, height=128)
     printer = _RecordingPrinter()
@@ -93,7 +94,7 @@ def test_webhook_image_response_has_generous_height_cap(monkeypatch):
     )
 
     assert len(printer.images) == 1
-    assert printer.images[0].height <= webhook.WEBHOOK_IMAGE_MAX_HEIGHT_DOTS
+    assert printer.images[0].height <= utils.IMAGE_MAX_HEIGHT_DOTS
     assert printer.images[0].size == (50, 64)
     assert printer.body == []
 
@@ -120,7 +121,7 @@ def test_webhook_preview_reports_image_response(monkeypatch):
 
 
 def test_webhook_preview_caps_image_data_url(monkeypatch):
-    monkeypatch.setattr(webhook, "WEBHOOK_IMAGE_MAX_HEIGHT_DOTS", 64)
+    monkeypatch.setattr(utils, "IMAGE_MAX_HEIGHT_DOTS", 64)
 
     payload = _png_bytes(width=100, height=128)
 
@@ -142,7 +143,7 @@ def test_webhook_preview_caps_image_data_url(monkeypatch):
 
     preview_bytes = base64.b64decode(result["preview_data_url"][len(prefix):])
     with Image.open(io.BytesIO(preview_bytes)) as preview:
-        assert preview.height <= webhook.WEBHOOK_IMAGE_MAX_HEIGHT_DOTS
+        assert preview.height <= utils.IMAGE_MAX_HEIGHT_DOTS
         assert preview.size == (50, 64)
 
 

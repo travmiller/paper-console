@@ -7,11 +7,10 @@ from PIL import Image
 from app.drivers.printer_mock import PrinterDriver
 from app.config import WebhookConfig, format_print_datetime
 from app.module_registry import register_module
+from app.utils import prepare_image_for_print
 
 logger = logging.getLogger(__name__)
 
-WEBHOOK_IMAGE_MAX_WIDTH_DOTS = 384
-WEBHOOK_IMAGE_MAX_HEIGHT_DOTS = 4096
 SAMPLE_IMAGE_WEBHOOK_URL = (
     "https://placehold.co/384x192/ffffff/000000.png?text=PC-1+Image+Webhook"
 )
@@ -84,21 +83,10 @@ def _response_content_type(response) -> str:
 def _response_is_image(response) -> bool:
     return _response_content_type(response).startswith("image/")
 
-
-def _prepare_image_for_print(image: Image.Image) -> Image.Image:
-    """Constrain arbitrary remote images to a generous receipt-safe box."""
-    image = image.copy()
-    image.thumbnail(
-        (WEBHOOK_IMAGE_MAX_WIDTH_DOTS, WEBHOOK_IMAGE_MAX_HEIGHT_DOTS),
-        Image.Resampling.LANCZOS,
-    )
-    return image
-
-
 def _print_image_response(response, printer: PrinterDriver) -> bool:
     try:
         with Image.open(io.BytesIO(response.content)) as image:
-            printer.print_image(_prepare_image_for_print(image))
+            printer.print_image(prepare_image_for_print(image))
         return True
     except Exception as exc:
         logger.error("Failed to print webhook image response: %s", exc)
