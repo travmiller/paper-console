@@ -105,7 +105,10 @@ def test_calendar_day_view_prints_agenda_list():
             },
             {
                 "time": "9:30 AM",
-                "summary": "Mock calendar event",
+                "summary": (
+                    "Mock calendar event with a very long descriptive title "
+                    "that should be handed to the printer as one paragraph"
+                ),
                 "sort_key": "09:30",
                 "datetime": None,
                 "is_all_day": False,
@@ -122,9 +125,15 @@ def test_calendar_day_view_prints_agenda_list():
     assert captured[0][0] == "subheader"
     assert captured[0][1].startswith("TODAY")
     assert ("bold", "All Day") in captured
-    assert ("body", "  Library pickup day") in captured
+    assert ("body", "Library pickup day") in captured
     assert ("bold", "9:30 AM") in captured
-    assert ("body", "  Mock calendar event") in captured
+    assert (
+        "body",
+        (
+            "Mock calendar event with a very long descriptive title "
+            "that should be handed to the printer as one paragraph"
+        ),
+    ) in captured
 
 
 def test_snapshot_email_defaults_override_live_credentials_with_mock():

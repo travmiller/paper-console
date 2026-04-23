@@ -1,7 +1,6 @@
 import requests
 import pytz
 import logging
-import textwrap
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Any, Optional
 from icalendar import Calendar
@@ -255,8 +254,7 @@ def _print_calendar_day_view(printer, sorted_dates, all_events):
         summary = str(event.get("summary", "")).strip() or "Untitled event"
 
         printer.print_bold(time_label)
-        for line in textwrap.wrap(summary, width=max(12, printer.width - 2)):
-            printer.print_body(f"  {line}")
+        printer.print_body(summary)
 
         if i < len(events) - 1:
             printer.feed(1)
