@@ -25,6 +25,7 @@ from app.config import TextConfig, settings
 from slack_bolt.app.async_app import AsyncApp
 from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 
+from app.main import trigger_channel
 from app.modules import text
 from app.hardware import try_begin_print_job, clear_print_reservation
 
@@ -112,6 +113,50 @@ async def print_message(body, client, ack):
         clear_print_reservation(clear_hold=False)
 
     await indicate_message_printed(client, event)
+
+@slackApp.command("/channels")
+async def get_channels(ack, respond):
+    # Acknowledge command request
+    await ack()
+
+    channel_listing = "CHANNELS\n"
+    for channel_num in range(1, 9):
+        channel = settings.channels.get(channel_num)
+        if channel and channel.modules:
+            names = []
+            for assignment in sorted(channel.modules, key=lambda m: m.order):
+                module = settings.modules.get(assignment.module_id)
+                if module:
+                    names.append(module.name)
+            if names:
+                channel_listing += f"{channel_num}: {' + '.join(names)}\n"
+            else:
+                channel_listing += f"{channel_num}: (empty)\n"
+        else:
+            channel_listing += f"{channel_num}: (empty)\n"
+
+    await respond(channel_listing)
+
+@slackApp.command("/channel")
+async def print_channel(ack, respond, command):
+    # Acknowledge command request
+    await ack()
+
+    channel_num = command.get("text", "").strip()
+
+    if not channel_num.isdigit() or int(channel_num) not in settings.channels:
+        await respond(f"Invalid channel number: {channel_num}. Please provide a number between 1 and 8.")
+        return
+
+    channel_num = int(channel_num)
+    channel = settings.channels.get(channel_num)
+    if not channel or not channel.modules:
+        await respond(f"Channel {channel_num} is empty")
+        return
+    
+    await respond(f"🖨️ Triggering print for channel {channel_num}...")
+    await trigger_channel(channel_num)
+    await respond(f"✅ Triggered print for channel {channel_num}.")
 
 async def ack_message(client, ack, message):
     # Acknowledge receipt of the message
