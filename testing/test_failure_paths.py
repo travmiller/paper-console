@@ -195,7 +195,9 @@ def test_fetch_release_data_prefers_latest_beta_release_when_beta_enabled(monkey
     assert result["tag_name"] == "v0.2.0-beta.1"
 
 
-def test_fetch_release_data_raises_when_no_beta_release_exists(monkeypatch):
+def test_fetch_release_data_uses_stable_release_when_beta_lane_has_no_prerelease(
+    monkeypatch,
+):
     class DummyResponse:
         def raise_for_status(self):
             return None
@@ -216,15 +218,72 @@ def test_fetch_release_data_raises_when_no_beta_release_exists(monkeypatch):
         types.SimpleNamespace(get=fake_requests_get),
     )
 
-    try:
-        main_module._fetch_release_data(
-            "travmiller/paper-console",
-            include_prerelease=True,
-        )
-    except RuntimeError as exc:
-        assert str(exc) == "No published beta releases are available."
-    else:
-        raise AssertionError("Expected RuntimeError when no beta releases exist")
+    result = main_module._fetch_release_data(
+        "travmiller/paper-console",
+        include_prerelease=True,
+    )
+
+    assert result["tag_name"] == "v0.1.9"
+
+
+def test_fetch_release_data_prefers_stable_over_matching_prerelease(monkeypatch):
+    class DummyResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {"tag_name": "v0.2.10-beta.1", "draft": False, "prerelease": True},
+                {"tag_name": "v0.2.10", "draft": False, "prerelease": False},
+                {"tag_name": "v0.2.9", "draft": False, "prerelease": False},
+            ]
+
+    def fake_requests_get(url, headers=None, timeout=None):  # noqa: ARG001
+        assert url.endswith("/releases")
+        return DummyResponse()
+
+    monkeypatch.setitem(
+        sys.modules,
+        "requests",
+        types.SimpleNamespace(get=fake_requests_get),
+    )
+
+    result = main_module._fetch_release_data(
+        "travmiller/paper-console",
+        include_prerelease=True,
+    )
+
+    assert result["tag_name"] == "v0.2.10"
+
+
+def test_fetch_release_data_uses_highest_semver_not_release_order(monkeypatch):
+    class DummyResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {"tag_name": "v0.2.10", "draft": False, "prerelease": False},
+                {"tag_name": "v0.2.11-beta.2", "draft": False, "prerelease": True},
+                {"tag_name": "v0.2.11-beta.1", "draft": False, "prerelease": True},
+            ]
+
+    def fake_requests_get(url, headers=None, timeout=None):  # noqa: ARG001
+        assert url.endswith("/releases")
+        return DummyResponse()
+
+    monkeypatch.setitem(
+        sys.modules,
+        "requests",
+        types.SimpleNamespace(get=fake_requests_get),
+    )
+
+    result = main_module._fetch_release_data(
+        "travmiller/paper-console",
+        include_prerelease=True,
+    )
+
+    assert result["tag_name"] == "v0.2.11-beta.2"
 
 
 def test_check_for_updates_uses_beta_channel_in_production(monkeypatch, tmp_path):
@@ -270,7 +329,9 @@ def test_check_for_updates_uses_beta_channel_in_production(monkeypatch, tmp_path
     assert result["release_channel"] == "beta"
 
 
-def test_check_for_updates_reports_when_beta_lane_is_empty(monkeypatch, tmp_path):
+def test_check_for_updates_falls_back_to_stable_when_beta_lane_has_no_prerelease(
+    monkeypatch, tmp_path
+):
     project_root = tmp_path / "project"
     app_dir = project_root / "app"
     app_dir.mkdir(parents=True)
@@ -306,10 +367,53 @@ def test_check_for_updates_reports_when_beta_lane_is_empty(monkeypatch, tmp_path
 
     result = asyncio.run(main_module.check_for_updates())
 
-    assert result["available"] is False
+    assert result["available"] is True
     assert result["current_version"] == "v0.1.0"
+    assert result["latest_version"] == "v0.1.9"
     assert result["release_channel"] == "beta"
-    assert result["error"] == "No published beta releases are available."
+
+
+def test_check_for_updates_does_not_offer_semver_downgrade(monkeypatch, tmp_path):
+    project_root = tmp_path / "project"
+    app_dir = project_root / "app"
+    app_dir.mkdir(parents=True)
+    fake_main_path = app_dir / "main.py"
+    fake_main_path.write_text("# test stub\n", encoding="utf-8")
+    (project_root / ".version").write_text("v0.2.11-beta.2\n", encoding="utf-8")
+
+    class DummyResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {"tag_name": "v0.2.10", "draft": False, "prerelease": False},
+            ]
+
+    def fake_requests_get(url, headers=None, timeout=None):  # noqa: ARG001
+        assert url.endswith("/releases")
+        return DummyResponse()
+
+    monkeypatch.setattr(main_module, "__file__", str(fake_main_path))
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        types.SimpleNamespace(release_channel="stable"),
+        raising=False,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "requests",
+        types.SimpleNamespace(get=fake_requests_get),
+    )
+
+    result = asyncio.run(main_module.check_for_updates())
+
+    assert result["available"] is False
+    assert result["up_to_date"] is True
+    assert result["current_version"] == "v0.2.11-beta.2"
+    assert result["latest_version"] == "v0.2.10"
+    assert result["release_channel"] == "stable"
 
 
 def test_convert_to_production_installs_release_and_removes_git(monkeypatch, tmp_path):
@@ -886,13 +990,15 @@ def test_install_updates_requires_explicit_production_release_asset(
 
     release_payload = {
         "tag_name": "v9.9.9",
+        "draft": False,
+        "prerelease": False,
         "assets": [{"name": "SHA256SUMS", "browser_download_url": "https://example.test/SHA256SUMS"}],
         "tarball_url": "https://example.test/source.tar.gz",
     }
 
     def fake_requests_get(url, headers=None, timeout=None, stream=False):  # noqa: ARG001
         assert stream is False
-        return DummyResponse(payload=release_payload)
+        return DummyResponse(payload=[release_payload])
 
     monkeypatch.setattr(main_module, "__file__", str(fake_main_path))
     monkeypatch.setitem(

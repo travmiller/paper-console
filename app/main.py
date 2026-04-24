@@ -15,6 +15,7 @@ import subprocess
 import platform
 import pytz
 import logging
+import re
 import shutil
 import sys
 import time
@@ -37,6 +38,14 @@ for noisy_logger in ("uvicorn.access", "httpx", "urllib3", "asyncio"):
     logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
 logger = logging.getLogger(__name__)
+
+SEMVER_TAG_RE = re.compile(
+    r"^v(?P<major>0|[1-9]\d*)\."
+    r"(?P<minor>0|[1-9]\d*)\."
+    r"(?P<patch>0|[1-9]\d*)"
+    r"(?:-(?P<prerelease>[0-9A-Za-z.-]+))?"
+    r"(?:\+[0-9A-Za-z.-]+)?$"
+)
 
 
 def _parse_cors_origins() -> List[str]:
@@ -1940,6 +1949,72 @@ def _should_include_prereleases() -> bool:
     return _get_release_channel() == "beta"
 
 
+def _parse_semver_tag(tag_name: object) -> Optional[tuple[int, int, int, tuple[str, ...]]]:
+    tag = str(tag_name or "").strip()
+    match = SEMVER_TAG_RE.match(tag)
+    if not match:
+        return None
+
+    prerelease = match.group("prerelease")
+    return (
+        int(match.group("major")),
+        int(match.group("minor")),
+        int(match.group("patch")),
+        tuple(prerelease.split(".")) if prerelease else (),
+    )
+
+
+def _compare_prerelease_identifiers(left: str, right: str) -> int:
+    left_is_numeric = left.isdigit()
+    right_is_numeric = right.isdigit()
+
+    if left_is_numeric and right_is_numeric:
+        left_num = int(left)
+        right_num = int(right)
+        return (left_num > right_num) - (left_num < right_num)
+
+    if left_is_numeric != right_is_numeric:
+        return -1 if left_is_numeric else 1
+
+    return (left > right) - (left < right)
+
+
+def _compare_semver_tags(
+    left: tuple[int, int, int, tuple[str, ...]],
+    right: tuple[int, int, int, tuple[str, ...]],
+) -> int:
+    left_core = left[:3]
+    right_core = right[:3]
+    if left_core != right_core:
+        return (left_core > right_core) - (left_core < right_core)
+
+    left_prerelease = left[3]
+    right_prerelease = right[3]
+    if not left_prerelease and not right_prerelease:
+        return 0
+    if not left_prerelease:
+        return 1
+    if not right_prerelease:
+        return -1
+
+    for left_part, right_part in zip(left_prerelease, right_prerelease):
+        comparison = _compare_prerelease_identifiers(left_part, right_part)
+        if comparison:
+            return comparison
+
+    return (len(left_prerelease) > len(right_prerelease)) - (
+        len(left_prerelease) < len(right_prerelease)
+    )
+
+
+def _is_release_newer_than_current(latest_version: str, current_version: str) -> bool:
+    latest_semver = _parse_semver_tag(latest_version)
+    current_semver = _parse_semver_tag(current_version)
+    if latest_semver and current_semver:
+        return _compare_semver_tags(latest_semver, current_semver) > 0
+    return latest_version != current_version
+
+
 def _select_release_from_list(
     releases: object,
     *,
@@ -1948,7 +2023,9 @@ def _select_release_from_list(
     if not isinstance(releases, list):
         raise RuntimeError("Release server returned an unexpected response.")
 
-    target_lane = "beta" if include_prerelease else "stable"
+    target_lane = "stable or beta" if include_prerelease else "stable"
+    best_release: Optional[Dict[str, object]] = None
+    best_version: Optional[tuple[int, int, int, tuple[str, ...]]] = None
 
     for release_data in releases:
         if not isinstance(release_data, dict):
@@ -1957,10 +2034,19 @@ def _select_release_from_list(
             continue
 
         is_prerelease = bool(release_data.get("prerelease"))
-        if include_prerelease != is_prerelease:
+        if is_prerelease and not include_prerelease:
             continue
 
-        return release_data
+        version = _parse_semver_tag(release_data.get("tag_name"))
+        if not version:
+            continue
+
+        if best_version is None or _compare_semver_tags(version, best_version) > 0:
+            best_release = release_data
+            best_version = version
+
+    if best_release is not None:
+        return best_release
 
     raise RuntimeError(f"No published {target_lane} releases are available.")
 
@@ -1983,25 +2069,16 @@ def _fetch_release_data(
         release_resp.raise_for_status()
         return release_resp.json()
 
-    if include_prerelease:
-        release_resp = requests.get(
-            f"https://api.github.com/repos/{release_repo}/releases",
-            headers={"User-Agent": "PC-1-OTA-Updater"},
-            timeout=10,
-        )
-        release_resp.raise_for_status()
-        return _select_release_from_list(
-            release_resp.json(),
-            include_prerelease=True,
-        )
-
     release_resp = requests.get(
-        f"https://api.github.com/repos/{release_repo}/releases/latest",
+        f"https://api.github.com/repos/{release_repo}/releases",
         headers={"User-Agent": "PC-1-OTA-Updater"},
         timeout=10,
     )
     release_resp.raise_for_status()
-    return release_resp.json()
+    return _select_release_from_list(
+        release_resp.json(),
+        include_prerelease=include_prerelease,
+    )
 
 
 def _get_release_bundle_metadata(
@@ -2437,12 +2514,13 @@ async def check_for_updates():
                 "release_channel": release_channel,
             }
 
-        if current_version == latest_version:
+        if not _is_release_newer_than_current(latest_version, current_version):
             return {
                 "available": False,
                 "up_to_date": True,
                 "message": "You're on the latest version",
                 "current_version": current_version,
+                "latest_version": latest_version,
                 "release_channel": release_channel,
             }
 

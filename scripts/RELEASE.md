@@ -72,7 +72,7 @@ git push origin v1.2.3
 
 Stable OTA behavior:
 
-- Production devices on the default `stable` channel check GitHub's `releases/latest` endpoint.
+- Production devices on the default `stable` channel choose the highest SemVer stable release from GitHub releases.
 - A newly published stable release becomes the update target for stable devices automatically.
 
 Optional hardening:
@@ -112,12 +112,12 @@ git push origin v1.2.3-beta.1
 OTA behavior:
 
 - Devices on the default `stable` channel do not see prereleases.
-- Devices with **General Settings → Updates → Beta Releases** enabled opt into the beta lane.
+- Devices with **General Settings → Updates → Beta Releases** enabled can see both prereleases and stable releases.
 - The beta toggle only affects production OTA installs. Development installs still use git-based updates until converted to production.
 
 Current implementation note:
 
-- Devices on the `beta` channel only receive published prereleases.
+- Devices on the `beta` channel receive the highest SemVer release across published prereleases and stable releases.
 - Devices on the `stable` channel only receive published stable releases.
 - Switching the **Beta Releases** toggle in General Settings changes which lane the device checks immediately.
 
