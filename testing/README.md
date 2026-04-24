@@ -54,6 +54,7 @@ Settings UI snapshot renderer:
 
 # Reuse already-running servers
 ./.venv/bin/python testing/render_settings_ui.py --reuse-servers
+./.venv/bin/python testing/render_settings_ui.py --reuse-servers --settings-password '<device-password>'
 
 # Optional output folder (still rewritten each run)
 ./.venv/bin/python testing/render_settings_ui.py --output-dir testing/artifacts/ui
@@ -64,6 +65,8 @@ Settings UI snapshot renderer:
 
 Notes:
 - This workflow captures key UI states (tabs, modals) and module edit screens.
+- When starting its own backend, the renderer uses a built-in test Device Password.
+- With `--reuse-servers`, pass `--settings-password` if the running backend requires login.
 - It creates temporary `UI TEST :: ...` modules to capture every module-type editor, then cleans them up.
 - Output includes `manifest.txt`, `failures.txt`, `notes.txt`, and optional `runtime_warnings.txt`.
 - If Linux runtime libraries are missing (e.g. `libnspr4.so`), run `npx --yes -p playwright playwright install-deps chromium` with sudo.

@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CAPTURE_SCRIPT = PROJECT_ROOT / "testing" / "render_settings_ui_capture.mjs"
+TEST_SETTINGS_PASSWORD = "pc1-test-password"
 
 
 def _load_dotenv(dotenv_path: Path) -> None:
@@ -160,8 +161,11 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--settings-password",
-        default=os.getenv("PC1_DEVICE_PASSWORD", ""),
-        help="Optional Device Password for session-based auth.",
+        default="",
+        help=(
+            "Device Password for session-based auth. Defaults to the built-in "
+            "test password when starting local servers."
+        ),
     )
     parser.add_argument(
         "--skip-module-seeding",
@@ -181,6 +185,15 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _resolve_settings_password(args: argparse.Namespace) -> str:
+    password = args.settings_password.strip()
+    if password:
+        return password
+    if args.reuse_servers:
+        return ""
+    return TEST_SETTINGS_PASSWORD
+
+
 def main() -> int:
     args = parse_args()
     if not CAPTURE_SCRIPT.exists():
@@ -195,9 +208,11 @@ def main() -> int:
 
     log_stream = None if args.show_server_logs else subprocess.DEVNULL
     child_env = dict(os.environ)
+    settings_password = _resolve_settings_password(args)
 
     try:
         if not args.reuse_servers:
+            child_env["PC1_DEVICE_PASSWORD"] = settings_password
             python_exec = _python_exec()
             backend_port = _parse_port(args.backend_url, 8000)
             frontend_port = _parse_port(args.frontend_url, 5173)
@@ -276,8 +291,8 @@ def main() -> int:
         ]
         if args.headful:
             capture_script_cmd.append("--headful")
-        if args.settings_password.strip():
-            capture_script_cmd.extend(["--settings-password", args.settings_password.strip()])
+        if settings_password:
+            capture_script_cmd.extend(["--settings-password", settings_password])
         if args.skip_module_seeding:
             capture_script_cmd.append("--skip-module-seeding")
 
