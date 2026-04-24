@@ -4,15 +4,15 @@
 
 ---
 
-* **No screens:** output is physical thermal paper.
-* **No subscriptions:** user-owned API keys or local algorithms.
-* **Quality materials:** walnut, brass, and archival-grade paper.
-* **Universal channels:** fully configurable channels (Adventure, Astronomy, Calendar, Email, History, Journal Prompt, Maze, News, QR Code, Quotes, RSS, Sudoku, System Monitor, Text / Note, Weather, Webhook)
+- **No screens:** output is physical thermal paper.
+- **No subscriptions:** user-owned API keys or local algorithms.
+- **Quality materials:** walnut, brass, and archival-grade paper.
+- **Universal channels:** fully configurable channels (Adventure, Astronomy, Calendar, Email, History, Journal Prompt, Maze, News, QR Code, Quotes, RSS, Sudoku, System Monitor, Text / Note, Weather, Webhook)
 
 For more information and build photos, visit [travismiller.design/paper-console](https://travismiller.design/paper-console).
 
 ![PC-1 Front View](images/pc-1_front2.jpg)
-*Front view showing the brass rotary dial, push button, and thermal paper output*
+_Front view showing the brass rotary dial, push button, and thermal paper output_
 
 ---
 
@@ -30,19 +30,22 @@ Use a Unix-like shell for project commands: Linux, macOS, or WSL on Windows
 uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-* **API Docs:** 
-  * Local: [http://localhost:8000/docs](http://localhost:8000/docs)
-* **Mock Output:** Watch your Terminal window. The "Printer" writes text there.
+- **API Docs:**
+    - Local: [http://localhost:8000/docs](http://localhost:8000/docs)
+- **Mock Output:** Watch your Terminal window. The "Printer" writes text there.
 
 **Frontend (Settings UI):**
+
 ```bash
 cd web
 npm install
 npm run dev
 ```
-* **URL:** [http://localhost:5173](http://localhost:5173)
+
+- **URL:** [http://localhost:5173](http://localhost:5173)
 
 **Tests:**
+
 ```bash
 ./testing/run_tests.sh
 ```
@@ -52,46 +55,46 @@ npm run dev
 When a user unboxes a PC-1 and powers it on for the first time, the expected flow is:
 
 1. **First boot prints setup receipt**
-   - The printer automatically outputs onboarding instructions.
-   - It includes:
-     - Setup SSID: `PC-1-Setup-XXXX` (device-specific suffix)
-     - Device Password (shared across setup WiFi, settings login, printed setup instructions, and SSH)
-     - A WiFi QR code for quickly joining the setup network on phones
-     - Setup URL: `http://10.42.0.1` (and `http://pc-1.local`)
+    - The printer automatically outputs onboarding instructions.
+    - It includes:
+        - Setup SSID: `PC-1-Setup-XXXX` (device-specific suffix)
+        - Device Password (shared across setup WiFi, settings login, printed setup instructions, and SSH)
+        - A WiFi QR code for quickly joining the setup network on phones
+        - Setup URL: `http://10.42.0.1` (and `http://pc-1.local`)
 
 2. **User connects to setup WiFi**
-   - On phone/computer, scan the printed WiFi QR code or connect to the printed SSID manually.
-   - If connecting manually, enter the printed Device Password.
-   - Many phones and laptops should open the setup page automatically as a captive portal after joining.
+    - On phone/computer, scan the printed WiFi QR code or connect to the printed SSID manually.
+    - If connecting manually, enter the printed Device Password.
+    - Many phones and laptops should open the setup page automatically as a captive portal after joining.
 
 3. **User configures home WiFi in the setup web UI**
-   - If the setup page does not open automatically, open `http://10.42.0.1`
-   - Choose home network and enter password.
-   - The UI explains that connection may drop while PC-1 switches networks.
+    - If the setup page does not open automatically, open `http://10.42.0.1`
+    - Choose home network and enter password.
+    - The UI explains that connection may drop while PC-1 switches networks.
 
 4. **PC-1 joins home WiFi**
-   - Device attempts connection in the background.
-   - On success, PC-1 prints a confirmation receipt.
-   - User reconnects their phone/computer to home WiFi.
+    - Device attempts connection in the background.
+    - On success, PC-1 prints a confirmation receipt.
+    - User reconnects their phone/computer to home WiFi.
 
 5. **User opens settings**
-   - Visit `http://pc-1.local`
-   - Configure channels/modules and print behavior.
+    - Visit `http://pc-1.local`
+    - Configure channels/modules and print behavior.
 
 6. **Normal daily usage**
-   - Turn dial to select channel (1-8)
-   - Press button to print selected channel
-   - Hold button ~5 seconds (half-line paper cue appears at threshold), then release to open **Quick Actions**:
-     - `1` Table of Contents
-     - `2` System Monitor
-     - `3` Reprint Setup Instructions
-     - `4` Reset WiFi
-     - `5` Reset Factory Settings
-     - `8` Cancel
-   - Quick Actions are single-shot: after you pick an option, the menu exits automatically.
-   - If no option is selected for 2 minutes, Quick Actions auto-exits and prints a timeout note.
-   - Hold button ~15 seconds for **Factory Reset** (clears settings and reboots)
-   - Use Web UI anytime for editing modules, schedules, and system settings
+    - Turn dial to select channel (1-8)
+    - Press button to print selected channel
+    - Hold button ~5 seconds (half-line paper cue appears at threshold), then release to open **Quick Actions**:
+        - `1` Table of Contents
+        - `2` System Monitor
+        - `3` Reprint Setup Instructions
+        - `4` Reset WiFi
+        - `5` Reset Factory Settings
+        - `8` Cancel
+    - Quick Actions are single-shot: after you pick an option, the menu exits automatically.
+    - If no option is selected for 2 minutes, Quick Actions auto-exits and prints a timeout note.
+    - Hold button ~15 seconds for **Factory Reset** (clears settings and reboots)
+    - Use Web UI anytime for editing modules, schedules, and system settings
 
 If WiFi setup fails, PC-1 returns to setup mode so the user can try again.
 
@@ -112,35 +115,40 @@ cd web && npm install
 ```
 
 1. **Install Python Dependencies:**
-   ```bash
-   ./.venv/bin/python -m pip install -r requirements-dev.txt
-   ```
-   This installs the app dependencies plus test tooling. It intentionally excludes Raspberry Pi-only GPIO packages.
+
+    ```bash
+    ./.venv/bin/python -m pip install -r requirements-dev.txt
+    ```
+
+    This installs the app dependencies plus test tooling. It intentionally excludes Raspberry Pi-only GPIO packages.
 
 2. **Run the Server:**
-   ```bash
-   ./run.sh
-   # Or: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-   ```
+    ```bash
+    ./run.sh
+    # Or: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ```
 
 ### Raspberry Pi Deployment
 
 1. **Install Python Dependencies:**
-   ```bash
-   ./.venv/bin/python -m pip install -r requirements-pi.txt
-   ```
+
+    ```bash
+    ./.venv/bin/python -m pip install -r requirements-pi.txt
+    ```
 
 2. **Run Setup Script:**
-   ```bash
-   cd ~/paper-console
-   chmod +x scripts/setup_pi.sh
-   sudo scripts/setup_pi.sh
-   ```
-   The script will:
-   - Set hostname (default: `pc-1`)
-   - Install Nginx (web proxy) and Avahi (mDNS)
-   - Configure systemd service
-   - Add user to `lp` group for printer access
+
+    ```bash
+    cd ~/paper-console
+    chmod +x scripts/setup_pi.sh
+    sudo scripts/setup_pi.sh
+    ```
+
+    The script will:
+    - Set hostname (default: `pc-1`)
+    - Install Nginx (web proxy) and Avahi (mDNS)
+    - Configure systemd service
+    - Add user to `lp` group for printer access
 
 3. **Access the Device:**
    Open your browser and go to `http://pc-1.local` (or your chosen hostname).
@@ -152,16 +160,18 @@ cd web && npm install
 Configuration is handled entirely via the **Web UI** at `http://pc-1.local` (or `http://localhost:8000`).
 
 ### Global Settings
-* **Location:** City name, Latitude, Longitude, Timezone (with search functionality)
-* **Time Format:** 12-hour (AM/PM) or 24-hour format
+
+- **Location:** City name, Latitude, Longitude, Timezone (with search functionality)
+- **Time Format:** 12-hour (AM/PM) or 24-hour format
 
 ### Channel System
-* **8 Channel Positions:** Each position (1-8) represents a slot on the rotary dial
-* **Modular System:** Channels are containers. You can assign **multiple modules** to a single channel (e.g., "News" followed by "Weather" followed by "Sudoku")
-* **Reordering:** 
-  * **Channels:** Use Up/Down arrows next to Channel title to swap entire channels
-  * **Modules:** Use arrow buttons within a channel card to change print order
-* **Scheduled Printing:** Click the clock icon on any channel to schedule automatic printing at specific times
+
+- **8 Channel Positions:** Each position (1-8) represents a slot on the rotary dial
+- **Modular System:** Channels are containers. You can assign **multiple modules** to a single channel (e.g., "News" followed by "Weather" followed by "Sudoku")
+- **Reordering:**
+    - **Channels:** Use Up/Down arrows next to Channel title to swap entire channels
+    - **Modules:** Use arrow buttons within a channel card to change print order
+- **Scheduled Printing:** Click the clock icon on any channel to schedule automatic printing at specific times
 
 ### Module Types
 
@@ -170,30 +180,34 @@ Each module is an independent instance with its own configuration. See [Architec
 Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **Sudoku**, **Maze**, **Adventure**, **Astronomy**, **Calendar**, **Webhook**, **QR Code**, **Text / Note**, **Quotes**, **Journal Prompt**, **History**, **System Monitor**, **Word of the Day**
 
 ### Settings Storage
-* **Settings File:** `config.json` (auto-saved, gitignored)
-* **Reset:** "Reset All Settings" button restores factory defaults
+
+- **Settings File:** `config.json` (auto-saved, gitignored)
+- **Reset:** "Reset All Settings" button restores factory defaults
 
 ### Local Validation Workflows
+
 For non-Pi development, use the local test and snapshot workflows:
 
-* **Pytest:** `./testing/run_tests.sh`
-* **Print snapshots:** `./.venv/bin/python testing/render_all_prints.py --output-dir testing/artifacts/print`
-* **Settings UI snapshots:** `./.venv/bin/python testing/render_settings_ui.py --output-dir testing/artifacts/ui`
+- **Pytest:** `./testing/run_tests.sh`
+- **Print snapshots:** `./.venv/bin/python testing/render_all_prints.py --output-dir testing/artifacts/print`
+- **Settings UI snapshots:** `./.venv/bin/python testing/render_settings_ui.py --output-dir testing/artifacts/ui`
 
 These workflows use mock/local paths and do not require Raspberry Pi GPIO packages.
 
 ### Security & Network Environment Variables
+
 For production deployments, configure these environment variables:
 
-* **`PC1_DEVICE_PASSWORD`**: Optional override for the unified Device Password used by setup WiFi, settings login, printed setup instructions, and SSH.  
+- **`PC1_DEVICE_PASSWORD`**: Optional override for the unified Device Password used by setup WiFi, settings login, printed setup instructions, and SSH.  
   On managed PC-1 devices, the runtime password is normally stored in the device-managed credential file instead. For scripted access, clients may send header `X-PC1-Device-Password`.
-* **Settings Login Sessions**: The web UI can remember a browser with a signed `HttpOnly` session cookie so users do not need to re-enter the password on every visit.
-* **`PC1_CORS_ORIGINS`**: Comma-separated CORS origins (default is local/dev origins only).
-* **`PC1_UPDATE_GITHUB_REPO`**: GitHub repo slug used by OTA release checks/install (default: `travmiller/paper-console`).
-* **`PC1_UPDATE_TARBALL_SHA256`**: Optional expected SHA256 for OTA tarball verification.
-* **`PC1_LOG_LEVEL`**: Backend log level (default: `WARNING` on device builds).
-* **`UVICORN_LOG_LEVEL`**: Uvicorn log level for `run.sh` (default: `warning`).
-* **`UVICORN_ACCESS_LOG`**: Set to `1` to enable HTTP access logs (default: `0` for lower log volume).
+- **Settings Login Sessions**: The web UI can remember a browser with a signed `HttpOnly` session cookie so users do not need to re-enter the password on every visit.
+- **`PC1_CORS_ORIGINS`**: Comma-separated CORS origins (default is local/dev origins only).
+- **`PC1_UPDATE_GITHUB_REPO`**: GitHub repo slug used by OTA release checks/install (default: `travmiller/paper-console`).
+- **`PC1_UPDATE_TARBALL_SHA256`**: Optional expected SHA256 for OTA tarball verification.
+- **`PC1_LOG_LEVEL`**: Backend log level (default: `WARNING` on device builds).
+- **`UVICORN_LOG_LEVEL`**: Uvicorn log level for `run.sh` (default: `warning`).
+- **`UVICORN_ACCESS_LOG`**: Set to `1` to enable HTTP access logs (default: `0` for lower log volume).
+- **`SLACK_BOT_TOKEN`** and **`SLACK_APP_TOKEN`**: Set to enable the Slack integration (Optional; see instructions in `slack_client.py`)
 
 ### Production Release Artifacts
 
@@ -211,11 +225,13 @@ See `scripts/RELEASE.md` for the current stable and beta release paths, includin
 ## 4. Architecture & Modules
 
 ### Tech Stack
-* **OS:** Raspberry Pi OS Lite (64-bit)
-* **Backend:** Python 3.12 + FastAPI
-* **Frontend:** React + Vite + Tailwind CSS v4
+
+- **OS:** Raspberry Pi OS Lite (64-bit)
+- **Backend:** Python 3.12 + FastAPI
+- **Frontend:** React + Vite + Tailwind CSS v4
 
 ### Directory Structure
+
 ```
 paper-console/
 ├── app/
@@ -229,6 +245,7 @@ paper-console/
 │   ├── module_registry.py      # @register_module metadata and validation
 │   ├── selection_mode.py       # Dial-driven interactive selection flows
 │   ├── utils.py
+│   ├── slack_client.py         # (Optional) Slack integration
 │   ├── wifi_manager.py         # Setup AP and WiFi connection orchestration
 │   ├── data/                   # Bundled offline content and lookup datasets
 │   ├── drivers/
@@ -327,13 +344,16 @@ paper-console/
 
 **System Monitor:** Hostname, IP, WiFi, disk/memory bars, uptime, load, CPU temp (where available).
 
-**Word of the Day:** Merriam Webster's word of the day
+**Word of the Day:** Merriam Webster's word of the day.
+
+**Slack Integration:** Add PC-1 as a bot to your Slack workspace and send it text, images, and links to print.
 
 ---
 
 ## 5. Hardware Setup
 
 ### Prerequisites
+
 1. **Raspberry Pi Zero 2 W** with Raspberry Pi OS Lite installed
 2. **Thermal Printer** (QR204/CSN-A2 or compatible 58mm TTL thermal printer. 30mm diameter paper roll maximum)
 3. **1-Pole 8-Position Rotary Switch**
@@ -345,38 +365,42 @@ paper-console/
 This layout organizes connections into logical groups (blocks) for easier assembly with standard connectors (DuPont or JST).
 
 #### 1. Power & Printer Data Block (Top)
-*Use a 4-pin or 5-pin connector block.*
 
-| Pin | GPIO | Function | Wire To |
-| :---: | :---: | :--- | :--- |
-| **2** | 5V | **Power Input (+)** | External PSU 5V (+) |
-| **6** | GND | **Power Input (-)** | External PSU GND (-) |
-| **8** | 14 | **TX (Data)** | Printer RX |
-| **10** | 15 | **RX (Data)** | Printer TX |
-| **12** | 18 | **DTR (Flow)** | Printer DTR |
-| **14** | GND | **Signal GND** | Printer GND |
+_Use a 4-pin or 5-pin connector block._
+
+|  Pin   | GPIO | Function            | Wire To              |
+| :----: | :--: | :------------------ | :------------------- |
+| **2**  |  5V  | **Power Input (+)** | External PSU 5V (+)  |
+| **6**  | GND  | **Power Input (-)** | External PSU GND (-) |
+| **8**  |  14  | **TX (Data)**       | Printer RX           |
+| **10** |  15  | **RX (Data)**       | Printer TX           |
+| **12** |  18  | **DTR (Flow)**      | Printer DTR          |
+| **14** | GND  | **Signal GND**      | Printer GND          |
 
 #### 2. Main Button Block (Middle)
-*Use a 2-pin connector.*
 
-| Pin | GPIO | Function | Wire To |
-| :---: | :---: | :--- | :--- |
-| **20** | GND | **Button GND** | Button Pin 1 |
-| **22** | 25 | **Button Signal** | Button Pin 2 |
+_Use a 2-pin connector._
+
+|  Pin   | GPIO | Function          | Wire To      |
+| :----: | :--: | :---------------- | :----------- |
+| **20** | GND  | **Button GND**    | Button Pin 1 |
+| **22** |  25  | **Button Signal** | Button Pin 2 |
 
 #### 3. Rotary Dial Block (Bottom)
-*Use a 12-pin (2x6) connector block.*
 
-| Pin (Left) | GPIO | Function | | Pin (Right) | GPIO | Function |
-| :---: | :---: | :--- | :--- | :---: | :---: | :--- |
-| **29** | 5 | **Pos 1** | \| | **30** | GND | *Unused* |
-| **31** | 6 | **Pos 2** | \| | **32** | 12 | *Unused* |
-| **33** | 13 | **Pos 3** | \| | **34** | GND | *Unused* |
-| **35** | 19 | **Pos 4** | \| | **36** | 16 | **Pos 6** |
-| **37** | 26 | **Pos 5** | \| | **38** | 20 | **Pos 7** |
-| **39** | GND | **Common** | \| | **40** | 21 | **Pos 8** |
+_Use a 12-pin (2x6) connector block._
+
+| Pin (Left) | GPIO | Function   |     | Pin (Right) | GPIO | Function  |
+| :--------: | :--: | :--------- | :-- | :---------: | :--: | :-------- |
+|   **29**   |  5   | **Pos 1**  | \|  |   **30**    | GND  | _Unused_  |
+|   **31**   |  6   | **Pos 2**  | \|  |   **32**    |  12  | _Unused_  |
+|   **33**   |  13  | **Pos 3**  | \|  |   **34**    | GND  | _Unused_  |
+|   **35**   |  19  | **Pos 4**  | \|  |   **36**    |  16  | **Pos 6** |
+|   **37**   |  26  | **Pos 5**  | \|  |   **38**    |  20  | **Pos 7** |
+|   **39**   | GND  | **Common** | \|  |   **40**    |  21  | **Pos 8** |
 
 ### Visual Pin Layout
+
 Legend: `[X]` = Used, `[ ]` = Empty. The header is 2 pins wide.
 
 ```
@@ -405,6 +429,7 @@ Legend: `[X]` = Used, `[ ]` = Empty. The header is 2 pins wide.
 ### Thermal Printer
 
 **TTL Serial Connection:**
+
 1. Wire according to table above
 2. **Serial port is automatically configured** by `scripts/setup_pi.sh` (disables console, enables hardware)
 3. Device appears as `/dev/serial0` after setup
@@ -412,10 +437,11 @@ Legend: `[X]` = Used, `[ ]` = Empty. The header is 2 pins wide.
 ### Power Supply
 
 **Recommended Setup (Split Power):**
+
 1.  **Source:** Use a 5V 5A power supply (Barrel Jack).
 2.  **Distribution:** Use a custom PCB HAT or a terminal splitter to feed power to two places simultaneously:
-    *   **To Pi:** Connect to GPIO Pins 2 (5V) and 6 (GND).
-    *   **To Printer:** Connect to the printer's power input cable.
+    - **To Pi:** Connect to GPIO Pins 2 (5V) and 6 (GND).
+    - **To Printer:** Connect to the printer's power input cable.
 3.  **Warning:** Do **not** plug the power supply into the Pi's USB port and try to power the printer from the Pi's GPIO pins. The printer draws too much current (up to 4A) and will crash the Pi.
 
 ---
@@ -423,47 +449,50 @@ Legend: `[X]` = Used, `[ ]` = Empty. The header is 2 pins wide.
 ## 6. Troubleshooting
 
 ### Printer Issues
-* **Device Not Found:**
-  * Check if `/dev/serial0` exists: `ls -l /dev/serial*`
-  * If missing, run setup script: `sudo scripts/setup_pi.sh` (configures serial automatically)
-  * Or manually: `sudo raspi-config` → Interface Options → Serial Port → Enable hardware, Disable console
-* **Permission Denied:**
-  * Ensure user is in `dialout` group: `groups`
-  * Add user: `sudo usermod -a -G dialout $USER` (then log out/in)
-* **Nothing Prints:**
-  * Verify power supply is adequate (5A minimum)
-  * Confirm printer is connected to correct GPIO pins using the wiring table above
-  * Make sure the printer is powered on (indicator lights as expected)
-  * Check for error/status lights or messages on the printer itself (if available)
-  * Test the printer with a simple echo command: `echo "test" > /dev/serial0`
-  * Check service logs: `sudo journalctl -u pc-1.service -f`
-  * Confirm no other application is holding the serial port open (use `lsof /dev/serial0`)
+
+- **Device Not Found:**
+    - Check if `/dev/serial0` exists: `ls -l /dev/serial*`
+    - If missing, run setup script: `sudo scripts/setup_pi.sh` (configures serial automatically)
+    - Or manually: `sudo raspi-config` → Interface Options → Serial Port → Enable hardware, Disable console
+- **Permission Denied:**
+    - Ensure user is in `dialout` group: `groups`
+    - Add user: `sudo usermod -a -G dialout $USER` (then log out/in)
+- **Nothing Prints:**
+    - Verify power supply is adequate (5A minimum)
+    - Confirm printer is connected to correct GPIO pins using the wiring table above
+    - Make sure the printer is powered on (indicator lights as expected)
+    - Check for error/status lights or messages on the printer itself (if available)
+    - Test the printer with a simple echo command: `echo "test" > /dev/serial0`
+    - Check service logs: `sudo journalctl -u pc-1.service -f`
+    - Confirm no other application is holding the serial port open (use `lsof /dev/serial0`)
 
 ### Service Issues
-  * **Restart Loop:**
-  * Service uses `run.sh` to handle port conflicts automatically
-  * Restart: `sudo systemctl restart pc-1.service`
-  * Check logs: `sudo journalctl -u pc-1.service -f`
-  * **Port Already in Use:**
-  * `run.sh` automatically kills zombie processes
-  * If persistent, reboot: `sudo reboot`
-  * **Log Storage:**
-  * Setup script configures journald in RAM (`Storage=volatile`) with a bounded budget (`RuntimeMaxUse=16M`).
-  * This minimizes SD writes and prevents long-term log growth on disk.
-  * Setup script also installs `pc1-storage-guard.timer` (runs every 6 hours) to trim journals/cache if root usage rises.
-  * Core dumps are disabled (`/etc/systemd/coredump.conf.d/pc-1.conf`) to prevent multi-megabyte crash artifacts.
-  * Check current journal usage: `journalctl --disk-usage`
-  * Check storage guard timer: `systemctl status pc1-storage-guard.timer`
-  * Run storage guard immediately: `sudo systemctl start pc1-storage-guard.service`
-  * Temporarily enable more logs for debugging by setting:
-    * `PC1_LOG_LEVEL=INFO`
-    * `UVICORN_ACCESS_LOG=1`
+
+- **Restart Loop:**
+- Service uses `run.sh` to handle port conflicts automatically
+- Restart: `sudo systemctl restart pc-1.service`
+- Check logs: `sudo journalctl -u pc-1.service -f`
+- **Port Already in Use:**
+- `run.sh` automatically kills zombie processes
+- If persistent, reboot: `sudo reboot`
+- **Log Storage:**
+- Setup script configures journald in RAM (`Storage=volatile`) with a bounded budget (`RuntimeMaxUse=16M`).
+- This minimizes SD writes and prevents long-term log growth on disk.
+- Setup script also installs `pc1-storage-guard.timer` (runs every 6 hours) to trim journals/cache if root usage rises.
+- Core dumps are disabled (`/etc/systemd/coredump.conf.d/pc-1.conf`) to prevent multi-megabyte crash artifacts.
+- Check current journal usage: `journalctl --disk-usage`
+- Check storage guard timer: `systemctl status pc1-storage-guard.timer`
+- Run storage guard immediately: `sudo systemctl start pc1-storage-guard.service`
+- Temporarily enable more logs for debugging by setting:
+    - `PC1_LOG_LEVEL=INFO`
+    - `UVICORN_ACCESS_LOG=1`
 
 ### Module-Specific Issues
-* **NewsAPI Returns 0 Articles:** Check if API key is valid and on free tier
-* **RSS Feeds Not Working:** Ensure RSS feed URLs are valid and accessible
-* **Email Auth Failed:** Use a **Google App Password**, not your main password. Ensure 2FA is enabled
-* **Calendar Not Showing Events:** Verify iCal URL is correct. Check that events exist in the date range
-* **Weather Wrong:** Check `config.json` Lat/Long via UI location search feature
+
+- **NewsAPI Returns 0 Articles:** Check if API key is valid and on free tier
+- **RSS Feeds Not Working:** Ensure RSS feed URLs are valid and accessible
+- **Email Auth Failed:** Use a **Google App Password**, not your main password. Ensure 2FA is enabled
+- **Calendar Not Showing Events:** Verify iCal URL is correct. Check that events exist in the date range
+- **Weather Wrong:** Check `config.json` Lat/Long via UI location search feature
 
 ---

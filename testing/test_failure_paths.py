@@ -11,6 +11,7 @@ import types
 from pathlib import Path
 
 import app.main as main_module
+import app.hardware as hardware_module
 import app.wifi_manager as wifi_manager
 from app.config import CalendarConfig
 from app.drivers.printer_serial import PrinterDriver
@@ -544,18 +545,18 @@ def test_install_updates_uses_beta_release_channel_in_production(monkeypatch, tm
 
 
 def test_try_begin_print_job_respects_hold_reservation(monkeypatch):
-    monkeypatch.setattr(main_module, "print_in_progress", False)
-    monkeypatch.setattr(main_module, "hold_action_in_progress", True)
-    monkeypatch.setattr(main_module, "last_print_time", 0.0)
+    monkeypatch.setattr(hardware_module, "print_in_progress", False)
+    monkeypatch.setattr(hardware_module, "hold_action_in_progress", True)
+    monkeypatch.setattr(hardware_module, "last_print_time", 0.0)
 
-    assert main_module._try_begin_print_job(debounce=False) is False
+    assert hardware_module.try_begin_print_job(debounce=False) is False
 
-    monkeypatch.setattr(main_module, "hold_action_in_progress", False)
-    assert main_module._try_begin_print_job(debounce=False) is True
+    monkeypatch.setattr(hardware_module, "hold_action_in_progress", False)
+    assert hardware_module.try_begin_print_job(debounce=False) is True
 
-    main_module._clear_print_reservation()
-    assert main_module.print_in_progress is False
-    assert main_module.hold_action_in_progress is False
+    hardware_module.clear_print_reservation()
+    assert hardware_module.print_in_progress is False
+    assert hardware_module.hold_action_in_progress is False
 
 
 def test_on_factory_reset_threadsafe_promotes_hold_reservation(monkeypatch):
@@ -571,18 +572,18 @@ def test_on_factory_reset_threadsafe_promotes_hold_reservation(monkeypatch):
         return None
 
     monkeypatch.setattr(main_module, "global_loop", DummyLoop())
-    monkeypatch.setattr(main_module, "print_in_progress", False)
-    monkeypatch.setattr(main_module, "hold_action_in_progress", True)
+    monkeypatch.setattr(hardware_module, "print_in_progress", False)
+    monkeypatch.setattr(hardware_module, "hold_action_in_progress", True)
     monkeypatch.setattr(main_module.asyncio, "run_coroutine_threadsafe", fake_run_coroutine_threadsafe)
 
     main_module.on_factory_reset_threadsafe()
 
-    assert main_module.print_in_progress is True
-    assert main_module.hold_action_in_progress is False
+    assert hardware_module.print_in_progress is True
+    assert hardware_module.hold_action_in_progress is False
     assert captured["loop"] is main_module.global_loop
     captured["coro"].close()
 
-    main_module._clear_print_reservation()
+    hardware_module.clear_print_reservation()
 
 
 def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
@@ -611,8 +612,8 @@ def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
         "channels",
         {1: types.SimpleNamespace(schedule=["12:00"])},
     )
-    monkeypatch.setattr(main_module, "print_in_progress", False)
-    monkeypatch.setattr(main_module, "hold_action_in_progress", True)
+    monkeypatch.setattr(hardware_module, "print_in_progress", False)
+    monkeypatch.setattr(hardware_module, "hold_action_in_progress", True)
 
     try:
         asyncio.run(main_module.scheduler_loop())
@@ -620,7 +621,7 @@ def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
         pass
 
     assert triggered == []
-    main_module._clear_print_reservation()
+    hardware_module.clear_print_reservation()
 
 
 def test_printer_driver_handles_serial_init_failure(monkeypatch):
