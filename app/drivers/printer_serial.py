@@ -2,6 +2,7 @@ import math
 import os
 import platform
 import random
+import threading
 import time
 import unicodedata
 import logging
@@ -12,6 +13,12 @@ import serial
 from PIL import Image, ImageDraw, ImageFont
 import app.config
 import app.selection_mode
+
+try:
+    from app.drivers.gpio_ioctl import GpioChip, GPIOHANDLE_REQUEST_INPUT
+except Exception:  # pragma: no cover - non-Pi environments
+    GpioChip = None
+    GPIOHANDLE_REQUEST_INPUT = 0
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +71,7 @@ class PrinterDriver:
     SPACING_SMALL = 4  # Tight spacing (after inline elements)
     SPACING_MEDIUM = 8  # Standard spacing (between content blocks)
     SPACING_LARGE = 16  # Section spacing (between modules)
+    BUSY_PIN_GPIO = 18  # Printer DTR line from the wiring table
 
     def __init__(
         self,
@@ -75,7 +83,11 @@ class PrinterDriver:
         self.width = width
         self.ser = None
         self.port = port
+        self.baudrate = baudrate
         self.last_init_error = None
+        self._io_lock = threading.RLock()
+        self._busy_chip = None
+        self._busy_handle = None
         # Buffer for print operations (prints are always inverted/reversed)
         # Each item is a tuple: ('text', line) or ('feed', count) or ('qr', data).
         self.print_buffer = []
@@ -143,6 +155,7 @@ class PrinterDriver:
             self.ser.reset_output_buffer()
 
             time.sleep(0.5)
+            self._initialize_busy_pin()
             self._initialize_printer()
 
         except serial.SerialException as e:
@@ -157,6 +170,38 @@ class PrinterDriver:
     def is_available(self) -> bool:
         """Return True if the serial printer is initialized and open."""
         return bool(self.ser and self.ser.is_open)
+
+    def _initialize_busy_pin(self):
+        """Open the printer DTR/busy GPIO line if it is available on this device."""
+        if GpioChip is None or not os.path.exists("/dev/gpiochip0"):
+            return
+
+        try:
+            self._busy_chip = GpioChip("/dev/gpiochip0")
+            self._busy_handle = self._busy_chip.request_lines(
+                [self.BUSY_PIN_GPIO],
+                GPIOHANDLE_REQUEST_INPUT,
+                label="printer_busy",
+            )
+        except Exception:
+            self._busy_handle = None
+            if self._busy_chip:
+                try:
+                    self._busy_chip.close()
+                except Exception:
+                    pass
+                self._busy_chip = None
+            logger.debug("Printer busy pin initialization failed", exc_info=True)
+
+    def _read_busy_pin(self) -> Optional[int]:
+        """Return the raw GPIO level of the printer DTR/busy line, if available."""
+        if not self._busy_handle:
+            return None
+        try:
+            return int(self._busy_handle.get_values()[0])
+        except Exception:
+            logger.debug("Printer busy pin read failed", exc_info=True)
+            return None
 
     def _load_font_family(self) -> dict:
         """Load IBM Plex Mono font family with multiple weights.
@@ -1091,11 +1136,12 @@ class PrinterDriver:
         This allows the printer to buffer data while we continue processing.
         """
         try:
-            if self.ser and self.ser.is_open:
-                # Write all data at once - don't flush() as that blocks
-                # until all bytes transmit (slow at 9600 baud)
-                self.ser.write(data)
-        except Exception as e:
+            with self._io_lock:
+                if self.ser and self.ser.is_open:
+                    # Write all data at once - don't flush() as that blocks
+                    # until all bytes transmit (slow at 9600 baud)
+                    self.ser.write(data)
+        except Exception:
             logger.exception("Serial write failed")
 
     def _read(self, size: int = 1, timeout: float = 1.0) -> bytes:
@@ -1138,26 +1184,95 @@ class PrinterDriver:
         except Exception:
             return False  # On error, assume ready
 
+    def wait_for_idle(self, timeout: float = 3.0, quiet_period: float = 0.35):
+        """Wait briefly for the printer to finish any trailing mechanical activity.
+
+        This is intentionally conservative: we first let the transport settle,
+        then poll real-time status when available. If the printer never answers
+        status queries, we still keep a short quiet-period delay so back-to-back
+        jobs do not overlap at the paper/feed stage.
+        """
+        if not self.ser or not self.ser.is_open:
+            return
+
+        deadline = time.time() + max(timeout, quiet_period)
+        busy_pin_seen = False
+        busy_seen = False
+
+        # Give the printer firmware a moment after serial flush/feed commands.
+        time.sleep(min(0.15, quiet_period))
+
+        busy_pin_level = self._read_busy_pin()
+        if busy_pin_level is not None:
+            while time.time() < deadline:
+                busy_pin_level = self._read_busy_pin()
+                if busy_pin_level == 1:
+                    busy_pin_seen = True
+                    time.sleep(0.05)
+                    continue
+                if busy_pin_seen:
+                    time.sleep(quiet_period)
+                    return
+                remaining = deadline - time.time()
+                if remaining > 0:
+                    time.sleep(min(quiet_period, remaining))
+                return
+
+        while time.time() < deadline:
+            busy = self.is_printer_busy()
+            if busy:
+                busy_seen = True
+                time.sleep(0.1)
+                continue
+            if busy_seen:
+                time.sleep(quiet_period)
+            else:
+                remaining = deadline - time.time()
+                if remaining > 0:
+                    time.sleep(min(quiet_period, remaining))
+            return
+
+    def close(self):
+        if self._busy_handle:
+            try:
+                self._busy_handle.close()
+            except Exception:
+                pass
+            self._busy_handle = None
+        if self._busy_chip:
+            try:
+                self._busy_chip.close()
+            except Exception:
+                pass
+            self._busy_chip = None
+        if self.ser and self.ser.is_open:
+            try:
+                self.ser.close()
+            except Exception:
+                pass
+            self.ser = None
+
     def clear_hardware_buffer(self):
         """Clear the printer's hardware buffer - call at startup to prevent garbage."""
         import time
 
         try:
-            # Clear software buffer
-            self.print_buffer.clear()
-            self.lines_printed = 0
-            self.max_lines = 0
+            with self._io_lock:
+                # Clear software buffer
+                self.print_buffer.clear()
+                self.lines_printed = 0
+                self.max_lines = 0
 
-            # Cancel any in-progress print job
-            self._write(b"\x18")  # CAN - Cancel print data in page mode
-            time.sleep(0.05)
+                # Cancel any in-progress print job
+                self._write(b"\x18")  # CAN - Cancel print data in page mode
+                time.sleep(0.05)
 
-            # ESC @ - Hardware reset (clears all settings and buffer)
-            self._write(b"\x1b\x40")
-            time.sleep(0.3)
+                # ESC @ - Hardware reset (clears all settings and buffer)
+                self._write(b"\x1b\x40")
+                time.sleep(0.3)
 
-            # Re-apply ASCII mode settings after reset
-            self._apply_ascii_settings()
+                # Re-apply ASCII mode settings after reset
+                self._apply_ascii_settings()
         except Exception:
             pass
 
@@ -1443,66 +1558,68 @@ class PrinterDriver:
         All text, feeds, and QR codes are rendered into a single tall image,
         rotated 180°, and sent as one raster graphics command.
         """
-        if not self.print_buffer:
-            logger.debug("Flush called on empty buffer.")
-            return
+        with self._io_lock:
+            if not self.print_buffer:
+                logger.debug("Flush called on empty buffer.")
+                return
 
-        logger.debug("Flushing buffer with %d ops...", len(self.print_buffer))
+            logger.debug("Flushing buffer with %d ops...", len(self.print_buffer))
 
 
-        # If max_lines is set, trim content from END of buffer
-        total_lines_in_buffer = 0
-        if self.max_lines > 0:
-            for op_type, op_data in self.print_buffer:
-                if op_type == "text":
-                    total_lines_in_buffer += op_data.count("\n") + 1
+            # If max_lines is set, trim content from END of buffer
+            total_lines_in_buffer = 0
+            if self.max_lines > 0:
+                for op_type, op_data in self.print_buffer:
+                    if op_type == "text":
+                        total_lines_in_buffer += op_data.count("\n") + 1
 
-            lines_counted = 0
-            trim_index = len(self.print_buffer)
+                lines_counted = 0
+                trim_index = len(self.print_buffer)
 
-            for i, (op_type, op_data) in enumerate(self.print_buffer):
-                if op_type == "text":
-                    lines_in_item = op_data.count("\n") + 1
-                    if lines_counted + lines_in_item > self.max_lines:
-                        trim_index = i
-                        self._max_lines_hit = True
-                        break
-                    lines_counted += lines_in_item
+                for i, (op_type, op_data) in enumerate(self.print_buffer):
+                    if op_type == "text":
+                        lines_in_item = op_data.count("\n") + 1
+                        if lines_counted + lines_in_item > self.max_lines:
+                            trim_index = i
+                            self._max_lines_hit = True
+                            break
+                        lines_counted += lines_in_item
 
+                if self._max_lines_hit:
+                    self.print_buffer = self.print_buffer[:trim_index]
+
+            # Add truncation message if needed
             if self._max_lines_hit:
-                self.print_buffer = self.print_buffer[:trim_index]
+                self.print_buffer.append(
+                    ("text", f"-- TRUNCATED ({self.max_lines}/{total_lines_in_buffer}) --")
+                )
 
-        # Add truncation message if needed
-        if self._max_lines_hit:
-            self.print_buffer.append(
-                ("text", f"-- TRUNCATED ({self.max_lines}/{total_lines_in_buffer}) --")
-            )
+            # Render everything as one unified bitmap
+            ops = list(self.print_buffer)
+            self.print_buffer.clear()
 
-        # Render everything as one unified bitmap
-        ops = list(self.print_buffer)
-        self.print_buffer.clear()
-
-        img = self._render_unified_bitmap(ops)
-        if img:
-            logger.debug("Rendered unified bitmap: %s", img.size)
-            self._send_bitmap(img)
-            # Ensure all data is transmitted before returning
-            if self.ser and self.ser.is_open:
-                try:
-                    self.ser.flush()
-                except Exception:
-                    logger.exception("Serial flush failed")
-            # Explicit post-print feed for cutter clearance.
-            # Use feed_direct() because it sends both ESC d and ESC J variants
-            # for better compatibility across printer firmwares.
-            feed_lines = max(0, int(self.cutter_feed_dots / 24))
-            if feed_lines > 0:
-                try:
-                    self.feed_direct(feed_lines)
-                except Exception:
-                    logger.exception("Post-print feed failed")
-        else:
-            logger.debug("No bitmap rendered from ops.")
+            img = self._render_unified_bitmap(ops)
+            if img:
+                logger.debug("Rendered unified bitmap: %s", img.size)
+                self._send_bitmap(img)
+                # Ensure all data is transmitted before returning
+                if self.ser and self.ser.is_open:
+                    try:
+                        self.ser.flush()
+                    except Exception:
+                        logger.exception("Serial flush failed")
+                # Explicit post-print feed for cutter clearance.
+                # Use feed_direct() because it sends both ESC d and ESC J variants
+                # for better compatibility across printer firmwares.
+                feed_lines = max(0, int(self.cutter_feed_dots / 24))
+                if feed_lines > 0:
+                    try:
+                        self.feed_direct(feed_lines)
+                    except Exception:
+                        logger.exception("Post-print feed failed")
+                self.wait_for_idle()
+            else:
+                logger.debug("No bitmap rendered from ops.")
 
 
     def reset_buffer(self, max_lines: int = 0):

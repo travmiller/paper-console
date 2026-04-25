@@ -171,20 +171,21 @@ async def email_polling_loop():
         try:
             # Find all active email modules
             email_modules = []
-            min_interval = 30  # Default polling interval
+            min_interval = None
 
             for module in settings.modules.values():
                 if module.type == "email":
                     email_config = EmailConfig(**(module.config or {}))
                     if email_config.auto_print_new:
                         email_modules.append(module)
-                        if email_config.polling_interval < min_interval:
+                        if min_interval is None or email_config.polling_interval < min_interval:
                             min_interval = email_config.polling_interval
 
-            await asyncio.sleep(min_interval)
-
             if not email_modules:
+                await asyncio.sleep(60)
                 continue
+
+            await asyncio.sleep(max(1, min_interval or 60))
 
             # Check each email module silently
             for module in email_modules:
@@ -278,8 +279,10 @@ import threading
 print_lock = threading.Lock()
 print_in_progress = False
 hold_action_in_progress = False
+hold_action_started_at = 0.0
 last_print_time = 0.0
 PRINT_DEBOUNCE_SECONDS = 3.0  # Minimum time between print jobs
+HOLD_ACTION_TIMEOUT_SECONDS = 20.0
 
 
 global_loop = None
@@ -290,16 +293,35 @@ def _printer_reserved_locked() -> bool:
     return print_in_progress or hold_action_in_progress
 
 
+def _expire_stale_hold_action_locked(current_time: float):
+    """Release a long-hold reservation if its matching release event was lost."""
+    global hold_action_in_progress, hold_action_started_at
+
+    if not hold_action_in_progress:
+        return
+    if (current_time - hold_action_started_at) < HOLD_ACTION_TIMEOUT_SECONDS:
+        return
+
+    hold_action_in_progress = False
+    hold_action_started_at = 0.0
+    logger.warning(
+        "Cleared stale hold reservation after %.1fs without a matching release.",
+        HOLD_ACTION_TIMEOUT_SECONDS,
+    )
+
+
 def _try_begin_print_job(*, debounce: bool = False) -> bool:
     """Reserve the printer for a new print job."""
     global print_in_progress, last_print_time
     import time
 
     with print_lock:
+        current_time = time.time()
+        _expire_stale_hold_action_locked(current_time)
+
         if _printer_reserved_locked():
             return False
 
-        current_time = time.time()
         if debounce and (current_time - last_print_time) < PRINT_DEBOUNCE_SECONDS:
             return False
 
@@ -310,41 +332,60 @@ def _try_begin_print_job(*, debounce: bool = False) -> bool:
 
 def _reserve_hold_action() -> bool:
     """Reserve the printer once the user crosses a long-hold threshold."""
-    global hold_action_in_progress, last_print_time
+    global hold_action_in_progress, hold_action_started_at, last_print_time
     import time
 
     with print_lock:
+        current_time = time.time()
+        _expire_stale_hold_action_locked(current_time)
+
         if print_in_progress:
             return False
 
         hold_action_in_progress = True
-        last_print_time = time.time()
+        hold_action_started_at = current_time
+        last_print_time = current_time
         return True
 
 
 def _promote_hold_to_print_job() -> bool:
     """Convert a hold reservation into an active print job."""
-    global print_in_progress, hold_action_in_progress, last_print_time
+    global print_in_progress, hold_action_in_progress, hold_action_started_at, last_print_time
     import time
 
     with print_lock:
+        current_time = time.time()
+        _expire_stale_hold_action_locked(current_time)
+
         if print_in_progress:
             return False
 
         hold_action_in_progress = False
+        hold_action_started_at = 0.0
         print_in_progress = True
-        last_print_time = time.time()
+        last_print_time = current_time
         return True
 
 
 def _clear_print_reservation(*, clear_hold: bool = True):
     """Release active print/hold reservations."""
-    global print_in_progress, hold_action_in_progress
+    global print_in_progress, hold_action_in_progress, hold_action_started_at, last_print_time
+    import time
 
     with print_lock:
+        if print_in_progress:
+            # Start debounce from the end of the physical print window, not the start.
+            last_print_time = time.time()
         print_in_progress = False
         if clear_hold:
             hold_action_in_progress = False
+            hold_action_started_at = 0.0
+
+    if hasattr(button, "drain_pending_events"):
+        try:
+            button.drain_pending_events()
+        except Exception:
+            logger.debug("Failed to drain button events after print completion", exc_info=True)
 
 
 def on_button_press_threadsafe():
@@ -575,9 +616,6 @@ async def long_press_menu_trigger():
     position = dial.read_position()
 
     def _initial_print():
-        # Start from a clean transport state to avoid mixed/partial frames.
-        if hasattr(printer, "clear_hardware_buffer"):
-            printer.clear_hardware_buffer()
         # Print quick actions menu only (no auto-TOC print).
         _print_long_press_menu(position)
 
@@ -587,10 +625,8 @@ async def long_press_menu_trigger():
             await loop.run_in_executor(executor, _initial_print)
     except Exception:
         logger.exception("Failed to render long-press menu")
-        return
-    finally:
-        # Release lock so normal button presses can drive selection mode.
         _clear_print_reservation(clear_hold=False)
+        return
 
     def _handle_quick_action(dial_position: int):
         from app.selection_mode import exit_selection_mode
@@ -652,7 +688,11 @@ async def long_press_menu_trigger():
             hw_printer.flush_buffer()
 
     quick_actions_id = f"quick-actions-{position}"
+    if hasattr(button, "drain_pending_events"):
+        button.drain_pending_events()
     enter_selection_mode(_handle_quick_action, quick_actions_id)
+    # Release lock only after quick-actions selection mode is fully active.
+    _clear_print_reservation(clear_hold=False)
 
     async def _auto_exit_quick_actions_after_timeout(module_id: str):
         """Auto-exit quick actions if no selection is made within timeout."""
@@ -3944,10 +3984,6 @@ async def trigger_channel(position: int):
         if hasattr(printer, "blip"):
             printer.blip()
 
-        # Clear hardware buffer (reset) before starting new job to kill any ghosts
-        if hasattr(printer, "clear_hardware_buffer"):
-            printer.clear_hardware_buffer()
-
         # Reset printer buffer at start of print job (for invert mode)
         # Also set max lines limit
         max_lines = getattr(settings, "max_print_lines", 200)
@@ -4219,10 +4255,6 @@ async def print_module_direct(module_id: str):
         # Instant tactile feedback - tiny paper blip (2 dots, ~0.01")
         if hasattr(printer, "blip"):
             printer.blip()
-
-        # Clear hardware buffer (reset) before starting new job to kill any ghosts
-        if hasattr(printer, "clear_hardware_buffer"):
-            printer.clear_hardware_buffer()
 
         # Reset printer buffer at start of print job (for invert mode)
         # Also set max lines limit

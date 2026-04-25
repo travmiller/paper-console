@@ -40,6 +40,7 @@ class ButtonDriver:
         self.factory_reset_callback = None
         self.long_press_duration = 5.0  # 5 seconds for long press (AP mode)
         self.factory_reset_duration = 15.0  # 15 seconds for factory reset
+        self.release_debounce_seconds = 0.12  # Require stable release before ending a hold
         self.monitoring = False
         self.monitor_thread = None
         self.hold_check_thread = None
@@ -54,6 +55,7 @@ class ButtonDriver:
         # self.cooldown_period = 0.05  # REMOVED: 50ms cooldown after release to prevent double-triggers
         self.last_callback_time = 0  # Track when callback was last called
         # self.callback_cooldown = 0.15  # REMOVED: 150ms minimum between callbacks to prevent rapid-fire
+        self._release_candidate_since = None
 
         self.chip = None
         self.event_handle = None
@@ -171,6 +173,10 @@ class ButtonDriver:
             time.sleep(0.1)  # Check every 100ms
 
             if self.is_pressed and self.press_start_time:
+                if self._release_is_stable(time.time()):
+                    self._handle_release(time.time())
+                    continue
+
                 duration = time.time() - self.press_start_time
 
                 # Mark that we've reached the long press threshold (5s)
@@ -197,6 +203,106 @@ class ButtonDriver:
                             self.factory_reset_callback()
                         except Exception:
                             pass
+
+    def _is_physically_released(self) -> bool:
+        """Return True when the GPIO line currently reads as released/high."""
+        if not self.event_handle:
+            return False
+
+        try:
+            return self.event_handle.read_value() == 1
+        except Exception:
+            return False
+
+    def _handle_press(self, current_time: float):
+        """Record the start of a new press."""
+        self.is_pressed = True
+        self.press_start_time = current_time
+        self.triggered_actions = set()
+        self._release_candidate_since = None
+
+    def _release_is_stable(self, current_time: float) -> bool:
+        """Return True only after the button has been continuously released for a short window."""
+        if not self._is_physically_released():
+            self._release_candidate_since = None
+            return False
+
+        if self._release_candidate_since is None:
+            self._release_candidate_since = current_time
+            return False
+
+        return (current_time - self._release_candidate_since) >= self.release_debounce_seconds
+
+    def _handle_release(self, current_time: float):
+        """Handle a release event, including long-press and short-press callbacks."""
+        if not self.is_pressed:
+            return
+
+        hold_duration = None
+        if self.press_start_time:
+            hold_duration = current_time - self.press_start_time
+
+        if (
+            hold_duration is not None
+            and hold_duration >= self.long_press_duration
+            and hold_duration < self.factory_reset_duration
+            and "factory_reset" not in self.triggered_actions
+            and self.long_press_callback
+        ):
+            try:
+                self.long_press_callback()
+                self.last_callback_time = current_time
+            except Exception:
+                pass
+        elif not self.triggered_actions and self.callback:
+            try:
+                self.callback()
+                self.last_callback_time = current_time
+            except Exception:
+                pass
+
+        self.is_pressed = False
+        self.press_start_time = None
+        self.triggered_actions = set()
+        self._release_candidate_since = None
+
+    def drain_pending_events(self, max_events: int = 32):
+        """Discard queued GPIO edge events after a mode transition."""
+        if not self.event_handle:
+            return 0
+
+        fd = getattr(self.event_handle, "fd", None)
+        if fd is None:
+            return 0
+
+        drained = 0
+        while drained < max_events:
+            try:
+                ready, _, _ = select.select([fd], [], [], 0)
+            except Exception:
+                break
+            if not ready:
+                break
+
+            event_id = self.event_handle.read_event()
+            if event_id is None:
+                break
+            drained += 1
+
+        try:
+            if self.event_handle.read_value() == 0:
+                self.is_pressed = True
+                self.press_start_time = time.time()
+            else:
+                self.is_pressed = False
+                self.press_start_time = None
+        except Exception:
+            self.is_pressed = False
+            self.press_start_time = None
+
+        self.triggered_actions = set()
+        self._release_candidate_since = None
+        return drained
 
     def _monitor_loop(self):
         """Monitor for button press/release events."""
@@ -243,57 +349,12 @@ class ButtonDriver:
                     # last_event_time = current_time
 
                     if event_id == GPIOEVENT_EVENT_FALLING_EDGE:
-                        # Press started
-                        # Only check cooldown if we're not already processing a press
-                        if not self.is_pressed:
-                            # time_since_release = current_time - self.last_release_time
-                            # if time_since_release < self.cooldown_period:
-                            #    continue
-                            pass
-                        
-                        self.is_pressed = True
-                        self.press_start_time = current_time
-                        self.triggered_actions = set()
+                        if self.event_handle.read_value() == 0 and not self.is_pressed:
+                            self._handle_press(current_time)
 
                     elif event_id == GPIOEVENT_EVENT_RISING_EDGE:
-                        # Released
-                        if self.is_pressed:
-                            # Calculate hold duration
-                            hold_duration = None
-                            if self.press_start_time:
-                                hold_duration = current_time - self.press_start_time
-
-                            # Check if we should trigger AP mode (long press)
-                            # Only trigger if:
-                            # - Hold duration was between 5-15 seconds
-                            # - Factory reset was NOT triggered
-                            if (
-                                hold_duration is not None
-                                and hold_duration >= self.long_press_duration
-                                and hold_duration < self.factory_reset_duration
-                                and "factory_reset" not in self.triggered_actions
-                                and self.long_press_callback
-                            ):
-                                # Check callback cooldown before triggering long press
-                                # if (current_time - self.last_callback_time) >= self.callback_cooldown:
-                                try:
-                                    self.long_press_callback()
-                                    self.last_callback_time = current_time
-                                except Exception:
-                                    pass
-                            # Otherwise, trigger short press if no actions were triggered
-                            elif not self.triggered_actions and self.callback:
-                                # Check callback cooldown before triggering short press
-                                # if (current_time - self.last_callback_time) >= self.callback_cooldown:
-                                try:
-                                    self.callback()
-                                    self.last_callback_time = current_time
-                                except Exception:
-                                    pass
-
-                            self.is_pressed = False
-                            self.press_start_time = None
-                            self.triggered_actions = set()
+                        if self.is_pressed and self._release_is_stable(current_time):
+                            self._handle_release(current_time)
                             # self.last_release_time = current_time  # Track release time for cooldown
 
             except OSError:
