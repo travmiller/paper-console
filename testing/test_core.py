@@ -119,6 +119,16 @@ def test_ap_script_device_id_matches_printed_uppercase_suffix(tmp_path):
     assert result.stdout.strip() == "ABCD"
 
 
+def test_setup_pi_disables_wifi_power_save_via_networkmanager_conf():
+    script = (
+        Path(__file__).resolve().parents[1] / "scripts" / "setup_pi.sh"
+    ).read_text(encoding="utf-8")
+
+    assert "/etc/NetworkManager/conf.d/10-wifi-powersave-off.conf" in script
+    assert "[connection]" in script
+    assert "wifi.powersave=2" in script
+
+
 class _RecordingPrinter:
     def __init__(self):
         self.captions = []

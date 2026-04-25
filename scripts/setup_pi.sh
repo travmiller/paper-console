@@ -158,6 +158,14 @@ cat > /etc/NetworkManager/conf.d/00-use-dnsmasq.conf <<EOF
 dns=dnsmasq
 EOF
 
+# Disable WiFi power saving to reduce Pi Zero/Zero 2 W disconnects on
+# always-on devices. This is managed by NetworkManager so it persists
+# across reboots and reconnects.
+cat > /etc/NetworkManager/conf.d/10-wifi-powersave-off.conf <<EOF
+[connection]
+wifi.powersave=2
+EOF
+
 # Restart NetworkManager to apply changes
 systemctl restart NetworkManager
 
