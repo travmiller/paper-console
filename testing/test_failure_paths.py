@@ -563,6 +563,60 @@ def test_try_begin_print_job_respects_hold_reservation(monkeypatch):
     assert main_module.hold_action_in_progress is False
 
 
+def test_clear_print_reservation_starts_post_print_debounce(monkeypatch):
+    monkeypatch.setattr(main_module, "print_in_progress", True)
+    monkeypatch.setattr(main_module, "hold_action_in_progress", False)
+    monkeypatch.setattr(main_module, "factory_reset_in_progress", False)
+    monkeypatch.setattr(main_module, "last_print_time", 0.0)
+
+    main_module._clear_print_reservation(clear_hold=False)
+
+    assert main_module.print_in_progress is False
+    assert main_module.last_print_time > 0
+    assert main_module._try_begin_print_job(debounce=True) is False
+
+    main_module.last_print_time -= main_module.PRINT_DEBOUNCE_SECONDS + 0.1
+    assert main_module._try_begin_print_job(debounce=True) is True
+    main_module._clear_print_reservation()
+
+
+def test_long_press_paths_respect_post_print_debounce(monkeypatch):
+    captured = []
+
+    class DummyLoop:
+        def is_running(self):
+            return True
+
+    def fake_run_coroutine_threadsafe(coro, loop):  # noqa: ARG001
+        captured.append(coro)
+        return None
+
+    monkeypatch.setattr(main_module, "global_loop", DummyLoop())
+    monkeypatch.setattr(main_module, "print_in_progress", False)
+    monkeypatch.setattr(main_module, "hold_action_in_progress", False)
+    monkeypatch.setattr(main_module, "factory_reset_in_progress", False)
+    monkeypatch.setattr(main_module, "last_print_time", time.time())
+    monkeypatch.setattr(
+        main_module.asyncio,
+        "run_coroutine_threadsafe",
+        fake_run_coroutine_threadsafe,
+    )
+
+    main_module.on_button_long_press_ready_threadsafe()
+    main_module.on_button_long_press_threadsafe()
+
+    assert main_module.hold_action_in_progress is False
+    assert captured == []
+
+    main_module.last_print_time -= main_module.PRINT_DEBOUNCE_SECONDS + 0.1
+    main_module.on_button_long_press_threadsafe()
+
+    assert main_module.print_in_progress is True
+    assert len(captured) == 1
+    captured[0].close()
+    main_module._clear_print_reservation()
+
+
 def test_long_press_ready_does_not_feed_when_print_busy(monkeypatch):
     class DummyPrinter:
         def __init__(self):

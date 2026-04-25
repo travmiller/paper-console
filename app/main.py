@@ -291,6 +291,10 @@ def _printer_reserved_locked() -> bool:
     return print_in_progress or hold_action_in_progress or factory_reset_in_progress
 
 
+def _print_debounce_active_locked(current_time: float) -> bool:
+    return (current_time - last_print_time) < PRINT_DEBOUNCE_SECONDS
+
+
 def _try_begin_print_job(*, debounce: bool = False) -> bool:
     """Reserve the printer for a new print job."""
     global print_in_progress, last_print_time
@@ -301,7 +305,7 @@ def _try_begin_print_job(*, debounce: bool = False) -> bool:
             return False
 
         current_time = time.time()
-        if debounce and (current_time - last_print_time) < PRINT_DEBOUNCE_SECONDS:
+        if debounce and _print_debounce_active_locked(current_time):
             return False
 
         print_in_progress = True
@@ -315,11 +319,14 @@ def _reserve_hold_action() -> bool:
     import time
 
     with print_lock:
+        current_time = time.time()
         if _printer_reserved_locked():
+            return False
+        if _print_debounce_active_locked(current_time):
             return False
 
         hold_action_in_progress = True
-        last_print_time = time.time()
+        last_print_time = current_time
         return True
 
 
@@ -330,6 +337,8 @@ def _promote_hold_to_print_job() -> bool:
 
     with print_lock:
         if print_in_progress or factory_reset_in_progress:
+            return False
+        if not hold_action_in_progress:
             return False
 
         hold_action_in_progress = False
@@ -358,14 +367,21 @@ def _force_begin_factory_reset_job() -> bool:
 
 def _clear_print_reservation(*, clear_hold: bool = True, clear_reset: bool = False):
     """Release active print/hold reservations."""
-    global print_in_progress, hold_action_in_progress, factory_reset_in_progress
+    global print_in_progress, hold_action_in_progress, factory_reset_in_progress, last_print_time
+    import time
 
     with print_lock:
+        was_reserved = _printer_reserved_locked()
         print_in_progress = False
         if clear_hold:
             hold_action_in_progress = False
         if clear_reset:
             factory_reset_in_progress = False
+        if was_reserved:
+            # Debounce from the end of a job. Long receipts can outlast the
+            # start-time debounce, and the printer still needs a short drain
+            # window before receiving fresh ESC/POS commands.
+            last_print_time = time.time()
 
 
 def on_button_press_threadsafe():
@@ -424,7 +440,7 @@ def on_button_long_press_threadsafe():
     """Callback for long press (5 seconds) - opens quick actions menu."""
     global global_loop
 
-    if not _promote_hold_to_print_job() and not _try_begin_print_job(debounce=False):
+    if not _promote_hold_to_print_job() and not _try_begin_print_job(debounce=True):
         return
 
     try:
