@@ -554,6 +554,11 @@ def test_install_updates_uses_beta_release_channel_in_production(monkeypatch, tm
             args=["pip"], returncode=0, stdout="", stderr=""
         ),
     )
+    monkeypatch.setattr(
+        main_module,
+        "_disable_wifi_power_save_for_saved_connections",
+        lambda: True,
+    )
     monkeypatch.setattr(main_module, "_restart_pc1_service", lambda: None)
 
     result = asyncio.run(main_module.install_updates())
@@ -564,6 +569,93 @@ def test_install_updates_uses_beta_release_channel_in_production(monkeypatch, tm
     assert captured["expected_sha"] == ""
     assert captured["release_tag"] == ""
     assert captured["include_prerelease"] is True
+
+
+def test_disable_wifi_power_save_updates_saved_wireless_profiles(monkeypatch):
+    commands = []
+
+    def fake_run(
+        cmd, capture_output=False, text=False, timeout=None, check=False, cwd=None
+    ):  # noqa: ARG001
+        commands.append(cmd)
+        if cmd == ["nmcli", "-t", "-f", "UUID,TYPE", "connection", "show"]:
+            return subprocess.CompletedProcess(
+                args=cmd,
+                returncode=0,
+                stdout="wifi-uuid:802-11-wireless\nethernet-uuid:802-3-ethernet\n",
+                stderr="",
+            )
+        if cmd == [
+            "sudo",
+            "nmcli",
+            "connection",
+            "modify",
+            "uuid",
+            "wifi-uuid",
+            "802-11-wireless.powersave",
+            "2",
+        ]:
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+        if cmd == ["sudo", "nmcli", "connection", "reload"]:
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+        if cmd == ["sudo", "nmcli", "device", "reapply", "wlan0"]:
+            return subprocess.CompletedProcess(
+                args=cmd, returncode=0, stdout="", stderr=""
+            )
+        raise AssertionError(f"Unexpected subprocess command: {cmd}")
+
+    monkeypatch.setattr(main_module.subprocess, "run", fake_run)
+
+    assert main_module._disable_wifi_power_save_for_saved_connections() is True
+    assert [
+        "sudo",
+        "nmcli",
+        "connection",
+        "modify",
+        "uuid",
+        "wifi-uuid",
+        "802-11-wireless.powersave",
+        "2",
+    ] in commands
+    assert ["sudo", "nmcli", "connection", "reload"] in commands
+    assert ["sudo", "nmcli", "device", "reapply", "wlan0"] in commands
+
+
+def test_install_updates_runs_wifi_power_save_migration_in_production(
+    monkeypatch, tmp_path
+):
+    project_root = tmp_path / "project"
+    project_root.mkdir()
+    migration_calls = []
+
+    monkeypatch.setattr(main_module, "_get_project_root", lambda: project_root)
+    monkeypatch.setattr(
+        main_module,
+        "_install_release_bundle",
+        lambda *args, **kwargs: "v0.2.15-beta.2",
+    )
+    monkeypatch.setattr(
+        main_module,
+        "_install_update_dependencies",
+        lambda current_project_root, is_dev: subprocess.CompletedProcess(
+            args=["pip"], returncode=0, stdout="", stderr=""
+        ),
+    )
+    monkeypatch.setattr(
+        main_module,
+        "_disable_wifi_power_save_for_saved_connections",
+        lambda: migration_calls.append("called") or True,
+    )
+    monkeypatch.setattr(main_module, "_restart_pc1_service", lambda: None)
+
+    result = asyncio.run(main_module.install_updates())
+
+    assert result["success"] is True
+    assert migration_calls == ["called"]
 
 
 def test_try_begin_print_job_respects_hold_reservation(monkeypatch):

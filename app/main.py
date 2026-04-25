@@ -2724,6 +2724,83 @@ def _install_update_dependencies(
     )
 
 
+def _disable_wifi_power_save_for_saved_connections() -> bool:
+    """Best-effort OTA migration for deployed units with existing WiFi profiles."""
+    try:
+        list_result = subprocess.run(
+            ["nmcli", "-t", "-f", "UUID,TYPE", "connection", "show"],
+            capture_output=True,
+            text=True,
+            timeout=15,
+            check=False,
+        )
+        if list_result.returncode != 0:
+            logger.warning(
+                "Could not list NetworkManager connections for power-save migration: %s",
+                (list_result.stderr or list_result.stdout or "").strip()[:300],
+            )
+            return False
+
+        wifi_connection_uuids = []
+        for line in list_result.stdout.splitlines():
+            parts = line.split(":")
+            if len(parts) >= 2:
+                connection_uuid, conn_type = parts[0].strip(), parts[1].strip()
+                if connection_uuid and conn_type == "802-11-wireless":
+                    wifi_connection_uuids.append(connection_uuid)
+
+        modified_any = False
+        for connection_uuid in wifi_connection_uuids:
+            modify_result = subprocess.run(
+                [
+                    "sudo",
+                    "nmcli",
+                    "connection",
+                    "modify",
+                    "uuid",
+                    connection_uuid,
+                    "802-11-wireless.powersave",
+                    "2",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            if modify_result.returncode == 0:
+                modified_any = True
+                continue
+
+            logger.warning(
+                "Could not disable WiFi power saving for connection %s: %s",
+                connection_uuid,
+                (modify_result.stderr or modify_result.stdout or "").strip()[:300],
+            )
+
+        if modified_any:
+            subprocess.run(
+                ["sudo", "nmcli", "connection", "reload"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+            subprocess.run(
+                ["sudo", "nmcli", "device", "reapply", "wlan0"],
+                capture_output=True,
+                text=True,
+                timeout=15,
+                check=False,
+            )
+
+        return modified_any
+    except Exception:
+        logger.warning(
+            "WiFi power-save OTA migration failed unexpectedly", exc_info=True
+        )
+        return False
+
+
 def _validate_production_update_bundle(source_dir: Path) -> None:
     required_paths = [
         source_dir / "web" / "dist" / "index.html",
@@ -2820,6 +2897,9 @@ async def install_updates():
                 "message": "Update failed",
                 "error": "Dependency installation failed. The running service was left unchanged.",
             }
+
+        if not is_dev:
+            _disable_wifi_power_save_for_saved_connections()
 
         # Dev-mode convenience only: production releases must ship prebuilt web assets.
         web_dir = project_root / "web"
