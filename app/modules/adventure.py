@@ -10,7 +10,6 @@ channel switching behavior until the user makes a choice or exits.
 """
 
 import json
-import os
 import logging
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field, asdict
@@ -117,19 +116,48 @@ def filter_choices(choices: List[Dict], state: AdventureState) -> List[Dict]:
 # Selection mode is now in app/selection_mode.py for reuse across modules
 
 from app.selection_mode import (
-    is_selection_mode_active,
     enter_selection_mode,
     exit_selection_mode,
-    handle_selection,
 )
+
+
+def _drain_pending_button_events():
+    """Discard button edges queued during the receipt that just printed."""
+    try:
+        from app.hardware import button
+
+        if hasattr(button, "drain_pending_events"):
+            button.drain_pending_events()
+    except Exception:
+        logger.debug("Adventure: failed to drain pending button events", exc_info=True)
+
+
+def _enter_adventure_selection(module_id: str, printer):
+    """Arm the next adventure choice only after stale button events are gone."""
+    state = load_state(module_id)
+    story = load_story()
+    current_node = get_node(story, state.current_node)
+    if current_node and current_node.get("ending"):
+        valid_positions = {1, 8}
+    elif current_node:
+        choices = filter_choices(current_node.get("choices", []), state)
+        valid_positions = {choice.get("dial", idx) for idx, choice in enumerate(choices, 1)}
+        valid_positions.add(8)
+    else:
+        valid_positions = {8}
+
+    _drain_pending_button_events()
+    enter_selection_mode(
+        lambda pos: process_choice(module_id, pos, printer),
+        module_id,
+        valid_positions=valid_positions,
+    )
 
 
 # --- Print Functions ---
 
 def print_story_node(printer, story: Dict, node: Dict, state: AdventureState, module_name: str):
     """Print a story node with its text and available choices."""
-    from datetime import datetime
-    
     meta = story.get("meta", {})
     title = meta.get("title", "Adventure")
     
@@ -212,11 +240,13 @@ def process_choice(module_id: str, dial_position: int, printer):
     
     # Use the hardware printer
     printer = hw_printer
+
+    # Disarm the current choice while this move is being processed. The next
+    # choice is armed after the resulting receipt is fully staged/printed.
+    exit_selection_mode()
     
     # Position 8 is always Exit
     if dial_position == 8:
-        exit_selection_mode()
-        
         # Print exit confirmation
         if hasattr(printer, "reset_buffer"):
             printer.reset_buffer()
@@ -239,7 +269,6 @@ def process_choice(module_id: str, dial_position: int, printer):
     
     if not current_node:
         logger.error(f"Adventure: Node not found: {state.current_node}")
-        exit_selection_mode()
         return
     
     # Handle game over / endings
@@ -250,8 +279,6 @@ def process_choice(module_id: str, dial_position: int, printer):
             current_node = get_node(story, "start")
         else:
             # Any other position (including 8) = Exit
-            exit_selection_mode()
-            
             if hasattr(printer, "reset_buffer"):
                 printer.reset_buffer()
             
@@ -276,26 +303,14 @@ def process_choice(module_id: str, dial_position: int, printer):
                 break
         
         if not selected_choice:
-            # Invalid selection - just reprint current node
-            if hasattr(printer, "reset_buffer"):
-                printer.reset_buffer()
-            
-            printer.print_header("ADVENTURE", icon="book")
-            printer.print_body(f"Invalid choice: {dial_position}")
-            printer.print_caption("Please select a valid option.")
-            printer.print_line()
-            
-            if hasattr(printer, "flush_buffer"):
-                printer.flush_buffer()
-            
-            # Stay in selection mode
+            # Empty dial slots are ignored to avoid wasting paper.
+            _enter_adventure_selection(module_id, printer)
             return
         
         # Get next node
         next_node_id = selected_choice.get("next")
         if not next_node_id:
             logger.error(f"Adventure: No next node for choice")
-            exit_selection_mode()
             return
         
         # Update state
@@ -333,10 +348,7 @@ def process_choice(module_id: str, dial_position: int, printer):
     
     # If not an ending, re-enter selection mode for next choice
     if not current_node.get("ending"):
-        enter_selection_mode(
-            lambda pos: process_choice(module_id, pos, printer),
-            module_id
-        )
+        _enter_adventure_selection(module_id, printer)
 
 
 # --- Module Registration ---
@@ -400,12 +412,9 @@ def format_adventure_receipt(
         state.flags[current_node["set_flag"]] = True
         save_state(module_id, state)
     
-    # Enter selection mode for player input (including at endings for Start Over / Exit)
-    # Note: Selection mode will be checked by main.py's button handler
-    enter_selection_mode(
-        lambda pos: process_choice(module_id, pos, printer),
-        module_id
-    )
-    
     # Print the current story node
     print_story_node(printer, story, current_node, state, module_name or meta.get("title", "Adventure"))
+
+    # Enter selection mode after the receipt content is staged so queued button
+    # edges from the triggering press cannot immediately select a choice.
+    _enter_adventure_selection(module_id, printer)

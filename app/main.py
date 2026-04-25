@@ -397,7 +397,7 @@ def on_button_press_threadsafe():
 
     try:
         if global_loop and global_loop.is_running():
-            # Check for selection mode (adventure game, settings menu, etc.)
+            # Check for selection mode (adventure game, quick actions, etc.)
             from app.selection_mode import is_selection_mode_active
 
             if is_selection_mode_active():
@@ -423,11 +423,11 @@ async def handle_selection_async(dial_position: int):
     Runs blocking operations in a thread pool.
     """
     from concurrent.futures import ThreadPoolExecutor
-    from app.selection_mode import handle_selection
+    from app.selection_mode import can_handle_selection, handle_selection
 
     def _do_selection():
-        # Tactile feedback - blip on button press
-        if hasattr(printer, "blip"):
+        # Tactile feedback only for active choices; empty slots stay silent.
+        if can_handle_selection(dial_position) and hasattr(printer, "blip"):
             printer.blip()
         handle_selection(dial_position)
 
@@ -605,6 +605,94 @@ def _print_long_press_menu(position: int):
         printer.flush_buffer()
 
 
+def _confirm_quick_factory_reset(printer, module_id: str):
+    """Show the Quick Actions factory reset confirmation receipt."""
+    from app.selection_mode import enter_selection_mode, exit_selection_mode
+
+    printer.print_header("FACTORY RESET", icon="alert")
+    printer.print_line()
+    printer.print_bold("WARNING")
+    printer.print_body("")
+    printer.print_body("This will delete ALL")
+    printer.print_body("settings and reboot.")
+    printer.print_body("")
+    printer.print_body("WiFi passwords, module")
+    printer.print_body("configs, and channels")
+    printer.print_body("will be erased.")
+    printer.print_line()
+    printer.print_subheader("ARE YOU SURE?")
+    printer.feed(1)
+    printer.print_body("  [1] Yes, Reset Everything")
+    printer.print_caption("  [8] Cancel")
+    printer.print_line()
+
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+
+    def _handle_reset_confirmation(dial_position: int):
+        from app.hardware import printer as hw_printer
+
+        exit_selection_mode()
+        if dial_position == 1:
+            _do_quick_factory_reset(hw_printer)
+            return
+
+        if hasattr(hw_printer, "reset_buffer"):
+            hw_printer.reset_buffer()
+
+        hw_printer.print_header("QUICK ACTIONS", icon="settings")
+        hw_printer.print_body("Factory reset cancelled.")
+        hw_printer.print_line()
+        hw_printer.feed(1)
+
+        if hasattr(hw_printer, "flush_buffer"):
+            hw_printer.flush_buffer()
+
+    enter_selection_mode(
+        _handle_reset_confirmation,
+        f"{module_id}-reset-confirm",
+        valid_positions={1, 8},
+    )
+
+
+def _do_quick_factory_reset(printer):
+    """Perform a confirmed factory reset from Quick Actions."""
+    from app.factory_reset import perform_factory_reset
+    from app.utils import print_setup_instructions_sync
+
+    printer.print_header("RESETTING...", icon="alert")
+    printer.print_line()
+    printer.print_body("Clearing all settings...")
+    printer.print_body("Device will reboot.")
+    printer.print_line()
+    printer.feed(1)
+
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+
+    result = perform_factory_reset()
+    if not result.get("reboot_requested", False):
+        logger.error(
+            "Factory reset from Quick Actions failed to request reboot: %s",
+            "; ".join(result.get("errors", [])),
+        )
+        try:
+            if wifi_manager.start_ap_mode(retries=2):
+                print_setup_instructions_sync()
+                if hasattr(printer, "reset_buffer"):
+                    printer.reset_buffer()
+                printer.print_header("RESET COMPLETE", icon="check")
+                printer.print_body("Reboot failed.")
+                printer.print_body("Setup mode started.")
+                printer.print_bold("Connect to PC-1-Setup-XXXX")
+                printer.print_caption("Then open: http://10.42.0.1")
+                printer.print_line()
+                if hasattr(printer, "flush_buffer"):
+                    printer.flush_buffer()
+        except Exception:
+            logger.exception("Factory reset fallback AP-mode recovery failed")
+
+
 async def long_press_menu_trigger():
     """Long-press flow: open quick action menu and enter selection mode."""
     from concurrent.futures import ThreadPoolExecutor
@@ -669,28 +757,22 @@ async def long_press_menu_trigger():
         if dial_position == 5:
             exit_selection_mode()
             try:
-                from app.modules.settings_menu import _confirm_factory_reset
-
-                _confirm_factory_reset(hw_printer, "quick-factory-reset")
+                _confirm_quick_factory_reset(hw_printer, "quick-factory-reset")
             except Exception:
                 logger.exception("Failed to open factory reset confirmation")
             return
 
-        # Invalid selection: exit quick actions without side effects.
-        exit_selection_mode()
-        if hasattr(hw_printer, "reset_buffer"):
-            hw_printer.reset_buffer()
-        hw_printer.print_header("QUICK ACTIONS", icon="settings")
-        hw_printer.print_caption("No action selected.")
-        hw_printer.print_caption("Hold button 5s to open menu.")
-        hw_printer.feed(1)
-        if hasattr(hw_printer, "flush_buffer"):
-            hw_printer.flush_buffer()
+        # Empty dial slots are ignored to avoid wasting paper.
+        return
 
     quick_actions_id = f"quick-actions-{position}"
     if hasattr(button, "drain_pending_events"):
         button.drain_pending_events()
-    enter_selection_mode(_handle_quick_action, quick_actions_id)
+    enter_selection_mode(
+        _handle_quick_action,
+        quick_actions_id,
+        valid_positions={1, 2, 3, 4, 5, 8},
+    )
     # Release lock only after quick-actions selection mode is fully active.
     _clear_print_reservation(clear_hold=False)
 
@@ -3964,8 +4046,23 @@ def execute_module(module: ModuleInstance) -> bool:
         # Use registry for all other modules
         module_def = get_module_def(module_type)
         if module_def:
-            # Standard call signature: (printer, config, module_name)
-            module_def.execute_fn(printer, config, module_name)
+            import inspect
+
+            # Most modules use (printer, config, module_name). Interactive
+            # modules can opt into the real instance ID for per-module state.
+            params = inspect.signature(module_def.execute_fn).parameters
+            accepts_module_id = "module_id" in params or any(
+                p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
+            )
+            if accepts_module_id:
+                module_def.execute_fn(
+                    printer,
+                    config,
+                    module_name,
+                    module_id=module.id,
+                )
+            else:
+                module_def.execute_fn(printer, config, module_name)
             return True
         else:
             # Unknown module type
@@ -4160,7 +4257,13 @@ async def trigger_channel(position: int):
 
             # Register the callback
             # We use a special ID to indicate this is the channel meta-menu
-            enter_selection_mode(handle_app_selection, f"channel-menu-{position}")
+            valid_positions = set(range(1, min(len(interactive_modules), 7) + 1))
+            valid_positions.add(8)
+            enter_selection_mode(
+                handle_app_selection,
+                f"channel-menu-{position}",
+                valid_positions=valid_positions,
+            )
 
             # Return early since we've handled the printing/logic
             return

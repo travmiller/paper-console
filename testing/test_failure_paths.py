@@ -12,7 +12,7 @@ from pathlib import Path
 
 import app.main as main_module
 import app.wifi_manager as wifi_manager
-from app.config import CalendarConfig
+from app.config import CalendarConfig, ChannelConfig, ChannelModuleAssignment, ModuleInstance
 from app.drivers.printer_serial import PrinterDriver
 from app.drivers.printer_mock import PrinterDriver as MockPrinterDriver
 from app.modules import email_client
@@ -701,7 +701,7 @@ def test_long_press_menu_trigger_drains_pending_button_events_before_unlock(monk
     monkeypatch.setattr(
         selection_mode,
         "enter_selection_mode",
-        lambda callback, module_id: order.append(f"enter_selection_mode_{module_id}"),
+        lambda callback, module_id, **kwargs: order.append(f"enter_selection_mode_{module_id}"),
     )
 
     original_executor = getattr(__import__("concurrent.futures", fromlist=["ThreadPoolExecutor"]), "ThreadPoolExecutor")
@@ -1268,3 +1268,392 @@ def test_release_build_preserves_local_temp_env(monkeypatch):
     assert env["TMPDIR"] == "/tmp/pc1-tests"
     assert env["TEMP"] == "/tmp/pc1-tests"
     assert env["TMP"] == "/tmp/pc1-tests"
+
+
+def test_selection_mode_ignores_overlapping_callbacks():
+    import threading
+    import app.selection_mode as selection_mode
+
+    selection_mode.exit_selection_mode()
+    started = threading.Event()
+    release = threading.Event()
+    calls = []
+    results = []
+
+    def slow_callback(dial_position):
+        calls.append(dial_position)
+        started.set()
+        release.wait(timeout=1)
+
+    selection_mode.enter_selection_mode(slow_callback, "busy-test")
+
+    worker = threading.Thread(
+        target=lambda: results.append(selection_mode.handle_selection(1))
+    )
+    worker.start()
+    assert started.wait(timeout=1)
+
+    results.append(selection_mode.handle_selection(2))
+    release.set()
+    worker.join(timeout=1)
+
+    assert calls == [1]
+    assert results.count(True) == 1
+    assert results.count(False) == 1
+
+    selection_mode.exit_selection_mode()
+
+
+def test_execute_module_passes_instance_id_to_modules_that_accept_it(monkeypatch):
+    from app.config import ModuleInstance
+
+    captured = {}
+
+    def fake_execute(printer, config, module_name, module_id=None):  # noqa: ARG001
+        captured["module_id"] = module_id
+        captured["module_name"] = module_name
+        captured["config"] = config
+
+    monkeypatch.setattr(
+        main_module,
+        "get_module_def",
+        lambda module_type: types.SimpleNamespace(execute_fn=fake_execute),
+    )
+
+    module = ModuleInstance(
+        id="adventure-one",
+        type="adventure",
+        name="Cave Run",
+        config={"reset_game": False},
+    )
+
+    assert main_module.execute_module(module) is True
+    assert captured == {
+        "module_id": "adventure-one",
+        "module_name": "Cave Run",
+        "config": {"reset_game": False},
+    }
+
+
+def test_adventure_ignores_invalid_choice_without_printing(monkeypatch, tmp_path):
+    import app.hardware as hardware
+    import app.selection_mode as selection_mode
+    from app.modules import adventure
+
+    selection_mode.exit_selection_mode()
+
+    class FakeButton:
+        def __init__(self):
+            self.drains = 0
+
+        def drain_pending_events(self):
+            self.drains += 1
+
+    class FakePrinter:
+        def __init__(self):
+            self.bodies = []
+
+        def reset_buffer(self, max_lines=0):  # noqa: ARG002
+            return None
+
+        def print_header(self, *args, **kwargs):  # noqa: ARG002
+            return None
+
+        def print_subheader(self, *args, **kwargs):  # noqa: ARG002
+            return None
+
+        def print_body(self, text):
+            self.bodies.append(text)
+
+        def print_caption(self, *args, **kwargs):  # noqa: ARG002
+            return None
+
+        def print_line(self):
+            return None
+
+        def feed(self, lines=1):  # noqa: ARG002
+            return None
+
+        def flush_buffer(self):
+            return None
+
+    fake_button = FakeButton()
+    fake_printer = FakePrinter()
+
+    monkeypatch.setattr(hardware, "button", fake_button)
+    monkeypatch.setattr(hardware, "printer", fake_printer)
+    monkeypatch.setattr(
+        adventure,
+        "_get_state_path",
+        lambda module_id: tmp_path / f"{module_id}.json",
+    )
+
+    adventure.format_adventure_receipt(
+        fake_printer,
+        config={},
+        module_name="ADVENTURE",
+        module_id="adventure-one",
+    )
+
+    assert selection_mode.is_selection_mode_active() is True
+    assert selection_mode.get_current_module_id() == "adventure-one"
+    assert fake_button.drains == 1
+    printed_before_invalid = list(fake_printer.bodies)
+
+    assert selection_mode.can_handle_selection(7) is False
+    assert selection_mode.handle_selection(7) is False
+
+    assert selection_mode.is_selection_mode_active() is True
+    assert selection_mode.get_current_module_id() == "adventure-one"
+    assert fake_button.drains == 1
+    assert fake_printer.bodies == printed_before_invalid
+
+    selection_mode.exit_selection_mode()
+
+
+def test_quick_actions_ignores_invalid_selection_without_printing(monkeypatch):
+    order = []
+    captured = {}
+
+    class FakePrinter:
+        def reset_buffer(self, max_lines=0):  # noqa: ARG002
+            order.append("reset_buffer")
+
+        def print_header(self, *args, **kwargs):  # noqa: ARG002
+            order.append("print_header")
+
+        def print_caption(self, *args, **kwargs):  # noqa: ARG002
+            order.append("print_caption")
+
+        def feed(self, lines=1):  # noqa: ARG002
+            order.append("feed")
+
+        def flush_buffer(self):
+            order.append("flush_buffer")
+
+    class FakeDial:
+        def read_position(self):
+            return 5
+
+    class FakeButton:
+        def drain_pending_events(self):
+            order.append("drain")
+
+    class ImmediateExecutor:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    class FakeLoop:
+        async def run_in_executor(self, executor, fn):
+            order.append("run_in_executor")
+            fn()
+
+    def fake_enter_selection_mode(callback, module_id, valid_positions=None):
+        captured["callback"] = callback
+        captured["module_id"] = module_id
+        captured["valid_positions"] = valid_positions
+        order.append(f"enter_selection_mode_{module_id}")
+
+    monkeypatch.setattr(main_module, "printer", FakePrinter())
+    monkeypatch.setattr(main_module, "dial", FakeDial())
+    monkeypatch.setattr(main_module, "button", FakeButton())
+    monkeypatch.setattr(main_module, "_print_long_press_menu", lambda pos: order.append(f"print_menu_{pos}"))
+    monkeypatch.setattr(
+        main_module,
+        "_clear_print_reservation",
+        lambda clear_hold=False: order.append(f"clear_reservation_{clear_hold}"),
+    )
+    monkeypatch.setattr(main_module.asyncio, "get_event_loop", lambda: FakeLoop())
+
+    import app.hardware as hardware
+    import app.selection_mode as selection_mode
+
+    monkeypatch.setattr(hardware, "printer", FakePrinter())
+    monkeypatch.setattr(selection_mode, "exit_selection_mode", lambda: order.append("exit_selection_mode"))
+    monkeypatch.setattr(selection_mode, "enter_selection_mode", fake_enter_selection_mode)
+    monkeypatch.setattr("concurrent.futures.ThreadPoolExecutor", ImmediateExecutor)
+
+    asyncio.run(main_module.long_press_menu_trigger())
+
+    order.clear()
+    captured["callback"](6)
+
+    assert order == []
+    assert captured["module_id"] == "quick-actions-5"
+    assert captured["valid_positions"] == {1, 2, 3, 4, 5, 8}
+
+
+def test_quick_factory_reset_confirmation_ignores_empty_slots(monkeypatch):
+    import app.hardware as hardware
+    import app.selection_mode as selection_mode
+
+    events = []
+
+    class FakePrinter:
+        def reset_buffer(self, max_lines=0):  # noqa: ARG002
+            events.append("reset_buffer")
+
+        def print_header(self, *args, **kwargs):  # noqa: ARG002
+            events.append("print_header")
+
+        def print_line(self):
+            events.append("print_line")
+
+        def print_bold(self, *args, **kwargs):  # noqa: ARG002
+            events.append("print_bold")
+
+        def print_body(self, *args, **kwargs):  # noqa: ARG002
+            events.append("print_body")
+
+        def print_subheader(self, *args, **kwargs):  # noqa: ARG002
+            events.append("print_subheader")
+
+        def print_caption(self, *args, **kwargs):  # noqa: ARG002
+            events.append("print_caption")
+
+        def feed(self, lines=1):  # noqa: ARG002
+            events.append("feed")
+
+        def flush_buffer(self):
+            events.append("flush_buffer")
+
+    fake_printer = FakePrinter()
+    monkeypatch.setattr(hardware, "printer", fake_printer)
+
+    selection_mode.exit_selection_mode()
+    main_module._confirm_quick_factory_reset(fake_printer, "quick-factory-reset")
+
+    assert selection_mode.is_selection_mode_active() is True
+    assert selection_mode.get_current_module_id() == "quick-factory-reset-reset-confirm"
+    assert selection_mode.can_handle_selection(1) is True
+    assert selection_mode.can_handle_selection(2) is False
+    assert selection_mode.can_handle_selection(8) is True
+
+    events.clear()
+    assert selection_mode.handle_selection(2) is False
+    assert events == []
+
+    assert selection_mode.handle_selection(8) is True
+    assert "reset_buffer" in events
+    assert selection_mode.is_selection_mode_active() is False
+
+
+def test_invalid_selection_position_does_not_blip(monkeypatch):
+    import app.selection_mode as selection_mode
+
+    calls = []
+
+    class FakePrinter:
+        def blip(self):
+            calls.append("blip")
+
+    selection_mode.exit_selection_mode()
+    selection_mode.enter_selection_mode(
+        lambda dial_position: calls.append(f"choice_{dial_position}"),
+        "valid-position-test",
+        valid_positions={1},
+    )
+
+    monkeypatch.setattr(main_module, "printer", FakePrinter())
+    monkeypatch.setattr(
+        main_module,
+        "_clear_print_reservation",
+        lambda clear_hold=False: calls.append(f"clear_{clear_hold}"),
+    )
+
+    asyncio.run(main_module.handle_selection_async(2))
+
+    assert calls == ["clear_False"]
+    assert selection_mode.is_selection_mode_active() is True
+
+    selection_mode.exit_selection_mode()
+
+
+def test_interactive_module_picker_ignores_empty_slots(monkeypatch):
+    import app.selection_mode as selection_mode
+
+    events = []
+
+    class FakePrinter:
+        def blip(self):
+            events.append("blip")
+
+        def reset_buffer(self, max_lines=0):  # noqa: ARG002
+            events.append("reset_buffer")
+
+        def print_header(self, *args, **kwargs):  # noqa: ARG002
+            events.append("print_header")
+
+        def print_line(self):
+            events.append("print_line")
+
+        def print_body(self, *args, **kwargs):  # noqa: ARG002
+            events.append("print_body")
+
+        def print_caption(self, *args, **kwargs):  # noqa: ARG002
+            events.append("print_caption")
+
+        def feed(self, lines=1):  # noqa: ARG002
+            events.append("feed")
+
+        def flush_buffer(self):
+            events.append("flush_buffer")
+
+    modules = {
+        "adventure-one": ModuleInstance(
+            id="adventure-one",
+            type="adventure",
+            name="Adventure One",
+            config={},
+        ),
+        "adventure-two": ModuleInstance(
+            id="adventure-two",
+            type="adventure",
+            name="Adventure Two",
+            config={},
+        ),
+    }
+    channels = {
+        1: ChannelConfig(
+            modules=[
+                ChannelModuleAssignment(module_id="adventure-one", order=0),
+                ChannelModuleAssignment(module_id="adventure-two", order=1),
+            ]
+        )
+    }
+
+    monkeypatch.setattr(main_module, "printer", FakePrinter())
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        types.SimpleNamespace(max_print_lines=200, channels=channels, modules=modules),
+    )
+    monkeypatch.setattr(
+        main_module,
+        "get_module",
+        lambda module_type: types.SimpleNamespace(interactive=True),
+        raising=False,
+    )
+    monkeypatch.setattr(main_module, "_clear_print_reservation", lambda clear_hold=False: None)
+
+    selection_mode.exit_selection_mode()
+
+    asyncio.run(main_module.trigger_channel(1))
+
+    assert selection_mode.is_selection_mode_active() is True
+    assert selection_mode.get_current_module_id() == "channel-menu-1"
+    assert selection_mode.can_handle_selection(1) is True
+    assert selection_mode.can_handle_selection(2) is True
+    assert selection_mode.can_handle_selection(3) is False
+    assert selection_mode.can_handle_selection(8) is True
+
+    events.clear()
+    asyncio.run(main_module.handle_selection_async(3))
+
+    assert events == []
+    assert selection_mode.is_selection_mode_active() is True
+
+    selection_mode.exit_selection_mode()

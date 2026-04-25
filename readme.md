@@ -249,7 +249,6 @@ paper-console/
 │   │   ├── qrcode_print.py
 │   │   ├── quotes.py
 │   │   ├── rss.py
-│   │   ├── settings_menu.py    # Quick actions / factory reset receipts (not on channel picker)
 │   │   ├── sudoku.py
 │   │   ├── system_monitor.py
 │   │   ├── text.py
