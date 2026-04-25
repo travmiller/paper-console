@@ -65,6 +65,9 @@ class PrinterDriver:
     SPACING_SMALL = 4  # Tight spacing (after inline elements)
     SPACING_MEDIUM = 8  # Standard spacing (between content blocks)
     SPACING_LARGE = 16  # Section spacing (between modules)
+    MIN_DRAIN_SECONDS = 4.0
+    MAX_DRAIN_SECONDS = 15.0
+    DRAIN_DOTS_PER_SECOND = 250.0
 
     def __init__(
         self,
@@ -81,6 +84,7 @@ class PrinterDriver:
         # Each item is a tuple: ('text', line) or ('feed', count) or ('qr', data).
         self.print_buffer = []
         self._io_lock = threading.RLock()
+        self._drain_until = 0.0
         # Line tracking for max print length
         self.lines_printed = 0
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
@@ -159,6 +163,20 @@ class PrinterDriver:
     def is_available(self) -> bool:
         """Return True if the serial printer is initialized and open."""
         return bool(self.ser and self.ser.is_open)
+
+    def is_draining(self) -> bool:
+        """Return True while the printer may still be physically finishing output."""
+        return time.monotonic() < self._drain_until
+
+    def _mark_output_draining(self, dots: int):
+        """Set a conservative physical drain window after raster/feed commands."""
+        if dots <= 0:
+            return
+        drain_seconds = max(
+            self.MIN_DRAIN_SECONDS,
+            min(self.MAX_DRAIN_SECONDS, dots / self.DRAIN_DOTS_PER_SECOND),
+        )
+        self._drain_until = max(self._drain_until, time.monotonic() + drain_seconds)
 
     def _load_font_family(self) -> dict:
         """Load IBM Plex Mono font family with multiple weights.
@@ -1510,6 +1528,7 @@ class PrinterDriver:
                         self.feed_direct(feed_lines)
                     except Exception:
                         logger.exception("Post-print feed failed")
+                self._mark_output_draining(img.height + (feed_lines * 24))
         else:
             logger.debug("No bitmap rendered from ops.")
 

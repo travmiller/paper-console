@@ -291,6 +291,17 @@ def _printer_reserved_locked() -> bool:
     return print_in_progress or hold_action_in_progress or factory_reset_in_progress
 
 
+def _printer_transport_draining() -> bool:
+    checker = getattr(printer, "is_draining", None)
+    if not callable(checker):
+        return False
+    try:
+        return bool(checker())
+    except Exception:
+        logger.debug("Printer drain-state probe failed", exc_info=True)
+        return False
+
+
 def _print_debounce_active_locked(current_time: float) -> bool:
     return (current_time - last_print_time) < PRINT_DEBOUNCE_SECONDS
 
@@ -302,6 +313,8 @@ def _try_begin_print_job(*, debounce: bool = False) -> bool:
 
     with print_lock:
         if _printer_reserved_locked():
+            return False
+        if _printer_transport_draining():
             return False
 
         current_time = time.time()
@@ -321,6 +334,8 @@ def _reserve_hold_action() -> bool:
     with print_lock:
         current_time = time.time()
         if _printer_reserved_locked():
+            return False
+        if _printer_transport_draining():
             return False
         if _print_debounce_active_locked(current_time):
             return False

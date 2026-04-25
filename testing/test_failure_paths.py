@@ -563,6 +563,36 @@ def test_try_begin_print_job_respects_hold_reservation(monkeypatch):
     assert main_module.hold_action_in_progress is False
 
 
+def test_try_begin_print_job_respects_printer_drain_window(monkeypatch):
+    class DrainingPrinter:
+        def is_draining(self):
+            return True
+
+    monkeypatch.setattr(main_module, "printer", DrainingPrinter())
+    monkeypatch.setattr(main_module, "print_in_progress", False)
+    monkeypatch.setattr(main_module, "hold_action_in_progress", False)
+    monkeypatch.setattr(main_module, "factory_reset_in_progress", False)
+    monkeypatch.setattr(
+        main_module,
+        "last_print_time",
+        time.time() - main_module.PRINT_DEBOUNCE_SECONDS - 1,
+    )
+
+    assert main_module._try_begin_print_job(debounce=True) is False
+    assert main_module._reserve_hold_action() is False
+
+
+def test_serial_printer_tracks_physical_drain_window():
+    driver = PrinterDriver(init_serial=False)
+
+    driver._mark_output_draining(1)
+
+    assert driver.is_draining() is True
+
+    driver._drain_until = time.monotonic() - 0.1
+    assert driver.is_draining() is False
+
+
 def test_clear_print_reservation_starts_post_print_debounce(monkeypatch):
     monkeypatch.setattr(main_module, "print_in_progress", True)
     monkeypatch.setattr(main_module, "hold_action_in_progress", False)
