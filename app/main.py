@@ -278,6 +278,7 @@ import threading
 print_lock = threading.Lock()
 print_in_progress = False
 hold_action_in_progress = False
+factory_reset_in_progress = False
 last_print_time = 0.0
 PRINT_DEBOUNCE_SECONDS = 3.0  # Minimum time between print jobs
 
@@ -286,8 +287,8 @@ global_loop = None
 
 
 def _printer_reserved_locked() -> bool:
-    """Return True when the printer is reserved for a print or hold action."""
-    return print_in_progress or hold_action_in_progress
+    """Return True when the printer is reserved for a print, hold, or reset."""
+    return print_in_progress or hold_action_in_progress or factory_reset_in_progress
 
 
 def _try_begin_print_job(*, debounce: bool = False) -> bool:
@@ -314,7 +315,7 @@ def _reserve_hold_action() -> bool:
     import time
 
     with print_lock:
-        if print_in_progress:
+        if _printer_reserved_locked():
             return False
 
         hold_action_in_progress = True
@@ -328,7 +329,7 @@ def _promote_hold_to_print_job() -> bool:
     import time
 
     with print_lock:
-        if print_in_progress:
+        if print_in_progress or factory_reset_in_progress:
             return False
 
         hold_action_in_progress = False
@@ -337,14 +338,34 @@ def _promote_hold_to_print_job() -> bool:
         return True
 
 
-def _clear_print_reservation(*, clear_hold: bool = True):
+def _force_begin_factory_reset_job() -> bool:
+    """Reserve reset handling even when a print job is wedged.
+
+    Returns True when an active print was already in progress, which signals that
+    the reset path should avoid any pre-reboot printer writes.
+    """
+    global print_in_progress, hold_action_in_progress, factory_reset_in_progress, last_print_time
+    import time
+
+    with print_lock:
+        print_was_in_progress = print_in_progress
+        factory_reset_in_progress = True
+        hold_action_in_progress = False
+        print_in_progress = True
+        last_print_time = time.time()
+        return print_was_in_progress
+
+
+def _clear_print_reservation(*, clear_hold: bool = True, clear_reset: bool = False):
     """Release active print/hold reservations."""
-    global print_in_progress, hold_action_in_progress
+    global print_in_progress, hold_action_in_progress, factory_reset_in_progress
 
     with print_lock:
         print_in_progress = False
         if clear_hold:
             hold_action_in_progress = False
+        if clear_reset:
+            factory_reset_in_progress = False
 
 
 def on_button_press_threadsafe():
@@ -418,7 +439,8 @@ def on_button_long_press_threadsafe():
 def on_button_long_press_ready_threadsafe():
     """Callback fired at 5s hold threshold to signal 'you can release now'."""
     try:
-        _reserve_hold_action()
+        if not _reserve_hold_action():
+            return
         # Half-line tactile feed cue.
         if hasattr(printer, "feed_dots"):
             printer.feed_dots(12)
@@ -963,7 +985,7 @@ async def manual_ap_mode_trigger():
         logger.error("AP mode failed to start - check wifi_ap_nmcli.sh script")
 
 
-async def factory_reset_trigger():
+async def factory_reset_trigger(*, skip_preprint: bool = False):
     """Factory reset (button hold 15+ seconds) - deletes config and reboots.
     Runs blocking printer operations in a thread pool to avoid blocking the event loop.
     """
@@ -1000,18 +1022,23 @@ async def factory_reset_trigger():
 
     try:
         # Run blocking printer operations in thread pool to avoid blocking event loop
-        try:
-            loop = asyncio.get_event_loop()
-            with ThreadPoolExecutor() as executor:
-                await loop.run_in_executor(executor, _print_reset_message)
-        except Exception:
-            logger.warning(
-                "Factory reset pre-reboot receipt failed to print",
-                exc_info=True,
-            )  # Continue reset flow even if print fails
+        if not skip_preprint:
+            try:
+                loop = asyncio.get_event_loop()
+                with ThreadPoolExecutor() as executor:
+                    await loop.run_in_executor(executor, _print_reset_message)
+            except Exception:
+                logger.warning(
+                    "Factory reset pre-reboot receipt failed to print",
+                    exc_info=True,
+                )  # Continue reset flow even if print fails
 
-        # Wait for print to complete
-        await asyncio.sleep(3)
+            # Wait for print to complete
+            await asyncio.sleep(3)
+        else:
+            logger.warning(
+                "Factory reset triggered while printer was busy; skipping pre-reboot receipt."
+            )
 
         reset_result = perform_factory_reset()
         if not reset_result.get("reboot_requested", False):
@@ -1027,20 +1054,21 @@ async def factory_reset_trigger():
             except Exception:
                 logger.exception("Factory reset fallback AP-mode recovery failed")
     finally:
-        _clear_print_reservation()
+        _clear_print_reservation(clear_reset=True)
 
 
 def on_factory_reset_threadsafe():
     """Callback for factory reset press (15+ seconds)."""
     global global_loop
-    if not _promote_hold_to_print_job() and not _try_begin_print_job(debounce=False):
-        logger.info("Ignoring factory reset hold because printer is already busy.")
-        return
+    print_was_in_progress = _force_begin_factory_reset_job()
 
     if global_loop and global_loop.is_running():
-        asyncio.run_coroutine_threadsafe(factory_reset_trigger(), global_loop)
+        asyncio.run_coroutine_threadsafe(
+            factory_reset_trigger(skip_preprint=print_was_in_progress),
+            global_loop,
+        )
     else:
-        _clear_print_reservation()
+        _clear_print_reservation(clear_reset=True)
 
 
 @asynccontextmanager

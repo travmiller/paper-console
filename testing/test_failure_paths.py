@@ -546,16 +546,44 @@ def test_install_updates_uses_beta_release_channel_in_production(monkeypatch, tm
 def test_try_begin_print_job_respects_hold_reservation(monkeypatch):
     monkeypatch.setattr(main_module, "print_in_progress", False)
     monkeypatch.setattr(main_module, "hold_action_in_progress", True)
+    monkeypatch.setattr(main_module, "factory_reset_in_progress", False)
     monkeypatch.setattr(main_module, "last_print_time", 0.0)
 
     assert main_module._try_begin_print_job(debounce=False) is False
 
     monkeypatch.setattr(main_module, "hold_action_in_progress", False)
+    monkeypatch.setattr(main_module, "factory_reset_in_progress", True)
+    assert main_module._try_begin_print_job(debounce=False) is False
+
+    monkeypatch.setattr(main_module, "factory_reset_in_progress", False)
     assert main_module._try_begin_print_job(debounce=False) is True
 
     main_module._clear_print_reservation()
     assert main_module.print_in_progress is False
     assert main_module.hold_action_in_progress is False
+
+
+def test_long_press_ready_does_not_feed_when_print_busy(monkeypatch):
+    class DummyPrinter:
+        def __init__(self):
+            self.feed_calls = 0
+
+        def feed_dots(self, dots):  # noqa: ARG002
+            self.feed_calls += 1
+
+    dummy_printer = DummyPrinter()
+
+    monkeypatch.setattr(main_module, "printer", dummy_printer)
+    monkeypatch.setattr(main_module, "print_in_progress", True)
+    monkeypatch.setattr(main_module, "hold_action_in_progress", False)
+    monkeypatch.setattr(main_module, "factory_reset_in_progress", False)
+
+    main_module.on_button_long_press_ready_threadsafe()
+
+    assert dummy_printer.feed_calls == 0
+    assert main_module.hold_action_in_progress is False
+
+    main_module._clear_print_reservation()
 
 
 def test_on_factory_reset_threadsafe_promotes_hold_reservation(monkeypatch):
@@ -573,16 +601,66 @@ def test_on_factory_reset_threadsafe_promotes_hold_reservation(monkeypatch):
     monkeypatch.setattr(main_module, "global_loop", DummyLoop())
     monkeypatch.setattr(main_module, "print_in_progress", False)
     monkeypatch.setattr(main_module, "hold_action_in_progress", True)
-    monkeypatch.setattr(main_module.asyncio, "run_coroutine_threadsafe", fake_run_coroutine_threadsafe)
+    monkeypatch.setattr(main_module, "factory_reset_in_progress", False)
+    monkeypatch.setattr(
+        main_module.asyncio,
+        "run_coroutine_threadsafe",
+        fake_run_coroutine_threadsafe,
+    )
 
     main_module.on_factory_reset_threadsafe()
 
     assert main_module.print_in_progress is True
     assert main_module.hold_action_in_progress is False
+    assert main_module.factory_reset_in_progress is True
     assert captured["loop"] is main_module.global_loop
     captured["coro"].close()
 
-    main_module._clear_print_reservation()
+    main_module._clear_print_reservation(clear_reset=True)
+
+
+def test_on_factory_reset_threadsafe_forces_reset_when_print_busy(monkeypatch):
+    captured = {}
+
+    class DummyLoop:
+        def is_running(self):
+            return True
+
+    async def fake_factory_reset_trigger(*, skip_preprint=False):
+        captured["skip_preprint"] = skip_preprint
+
+    def fake_run_coroutine_threadsafe(coro, loop):
+        captured["coro"] = coro
+        captured["loop"] = loop
+        return None
+
+    monkeypatch.setattr(main_module, "global_loop", DummyLoop())
+    monkeypatch.setattr(main_module, "print_in_progress", True)
+    monkeypatch.setattr(main_module, "hold_action_in_progress", False)
+    monkeypatch.setattr(main_module, "factory_reset_in_progress", False)
+    monkeypatch.setattr(main_module, "factory_reset_trigger", fake_factory_reset_trigger)
+    monkeypatch.setattr(
+        main_module.asyncio,
+        "run_coroutine_threadsafe",
+        fake_run_coroutine_threadsafe,
+    )
+
+    main_module.on_factory_reset_threadsafe()
+
+    assert main_module.print_in_progress is True
+    assert main_module.hold_action_in_progress is False
+    assert main_module.factory_reset_in_progress is True
+    assert captured["loop"] is main_module.global_loop
+
+    main_module._clear_print_reservation(clear_hold=False)
+    assert main_module.print_in_progress is False
+    assert main_module.factory_reset_in_progress is True
+    assert main_module._try_begin_print_job(debounce=False) is False
+
+    asyncio.run(captured["coro"])
+    assert captured["skip_preprint"] is True
+
+    main_module._clear_print_reservation(clear_reset=True)
 
 
 def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
@@ -850,6 +928,7 @@ def test_factory_reset_resets_managed_device_password(monkeypatch, tmp_path: Pat
     monkeypatch.setenv("PC1_DEVICE_MANAGED_FILE", str(managed_file))
     monkeypatch.delenv("PC1_DEVICE_PASSWORD", raising=False)
     monkeypatch.setenv("USER", "pc1")
+    monkeypatch.setattr(factory_reset_module.platform, "system", lambda: "Linux")
 
     result = factory_reset_module.perform_factory_reset()
 

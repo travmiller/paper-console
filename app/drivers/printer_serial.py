@@ -2,6 +2,7 @@ import math
 import os
 import platform
 import random
+import threading
 import time
 import unicodedata
 import logging
@@ -79,6 +80,7 @@ class PrinterDriver:
         # Buffer for print operations (prints are always inverted/reversed)
         # Each item is a tuple: ('text', line) or ('feed', count) or ('qr', data).
         self.print_buffer = []
+        self._io_lock = threading.RLock()
         # Line tracking for max print length
         self.lines_printed = 0
         self.max_lines = 0  # 0 = no limit, set by reset_buffer
@@ -1091,22 +1093,24 @@ class PrinterDriver:
         This allows the printer to buffer data while we continue processing.
         """
         try:
-            if self.ser and self.ser.is_open:
-                # Write all data at once - don't flush() as that blocks
-                # until all bytes transmit (slow at 9600 baud)
-                self.ser.write(data)
+            with self._io_lock:
+                if self.ser and self.ser.is_open:
+                    # Write all data at once - don't flush() as that blocks
+                    # until all bytes transmit (slow at 9600 baud)
+                    self.ser.write(data)
         except Exception as e:
             logger.exception("Serial write failed")
 
     def _read(self, size: int = 1, timeout: float = 1.0) -> bytes:
         """Read bytes from serial interface. Returns empty bytes on error."""
         try:
-            if self.ser and self.ser.is_open:
-                old_timeout = self.ser.timeout
-                self.ser.timeout = timeout
-                data = self.ser.read(size)
-                self.ser.timeout = old_timeout
-                return data
+            with self._io_lock:
+                if self.ser and self.ser.is_open:
+                    old_timeout = self.ser.timeout
+                    self.ser.timeout = timeout
+                    data = self.ser.read(size)
+                    self.ser.timeout = old_timeout
+                    return data
         except Exception:
             pass
         return b""
@@ -1143,35 +1147,37 @@ class PrinterDriver:
         import time
 
         try:
-            # Clear software buffer
-            self.print_buffer.clear()
-            self.lines_printed = 0
-            self.max_lines = 0
+            with self._io_lock:
+                # Clear software buffer
+                self.print_buffer.clear()
+                self.lines_printed = 0
+                self.max_lines = 0
 
-            # Cancel any in-progress print job
-            self._write(b"\x18")  # CAN - Cancel print data in page mode
-            time.sleep(0.05)
+                # Cancel any in-progress print job
+                self._write(b"\x18")  # CAN - Cancel print data in page mode
+                time.sleep(0.05)
 
-            # ESC @ - Hardware reset (clears all settings and buffer)
-            self._write(b"\x1b\x40")
-            time.sleep(0.3)
+                # ESC @ - Hardware reset (clears all settings and buffer)
+                self._write(b"\x1b\x40")
+                time.sleep(0.3)
 
-            # Re-apply ASCII mode settings after reset
-            self._apply_ascii_settings()
+                # Re-apply ASCII mode settings after reset
+                self._apply_ascii_settings()
         except Exception:
             pass
 
     def _apply_ascii_settings(self):
         """Apply ASCII-only mode settings for bitmap rendering."""
         try:
-            # Cancel Chinese character mode (confirmed in QR204 manual)
-            self._write(b"\x1c\x2e")  # FS . (1C 2E) - Cancel Chinese mode
+            with self._io_lock:
+                # Cancel Chinese character mode (confirmed in QR204 manual)
+                self._write(b"\x1c\x2e")  # FS . (1C 2E) - Cancel Chinese mode
 
-            # Select USA character set (confirmed in QR204 manual)
-            self._write(b"\x1b\x52\x00")  # ESC R 0 (1B 52 00) - USA character set
+                # Select USA character set (confirmed in QR204 manual)
+                self._write(b"\x1b\x52\x00")  # ESC R 0 (1B 52 00) - USA character set
 
-            # Select code page PC437 (confirmed in QR204 manual)
-            self._write(b"\x1b\x74\x00")  # ESC t 0 (1B 74 00) - Code page PC437 (US)
+                # Select code page PC437 (confirmed in QR204 manual)
+                self._write(b"\x1b\x74\x00")  # ESC t 0 (1B 74 00) - Code page PC437 (US)
 
             # Note: No ESC { rotation needed - we rotate bitmaps in software
         except Exception:
@@ -1182,24 +1188,26 @@ class PrinterDriver:
         import time
 
         try:
-            # Clear any garbage in the printer buffer
-            self._write(b"\x00\x00\x00\x00\x00")
-            time.sleep(0.1)
+            with self._io_lock:
+                # Clear any garbage in the printer buffer
+                self._write(b"\x00\x00\x00\x00\x00")
+                time.sleep(0.1)
 
-            # ESC @ - Hardware reset (clears all settings)
-            self._write(b"\x1b\x40")
-            time.sleep(0.3)
+                # ESC @ - Hardware reset (clears all settings)
+                self._write(b"\x1b\x40")
+                time.sleep(0.3)
 
-            # Apply ASCII settings
-            self._apply_ascii_settings()
+                # Apply ASCII settings
+                self._apply_ascii_settings()
         except Exception:
             pass
 
     def _ensure_ascii_mode(self):
         """Re-send commands to ensure printer stays in ASCII mode."""
         try:
-            # Cancel Chinese mode (confirmed in QR204 manual)
-            self._write(b"\x1c\x2e")  # FS . (1C 2E)
+            with self._io_lock:
+                # Cancel Chinese mode (confirmed in QR204 manual)
+                self._write(b"\x1c\x2e")  # FS . (1C 2E)
             # Note: No rotation command needed - bitmaps are pre-rotated
         except Exception:
             pass
@@ -1485,22 +1493,23 @@ class PrinterDriver:
         img = self._render_unified_bitmap(ops)
         if img:
             logger.debug("Rendered unified bitmap: %s", img.size)
-            self._send_bitmap(img)
-            # Ensure all data is transmitted before returning
-            if self.ser and self.ser.is_open:
-                try:
-                    self.ser.flush()
-                except Exception:
-                    logger.exception("Serial flush failed")
-            # Explicit post-print feed for cutter clearance.
-            # Use feed_direct() because it sends both ESC d and ESC J variants
-            # for better compatibility across printer firmwares.
-            feed_lines = max(0, int(self.cutter_feed_dots / 24))
-            if feed_lines > 0:
-                try:
-                    self.feed_direct(feed_lines)
-                except Exception:
-                    logger.exception("Post-print feed failed")
+            with self._io_lock:
+                self._send_bitmap(img)
+                # Ensure all data is transmitted before returning
+                if self.ser and self.ser.is_open:
+                    try:
+                        self.ser.flush()
+                    except Exception:
+                        logger.exception("Serial flush failed")
+                # Explicit post-print feed for cutter clearance.
+                # Use feed_direct() because it sends both ESC d and ESC J variants
+                # for better compatibility across printer firmwares.
+                feed_lines = max(0, int(self.cutter_feed_dots / 24))
+                if feed_lines > 0:
+                    try:
+                        self.feed_direct(feed_lines)
+                    except Exception:
+                        logger.exception("Post-print feed failed")
         else:
             logger.debug("No bitmap rendered from ops.")
 
@@ -1536,25 +1545,26 @@ class PrinterDriver:
             return
 
         try:
-            # Small delay to let bitmap finish processing
-            time.sleep(0.05)
+            with self._io_lock:
+                # Small delay to let bitmap finish processing
+                time.sleep(0.05)
 
-            # ESC d n - Print and feed n lines (0x1B 0x64 n)
-            # This command works after bitmap printing because it's a "print and feed" command
-            # Even with no data to print, it should still feed the paper
-            feed_amount = min(lines, 255)
-            self._write(b"\x1b\x64" + bytes([feed_amount]))
+                # ESC d n - Print and feed n lines (0x1B 0x64 n)
+                # This command works after bitmap printing because it's a "print and feed" command
+                # Even with no data to print, it should still feed the paper
+                feed_amount = min(lines, 255)
+                self._write(b"\x1b\x64" + bytes([feed_amount]))
 
-            # Backup: Also send ESC J (feed by dots) in case ESC d doesn't work
-            dots = lines * 24
-            while dots > 0:
-                chunk = min(dots, 255)
-                self._write(b"\x1b\x4a" + bytes([chunk]))
-                dots -= chunk
+                # Backup: Also send ESC J (feed by dots) in case ESC d doesn't work
+                dots = lines * 24
+                while dots > 0:
+                    chunk = min(dots, 255)
+                    self._write(b"\x1b\x4a" + bytes([chunk]))
+                    dots -= chunk
 
-            # Flush to ensure all data is sent
-            if self.ser and self.ser.is_open:
-                self.ser.flush()
+                # Flush to ensure all data is sent
+                if self.ser and self.ser.is_open:
+                    self.ser.flush()
         except Exception:
             pass
 
@@ -1564,20 +1574,22 @@ class PrinterDriver:
             return
         remaining = int(dots)
         try:
-            while remaining > 0:
-                chunk = min(remaining, 255)
-                self._write(b"\x1b\x4a" + bytes([chunk]))  # ESC J n
-                remaining -= chunk
-            if self.ser and self.ser.is_open:
-                self.ser.flush()
+            with self._io_lock:
+                while remaining > 0:
+                    chunk = min(remaining, 255)
+                    self._write(b"\x1b\x4a" + bytes([chunk]))  # ESC J n
+                    remaining -= chunk
+                if self.ser and self.ser.is_open:
+                    self.ser.flush()
         except Exception:
             pass
 
     def blip(self):
         """Short paper feed for tactile feedback."""
         try:
-            # ESC J n - Feed paper n dots (n/203 inches, ~24 dots = 1 line)
-            self._write(b"\x1b\x4a\x02")
+            with self._io_lock:
+                # ESC J n - Feed paper n dots (n/203 inches, ~24 dots = 1 line)
+                self._write(b"\x1b\x4a\x02")
         except Exception:
             pass
 
