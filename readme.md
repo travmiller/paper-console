@@ -241,11 +241,13 @@ paper-console/
 │   │   ├── adventure.py        # Interactive CYOA (dial)
 │   │   ├── astronomy.py
 │   │   ├── calendar.py
+│   │   ├── crossword.py
 │   │   ├── email_client.py
 │   │   ├── history.py
 │   │   ├── journal_prompts.py
 │   │   ├── maze.py
 │   │   ├── news.py
+│   │   ├── print_image.py
 │   │   ├── qrcode_print.py
 │   │   ├── quotes.py
 │   │   ├── rss.py
@@ -253,7 +255,9 @@ paper-console/
 │   │   ├── system_monitor.py
 │   │   ├── text.py
 │   │   ├── weather.py
-│   │   └── webhook.py
+│   │   ├── webhook.py
+│   │   ├── wordsearch.py
+│   │   └── wotd.py
 │   └── routers/
 │       └── wifi.py
 ├── web/                        # React + Vite + Tailwind settings UI
@@ -327,6 +331,10 @@ paper-console/
 **System Monitor:** Hostname, IP, WiFi, disk/memory bars, uptime, load, CPU temp (where available).
 
 **Word of the Day:** Merriam Webster's word of the day
+
+**Crossword:** Easy / Medium / Hard; generated crossword puzzle printed as bitmap grid.
+
+**Word Search:** Easy / Medium / Hard; generated word search puzzle printed as bitmap grid.
 
 ---
 
