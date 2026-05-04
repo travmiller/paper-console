@@ -36,6 +36,7 @@ config.json.bak
 .env.local
 .env.*.local
 .welcome_printed
+.connectivity_state.json
 
 # Development (internal production tools & images)
 development/

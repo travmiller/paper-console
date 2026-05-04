@@ -112,6 +112,7 @@ from app.modules import email_client, webhook, text, calendar
 from app.routers import wifi
 import app.device_password as device_password
 import app.wifi_manager as wifi_manager
+import app.connectivity_state as connectivity_state
 import app.hardware as hardware
 from app.hardware import printer, dial, button, _is_raspberry_pi
 import app.location_lookup as location_lookup
@@ -130,6 +131,7 @@ async def save_settings_background(settings_snapshot: Settings):
 email_polling_task = None
 scheduler_task = None
 task_monitor_task = None
+connectivity_monitor_task = None
 
 
 def _printer_is_available() -> bool:
@@ -149,7 +151,7 @@ def _printer_is_available() -> bool:
 
 async def task_watchdog():
     """Monitor background tasks and restart them if they die unexpectedly."""
-    global email_polling_task, scheduler_task
+    global email_polling_task, scheduler_task, connectivity_monitor_task
 
     while True:
         await asyncio.sleep(60)  # Check every minute
@@ -160,6 +162,279 @@ async def task_watchdog():
 
         if scheduler_task is not None and scheduler_task.done():
             scheduler_task = asyncio.create_task(scheduler_loop())
+
+        if connectivity_monitor_task is not None and connectivity_monitor_task.done():
+            connectivity_monitor_task = asyncio.create_task(connectivity_monitor_loop())
+
+
+def _connectivity_issue(diagnostics: Dict) -> str:
+    """Classify current network health for logging and conservative recovery."""
+    status = diagnostics.get("status") or {}
+    internet = diagnostics.get("internet") or {}
+
+    if status.get("mode") == "ap":
+        return "setup_ap"
+    if not status.get("connected"):
+        return "wifi_disconnected"
+    if not status.get("ip"):
+        return "wifi_no_ip"
+    if internet and not internet.get("dns_ok"):
+        return "dns_unreachable"
+    if internet and not internet.get("tcp_ok"):
+        return "internet_unreachable"
+    return "healthy"
+
+
+def _network_state_key(diagnostics: Dict) -> tuple:
+    """Return a compact key used to log only meaningful connectivity changes."""
+    status = diagnostics.get("status") or {}
+    wlan0 = diagnostics.get("wlan0") or {}
+    ip4 = diagnostics.get("ip4") or {}
+    internet = diagnostics.get("internet") or {}
+    power_save = diagnostics.get("power_save") or {}
+    return (
+        status.get("mode"),
+        status.get("connected"),
+        status.get("ssid"),
+        status.get("ip"),
+        wlan0.get("state"),
+        wlan0.get("connection"),
+        bool(diagnostics.get("default_route")),
+        ip4.get("gateway"),
+        tuple(ip4.get("dns") or []),
+        internet.get("dns_ok"),
+        internet.get("tcp_ok"),
+        power_save.get("kernel"),
+        power_save.get("networkmanager_profile"),
+    )
+
+
+def _format_network_diagnostics(diagnostics: Dict) -> str:
+    status = diagnostics.get("status") or {}
+    wlan0 = diagnostics.get("wlan0") or {}
+    ip4 = diagnostics.get("ip4") or {}
+    internet = diagnostics.get("internet") or {}
+    wifi_link = diagnostics.get("wifi_link") or {}
+    power_save = diagnostics.get("power_save") or {}
+    return (
+        "mode=%s connected=%s ssid=%s ip=%s wlan0=%s conn=%s radio=%s "
+        "signal=%s freq_mhz=%s tx_bitrate=%s kernel_powersave=%s nm_powersave=%s "
+        "gateway=%s dns=%s default_route=%s internet_dns=%s internet_tcp=%s "
+        "probe_host=%s probe_ip=%s probe_ms=%s probe_error=%s"
+        % (
+            status.get("mode"),
+            status.get("connected"),
+            status.get("ssid"),
+            status.get("ip"),
+            wlan0.get("state"),
+            wlan0.get("connection"),
+            diagnostics.get("wifi_radio"),
+            wifi_link.get("signal_dbm"),
+            wifi_link.get("freq_mhz"),
+            wifi_link.get("tx_bitrate"),
+            power_save.get("kernel"),
+            power_save.get("networkmanager_profile"),
+            ip4.get("gateway"),
+            ",".join(ip4.get("dns") or []),
+            "yes" if diagnostics.get("default_route") else "no",
+            internet.get("dns_ok"),
+            internet.get("tcp_ok"),
+            internet.get("host"),
+            internet.get("ip"),
+            internet.get("latency_ms"),
+            internet.get("error"),
+        )
+    )
+
+
+def _wifi_recovery_action_for(
+    degraded_for_seconds: float,
+    completed_actions: set,
+    seconds_since_last_retry: float,
+) -> Optional[str]:
+    """Return the next conservative WiFi recovery action, if any."""
+    if degraded_for_seconds >= 600 and "cycle" not in completed_actions:
+        return "cycle"
+    if degraded_for_seconds >= 360 and "reapply" not in completed_actions:
+        return "reapply"
+    if degraded_for_seconds >= 180 and "connection_up" not in completed_actions:
+        return "connection_up"
+    if degraded_for_seconds >= 600 and seconds_since_last_retry >= 900:
+        return "connection_up"
+    return None
+
+
+def _write_connectivity_sample(
+    diagnostics: Dict,
+    issue: str,
+    degraded_since: Optional[float],
+):
+    """Persist the current connectivity view for System Monitor receipts."""
+    now_iso = connectivity_state.utc_now_iso()
+    healthy = issue == "healthy"
+    update = {
+        "health": issue,
+        "last_checked_at": now_iso,
+        "current": connectivity_state.summarize_diagnostics(diagnostics),
+    }
+    if healthy:
+        update["last_healthy_at"] = now_iso
+    elif issue != "setup_ap":
+        update["last_degraded_at"] = now_iso
+        update["last_issue"] = {
+            "type": issue,
+            "at": now_iso,
+            "degraded_for_seconds": int(time.time() - degraded_since)
+            if degraded_since
+            else 0,
+            "details": connectivity_state.summarize_diagnostics(diagnostics),
+        }
+    connectivity_state.write_connectivity_state(update)
+
+
+async def _run_wifi_recovery(action: str, issue: str, preferred_ssid: Optional[str]) -> Dict:
+    logger.warning(
+        "WiFi recovery starting: action=%s issue=%s preferred_ssid=%s",
+        action,
+        issue,
+        preferred_ssid,
+    )
+    result = await asyncio.to_thread(
+        wifi_manager.recover_saved_wifi,
+        action,
+        preferred_ssid,
+    )
+    logger.warning(
+        "WiFi recovery finished: action=%s target=%s success=%s returncode=%s error=%s stderr=%s",
+        result.get("action"),
+        result.get("target"),
+        result.get("success"),
+        result.get("returncode"),
+        result.get("error"),
+        result.get("stderr"),
+    )
+    connectivity_state.write_connectivity_state(
+        {
+            "recovery": {
+                "last_action": result.get("action"),
+                "last_target": result.get("target"),
+                "last_success": result.get("success"),
+                "last_result_at": connectivity_state.utc_now_iso(),
+                "last_error": result.get("error") or result.get("stderr"),
+            }
+        }
+    )
+    return result
+
+
+async def connectivity_monitor_loop():
+    """
+    Log WiFi/internet state transitions and gently nudge saved WiFi recovery.
+
+    This loop never starts AP mode and never prints. It only asks NetworkManager
+    to retry saved client WiFi after sustained degraded connectivity.
+    """
+    interval = max(15, int(os.environ.get("PC1_CONNECTIVITY_LOG_INTERVAL", "60")))
+    unhealthy_heartbeat = max(
+        interval,
+        int(os.environ.get("PC1_CONNECTIVITY_UNHEALTHY_LOG_INTERVAL", "300")),
+    )
+    healthy_heartbeat = max(
+        interval,
+        int(os.environ.get("PC1_CONNECTIVITY_HEALTHY_LOG_INTERVAL", "3600")),
+    )
+    last_state_key = None
+    last_unhealthy_log_at = 0.0
+    last_healthy_log_at = 0.0
+    degraded_since = None
+    completed_actions = set()
+    last_recovery_at = 0.0
+    last_known_ssid = None
+
+    while True:
+        try:
+            diagnostics = await asyncio.to_thread(wifi_manager.get_network_diagnostics)
+            issue = _connectivity_issue(diagnostics)
+            state_key = _network_state_key(diagnostics)
+            now = time.time()
+            status = diagnostics.get("status") or {}
+            if status.get("ssid"):
+                last_known_ssid = status.get("ssid")
+
+            if issue in {"healthy", "setup_ap"}:
+                degraded_since = None
+                completed_actions.clear()
+            elif degraded_since is None:
+                degraded_since = now
+
+            _write_connectivity_sample(diagnostics, issue, degraded_since)
+
+            if last_state_key is None:
+                logger.warning(
+                    "Connectivity monitor initial state: issue=%s %s",
+                    issue,
+                    _format_network_diagnostics(diagnostics),
+                )
+                if issue == "healthy":
+                    last_healthy_log_at = now
+                elif issue != "setup_ap":
+                    last_unhealthy_log_at = now
+            elif state_key != last_state_key:
+                if issue == "healthy":
+                    logger.warning(
+                        "Connectivity recovered/changed: issue=%s %s",
+                        issue,
+                        _format_network_diagnostics(diagnostics),
+                    )
+                    last_healthy_log_at = now
+                elif issue == "setup_ap":
+                    logger.warning(
+                        "Connectivity in setup AP mode: %s",
+                        _format_network_diagnostics(diagnostics),
+                    )
+                else:
+                    logger.warning(
+                        "Connectivity degraded/changed: issue=%s %s",
+                        issue,
+                        _format_network_diagnostics(diagnostics),
+                    )
+                    last_unhealthy_log_at = now
+            elif issue == "healthy" and (now - last_healthy_log_at) >= healthy_heartbeat:
+                logger.warning(
+                    "Connectivity healthy heartbeat: issue=%s %s",
+                    issue,
+                    _format_network_diagnostics(diagnostics),
+                )
+                last_healthy_log_at = now
+            elif issue not in {"healthy", "setup_ap"} and (
+                now - last_unhealthy_log_at
+            ) >= unhealthy_heartbeat:
+                logger.warning(
+                    "Connectivity still degraded: issue=%s %s",
+                    issue,
+                    _format_network_diagnostics(diagnostics),
+                )
+                last_unhealthy_log_at = now
+
+            if issue not in {"healthy", "setup_ap"} and degraded_since is not None:
+                degraded_for = now - degraded_since
+                action = _wifi_recovery_action_for(
+                    degraded_for,
+                    completed_actions,
+                    now - last_recovery_at,
+                )
+                if action:
+                    result = await _run_wifi_recovery(action, issue, last_known_ssid)
+                    completed_actions.add(action)
+                    last_recovery_at = now
+                    if result.get("target"):
+                        last_known_ssid = result.get("target")
+
+            last_state_key = state_key
+        except Exception:
+            logger.exception("Connectivity monitor failed")
+
+        await asyncio.sleep(interval)
 
 
 async def email_polling_loop():
@@ -1168,7 +1443,7 @@ def on_factory_reset_threadsafe():
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
-    global email_polling_task, scheduler_task, task_monitor_task, global_loop
+    global email_polling_task, scheduler_task, task_monitor_task, connectivity_monitor_task, global_loop
     from concurrent.futures import ThreadPoolExecutor
 
     # Capture the running loop
@@ -1211,6 +1486,7 @@ async def lifespan(app: FastAPI):
     # Start background tasks
     email_polling_task = asyncio.create_task(email_polling_loop())
     scheduler_task = asyncio.create_task(scheduler_loop())
+    connectivity_monitor_task = asyncio.create_task(connectivity_monitor_loop())
     task_monitor_task = asyncio.create_task(task_watchdog())
 
     # Initialize Main Button Callbacks
@@ -1227,7 +1503,12 @@ async def lifespan(app: FastAPI):
     yield
 
     # Shutdown - cancel all background tasks
-    for task in [email_polling_task, scheduler_task, task_monitor_task]:
+    for task in [
+        email_polling_task,
+        scheduler_task,
+        connectivity_monitor_task,
+        task_monitor_task,
+    ]:
         if task:
             task.cancel()
             try:

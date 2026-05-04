@@ -2,15 +2,45 @@ import shutil
 import socket
 import os
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, Any
 from app.wifi_manager import get_wifi_status
+from app.connectivity_state import read_connectivity_state
 from app.utils import wrap_text
 from app.module_registry import register_module
 from app.config import format_print_datetime
 from PIL import Image, ImageDraw
 
 logger = logging.getLogger(__name__)
+
+
+def _format_connectivity_age(timestamp: str) -> str:
+    if not timestamp:
+        return "unknown"
+    try:
+        dt = datetime.fromisoformat(timestamp)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        seconds = max(0, int((datetime.now(timezone.utc) - dt).total_seconds()))
+        if seconds < 90:
+            return "just now"
+        minutes = seconds // 60
+        if minutes < 90:
+            return f"{minutes}m ago"
+        hours = minutes // 60
+        if hours < 48:
+            return f"{hours}h ago"
+        days = hours // 24
+        return f"{days}d ago"
+    except Exception:
+        return "unknown"
+
+
+def _shorten(text: Any, max_len: int = 28) -> str:
+    value = str(text or "")
+    if len(value) <= max_len:
+        return value
+    return value[: max_len - 3] + "..."
 
 
 @register_module(
@@ -45,11 +75,39 @@ def format_system_monitor_receipt(
     wifi_status = get_wifi_status()
     ip_address = wifi_status.get("ip") or "No IP"
     ssid = wifi_status.get("ssid") or "Disconnected"
+    connectivity = read_connectivity_state()
+    current_network = connectivity.get("current") or {}
+    recovery = connectivity.get("recovery") or {}
+    last_issue = connectivity.get("last_issue") or {}
+    health = connectivity.get("health") or "unknown"
+    internet_ok = current_network.get("internet_tcp_ok")
+    power_save = current_network.get("nm_powersave") or "unknown"
 
     printer.print_subheader("NETWORK")
     printer.print_body(f"Host: {hostname}")
     printer.print_body(f"IP:   {ip_address}")
     printer.print_body(f"WiFi: {ssid}")
+    printer.print_caption(f"Health: {health}")
+    if internet_ok is not None:
+        printer.print_caption(f"Internet: {'OK' if internet_ok else 'Failed'}")
+    printer.print_caption(f"Power save: {_shorten(power_save, 18)}")
+    if connectivity.get("last_healthy_at"):
+        printer.print_caption(
+            f"Last OK: {_format_connectivity_age(connectivity.get('last_healthy_at'))}"
+        )
+    if last_issue:
+        issue_type = last_issue.get("type") or "unknown"
+        printer.print_caption(
+            f"Last issue: {_shorten(issue_type, 18)} "
+            f"{_format_connectivity_age(last_issue.get('at'))}"
+        )
+    if recovery:
+        result = "OK" if recovery.get("last_success") else "failed"
+        action = recovery.get("last_action") or "none"
+        printer.print_caption(
+            f"Recovery: {_shorten(action, 14)} {result} "
+            f"{_format_connectivity_age(recovery.get('last_result_at'))}"
+        )
     printer.print_line()
 
     # Disk Usage

@@ -6,6 +6,9 @@ Handles WiFi scanning, connection, and AP mode management.
 import subprocess
 import os
 import logging
+import shutil
+import socket
+import time
 from typing import List, Dict, Optional
 
 import app.device_password as device_password
@@ -148,6 +151,206 @@ def get_wifi_status() -> Dict:
         return {"connected": False, "mode": "none", "ssid": None, "ip": None}
     except Exception:
         return {"connected": False, "mode": "error", "ssid": None, "ip": None}
+
+
+def _optional_command(name: str, fallback_paths: List[str]) -> Optional[str]:
+    found = shutil.which(name)
+    if found:
+        return found
+    for path in fallback_paths:
+        if os.path.exists(path):
+            return path
+    return None
+
+
+def check_internet_reachability(
+    host: str = "api.open-meteo.com",
+    port: int = 443,
+    timeout: float = 5.0,
+) -> Dict:
+    """Best-effort DNS/TCP probe for online modules without making API requests."""
+    started_at = time.monotonic()
+    result = {
+        "host": host,
+        "port": port,
+        "dns_ok": False,
+        "tcp_ok": False,
+        "ip": None,
+        "latency_ms": None,
+        "error": None,
+    }
+
+    try:
+        addresses = socket.getaddrinfo(host, port, type=socket.SOCK_STREAM)
+        if not addresses:
+            result["error"] = "dns returned no addresses"
+            return result
+
+        result["dns_ok"] = True
+        result["ip"] = addresses[0][4][0]
+
+        with socket.create_connection((host, port), timeout=timeout):
+            result["tcp_ok"] = True
+            result["latency_ms"] = int((time.monotonic() - started_at) * 1000)
+            return result
+    except Exception as exc:
+        result["latency_ms"] = int((time.monotonic() - started_at) * 1000)
+        result["error"] = f"{type(exc).__name__}: {exc}"
+        return result
+
+
+def get_network_diagnostics(probe_internet: bool = True) -> Dict:
+    """Collect compact WiFi diagnostics for state-change logging and receipts."""
+    diagnostics = {
+        "status": get_wifi_status(),
+        "wlan0": {},
+        "active_wifi": {},
+        "ip4": {},
+        "wifi_link": {},
+        "power_save": {},
+        "wifi_radio": None,
+        "default_route": None,
+        "internet": None,
+    }
+
+    try:
+        result = run_command(
+            ["nmcli", "-t", "-f", "DEVICE,TYPE,STATE,CONNECTION", "device"],
+            check=False,
+        )
+        for line in result.stdout.splitlines():
+            parts = line.split(":")
+            if len(parts) >= 4 and parts[0] == "wlan0":
+                diagnostics["wlan0"] = {
+                    "device": parts[0],
+                    "type": parts[1],
+                    "state": parts[2],
+                    "connection": ":".join(parts[3:]) or None,
+                }
+                break
+    except Exception as exc:
+        diagnostics["wlan0"] = {"error": f"{type(exc).__name__}: {exc}"}
+
+    try:
+        result = run_command(
+            ["nmcli", "-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"],
+            check=False,
+        )
+        for line in result.stdout.splitlines():
+            parts = line.split(":")
+            if len(parts) >= 3 and parts[1] == "802-11-wireless" and parts[2] == "wlan0":
+                diagnostics["active_wifi"] = {
+                    "name": parts[0],
+                    "type": parts[1],
+                    "device": parts[2],
+                }
+                break
+    except Exception as exc:
+        diagnostics["active_wifi"] = {"error": f"{type(exc).__name__}: {exc}"}
+
+    active_wifi_name = (diagnostics.get("active_wifi") or {}).get("name")
+    if active_wifi_name:
+        try:
+            result = run_command(
+                [
+                    "nmcli",
+                    "-g",
+                    "802-11-wireless.powersave",
+                    "connection",
+                    "show",
+                    active_wifi_name,
+                ],
+                check=False,
+            )
+            diagnostics["power_save"]["networkmanager_profile"] = (
+                result.stdout.strip() or None
+            )
+        except Exception as exc:
+            diagnostics["power_save"]["networkmanager_profile"] = (
+                f"error: {type(exc).__name__}: {exc}"
+            )
+
+    try:
+        result = run_command(
+            [
+                "nmcli",
+                "-t",
+                "-f",
+                "IP4.ADDRESS,IP4.GATEWAY,IP4.DNS",
+                "device",
+                "show",
+                "wlan0",
+            ],
+            check=False,
+        )
+        ip4 = {}
+        dns = []
+        for line in result.stdout.splitlines():
+            key, _, value = line.partition(":")
+            if key.startswith("IP4.ADDRESS"):
+                ip4.setdefault("addresses", []).append(value)
+            elif key == "IP4.GATEWAY":
+                ip4["gateway"] = value or None
+            elif key.startswith("IP4.DNS"):
+                dns.append(value)
+        if dns:
+            ip4["dns"] = dns
+        diagnostics["ip4"] = ip4
+    except Exception as exc:
+        diagnostics["ip4"] = {"error": f"{type(exc).__name__}: {exc}"}
+
+    iw_cmd = _optional_command("iw", ["/usr/sbin/iw", "/sbin/iw"])
+    if iw_cmd:
+        try:
+            result = run_command([iw_cmd, "dev", "wlan0", "link"], check=False)
+            link = {}
+            for raw_line in result.stdout.splitlines():
+                line = raw_line.strip()
+                if line.startswith("Connected to "):
+                    link["connected_to"] = line.removeprefix("Connected to ").strip()
+                elif line.startswith("SSID:"):
+                    link["ssid"] = line.split(":", 1)[1].strip()
+                elif line.startswith("freq:"):
+                    link["freq_mhz"] = line.split(":", 1)[1].strip()
+                elif line.startswith("signal:"):
+                    link["signal_dbm"] = line.split(":", 1)[1].strip()
+                elif line.startswith("tx bitrate:"):
+                    link["tx_bitrate"] = line.split(":", 1)[1].strip()
+            diagnostics["wifi_link"] = link or {"raw": result.stdout.strip() or None}
+        except Exception as exc:
+            diagnostics["wifi_link"] = {"error": f"{type(exc).__name__}: {exc}"}
+
+        try:
+            result = run_command([iw_cmd, "dev", "wlan0", "get", "power_save"], check=False)
+            diagnostics["power_save"]["kernel"] = result.stdout.strip() or None
+        except Exception as exc:
+            diagnostics["power_save"]["kernel"] = f"error: {type(exc).__name__}: {exc}"
+    else:
+        diagnostics["wifi_link"] = {"error": "iw unavailable"}
+        diagnostics["power_save"]["kernel"] = "iw unavailable"
+
+    try:
+        result = run_command(["nmcli", "radio", "wifi"], check=False)
+        diagnostics["wifi_radio"] = result.stdout.strip() or None
+    except Exception as exc:
+        diagnostics["wifi_radio"] = f"error: {type(exc).__name__}: {exc}"
+
+    ip_cmd = _optional_command("ip", ["/usr/sbin/ip", "/sbin/ip"])
+    if ip_cmd:
+        try:
+            result = run_command([ip_cmd, "route", "show", "default"], check=False)
+            diagnostics["default_route"] = (
+                result.stdout.strip().splitlines()[0] if result.stdout.strip() else None
+            )
+        except Exception as exc:
+            diagnostics["default_route"] = f"error: {type(exc).__name__}: {exc}"
+    else:
+        diagnostics["default_route"] = "ip command unavailable"
+
+    if probe_internet:
+        diagnostics["internet"] = check_internet_reachability()
+
+    return diagnostics
 
 
 def scan_networks() -> List[Dict]:
@@ -405,6 +608,119 @@ def stop_ap_mode() -> bool:
         return True
     except Exception:
         return False
+
+
+def get_saved_wifi_profiles() -> List[Dict]:
+    """Return saved client WiFi profiles, excluding the setup hotspot profile."""
+    profiles = []
+    try:
+        result = run_command(
+            ["nmcli", "-t", "-f", "NAME,UUID,TYPE,AUTOCONNECT", "connection", "show"],
+            check=False,
+        )
+        for line in result.stdout.splitlines():
+            parts = line.split(":")
+            if len(parts) < 4:
+                continue
+            name, uuid, conn_type, autoconnect = parts[0], parts[1], parts[2], parts[3]
+            if conn_type != "802-11-wireless" or name == "PC-1-Hotspot":
+                continue
+            profiles.append(
+                {
+                    "name": name,
+                    "uuid": uuid,
+                    "autoconnect": autoconnect.lower() in {"yes", "true"},
+                }
+            )
+    except Exception:
+        return []
+
+    profiles.sort(key=lambda p: (not p.get("autoconnect", False), p.get("name") or ""))
+    return profiles
+
+
+def _select_saved_wifi_profile(preferred_ssid: Optional[str] = None) -> Optional[Dict]:
+    profiles = get_saved_wifi_profiles()
+    if not profiles:
+        return None
+
+    if preferred_ssid:
+        for profile in profiles:
+            if profile.get("name") == preferred_ssid:
+                return profile
+
+    for profile in profiles:
+        if profile.get("autoconnect"):
+            return profile
+
+    return profiles[0]
+
+
+def recover_saved_wifi(action: str, preferred_ssid: Optional[str] = None) -> Dict:
+    """
+    Nudge NetworkManager toward saved client WiFi without starting setup AP mode.
+
+    action:
+      - connection_up: bring up the selected saved profile
+      - reapply: reapply wlan0 settings, then bring up the saved profile if needed
+      - cycle: disconnect wlan0 briefly, then bring up the saved profile
+    """
+    profile = _select_saved_wifi_profile(preferred_ssid)
+    if not profile:
+        return {
+            "success": False,
+            "action": action,
+            "target": None,
+            "error": "no saved wifi profiles",
+        }
+
+    target = profile["name"]
+    commands = []
+
+    def _run(cmd: List[str]) -> subprocess.CompletedProcess:
+        commands.append(cmd)
+        return run_command(cmd, check=False)
+
+    try:
+        _run(["sudo", "nmcli", "radio", "wifi", "on"])
+
+        if action == "connection_up":
+            result = _run(["sudo", "nmcli", "connection", "up", target])
+        elif action == "reapply":
+            result = _run(["sudo", "nmcli", "device", "reapply", "wlan0"])
+            status = get_wifi_status()
+            if not status.get("connected"):
+                result = _run(["sudo", "nmcli", "connection", "up", target])
+        elif action == "cycle":
+            _run(["sudo", "nmcli", "device", "disconnect", "wlan0"])
+            time.sleep(5)
+            _run(["sudo", "nmcli", "radio", "wifi", "on"])
+            result = _run(["sudo", "nmcli", "connection", "up", target])
+        else:
+            return {
+                "success": False,
+                "action": action,
+                "target": target,
+                "error": f"unknown recovery action: {action}",
+            }
+
+        return {
+            "success": result.returncode == 0,
+            "action": action,
+            "target": target,
+            "returncode": result.returncode,
+            "stdout": (result.stdout or "").strip()[:300],
+            "stderr": (result.stderr or "").strip()[:300],
+            "commands": [" ".join(cmd) for cmd in commands],
+        }
+    except Exception as exc:
+        return {
+            "success": False,
+            "action": action,
+            "target": target,
+            "error": f"{type(exc).__name__}: {exc}",
+            "commands": [" ".join(cmd) for cmd in commands],
+        }
 
 
 def forget_wifi(ssid: str) -> bool:

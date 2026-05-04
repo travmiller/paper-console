@@ -20,6 +20,7 @@ from app.modules import quotes as quotes_module
 from app.modules import news as news_module
 from app.modules import calendar as calendar_module
 from app.modules import history as history_module
+from app.modules import system_monitor as system_monitor_module
 from app import factory_reset as factory_reset_module
 from datetime import datetime, timedelta, timezone
 
@@ -119,6 +120,132 @@ def test_ensure_wifi_powersave_disabled_invokes_privileged_script(monkeypatch):
     assert wifi_manager.ensure_wifi_powersave_disabled() is True
     assert commands
     assert commands[0][-1] == "ensure-wifi-powersave-off"
+
+
+def test_get_saved_wifi_profiles_excludes_setup_hotspot(monkeypatch):
+    def fake_run_command(cmd, check=False):  # noqa: ARG001
+        return _completed(
+            stdout=(
+                "HomeWifi:uuid-home:802-11-wireless:yes\n"
+                "PC-1-Hotspot:uuid-ap:802-11-wireless:yes\n"
+                "Wired:uuid-eth:802-3-ethernet:yes\n"
+            )
+        )
+
+    monkeypatch.setattr(wifi_manager, "run_command", fake_run_command)
+
+    assert wifi_manager.get_saved_wifi_profiles() == [
+        {"name": "HomeWifi", "uuid": "uuid-home", "autoconnect": True}
+    ]
+
+
+def test_recover_saved_wifi_uses_saved_profile_without_starting_ap(monkeypatch):
+    commands = []
+
+    def fake_run_command(cmd, check=False):  # noqa: ARG001
+        commands.append(list(cmd))
+        if cmd[:4] == ["nmcli", "-t", "-f", "NAME,UUID,TYPE,AUTOCONNECT"]:
+            return _completed(stdout="HomeWifi:uuid-home:802-11-wireless:yes\n")
+        return _completed(returncode=0, stdout="ok\n")
+
+    monkeypatch.setattr(wifi_manager, "run_command", fake_run_command)
+
+    result = wifi_manager.recover_saved_wifi("connection_up")
+
+    assert result["success"] is True
+    assert result["target"] == "HomeWifi"
+    assert ["sudo", "nmcli", "connection", "up", "HomeWifi"] in commands
+    assert not any("PC-1-Hotspot" in cmd for command in commands for cmd in command)
+
+
+def test_wifi_recovery_action_schedule():
+    assert main_module._wifi_recovery_action_for(60, set(), 999) is None
+    assert main_module._wifi_recovery_action_for(181, set(), 999) == "connection_up"
+    assert (
+        main_module._wifi_recovery_action_for(361, {"connection_up"}, 999)
+        == "reapply"
+    )
+    assert (
+        main_module._wifi_recovery_action_for(
+            601, {"connection_up", "reapply"}, 999
+        )
+        == "cycle"
+    )
+    assert (
+        main_module._wifi_recovery_action_for(
+            1200, {"connection_up", "reapply", "cycle"}, 901
+        )
+        == "connection_up"
+    )
+
+
+def test_system_monitor_prints_connectivity_diagnostics(monkeypatch):
+    class FakePrinter:
+        PRINTER_WIDTH_DOTS = 384
+
+        def __init__(self):
+            self.lines = []
+
+        def _get_font(self, _style):
+            return None
+
+        def print_header(self, *args, **kwargs):  # noqa: ARG002
+            return None
+
+        def print_caption(self, text, *args, **kwargs):  # noqa: ARG002
+            self.lines.append(str(text))
+
+        def print_subheader(self, text):
+            self.lines.append(str(text))
+
+        def print_body(self, text):
+            self.lines.append(str(text))
+
+        def print_bold(self, text):
+            self.lines.append(str(text))
+
+        def print_line(self):
+            return None
+
+        def print_image(self, _image):
+            return None
+
+    monkeypatch.setattr(
+        system_monitor_module,
+        "get_wifi_status",
+        lambda: {
+            "connected": True,
+            "mode": "client",
+            "ssid": "HomeWifi",
+            "ip": "192.168.1.10",
+        },
+    )
+    monkeypatch.setattr(
+        system_monitor_module,
+        "read_connectivity_state",
+        lambda: {
+            "health": "healthy",
+            "last_healthy_at": "2026-05-04T16:00:00+00:00",
+            "current": {
+                "internet_tcp_ok": True,
+                "nm_powersave": "disable",
+            },
+            "recovery": {
+                "last_action": "connection_up",
+                "last_success": True,
+                "last_result_at": "2026-05-04T16:00:00+00:00",
+            },
+        },
+    )
+
+    printer = FakePrinter()
+    system_monitor_module.format_system_monitor_receipt(printer, {}, "SYSTEM")
+
+    output = "\n".join(printer.lines)
+    assert "Health: healthy" in output
+    assert "Internet: OK" in output
+    assert "Power save: disable" in output
+    assert "Recovery: connection_up OK" in output
 
 
 def test_check_wifi_startup_skips_duplicate_setup_receipt_on_first_boot(monkeypatch):
