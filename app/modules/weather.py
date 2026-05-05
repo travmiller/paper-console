@@ -1,5 +1,7 @@
 import os
+import logging
 import requests
+import time
 from collections import Counter
 from datetime import datetime
 from typing import Dict, Any, Optional
@@ -9,6 +11,14 @@ import app.config
 from app.drivers.printer_mock import PrinterDriver
 from app.config import format_print_datetime
 from app.module_registry import register_module
+
+logger = logging.getLogger(__name__)
+WEATHER_REQUEST_TIMEOUT_SECONDS = 10
+WEATHER_REQUEST_ATTEMPTS = 2
+
+
+class WeatherFetchError(Exception):
+    """Raised when fresh weather data cannot be fetched or validated."""
 
 
 def get_weather_condition(code: int) -> str:
@@ -79,47 +89,114 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         timezone = app.config.settings.timezone
         city_name = app.config.settings.city_name
 
-    empty_forecast = [
-        {
-            "day": "--",
-            "high": "--",
-            "low": "--",
-            "condition": "Unknown",
-            "icon": "cloud",
-        }
-        for _ in range(7)
-    ]
-    empty_hourly = []
     temperature_unit = config.get("temperature_unit", "fahrenheit")
     if not temperature_unit:
         temperature_unit = "fahrenheit"
 
-    try:
-        url = "https://api.open-meteo.com/v1/forecast"
-        params = {
-            "latitude": latitude,
-            "longitude": longitude,
-            "current_weather": "true",
-            "daily": "weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
-            "hourly": "weathercode,temperature_2m,precipitation_probability",
-            "timezone": timezone,
+    def _failure(reason: str, error: Optional[Exception] = None) -> Dict[str, Any]:
+        return {
+            "ok": False,
+            "error": reason,
+            "error_type": type(error).__name__ if error else None,
+            "city": city_name,
+            "forecast": [],
+            "hourly_forecast": [],
             "temperature_unit": temperature_unit,
-            "forecast_days": 8,
-            "forecast_hours": 24,
         }
 
-        resp = requests.get(url, params=params, timeout=10)
-        data = resp.json()
+    def _require_list(payload: Dict[str, Any], path: str, min_items: int = 1) -> list:
+        value: Any = payload
+        for part in path.split("."):
+            if not isinstance(value, dict):
+                raise WeatherFetchError(f"Weather response missing {path}")
+            value = value.get(part)
+        if not isinstance(value, list) or len(value) < min_items:
+            raise WeatherFetchError(f"Weather response missing {path}")
+        return value
 
-        current = data.get("current_weather", {})
+    url = "https://api.open-meteo.com/v1/forecast"
+    params = {
+        "latitude": latitude,
+        "longitude": longitude,
+        "current_weather": "true",
+        "daily": "weathercode,temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+        "hourly": "weathercode,temperature_2m,precipitation_probability",
+        "timezone": timezone,
+        "temperature_unit": temperature_unit,
+        "forecast_days": 8,
+        "forecast_hours": 24,
+    }
+
+    last_error: Optional[Exception] = None
+    data = None
+    for attempt in range(1, WEATHER_REQUEST_ATTEMPTS + 1):
+        started_at = time.monotonic()
+        try:
+            logger.info(
+                "Weather request started: attempt=%s city=%s lat=%s lon=%s timezone=%s",
+                attempt,
+                city_name,
+                latitude,
+                longitude,
+                timezone,
+            )
+            resp = requests.get(
+                url,
+                params=params,
+                timeout=WEATHER_REQUEST_TIMEOUT_SECONDS,
+            )
+            status_code = getattr(resp, "status_code", None)
+            raise_for_status = getattr(resp, "raise_for_status", None)
+            if callable(raise_for_status):
+                raise_for_status()
+            data = resp.json()
+            if not isinstance(data, dict):
+                raise WeatherFetchError("Weather response was not a JSON object")
+            if data.get("error"):
+                reason = data.get("reason") or "Weather service returned an error"
+                raise WeatherFetchError(str(reason))
+
+            logger.info(
+                "Weather request succeeded: attempt=%s status=%s elapsed_ms=%s city=%s",
+                attempt,
+                status_code,
+                int((time.monotonic() - started_at) * 1000),
+                city_name,
+            )
+            break
+        except Exception as exc:
+            last_error = exc
+            logger.warning(
+                "Weather request failed: attempt=%s elapsed_ms=%s city=%s error=%s",
+                attempt,
+                int((time.monotonic() - started_at) * 1000),
+                city_name,
+                exc,
+            )
+            if attempt < WEATHER_REQUEST_ATTEMPTS:
+                time.sleep(2)
+
+    if data is None:
+        reason = str(last_error) if last_error else "Weather request failed"
+        return _failure(reason, last_error)
+
+    try:
+        current = data.get("current_weather")
+        if not isinstance(current, dict):
+            raise WeatherFetchError("Weather response missing current_weather")
+        if current.get("temperature") is None:
+            raise WeatherFetchError("Weather response missing current temperature")
+        if current.get("weathercode") is None:
+            raise WeatherFetchError("Weather response missing current weathercode")
+
         daily = data.get("daily", {})
         hourly = data.get("hourly", {})
 
         forecast = []
-        daily_times = daily.get("time", [])
-        daily_max = daily.get("temperature_2m_max", [])
-        daily_min = daily.get("temperature_2m_min", [])
-        daily_weathercode = daily.get("weathercode", [])
+        daily_times = _require_list(data, "daily.time")
+        daily_max = _require_list(data, "daily.temperature_2m_max")
+        daily_min = _require_list(data, "daily.temperature_2m_min")
+        daily_weathercode = _require_list(data, "daily.weathercode")
         daily_precip_prob = daily.get("precipitation_probability_max", [])
 
         today = datetime.now().date()
@@ -158,15 +235,25 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             except (ValueError, IndexError, TypeError):
                 continue
 
-        today_high = int(daily_max[0]) if daily_max else None
-        today_low = int(daily_min[0]) if daily_min else None
+        if not forecast:
+            raise WeatherFetchError("Weather response did not contain printable daily forecast rows")
+
+        today_high = int(daily_max[0])
+        today_low = int(daily_min[0])
 
         hourly_forecast = []
         current_time = datetime.now()
         current_hour = current_time.replace(minute=0, second=0, microsecond=0)
 
-        for i in range(len(hourly.get("time", []))):
-            time_str = hourly["time"][i]
+        hourly_times = hourly.get("time", []) if isinstance(hourly, dict) else []
+        hourly_codes = hourly.get("weathercode", []) if isinstance(hourly, dict) else []
+        hourly_temps = hourly.get("temperature_2m", []) if isinstance(hourly, dict) else []
+        hourly_precip_prob = (
+            hourly.get("precipitation_probability", []) if isinstance(hourly, dict) else []
+        )
+
+        for i in range(len(hourly_times)):
+            time_str = hourly_times[i]
             time_str_clean = time_str.split("+")[0].split("Z")[0]
 
             try:
@@ -182,10 +269,9 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             if dt < current_hour:
                 continue
 
-            weather_code = hourly["weathercode"][i] if "weathercode" in hourly else 0
+            weather_code = hourly_codes[i] if i < len(hourly_codes) else 0
             condition = get_weather_condition(weather_code)
-            temp = int(hourly["temperature_2m"][i]) if "temperature_2m" in hourly else 0
-            hourly_precip_prob = hourly.get("precipitation_probability", [])
+            temp = int(hourly_temps[i]) if i < len(hourly_temps) else 0
             precip_prob = (
                 int(hourly_precip_prob[i])
                 if i < len(hourly_precip_prob) and hourly_precip_prob[i] is not None
@@ -214,6 +300,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                 break
 
         return {
+            "ok": True,
             "current": int(current.get("temperature", 0)),
             "condition": get_weather_condition(current.get("weathercode", 0)),
             "high": today_high,
@@ -224,17 +311,9 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             "temperature_unit": temperature_unit
         }
 
-    except Exception:
-        return {
-            "current": "--",
-            "condition": "Unavailable",
-            "high": "--",
-            "low": "--",
-            "city": city_name,
-            "forecast": empty_forecast,
-            "hourly_forecast": empty_hourly,
-            "temperature_unit": temperature_unit,
-        }
+    except Exception as exc:
+        logger.warning("Weather response invalid: city=%s error=%s", city_name, exc)
+        return _failure(str(exc), exc)
 
 
 def _get_icon_type(condition: str) -> str:
@@ -856,6 +935,23 @@ def format_weather_receipt(
     # Header
     printer.print_header(module_name or "WEATHER", icon="cloud-sun")
 
+    if not weather.get("ok", True):
+        printer.print_caption(format_print_datetime())
+        printer.print_line()
+        printer.print_subheader((weather.get("city") or "LOCATION").upper())
+        printer.print_body("Forecast unavailable.")
+        printer.print_caption("Could not load fresh weather data.")
+        error = weather.get("error")
+        if error:
+            printer.print_caption(str(error)[:96])
+        printer.feed(1)
+        logger.warning(
+            "Weather receipt printed unavailable state: city=%s error=%s",
+            weather.get("city"),
+            weather.get("error"),
+        )
+        return
+
     printer_width = getattr(
         printer,
         "_get_content_width",
@@ -881,7 +977,7 @@ def format_weather_receipt(
         printer.print_text(_format_temperature(weather.get("current"), weather.get("temperature_unit")), "bold_lg")
         printer.print_body(weather.get("condition") or "Unavailable")
         printer.print_body(
-            f"High {_format_temperature(weather.get('high'),weather.get("temperature_unit"))} | "
+            f"High {_format_temperature(weather.get('high'), weather.get("temperature_unit"))} | "
             f"Low {_format_temperature(weather.get('low'), weather.get("temperature_unit"))}"
         )
     printer.print_body(_build_24_hour_summary(weather))
