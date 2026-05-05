@@ -72,6 +72,7 @@ def test_get_weather_defaults_temperature_unit_when_config_missing(monkeypatch):
 
     def fake_get(url, params=None, timeout=0):  # noqa: ARG001
         captured["params"] = dict(params or {})
+        captured["timeout"] = timeout
         return _FakeWeatherResponse(
             {
                 "current_weather": {"temperature": 72, "weathercode": 0},
@@ -96,6 +97,7 @@ def test_get_weather_defaults_temperature_unit_when_config_missing(monkeypatch):
     weather = weather_module.get_weather(None)
 
     assert captured["params"]["temperature_unit"] == "fahrenheit"
+    assert captured["timeout"] == weather_module.WEATHER_REQUEST_TIMEOUT
     assert weather["temperature_unit"] == "fahrenheit"
     assert weather["city"] == "Worcester"
     assert weather["ok"] is True
@@ -106,6 +108,7 @@ def test_get_weather_retries_then_returns_unavailable_without_placeholder_rows(m
 
     def fake_get(url, params=None, timeout=0):  # noqa: ARG001
         calls["count"] += 1
+        assert timeout == weather_module.WEATHER_REQUEST_TIMEOUT
         raise weather_module.requests.Timeout("request timed out")
 
     monkeypatch.setattr(weather_module.requests, "get", fake_get)

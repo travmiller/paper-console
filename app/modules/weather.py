@@ -13,7 +13,12 @@ from app.config import format_print_datetime
 from app.module_registry import register_module
 
 logger = logging.getLogger(__name__)
-WEATHER_REQUEST_TIMEOUT_SECONDS = 10
+WEATHER_REQUEST_CONNECT_TIMEOUT_SECONDS = 5
+WEATHER_REQUEST_READ_TIMEOUT_SECONDS = 20
+WEATHER_REQUEST_TIMEOUT = (
+    WEATHER_REQUEST_CONNECT_TIMEOUT_SECONDS,
+    WEATHER_REQUEST_READ_TIMEOUT_SECONDS,
+)
 WEATHER_REQUEST_ATTEMPTS = 2
 
 
@@ -143,7 +148,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             resp = requests.get(
                 url,
                 params=params,
-                timeout=WEATHER_REQUEST_TIMEOUT_SECONDS,
+                timeout=WEATHER_REQUEST_TIMEOUT,
             )
             status_code = getattr(resp, "status_code", None)
             raise_for_status = getattr(resp, "raise_for_status", None)
