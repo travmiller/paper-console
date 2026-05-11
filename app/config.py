@@ -141,6 +141,9 @@ class ChannelConfig(BaseModel):
     # Schedule: List of times in "HH:MM" 24h format to automatically print this channel
     schedule: List[str] = []
 
+    # Cron schedule rules with optional per-rule timezone override.
+    schedule_rules: List[Dict[str, Any]] = []
+
 
 from pydantic import field_validator, Field
 

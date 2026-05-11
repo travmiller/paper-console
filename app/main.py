@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Depends, Request, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, RedirectResponse, Response
@@ -7,7 +7,7 @@ import asyncio
 import uuid
 import os
 import hmac
-from typing import Dict, Optional, List
+from typing import Any, Dict, Optional, List
 from datetime import datetime
 from pathlib import Path
 from pydantic import BaseModel
@@ -19,6 +19,8 @@ import re
 import shutil
 import sys
 import time
+import arrow
+from croniter import croniter
 
 # Configure logging
 LOG_LEVEL_NAME = os.environ.get("PC1_LOG_LEVEL", "WARNING").upper()
@@ -115,6 +117,12 @@ import app.wifi_manager as wifi_manager
 import app.hardware as hardware
 from app.hardware import printer, dial, button, _is_raspberry_pi
 import app.location_lookup as location_lookup
+from app.schedule_utils import (
+    humanize_cron,
+    legacy_schedule_to_rules,
+    normalize_schedule_rules,
+    resolve_timezone_name,
+)
 
 # --- BACKGROUND TASKS ---
 
@@ -239,26 +247,82 @@ async def email_polling_loop():
 
 async def scheduler_loop():
     """
-    Checks every minute if any channel is scheduled to run at the current time.
+    Evaluate channel schedules every 10 seconds using cron expressions.
     """
     last_run_minute = ""
+    last_fired_keys: dict[str, str] = {}
 
     while True:
         try:
             await asyncio.sleep(10)
 
-            now = datetime.now()
-            current_time = now.strftime("%H:%M")
+            configured_timezone = resolve_timezone_name(
+                getattr(settings, "timezone", None),
+                fallback="UTC",
+            )
+            now = arrow.now(configured_timezone)
+            current_time = now.format("HH:mm")
+            current_minute_key = now.floor("minute").format("YYYY-MM-DD HH:mm")
 
-            # Prevent running multiple times in the same minute
+            # Prevent full re-scan more than once per minute.
             if current_time == last_run_minute:
                 continue
 
             last_run_minute = current_time
 
-            # Check all channels for matching schedule
             for pos, channel in settings.channels.items():
-                if channel.schedule and current_time in channel.schedule:
+                rules = _channel_schedule_rules(channel)
+                if not rules:
+                    continue
+
+                for rule in rules:
+                    if not bool(rule.get("enabled", True)):
+                        continue
+
+                    expression = str(rule.get("expression") or "").strip()
+                    if not expression:
+                        continue
+
+                    rule_timezone = resolve_timezone_name(
+                        rule.get("timezone"),
+                        fallback=configured_timezone,
+                    )
+                    now_in_rule_tz = now.to(rule_timezone)
+                    minute_key = now_in_rule_tz.floor("minute").format("YYYY-MM-DD HH:mm")
+
+                    try:
+                        previous_fire = croniter(expression, now_in_rule_tz.datetime).get_prev(datetime)
+                    except Exception:
+                        logger.warning(
+                            "Skipping invalid cron rule for channel %s: expression='%s' timezone='%s'",
+                            pos,
+                            expression,
+                            rule_timezone,
+                        )
+                        continue
+
+                    previous_fire_key = (
+                        arrow.get(previous_fire)
+                        .to(rule_timezone)
+                        .floor("minute")
+                        .format("YYYY-MM-DD HH:mm")
+                    )
+                    if previous_fire_key != minute_key:
+                        continue
+
+                    dedupe_key = f"{pos}|{rule_timezone}|{expression}"
+                    if last_fired_keys.get(dedupe_key) == current_minute_key:
+                        continue
+                    last_fired_keys[dedupe_key] = current_minute_key
+
+                    logger.info(
+                        "Cron due for channel %s at %s (%s): %s",
+                        pos,
+                        minute_key,
+                        rule_timezone,
+                        expression,
+                    )
+
                     if not _try_begin_print_job(debounce=False):
                         logger.info(
                             "Skipping scheduled print for channel %s because printer is busy or reserved.",
@@ -268,7 +332,52 @@ async def scheduler_loop():
                     await trigger_channel(pos)
 
         except Exception:
+            logger.exception("Scheduler loop encountered an unexpected error")
             await asyncio.sleep(60)
+
+
+def _channel_schedule_rules(channel: ChannelConfig) -> list[dict]:
+    """Return normalized schedule rules for runtime and presentation."""
+    if not channel:
+        return []
+
+    if channel.schedule_rules:
+        try:
+            return normalize_schedule_rules(
+                [dict(rule) for rule in channel.schedule_rules],
+                fallback_timezone=getattr(settings, "timezone", "UTC"),
+            )
+        except ValueError:
+            logger.warning("Ignoring invalid persisted schedule_rules payload", exc_info=True)
+            return []
+
+    if channel.schedule:
+        try:
+            return legacy_schedule_to_rules(
+                channel.schedule,
+                timezone_name=getattr(settings, "timezone", "UTC"),
+            )
+        except ValueError:
+            logger.warning("Ignoring invalid legacy HH:MM schedule payload", exc_info=True)
+            return []
+
+    return []
+
+
+def _schedule_preview_lines(channel: ChannelConfig, limit: int = 8) -> list[str]:
+    lines: list[str] = []
+    for rule in _channel_schedule_rules(channel)[:limit]:
+        expression = str(rule.get("expression") or "").strip()
+        timezone_name = resolve_timezone_name(
+            rule.get("timezone"),
+            fallback=getattr(settings, "timezone", "UTC"),
+        )
+        description = str(rule.get("description") or "").strip()
+        if not description and expression:
+            description = humanize_cron(expression, timezone_name)
+        if description:
+            lines.append(description)
+    return lines
 
 
 # --- HARDWARE CALLBACKS ---
@@ -490,13 +599,15 @@ def _print_channel_config_summary(position: int):
             module_name = module.name if module else "(missing module)"
             printer.print_body(f"  {idx}. {module_name}")
 
-        if channel.schedule:
+        schedule_lines = _schedule_preview_lines(channel, limit=8)
+        if schedule_lines:
             printer.feed(1)
             printer.print_caption("Schedule:")
-            for schedule_time in channel.schedule[:8]:
-                printer.print_body(f"  - {schedule_time}")
-            if len(channel.schedule) > 8:
-                printer.print_caption(f"  +{len(channel.schedule) - 8} more")
+            for schedule_line in schedule_lines:
+                printer.print_body(f"  - {schedule_line}")
+            all_rules = _channel_schedule_rules(channel)
+            if len(all_rules) > len(schedule_lines):
+                printer.print_caption(f"  +{len(all_rules) - len(schedule_lines)} more")
         else:
             printer.feed(1)
             printer.print_caption("Schedule: none")
@@ -571,10 +682,12 @@ def _print_current_channel_and_menu(position: int):
             module = settings.modules.get(assignment.module_id)
             module_name = module.name if module else "(missing module)"
             printer.print_body(f"{idx}. {module_name}")
-        if channel.schedule:
-            printer.print_caption("Schedule: " + ", ".join(channel.schedule[:4]))
-            if len(channel.schedule) > 4:
-                printer.print_caption(f"+{len(channel.schedule) - 4} more times")
+        schedule_lines = _schedule_preview_lines(channel, limit=1)
+        if schedule_lines:
+            printer.print_caption("Schedule: " + schedule_lines[0])
+            all_rules = _channel_schedule_rules(channel)
+            if len(all_rules) > 1:
+                printer.print_caption(f"+{len(all_rules) - 1} more rules")
         else:
             printer.print_caption("Schedule: none")
 
@@ -4094,18 +4207,56 @@ async def reorder_channel_modules(
     dependencies=[Depends(require_admin_access)],
 )
 async def update_channel_schedule(
-    position: int, schedule: List[str], background_tasks: BackgroundTasks
+    position: int,
+    background_tasks: BackgroundTasks,
+    payload: Any = Body(...),
 ):
-    """Update the print schedule for a channel."""
+    """Update a channel schedule.
+
+    Accepted payloads:
+    - Legacy: ["13:54", "18:30"]
+    - Cron: {"rules": [{"expression": "54 13 * * *", "timezone": "America/Chicago"}]}
+    """
     global settings
 
     if position not in settings.channels:
         settings.channels[position] = ChannelConfig(modules=[])
 
-    settings.channels[position].schedule = schedule
-    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
+    channel = settings.channels[position]
 
-    return {"message": "Schedule updated", "channel": settings.channels[position]}
+    if isinstance(payload, list):
+        # Legacy HH:MM input path.
+        schedule = [str(item).strip() for item in payload if str(item).strip()]
+        channel.schedule = sorted(set(schedule))
+        channel.schedule_rules = legacy_schedule_to_rules(
+            channel.schedule,
+            timezone_name=getattr(settings, "timezone", "UTC"),
+        )
+    elif isinstance(payload, dict):
+        rules_payload = payload.get("rules", [])
+        if not isinstance(rules_payload, list):
+            raise HTTPException(status_code=400, detail="'rules' must be an array")
+
+        try:
+            channel.schedule_rules = normalize_schedule_rules(
+                [dict(rule) for rule in rules_payload],
+                fallback_timezone=getattr(settings, "timezone", "UTC"),
+            )
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        # When using new cron format, don't populate legacy schedule field.
+        # The legacy field is only for initial migration, not ongoing use.
+        channel.schedule = []
+    else:
+        raise HTTPException(status_code=400, detail="Schedule payload must be an array or object")
+
+    background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
+    return {
+        "message": "Schedule updated",
+        "channel": channel,
+        "schedule_preview": _schedule_preview_lines(channel, limit=8),
+    }
 
 
 # --- EVENT ROUTER ---

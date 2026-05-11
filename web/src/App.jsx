@@ -211,12 +211,12 @@ function App() {
     }, 500); // 500ms debounce
   };
 
-  const updateChannelSchedule = async (position, schedule) => {
+  const updateChannelSchedule = async (position, schedulePayload) => {
     try {
       const response = await adminAuthFetch(`/api/channels/${position}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(schedule),
+        body: JSON.stringify(schedulePayload),
       });
 
       if (!response.ok) throw new Error('Failed to update schedule');
@@ -896,8 +896,9 @@ function App() {
           position={showScheduleModal}
           channel={settings.channels[showScheduleModal] || {}}
           onClose={() => setShowScheduleModal(null)}
-          onUpdate={(newSchedule) => updateChannelSchedule(showScheduleModal, newSchedule)}
+          onUpdate={(schedulePayload) => updateChannelSchedule(showScheduleModal, schedulePayload)}
           timeFormat={settings.time_format}
+          timezone={settings.timezone}
         />
 
         <APInstructionsModal show={showAPInstructions} wifiStatus={wifiStatus} />
