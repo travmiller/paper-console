@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from app.config import DEFAULT_CUTTER_FEED_LINES
 
 class PrinterDriver:

@@ -3,9 +3,9 @@ import logging
 import requests
 import time
 from collections import Counter
-from datetime import datetime
 from typing import Dict, Any, Optional
 from PIL import Image, ImageDraw
+import arrow
 
 import app.config
 from app.drivers.printer_mock import PrinterDriver
@@ -204,12 +204,13 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         daily_weathercode = _require_list(data, "daily.weathercode")
         daily_precip_prob = daily.get("precipitation_probability_max", [])
 
-        today = datetime.now().date()
+        current_time = arrow.now(timezone)
+        today = current_time.date()
 
         for i in range(min(len(daily_times), 7)):
             try:
-                dt = datetime.strptime(daily_times[i], "%Y-%m-%d")
-                date_obj = dt.date()
+                day_dt = arrow.get(daily_times[i], "YYYY-MM-DD")
+                date_obj = day_dt.date()
                 weather_code = daily_weathercode[i] if i < len(daily_weathercode) else 0
                 condition = get_weather_condition(weather_code)
                 high = int(daily_max[i]) if i < len(daily_max) else None
@@ -222,10 +223,10 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
 
                 if date_obj == today:
                     day_label = "Today"
-                    date_label = f"{dt.month}/{dt.day}"
+                    date_label = f"{day_dt.month}/{day_dt.day}"
                 else:
-                    day_label = dt.strftime("%a")
-                    date_label = f"{dt.month}/{dt.day}"
+                    day_label = day_dt.format("ddd")
+                    date_label = f"{day_dt.month}/{day_dt.day}"
 
                 forecast.append(
                     {
@@ -247,8 +248,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
         today_low = int(daily_min[0])
 
         hourly_forecast = []
-        current_time = datetime.now()
-        current_hour = current_time.replace(minute=0, second=0, microsecond=0)
+        current_hour = current_time.floor("hour")
 
         hourly_times = hourly.get("time", []) if isinstance(hourly, dict) else []
         hourly_codes = hourly.get("weathercode", []) if isinstance(hourly, dict) else []
@@ -263,15 +263,19 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
 
             try:
                 if len(time_str_clean) == 16:
-                    dt = datetime.strptime(time_str_clean, "%Y-%m-%dT%H:%M")
+                    forecast_dt = arrow.get(time_str_clean, "YYYY-MM-DDTHH:mm").replace(
+                        tzinfo=timezone
+                    )
                 elif len(time_str_clean) >= 19:
-                    dt = datetime.strptime(time_str_clean[:19], "%Y-%m-%dT%H:%M:%S")
+                    forecast_dt = arrow.get(
+                        time_str_clean[:19], "YYYY-MM-DDTHH:mm:ss"
+                    ).replace(tzinfo=timezone)
                 else:
                     continue
             except Exception:
                 continue
 
-            if dt < current_hour:
+            if forecast_dt < current_hour:
                 continue
 
             weather_code = hourly_codes[i] if i < len(hourly_codes) else 0
@@ -283,18 +287,15 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                 else None
             )
 
-            current_hour_dt = datetime.now().replace(minute=0, second=0, microsecond=0)
-            if dt == current_hour_dt:
+            if forecast_dt == current_hour:
                 time_display = "Now"
             else:
-                time_display = dt.strftime("%I %p")
-                if time_display.startswith("0"):
-                    time_display = time_display[1:]
+                time_display = forecast_dt.format("h A")
 
             hourly_forecast.append(
                 {
                     "time": time_display,
-                    "hour": dt.strftime("%H"),
+                    "hour": forecast_dt.format("HH"),
                     "temperature": temp,
                     "condition": condition,
                     "precipitation": precip_prob,

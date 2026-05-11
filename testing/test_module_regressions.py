@@ -1,7 +1,7 @@
 """Regression tests for merged module configuration features."""
 
-from datetime import datetime
 from types import SimpleNamespace
+import arrow
 
 from app.modules import rss as rss_module
 from app.modules import weather as weather_module
@@ -53,7 +53,7 @@ class _FakeRSSResponse:
 
 def test_get_weather_defaults_temperature_unit_when_config_missing(monkeypatch):
     captured = {}
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    now = arrow.now().floor("hour").naive
 
     monkeypatch.setattr(weather_module.app.config.settings, "latitude", 42.0, raising=False)
     monkeypatch.setattr(weather_module.app.config.settings, "longitude", -71.0, raising=False)

@@ -1,10 +1,10 @@
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, List, Any, Union, Literal
-from datetime import datetime
 import json
 import os
 import uuid
 import logging
+import arrow
 
 # Constants
 PRINTER_WIDTH = 42
@@ -462,12 +462,12 @@ def save_config(new_settings: Settings):
         raise
 
 
-def format_time(dt: datetime, time_format: Optional[str] = None) -> str:
+def format_time(dt: Any, time_format: Optional[str] = None) -> str:
     """
     Format a datetime object according to the time_format setting.
 
     Args:
-        dt: datetime object to format
+        dt: datetime-like value to format
         time_format: Optional override (defaults to settings.time_format)
 
     Returns:
@@ -476,27 +476,22 @@ def format_time(dt: datetime, time_format: Optional[str] = None) -> str:
     if time_format is None:
         time_format = settings.time_format
 
+    arrow_dt = arrow.get(dt)
     if time_format == "24h":
-        return dt.strftime("%H:%M")
-    else:  # Default to 12h
-        return dt.strftime("%I:%M %p").lstrip(
-            "0"
-        )  # Remove leading zero, e.g., "3:45 PM" instead of "03:45 PM"
+        return arrow_dt.format("HH:mm")
+    return arrow_dt.format("h:mm A")
 
 
-def current_datetime() -> datetime:
+def current_datetime() -> arrow.Arrow:
     """Return the current datetime in the configured timezone."""
     try:
-        import pytz
-
-        tz = pytz.timezone(settings.timezone)
-        return datetime.now(tz)
+        return arrow.now(settings.timezone)
     except Exception:
-        return datetime.now()
+        return arrow.now()
 
 
 def format_print_datetime(
-    dt: Optional[datetime] = None,
+    dt: Optional[Any] = None,
     time_format: Optional[str] = None,
     date_format: str = "%A, %B %d, %Y",
 ) -> str:
@@ -506,8 +501,8 @@ def format_print_datetime(
     Returns strings like "Tuesday, April 21, 2026 3:45 PM" or
     "Tuesday, April 21, 2026 15:45", depending on the time_format setting.
     """
-    dt = dt or current_datetime()
-    return f"{dt.strftime(date_format)} {format_time(dt, time_format)}"
+    arrow_dt = arrow.get(dt) if dt is not None else current_datetime()
+    return f"{arrow_dt.datetime.strftime(date_format)} {format_time(arrow_dt, time_format)}"
 
 
 # Global settings instance

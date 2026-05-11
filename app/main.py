@@ -8,7 +8,6 @@ import uuid
 import os
 import hmac
 from typing import Any, Dict, Optional, List
-from datetime import datetime
 from pathlib import Path
 from pydantic import BaseModel
 import subprocess
@@ -291,7 +290,7 @@ async def scheduler_loop():
                     minute_key = now_in_rule_tz.floor("minute").format("YYYY-MM-DD HH:mm")
 
                     try:
-                        previous_fire = croniter(expression, now_in_rule_tz.datetime).get_prev(datetime)
+                        previous_fire = croniter(expression, now_in_rule_tz.datetime).get_prev(float)
                     except Exception:
                         logger.warning(
                             "Skipping invalid cron rule for channel %s: expression='%s' timezone='%s'",
@@ -1818,8 +1817,7 @@ async def get_system_time():
     try:
         from app.config import format_time
 
-        tz = pytz.timezone(settings.timezone)
-        now = datetime.now(tz)
+        now = arrow.now(settings.timezone)
 
         # Format time according to user's preference
         time_formatted = format_time(now, settings.time_format)
@@ -1840,7 +1838,7 @@ async def get_system_time():
         # Fallback to UTC if timezone is invalid
         from app.config import format_time
 
-        now = datetime.now(pytz.UTC)
+        now = arrow.utcnow()
         time_formatted = format_time(now, settings.time_format)
         date_str = now.strftime("%Y-%m-%d")
         formatted = f"{date_str} {time_formatted}"
@@ -1874,8 +1872,8 @@ async def set_system_time(request: SetTimeRequest):
     time = request.time
     try:
         # Validate date and time format
-        datetime.strptime(date, "%Y-%m-%d")
-        datetime.strptime(time, "%H:%M:%S")
+        arrow.get(date, "YYYY-MM-DD")
+        arrow.get(time, "HH:mm:ss")
 
         # Combine date and time
         datetime_str = f"{date} {time}"

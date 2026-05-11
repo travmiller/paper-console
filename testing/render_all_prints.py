@@ -19,7 +19,8 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 from typing import Optional
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+import arrow
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -195,10 +196,8 @@ class CapturePrinter(SerialPrinterDriver):
 
 def _build_snapshot_calendar_ics(reference_day: Optional[date] = None) -> str:
     today = reference_day or date.today()
-    timed_one = datetime.combine(today, datetime.min.time()).replace(hour=9, minute=30)
-    timed_two = datetime.combine(today + timedelta(days=1), datetime.min.time()).replace(
-        hour=18, minute=0
-    )
+    timed_one = arrow.get(today).shift(hours=9, minutes=30).naive
+    timed_two = arrow.get(today + timedelta(days=1)).shift(hours=18).naive
     all_day = today + timedelta(days=3)
     return "\r\n".join(
         [

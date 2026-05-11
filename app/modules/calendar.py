@@ -1,7 +1,8 @@
 import requests
 import pytz
 import logging
-from datetime import datetime, timedelta, date
+import datetime as dt
+from datetime import timedelta, date
 from typing import List, Dict, Any, Optional
 from icalendar import Calendar
 from dateutil.rrule import rrulestr
@@ -11,6 +12,7 @@ import app.config
 from app.module_registry import register_module
 from PIL import Image, ImageDraw
 import app.config  # Ensure app.config is imported for timezone access
+import arrow
 
 APP_CONFIG = app.config  # Alias to avoid confusion if needed
 logger = logging.getLogger(__name__)
@@ -54,7 +56,7 @@ def parse_events(
     except:
         local_tz = pytz.UTC
 
-    now = datetime.now(local_tz)
+    now = arrow.now(local_tz).datetime
     today = now.date()
     end_date = today + timedelta(days=days_to_show)
 
@@ -79,7 +81,7 @@ def parse_events(
 
             # Handle all-day events (date objects)
             is_all_day = False
-            if not isinstance(start, datetime):
+            if not isinstance(start, dt.datetime):
                 is_all_day = True
                 # Convert to datetime for comparison logic (midnight local)
                 # Note: All day events in ICS usually don't have TZ, so we assume local context or keep naive?
@@ -99,7 +101,7 @@ def parse_events(
                 try:
                     rrule_start = start
                     if is_all_day:
-                        rrule_start = datetime.combine(start, datetime.min.time())
+                        rrule_start = dt.datetime.combine(start, dt.time.min)
 
                     rule = rrulestr(
                         component["RRULE"].to_ical().decode(), dtstart=rrule_start
@@ -130,7 +132,7 @@ def parse_events(
                         for ex in exdate_props:
                             for ex_dt_val in getattr(ex, "dts", []):
                                 ex_dt = ex_dt_val.dt
-                                if isinstance(ex_dt, datetime):
+                                if isinstance(ex_dt, dt.datetime):
                                     if ex_dt.tzinfo is None and rrule_start.tzinfo is not None:
                                         ex_dt = local_tz.localize(ex_dt)
                                     elif (
@@ -142,16 +144,16 @@ def parse_events(
                                 else:
                                     exdate_keys.add(ex_dt)
 
-                    for dt in rule.between(query_start, query_end, inc=True):
-                        if dt in exdate_keys or dt.date() in exdate_keys:
+                    for occurrence in rule.between(query_start, query_end, inc=True):
+                        if occurrence in exdate_keys or occurrence.date() in exdate_keys:
                             continue
 
                         if is_all_day:
-                            event_instances.append((dt.date(), True))
+                            event_instances.append((occurrence.date(), True))
                         else:
-                            if dt.tzinfo is None and local_tz:
-                                dt = local_tz.localize(dt)
-                            event_instances.append((dt, False))
+                            if occurrence.tzinfo is None and local_tz:
+                                occurrence = local_tz.localize(occurrence)
+                            event_instances.append((occurrence, False))
 
                     # Include RDATE manual additions that may not be part of RRULE expansion.
                     rdate_prop = component.get("RDATE")
@@ -164,7 +166,7 @@ def parse_events(
                         for rdate_entry in rdate_props:
                             for rdate_dt_val in getattr(rdate_entry, "dts", []):
                                 rdt = rdate_dt_val.dt
-                                if isinstance(rdt, datetime):
+                                if isinstance(rdt, dt.datetime):
                                     if rdt.tzinfo is None:
                                         rdt = local_tz.localize(rdt)
                                     else:
@@ -190,7 +192,7 @@ def parse_events(
             for evt_dt, evt_is_all_day in event_instances:
                 key = (
                     evt_dt.isoformat()
-                    if isinstance(evt_dt, datetime)
+                    if isinstance(evt_dt, dt.datetime)
                     else str(evt_dt)
                 )
                 if key in seen_instance_keys:
@@ -203,7 +205,7 @@ def parse_events(
                 # Check bounds
                 evt_date = (
                     evt_dt
-                    if isinstance(evt_dt, date) and not isinstance(evt_dt, datetime)
+                    if isinstance(evt_dt, date) and not isinstance(evt_dt, dt.datetime)
                     else evt_dt.date()
                 )
 
@@ -629,8 +631,6 @@ def draw_calendar_grid_image(
     month_end=None,
 ) -> Image.Image:
     """Draw a calendar grid to an image."""
-    from datetime import timedelta
-
     if not start_date:
         start_date = date.today()
 

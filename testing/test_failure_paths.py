@@ -21,7 +21,8 @@ from app.modules import news as news_module
 from app.modules import calendar as calendar_module
 from app.modules import history as history_module
 from app import factory_reset as factory_reset_module
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta, timezone
+import arrow
 
 
 def _completed(returncode: int = 0, stdout: str = "", stderr: str = ""):
@@ -921,10 +922,7 @@ def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
     triggered = []
     sleep_calls = {"count": 0}
 
-    class FrozenDateTime:
-        @classmethod
-        def now(cls):
-            return datetime(2026, 4, 3, 12, 0)
+    frozen_now = arrow.get(2026, 4, 3, 12, 0)
 
     async def fake_sleep(_seconds):
         sleep_calls["count"] += 1
@@ -935,7 +933,7 @@ def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
     async def fake_trigger_channel(position):
         triggered.append(position)
 
-    monkeypatch.setattr(main_module, "datetime", FrozenDateTime)
+    monkeypatch.setattr(main_module.arrow, "now", lambda *_args, **_kwargs: frozen_now)
     monkeypatch.setattr(main_module.asyncio, "sleep", fake_sleep)
     monkeypatch.setattr(main_module, "trigger_channel", fake_trigger_channel)
     monkeypatch.setattr(
@@ -1023,7 +1021,7 @@ def test_news_module_uses_configurable_country_and_page_size(monkeypatch):
 
 
 def test_calendar_rrule_respects_exdate_in_window():
-    now = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    now = arrow.now(timezone.utc).floor("day").datetime
     start = now + timedelta(hours=9)
     skip = start + timedelta(days=1)
 

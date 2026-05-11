@@ -6,8 +6,7 @@ and new cron rule schedules with proper timezone handling.
 """
 
 import pytest
-from datetime import datetime
-import arrow
+import datetime as dt
 import pytz
 from unittest.mock import MagicMock, patch
 
@@ -43,7 +42,7 @@ class TestSchedulerLoopIntegration:
         
         # Create a time that's 2:00 PM in NYC
         tz_obj = pytz.timezone(rule_tz)
-        target_time_ny = tz_obj.localize(datetime(2026, 5, 11, 14, 0, 0))
+        target_time_ny = tz_obj.localize(dt.datetime(2026, 5, 11, 14, 0, 0))
         
         # Verify the cron would evaluate as a match at this time
         from croniter import croniter
@@ -51,7 +50,7 @@ class TestSchedulerLoopIntegration:
         cron = croniter(rule_cron, target_naive)
         
         # Get next occurrence from this exact time
-        next_run = cron.get_next(datetime)
+        next_run = cron.get_next(dt.datetime)
         # Should be tomorrow at 2:00 PM (same local time, next day)
         assert next_run.hour == 14
         assert next_run.minute == 0

@@ -1,4 +1,5 @@
-from datetime import datetime, timedelta
+import datetime as dt
+from datetime import timedelta
 import pytz
 import math
 from astral import LocationInfo
@@ -6,6 +7,7 @@ from astral.sun import sun, zenith_and_azimuth
 from astral.moon import phase
 from typing import Dict, Any, List, Tuple
 from PIL import Image, ImageDraw
+import arrow
 
 import app.config
 from app.config import format_print_datetime, format_time
@@ -33,7 +35,9 @@ def get_moon_phase_text(moon_phase: float) -> str:
     elif moon_phase < 23: return "Last Qtr"
     else: return "Wan Crescent"
 
-def get_sun_path_data(now: datetime, city: LocationInfo, tz: pytz.BaseTzInfo) -> List[Tuple[datetime, float]]:
+def get_sun_path_data(
+    now: dt.datetime, city: LocationInfo, tz: pytz.BaseTzInfo
+) -> List[Tuple[dt.datetime, float]]:
     """Calculate sun altitude throughout a full 24-hour day.
     
     Returns a list of (datetime, altitude) tuples where altitude is in degrees.
@@ -80,7 +84,7 @@ def get_sun_path_data(now: datetime, city: LocationInfo, tz: pytz.BaseTzInfo) ->
 def get_almanac_data():
     """Calculates local astronomical data for today."""
     tz = pytz.timezone(app.config.settings.timezone)
-    now = datetime.now(tz)
+    now = arrow.now(tz).datetime
     
     city = get_city_info()
 
@@ -220,9 +224,9 @@ def draw_moon_phase_image(phase: float, size: int) -> Image.Image:
 
 def draw_sun_path_image(
     sun_path: list,
-    sunrise: datetime,
-    sunset: datetime,
-    current_time: datetime,
+    sunrise: dt.datetime,
+    sunset: dt.datetime,
+    current_time: dt.datetime,
     current_altitude: float,
     sunrise_time: str,
     sunset_time: str,
