@@ -1,20 +1,32 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import cronstrue from 'cronstrue';
 import {
   cronToReadable,
   parseCronTimezone,
   validateCronExpression,
 } from '../utils';
-import { CRON_EXAMPLES } from '../constants';
 import CloseButton from './CloseButton';
 import PrimaryButton from './PrimaryButton';
 
 const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat, timezone }) => {
   const modalMouseDownTarget = useRef(null);
-  const [cronInput, setCronInput] = useState('');
+  const [cronInput, setCronInput] = useState('* * * * *');
   const [ruleTimezone, setRuleTimezone] = useState(timezone || 'UTC');
   const [quickDailyTime, setQuickDailyTime] = useState('');
   const [timezoneSuggestions, setTimezoneSuggestions] = useState([]);
   const [error, setError] = useState('');
+
+  const formatCronDescription = (expression, tz) => {
+    if (!validateCronExpression(expression)) {
+      return `Cron: ${expression} (${tz})`;
+    }
+
+    try {
+      return `${cronstrue.toString(expression)} (${tz})`;
+    } catch {
+      return cronToReadable(expression, tz, timeFormat);
+    }
+  };
 
   const scheduleRules = useMemo(() => {
     if (channel?.schedule_rules?.length) {
@@ -33,7 +45,7 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat, timez
           expression: `${Number(minute)} ${Number(hour)} * * *`,
           timezone: timezone || 'UTC',
           enabled: true,
-          description: cronToReadable(`${Number(minute)} ${Number(hour)} * * *`, timezone || 'UTC', timeFormat),
+          description: formatCronDescription(`${Number(minute)} ${Number(hour)} * * *`, timezone || 'UTC'),
         };
       })
       .filter(Boolean);
@@ -81,7 +93,7 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat, timez
         ...rule,
         expression,
         timezone: normalizedTimezone,
-        description: cronToReadable(expression, normalizedTimezone, timeFormat),
+        description: formatCronDescription(expression, normalizedTimezone),
       };
     });
 
@@ -110,14 +122,14 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat, timez
 
         <div className='space-y-4'>
           <div className='text-sm text-gray-600'>
-            Use <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer">cron rules</a> to control print timing.
+            Use <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800">cron rules</a> to control print timing.
           </div>
 
           <div className='space-y-2 max-h-[280px] overflow-y-auto'>
             {scheduleRules.map((rule, idx) => {
               const expression = String(rule.expression || rule.cron || '').trim();
               const tz = parseCronTimezone(expression, rule.timezone || ruleTimezone || timezone || 'UTC');
-              const readable = cronToReadable(expression, tz, timeFormat);
+              const readable = formatCronDescription(expression, tz);
               return (
                 <div key={`${expression}-${idx}`} className='p-3 rounded-lg border-2 border-gray-300 hover:border-black' style={{ backgroundColor: 'var(--color-bg-card)' }}>
                   <div className='flex items-center justify-between gap-3'>
@@ -146,6 +158,15 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat, timez
           </div>
 
           <div className='pt-4 border-t-2 border-gray-300'>
+            <pre className='font-mono text-xs text-gray-600 mb-4 overflow-x-auto'>
+{`  ┌───────────── minute   (0-59)
+  │  ┌────────── hour     (0-23)
+  │  │  ┌─────── day      (1-31)
+  │  │  │  ┌──── month    (1-12)
+  │  │  │  │  ┌─ weekday  (0-6, MON-SUN)
+  │  │  │  │  │
+  *  *  *  *  *`}
+            </pre>
 
             <form
               onSubmit={(e) => {
@@ -201,25 +222,35 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat, timez
                   expression,
                   timezone: tz,
                   enabled: true,
-                  description: cronToReadable(expression, tz, timeFormat),
+                  description: formatCronDescription(expression, tz),
                 };
 
                 setCronInput('');
                 commitRules([...scheduleRules, newRule]);
               }}
               className='space-y-3'>
-              <input
-                name='cronInput'
-                value={cronInput}
-                onChange={(e) => {
-                  setCronInput(e.target.value);
-                  if (error) setError('');
-                }}
-                placeholder='54 13 * * *'
-                required
-                className='w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:border-black font-mono'
-                style={{ backgroundColor: 'var(--color-bg-card)' }}
-              />
+              <div className='space-y-0.5'>
+                <input
+                  name='cronInput'
+                  value={cronInput}
+                  onChange={(e) => {
+                    setCronInput(e.target.value);
+                    if (error) setError('');
+                  }}
+                  placeholder='54 13 * * *'
+                  required
+                  className='w-full border-2 border-gray-300 rounded-lg px-3 py-2 text-black focus:outline-none focus:border-black font-mono'
+                  style={{ backgroundColor: 'var(--color-bg-card)' }}
+                />
+
+                {cronInput.trim() && (
+                  <div className='text-xs text-gray-600 italic px-1'>
+                    {!validateCronExpression(cronInput.trim()) 
+                      ? 'Invalid cron expression' 
+                      : cronstrue.toString(cronInput.trim())}
+                  </div>
+                )}
+              </div>
 
               <div>
                 <label className='text-sm font-bold text-black'>Timezone</label>
@@ -268,14 +299,6 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat, timez
                 </div>
               )}
             </form>
-
-            <div className='mt-3 text-xs text-gray-600 space-y-1'>
-              {CRON_EXAMPLES.map((line) => (
-                <div key={line} className='font-mono'>{line}</div>
-              ))}
-            </div>
-
-
           </div>
         </div>
       </div>

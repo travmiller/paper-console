@@ -15,10 +15,3 @@ export const INK_GRADIENTS = [
   `radial-gradient(ellipse at 40% 60%, ${INK_BLACK} 0%, ${INK_GRAY_MEDIUM} 30%, ${INK_BLACK} 60%, ${INK_GRAY_DARK} 90%, ${INK_BLACK} 100%)`,
   `radial-gradient(circle at 50% 50%, ${INK_BLACK} 0%, ${INK_GRAY_DARK} 25%, ${INK_BLACK} 50%, ${INK_GRAY_MEDIUM} 75%, ${INK_BLACK} 100%)`,
 ];
-
-export const CRON_EXAMPLES = [
-  '54 13 * * *  -> Every day at 1:54 PM',
-  '0 9 * * 1-5  -> Weekdays at 9:00 AM',
-  '0 8 1 * *  -> 8:00 AM on the first day of each month',
-  '*/15 * * * *  -> Every 15 minutes',
-];
