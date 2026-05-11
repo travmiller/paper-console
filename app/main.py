@@ -87,7 +87,6 @@ from app.config import (
     save_config,
     load_config,
     WebhookConfig,
-    IncomingWebhookConfig,
     TextConfig,
     CalendarConfig,
     EmailConfig,
@@ -110,7 +109,7 @@ from app.module_registry import (
 )
 
 # Legacy imports for modules with special handling (can be removed after full migration)
-from app.modules import email_client, webhook, text, calendar, incoming_webhook
+from app.modules import email_client, webhook, text, calendar
 
 from app.routers import wifi
 import app.device_password as device_password
@@ -4755,132 +4754,6 @@ def _module_is_assigned_to_current_channel(module_id: str) -> bool:
         return False
 
     return any(assignment.module_id == module_id for assignment in channel.modules)
-
-
-def _build_incoming_webhook_metadata_lines(
-    request: Request,
-    config: IncomingWebhookConfig,
-) -> List[str]:
-    lines: List[str] = []
-
-    client_host = getattr(request.client, "host", None)
-    if config.print_sender_ip and client_host:
-        lines.append(f"From: {client_host}")
-
-    if config.print_content_type:
-        content_type = incoming_webhook.normalize_content_type(
-            request.headers.get("content-type", "")
-        )
-        if content_type:
-            lines.append(f"Type: {content_type}")
-
-    if config.print_user_agent:
-        user_agent = (request.headers.get("user-agent") or "").strip()
-        if user_agent:
-            lines.append(f"UA: {user_agent}")
-
-    return lines
-
-
-def _print_incoming_webhook_job_sync(module_id: str, job: dict) -> None:
-    module = settings.modules.get(module_id)
-    if not module or module.type != "incoming_webhook":
-        return
-
-    config = IncomingWebhookConfig(**(module.config or {}))
-    module_name = module.name or "INCOMING WEBHOOK"
-
-    if hasattr(printer, "blip"):
-        printer.blip()
-
-    max_lines = getattr(settings, "max_print_lines", 200)
-    if hasattr(printer, "reset_buffer"):
-        printer.reset_buffer(max_lines)
-
-    incoming_webhook.print_parsed_job(printer, job, config, module_name)
-
-    if hasattr(printer, "flush_buffer"):
-        printer.flush_buffer()
-
-
-async def _run_incoming_webhook_print_job(module_id: str, job: dict) -> None:
-    try:
-        await asyncio.to_thread(_print_incoming_webhook_job_sync, module_id, job)
-    finally:
-        _clear_print_reservation(clear_hold=False)
-
-
-@app.post("/hook/{endpoint_path:path}")
-async def receive_incoming_webhook(
-    endpoint_path: str,
-    request: Request,
-    background_tasks: BackgroundTasks,
-):
-    module = _find_incoming_webhook_module_by_path(endpoint_path)
-    if not module:
-        raise HTTPException(status_code=404, detail="Webhook endpoint not found")
-
-    config = IncomingWebhookConfig(**(module.config or {}))
-    bearer_token = _extract_bearer_token(request)
-    if config.token and bearer_token != config.token:
-        raise HTTPException(status_code=401, detail="Invalid bearer token")
-
-    if not _module_is_assigned_to_current_channel(module.id):
-        raise HTTPException(
-            status_code=503,
-            detail="Inbound webhook module is not on the active channel",
-        )
-
-    body = await request.body()
-    try:
-        job = incoming_webhook.parse_request_payload(
-            content_type=request.headers.get("content-type", ""),
-            body=body,
-            config=config,
-            module_name=module.name or "INCOMING WEBHOOK",
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-
-    metadata_lines = _build_incoming_webhook_metadata_lines(request, config)
-    if metadata_lines:
-        job["metadata_lines"] = metadata_lines
-
-    if not _try_begin_print_job(debounce=False):
-        raise HTTPException(status_code=423, detail="Printer is already busy")
-
-    background_tasks.add_task(_run_incoming_webhook_print_job, module.id, job)
-    return Response(
-        content='{"message":"Print request accepted"}',
-        status_code=202,
-        media_type="application/json",
-    )
-
-
-@app.post("/debug/test-webhook", dependencies=[Depends(require_admin_access)])
-async def test_webhook(action: WebhookConfig):
-    """
-    Executes a custom webhook immediately for testing.
-    Pass the webhook configuration in the body.
-    Runs blocking operations in a thread pool to avoid blocking the event loop.
-    """
-    from concurrent.futures import ThreadPoolExecutor
-
-    def _run_webhook():
-        webhook.run_webhook(action, printer, module_name=None)
-
-    try:
-        loop = asyncio.get_event_loop()
-        with ThreadPoolExecutor() as executor:
-            await loop.run_in_executor(executor, _run_webhook)
-    except Exception as e:
-        logger = logging.getLogger(__name__)
-        logger.error(f"Error in test_webhook: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=500, detail=f"Webhook execution failed: {str(e)}"
-        )
-
-    return {"message": "Webhook executed"}
 
 
 def _preview_webhook_sync(config: dict):
