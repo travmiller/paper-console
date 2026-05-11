@@ -1,5 +1,7 @@
+import copy
 import os
 import logging
+import threading
 import requests
 import time
 from collections import Counter
@@ -20,10 +22,145 @@ WEATHER_REQUEST_TIMEOUT = (
     WEATHER_REQUEST_READ_TIMEOUT_SECONDS,
 )
 WEATHER_REQUEST_ATTEMPTS = 2
+WEATHER_PREFETCH_READ_TIMEOUT_SECONDS = 60
+WEATHER_PREFETCH_TIMEOUT = (
+    WEATHER_REQUEST_CONNECT_TIMEOUT_SECONDS,
+    WEATHER_PREFETCH_READ_TIMEOUT_SECONDS,
+)
+WEATHER_CACHE_MAX_AGE_SECONDS = 10 * 60
+
+_WEATHER_CACHE_LOCK = threading.Lock()
+_WEATHER_CACHE: Dict[str, Dict[str, Any]] = {}
 
 
 class WeatherFetchError(Exception):
     """Raised when fresh weather data cannot be fetched or validated."""
+
+
+def _resolve_weather_request_config(
+    config: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    """Resolve weather request parameters from module and global config."""
+    config = config or {}
+
+    if config:
+        location = config.get("location", {})
+        latitude = (
+            location.get("latitude")
+            or config.get("latitude")
+            or app.config.settings.latitude
+        )
+        longitude = (
+            location.get("longitude")
+            or config.get("longitude")
+            or app.config.settings.longitude
+        )
+        timezone = (
+            location.get("timezone")
+            or config.get("timezone")
+            or app.config.settings.timezone
+        )
+        city_name = (
+            location.get("city_name")
+            or config.get("city_name")
+            or app.config.settings.city_name
+        )
+    else:
+        latitude = app.config.settings.latitude
+        longitude = app.config.settings.longitude
+        timezone = app.config.settings.timezone
+        city_name = app.config.settings.city_name
+
+    temperature_unit = config.get("temperature_unit", "fahrenheit")
+    if not temperature_unit:
+        temperature_unit = "fahrenheit"
+    return {
+        "latitude": latitude,
+        "longitude": longitude,
+        "timezone": timezone,
+        "city_name": city_name,
+        "temperature_unit": temperature_unit,
+    }
+
+
+def _weather_cache_key(
+    config: Optional[Dict[str, Any]] = None,
+    module_id: Optional[str] = None,
+) -> str:
+    """Return a stable cache key for a weather module instance."""
+    if module_id:
+        return f"module:{module_id}"
+
+    resolved = _resolve_weather_request_config(config)
+    return (
+        "weather:"
+        f"{resolved['latitude']}:{resolved['longitude']}:"
+        f"{resolved['timezone']}:{resolved['temperature_unit']}"
+    )
+
+
+def _evict_expired_weather_cache(now_monotonic: Optional[float] = None) -> None:
+    """Drop stale weather cache entries once they exceed the TTL."""
+    now_monotonic = now_monotonic or time.monotonic()
+    with _WEATHER_CACHE_LOCK:
+        expired_keys = [
+            key
+            for key, entry in _WEATHER_CACHE.items()
+            if (now_monotonic - entry.get("stored_at_monotonic", 0.0))
+            > WEATHER_CACHE_MAX_AGE_SECONDS
+        ]
+        for key in expired_keys:
+            _WEATHER_CACHE.pop(key, None)
+
+
+def clear_weather_cache() -> None:
+    """Clear all cached weather data."""
+    with _WEATHER_CACHE_LOCK:
+        _WEATHER_CACHE.clear()
+
+
+def _store_weather_cache(
+    weather: Dict[str, Any],
+    config: Optional[Dict[str, Any]] = None,
+    module_id: Optional[str] = None,
+) -> None:
+    """Store a successful weather payload for later scheduled use."""
+    if not weather.get("ok", True):
+        return
+
+    stored_at_monotonic = time.monotonic()
+    stored_at_epoch = time.time()
+    cache_key = _weather_cache_key(config, module_id)
+    cached_weather = copy.deepcopy(weather)
+    cached_weather["cache_key"] = cache_key
+    cached_weather["fetched_at_epoch"] = stored_at_epoch
+
+    with _WEATHER_CACHE_LOCK:
+        _WEATHER_CACHE[cache_key] = {
+            "weather": cached_weather,
+            "stored_at_monotonic": stored_at_monotonic,
+            "stored_at_epoch": stored_at_epoch,
+        }
+
+
+def get_cached_weather(
+    config: Optional[Dict[str, Any]] = None,
+    module_id: Optional[str] = None,
+    max_age_seconds: int = WEATHER_CACHE_MAX_AGE_SECONDS,
+) -> Optional[Dict[str, Any]]:
+    """Return a fresh cached weather payload, or None if unavailable/stale."""
+    now_monotonic = time.monotonic()
+    _evict_expired_weather_cache(now_monotonic)
+
+    cache_key = _weather_cache_key(config, module_id)
+    with _WEATHER_CACHE_LOCK:
+        entry = _WEATHER_CACHE.get(cache_key)
+        if not entry:
+            return None
+        if (now_monotonic - entry.get("stored_at_monotonic", 0.0)) > max_age_seconds:
+            _WEATHER_CACHE.pop(cache_key, None)
+            return None
+        return copy.deepcopy(entry.get("weather"))
 
 
 def get_weather_condition(code: int) -> str:
@@ -61,42 +198,20 @@ def get_weather_condition(code: int) -> str:
     return "Unknown"
 
 
-def get_weather(config: Optional[Dict[str, Any]] = None):
-    """Fetches weather from Open-Meteo API."""
-    config = config or {}
-
-    if config:
-        # Support new nested location object
-        location = config.get("location", {})
-        latitude = (
-            location.get("latitude")
-            or config.get("latitude")
-            or app.config.settings.latitude
-        )
-        longitude = (
-            location.get("longitude")
-            or config.get("longitude")
-            or app.config.settings.longitude
-        )
-        timezone = (
-            location.get("timezone")
-            or config.get("timezone")
-            or app.config.settings.timezone
-        )
-        city_name = (
-            location.get("city_name")
-            or config.get("city_name")
-            or app.config.settings.city_name
-        )
-    else:
-        latitude = app.config.settings.latitude
-        longitude = app.config.settings.longitude
-        timezone = app.config.settings.timezone
-        city_name = app.config.settings.city_name
-
-    temperature_unit = config.get("temperature_unit", "fahrenheit")
-    if not temperature_unit:
-        temperature_unit = "fahrenheit"
+def _fetch_weather(
+    config: Optional[Dict[str, Any]] = None,
+    *,
+    timeout=WEATHER_REQUEST_TIMEOUT,
+    attempts: int = WEATHER_REQUEST_ATTEMPTS,
+    module_id: Optional[str] = None,
+):
+    """Fetch weather from Open-Meteo with configurable timeout behavior."""
+    resolved = _resolve_weather_request_config(config)
+    latitude = resolved["latitude"]
+    longitude = resolved["longitude"]
+    timezone = resolved["timezone"]
+    city_name = resolved["city_name"]
+    temperature_unit = resolved["temperature_unit"]
 
     def _failure(reason: str, error: Optional[Exception] = None) -> Dict[str, Any]:
         return {
@@ -134,7 +249,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
 
     last_error: Optional[Exception] = None
     data = None
-    for attempt in range(1, WEATHER_REQUEST_ATTEMPTS + 1):
+    for attempt in range(1, attempts + 1):
         started_at = time.monotonic()
         try:
             logger.info(
@@ -148,7 +263,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             resp = requests.get(
                 url,
                 params=params,
-                timeout=WEATHER_REQUEST_TIMEOUT,
+                timeout=timeout,
             )
             status_code = getattr(resp, "status_code", None)
             raise_for_status = getattr(resp, "raise_for_status", None)
@@ -178,7 +293,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
                 city_name,
                 exc,
             )
-            if attempt < WEATHER_REQUEST_ATTEMPTS:
+            if attempt < attempts:
                 time.sleep(2)
 
     if data is None:
@@ -305,7 +420,7 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             if len(hourly_forecast) >= 24:
                 break
 
-        return {
+        weather = {
             "ok": True,
             "current": int(current.get("temperature", 0)),
             "condition": get_weather_condition(current.get("weathercode", 0)),
@@ -314,12 +429,38 @@ def get_weather(config: Optional[Dict[str, Any]] = None):
             "city": city_name,
             "forecast": forecast,
             "hourly_forecast": hourly_forecast,
-            "temperature_unit": temperature_unit
+            "temperature_unit": temperature_unit,
         }
+        _store_weather_cache(weather, config, module_id)
+        return weather
 
     except Exception as exc:
         logger.warning("Weather response invalid: city=%s error=%s", city_name, exc)
         return _failure(str(exc), exc)
+
+
+def prefetch_weather(
+    config: Optional[Dict[str, Any]] = None,
+    *,
+    module_id: Optional[str] = None,
+):
+    """Warm weather data before a scheduled print using a longer timeout."""
+    return _fetch_weather(
+        config,
+        timeout=WEATHER_PREFETCH_TIMEOUT,
+        attempts=WEATHER_REQUEST_ATTEMPTS,
+        module_id=module_id,
+    )
+
+
+def get_weather(config: Optional[Dict[str, Any]] = None, *, module_id: Optional[str] = None):
+    """Fetch fresh weather data and cache successful results."""
+    return _fetch_weather(
+        config,
+        timeout=WEATHER_REQUEST_TIMEOUT,
+        attempts=WEATHER_REQUEST_ATTEMPTS,
+        module_id=module_id,
+    )
 
 
 def _get_icon_type(condition: str) -> str:
@@ -933,10 +1074,27 @@ def draw_hourly_forecast_image(
     ui_schema={"location": {"ui:widget": "location-search"}},
 )
 def format_weather_receipt(
-    printer: PrinterDriver, config: Dict[str, Any] = None, module_name: str = None
+    printer: PrinterDriver,
+    config: Dict[str, Any] = None,
+    module_name: str = None,
+    module_id: str = None,
+    scheduled: bool = False,
 ):
     """Prints weather with current conditions plus compact hourly/daily forecasts."""
-    weather = get_weather(config)
+    if scheduled:
+        weather = get_cached_weather(config, module_id=module_id)
+        if not weather:
+            resolved = _resolve_weather_request_config(config)
+            weather = {
+                "ok": False,
+                "city": resolved["city_name"],
+                "error": "No fresh prefetched weather data available.",
+                "temperature_unit": resolved["temperature_unit"],
+                "forecast": [],
+                "hourly_forecast": [],
+            }
+    else:
+        weather = get_weather(config, module_id=module_id)
 
     # Header
     printer.print_header(module_name or "WEATHER", icon="cloud-sun")
