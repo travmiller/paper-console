@@ -8,6 +8,129 @@ import ActionButton from './widgets/ActionButton';
 import RichTextEditor from './widgets/RichTextEditor';
 import ImageWidget from './widgets/ImageWidget';
 
+const copyToClipboard = async (text) => {
+  if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text);
+    return;
+  }
+
+  if (typeof document === 'undefined') {
+    throw new Error('Clipboard is unavailable');
+  }
+
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  textarea.style.pointerEvents = 'none';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+
+  try {
+    const copied = document.execCommand('copy');
+    if (!copied) {
+      throw new Error('document.execCommand("copy") returned false');
+    }
+  } finally {
+    document.body.removeChild(textarea);
+  }
+};
+
+const resolveFieldDescription = ({ description, fieldPath, rootValue }) => {
+  if (!description) return description;
+
+  if (fieldPath === 'endpoint_path' && description.includes('/hook/<endpoint_path>')) {
+    const endpointPath = (rootValue?.endpoint_path || '').trim() || 'your-endpoint';
+    return description.replace('/hook/<endpoint_path>', `/hook/${endpointPath}`);
+  }
+
+  return description;
+};
+
+const PrintWebhookHelp = ({ rootValue = {} }) => {
+  const [copiedLabel, setCopiedLabel] = React.useState('');
+  const endpointPath = (rootValue.endpoint_path || '').trim() || 'your-endpoint';
+  const token = rootValue.token || '';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'http://pc-1.local';
+  const endpointUrl = `${origin}/hook/${endpointPath}`;
+  const authHeader = token
+    ? `-H 'Authorization: Bearer YOUR_TOKEN_HERE' \\\n`
+    : '';
+  const authNote = token
+    ? "Auth enabled: send the bearer token in the Authorization header."
+    : "Auth disabled: leave out the Authorization header.";
+  const jsonExample = `curl -X POST '${endpointUrl}' \\
+${authHeader}-H 'Content-Type: application/json' \\
+-d '{
+  "title": "Front Door",
+  "subtitle": "Motion detected",
+  "items": [
+    { "type": "text", "text": "Someone is at the front door." },
+    { "type": "image_url", "url": "https://example.com/snapshot.jpg" }
+  ]
+}'`;
+  const textExample = `curl -X POST '${endpointUrl}' \\
+${authHeader}-H 'Content-Type: text/plain' \\
+--data 'Package delivered at the front door.'`;
+  const imageExample = `curl -X POST '${endpointUrl}' \\
+${authHeader}-H 'Content-Type: image/png' \\
+--data-binary @snapshot.png`;
+
+  const copyText = async (label, text) => {
+    try {
+      await copyToClipboard(text);
+      setCopiedLabel(label);
+      window.setTimeout(() => {
+        setCopiedLabel((current) => (current === label ? '' : current));
+      }, 1200);
+    } catch (error) {
+      console.error('Failed to copy print webhook example:', error);
+    }
+  };
+
+  return (
+    <div className="mb-4 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-4 space-y-3">
+      <div>
+        <div className="text-sm font-bold text-black">How to send to this print webhook</div>
+        <p className="text-xs text-zinc-600 mt-1">
+          POST to <code className="bg-white px-1 py-0.5 rounded">{endpointUrl}</code>
+        </p>
+        <p className="text-xs text-zinc-600 mt-1">{authNote}</p>
+        {token ? (
+          <p className="text-xs text-zinc-600 mt-1">
+            Header format: <code className="bg-white px-1 py-0.5 rounded">Authorization: Bearer YOUR_TOKEN_HERE</code>
+          </p>
+        ) : null}
+      </div>
+
+      <div className="space-y-3">
+        {[
+          { label: 'JSON Print Job', value: jsonExample },
+          { label: 'Plain Text', value: textExample },
+          { label: 'Raw Image', value: imageExample },
+        ].map((example) => (
+          <div key={example.label} className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-xs font-bold text-black uppercase tracking-wide">{example.label}</div>
+              <button
+                type="button"
+                onClick={() => copyText(example.label, example.value)}
+                className={commonClasses.buttonGhost}
+              >
+                {copiedLabel === example.label ? 'Copied' : 'Copy'}
+              </button>
+            </div>
+            <pre className="overflow-x-auto rounded border border-zinc-200 bg-white p-3 text-[11px] leading-5 text-zinc-700 whitespace-pre-wrap">
+              {example.value}
+            </pre>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
 
 /**
  * A lightweight JSON Schema form renderer.
@@ -205,6 +328,10 @@ const SchemaField = ({
           )}
         </div>
       );
+    }
+
+    if (widget === 'print-webhook-help') {
+        return <PrintWebhookHelp rootValue={rootValue} />;
     }
     
     if (widget === 'richtext') {

@@ -26,6 +26,20 @@ class WebhookConfig(BaseModel):
     auth_password: Optional[str] = None
 
 
+class PrintWebhookConfig(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    token: str = ""
+    endpoint_path: str = ""
+    accept_text: bool = True
+    accept_images: bool = True
+    accept_json: bool = True
+    max_image_height_dots: int = 4096
+    print_header: Optional[str] = None
+    print_sender_ip: bool = False
+    print_content_type: bool = False
+    print_user_agent: bool = False
+
+
 class NewsConfig(BaseModel):
     model_config = ConfigDict(extra="ignore")
     news_api_key: Optional[str] = None
@@ -462,7 +476,7 @@ def save_config(new_settings: Settings):
         raise
 
 
-def format_time(dt: Any, time_format: Optional[str] = None) -> str:
+def format_time(dt: arrow.Arrow, time_format: Optional[str] = None) -> str:
     """
     Format a datetime object according to the time_format setting.
 

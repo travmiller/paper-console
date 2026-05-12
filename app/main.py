@@ -86,6 +86,7 @@ from app.config import (
     save_config,
     load_config,
     WebhookConfig,
+    PrintWebhookConfig,
     TextConfig,
     CalendarConfig,
     EmailConfig,
@@ -108,7 +109,7 @@ from app.module_registry import (
 )
 
 # Legacy imports for modules with special handling (can be removed after full migration)
-from app.modules import email_client, webhook, text, calendar
+from app.modules import email_client, webhook, text, calendar, print_webhook, weather
 
 from app.routers import wifi
 import app.device_password as device_password
@@ -137,6 +138,10 @@ async def save_settings_background(settings_snapshot: Settings):
 email_polling_task = None
 scheduler_task = None
 task_monitor_task = None
+WEATHER_PREFETCH_MIN_LEAD_SECONDS = 120
+WEATHER_PREFETCH_MAX_LEAD_SECONDS = 240
+WEATHER_PREFETCH_RETRY_SECONDS = 30
+_weather_prefetch_state: Dict[str, Dict[str, object]] = {}
 
 
 def _printer_is_available() -> bool:
@@ -244,6 +249,145 @@ async def email_polling_loop():
             await asyncio.sleep(60)  # Wait before retrying on error
 
 
+def _iter_weather_modules_for_channel(channel: Optional[ChannelConfig]) -> List[ModuleInstance]:
+    """Return non-interactive weather modules assigned to a channel."""
+    if not channel or not getattr(channel, "modules", None):
+        return []
+
+    weather_modules: List[ModuleInstance] = []
+    for assignment in channel.modules:
+        module = settings.modules.get(assignment.module_id)
+        if module and module.type == "weather":
+            weather_modules.append(module)
+    return weather_modules
+
+
+def _parse_scheduled_datetime(
+    now: arrow.Arrow, schedule_time: str
+) -> Optional[arrow.Arrow]:
+    """Build the next scheduled Arrow timestamp for a HH:MM schedule entry."""
+    try:
+        scheduled_for = arrow.get(
+            f"{now.format('YYYY-MM-DD')} {schedule_time}",
+            "YYYY-MM-DD HH:mm",
+            tzinfo=now.tzinfo,
+        )
+    except (TypeError, ValueError, arrow.parser.ParserError):
+        return None
+
+    if scheduled_for <= now:
+        scheduled_for = scheduled_for.shift(days=1)
+    return scheduled_for
+
+
+def _weather_prefetch_lead_seconds(module_id: str, scheduled_for: arrow.Arrow) -> int:
+    """Spread prefetch start times across the 2-4 minute warm-up window."""
+    window = WEATHER_PREFETCH_MAX_LEAD_SECONDS - WEATHER_PREFETCH_MIN_LEAD_SECONDS
+    if window <= 0:
+        return WEATHER_PREFETCH_MIN_LEAD_SECONDS
+
+    seed = f"{module_id}:{scheduled_for.strftime('%Y-%m-%dT%H:%M')}"
+    digest = hashlib.sha1(seed.encode("utf-8")).digest()
+    offset = int.from_bytes(digest[:2], "big") % (window + 1)
+    return WEATHER_PREFETCH_MIN_LEAD_SECONDS + offset
+
+
+def _weather_prefetch_slot_key(module_id: str, scheduled_for: arrow.Arrow) -> str:
+    """Identify one weather module's prefetch work for one scheduled run."""
+    return f"{module_id}:{scheduled_for.strftime('%Y-%m-%dT%H:%M')}"
+
+
+def _cleanup_weather_prefetch_state(now: arrow.Arrow) -> None:
+    """Forget prefetch bookkeeping once a scheduled slot is well in the past."""
+    stale_keys = [
+        key
+        for key, state in _weather_prefetch_state.items()
+        if isinstance(state.get("scheduled_for"), arrow.Arrow)
+        and state["scheduled_for"] < now.shift(minutes=-15)
+    ]
+    for key in stale_keys:
+        _weather_prefetch_state.pop(key, None)
+
+
+async def _prefetch_weather_module_for_schedule(
+    module: ModuleInstance, scheduled_for: arrow.Arrow, slot_key: str
+) -> None:
+    """Warm weather data in a worker thread for an upcoming scheduled print."""
+    state = _weather_prefetch_state.setdefault(slot_key, {})
+    state["in_flight"] = True
+    state["last_attempt_at"] = time.monotonic()
+
+    try:
+        result = await asyncio.to_thread(
+            weather.prefetch_weather,
+            module.config or {},
+            module_id=module.id,
+        )
+        state["success"] = bool(result.get("ok", False))
+        if not state["success"]:
+            logger.warning(
+                "Weather prefetch failed for module_id=%s schedule=%s error=%s",
+                module.id,
+                scheduled_for.isoformat(timespec="minutes"),
+                result.get("error"),
+            )
+    except Exception:
+        state["success"] = False
+        logger.exception(
+            "Weather prefetch crashed for module_id=%s schedule=%s",
+            module.id,
+            scheduled_for.isoformat(timespec="minutes"),
+        )
+    finally:
+        state["in_flight"] = False
+
+
+async def _run_weather_prefetch_cycle(now: arrow.Arrow) -> None:
+    """Warm weather modules that have scheduled prints approaching soon."""
+    _cleanup_weather_prefetch_state(now)
+
+    for channel in settings.channels.values():
+        weather_modules = _iter_weather_modules_for_channel(channel)
+        if not weather_modules or not getattr(channel, "schedule", None):
+            continue
+
+        for schedule_time in channel.schedule:
+            scheduled_for = _parse_scheduled_datetime(now, schedule_time)
+            if scheduled_for is None:
+                continue
+
+            seconds_until = (scheduled_for - now).total_seconds()
+            if seconds_until <= 0 or seconds_until > WEATHER_PREFETCH_MAX_LEAD_SECONDS:
+                continue
+
+            for module in weather_modules:
+                slot_key = _weather_prefetch_slot_key(module.id, scheduled_for)
+                state = _weather_prefetch_state.setdefault(
+                    slot_key,
+                    {
+                        "scheduled_for": scheduled_for,
+                        "in_flight": False,
+                        "success": False,
+                        "last_attempt_at": None,
+                    },
+                )
+                lead_seconds = _weather_prefetch_lead_seconds(module.id, scheduled_for)
+                prefetch_at = scheduled_for.shift(seconds=-lead_seconds)
+                if now < prefetch_at or state.get("success") or state.get("in_flight"):
+                    continue
+
+                last_attempt_at = state.get("last_attempt_at")
+                if isinstance(last_attempt_at, (int, float)):
+                    if (time.monotonic() - last_attempt_at) < WEATHER_PREFETCH_RETRY_SECONDS:
+                        continue
+
+                state["in_flight"] = True
+                state["last_attempt_at"] = time.monotonic()
+                asyncio.create_task(
+                    _prefetch_weather_module_for_schedule(module, scheduled_for, slot_key)
+                )
+
+
 async def scheduler_loop():
     """
     Evaluate channel schedules every 10 seconds using cron expressions.
@@ -260,6 +404,7 @@ async def scheduler_loop():
                 fallback="UTC",
             )
             now = arrow.now(configured_timezone)
+            await _run_weather_prefetch_cycle(now)
             current_time = now.format("HH:mm")
             current_minute_key = now.floor("minute").format("YYYY-MM-DD HH:mm")
 
@@ -328,7 +473,7 @@ async def scheduler_loop():
                             pos,
                         )
                         continue
-                    await trigger_channel(pos)
+                    await trigger_channel(pos, scheduled=True)
 
         except Exception:
             logger.exception("Scheduler loop encountered an unexpected error")
@@ -2254,6 +2399,30 @@ def _is_release_newer_than_current(latest_version: str, current_version: str) ->
     return latest_version != current_version
 
 
+def _is_prerelease_tag(tag_name: str) -> bool:
+    semver = _parse_semver_tag(tag_name)
+    return bool(semver and semver[3])
+
+
+def _is_release_target_available(
+    target_version: str,
+    current_version: str,
+    *,
+    release_channel: str,
+) -> bool:
+    if not target_version or target_version == current_version:
+        return False
+
+    if _is_release_newer_than_current(target_version, current_version):
+        return True
+
+    return (
+        release_channel == "stable"
+        and _is_prerelease_tag(current_version)
+        and not _is_prerelease_tag(target_version)
+    )
+
+
 def _select_release_from_list(
     releases: object,
     *,
@@ -2753,7 +2922,11 @@ async def check_for_updates():
                 "release_channel": release_channel,
             }
 
-        if not _is_release_newer_than_current(latest_version, current_version):
+        if not _is_release_target_available(
+            latest_version,
+            current_version,
+            release_channel=release_channel,
+        ):
             return {
                 "available": False,
                 "up_to_date": True,
@@ -3989,23 +4162,23 @@ def _normalize_text_module_config(module: ModuleInstance) -> None:
     module.config = config
 
 
-def _slugify_incoming_webhook_endpoint(value: str) -> str:
+def _slugify_print_webhook_endpoint(value: str) -> str:
     slug = re.sub(r"[^a-z0-9-]+", "-", (value or "").strip().lower())
     slug = slug.strip("-")
     return slug or f"hook-{uuid.uuid4().hex[:8]}"
 
 
-def _normalize_incoming_webhook_module_config(module: ModuleInstance) -> None:
-    if module.type != "incoming_webhook":
+def _normalize_print_webhook_module_config(module: ModuleInstance) -> None:
+    if module.type != "print_webhook":
         return
 
     config = module.config if isinstance(module.config, dict) else {}
 
     if not config.get("endpoint_path"):
-        seed = module.name or module.id or "incoming-webhook"
-        config["endpoint_path"] = _slugify_incoming_webhook_endpoint(seed)
+        seed = module.name or module.id or "print-webhook"
+        config["endpoint_path"] = _slugify_print_webhook_endpoint(seed)
     else:
-        config["endpoint_path"] = _slugify_incoming_webhook_endpoint(
+        config["endpoint_path"] = _slugify_print_webhook_endpoint(
             str(config["endpoint_path"])
         )
 
@@ -4023,11 +4196,11 @@ def _normalize_incoming_webhook_module_config(module: ModuleInstance) -> None:
     module.config = config
 
 
-def _validate_incoming_webhook_endpoint_uniqueness(
+def _validate_print_webhook_endpoint_uniqueness(
     module_id: str,
     module: ModuleInstance,
 ) -> None:
-    if module.type != "incoming_webhook":
+    if module.type != "print_webhook":
         return
 
     endpoint_path = str((module.config or {}).get("endpoint_path") or "").strip().strip("/")
@@ -4035,7 +4208,7 @@ def _validate_incoming_webhook_endpoint_uniqueness(
         raise HTTPException(status_code=400, detail="Endpoint path is required")
 
     for existing_id, existing in settings.modules.items():
-        if existing_id == module_id or existing.type != "incoming_webhook":
+        if existing_id == module_id or existing.type != "print_webhook":
             continue
         existing_path = str((existing.config or {}).get("endpoint_path") or "").strip().strip("/")
         if existing_path == endpoint_path:
@@ -4067,9 +4240,9 @@ async def create_module(module: ModuleInstance, background_tasks: BackgroundTask
         module.id = str(uuid.uuid4())
 
     _normalize_text_module_config(module)
-    _normalize_incoming_webhook_module_config(module)
+    _normalize_print_webhook_module_config(module)
     _convert_and_resize_image_module_config(module)
-    _validate_incoming_webhook_endpoint_uniqueness(module.id, module)
+    _validate_print_webhook_endpoint_uniqueness(module.id, module)
     settings.modules[module.id] = module
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
@@ -4099,9 +4272,9 @@ async def update_module(
     # Ensure ID matches
     module.id = module_id
     _normalize_text_module_config(module)
-    _normalize_incoming_webhook_module_config(module)
+    _normalize_print_webhook_module_config(module)
     _convert_and_resize_image_module_config(module)
-    _validate_incoming_webhook_endpoint_uniqueness(module_id, module)
+    _validate_print_webhook_endpoint_uniqueness(module_id, module)
     settings.modules[module_id] = module
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
@@ -4320,7 +4493,7 @@ async def update_channel_schedule(
 # --- EVENT ROUTER ---
 
 
-def execute_module(module: ModuleInstance) -> bool:
+def execute_module(module: ModuleInstance, *, scheduled: bool = False) -> bool:
     """
     Execute a single module instance using the module registry.
 
@@ -4368,15 +4541,20 @@ def execute_module(module: ModuleInstance) -> bool:
             # Most modules use (printer, config, module_name). Interactive
             # modules can opt into the real instance ID for per-module state.
             params = inspect.signature(module_def.execute_fn).parameters
-            accepts_module_id = "module_id" in params or any(
+            accepts_kwargs = any(
                 p.kind == inspect.Parameter.VAR_KEYWORD for p in params.values()
             )
-            if accepts_module_id:
+            execute_kwargs = {}
+            if "module_id" in params or accepts_kwargs:
+                execute_kwargs["module_id"] = module.id
+            if "scheduled" in params or accepts_kwargs:
+                execute_kwargs["scheduled"] = scheduled
+            if execute_kwargs:
                 module_def.execute_fn(
                     printer,
                     config,
                     module_name,
-                    module_id=module.id,
+                    **execute_kwargs,
                 )
             else:
                 module_def.execute_fn(printer, config, module_name)
@@ -4402,7 +4580,7 @@ def execute_module(module: ModuleInstance) -> bool:
         return False
 
 
-async def trigger_channel(position: int):
+async def trigger_channel(position: int, *, scheduled: bool = False):
     """
     Executes all modules assigned to a specific channel position.
     Runs blocking printer operations in a thread pool to avoid blocking the event loop.
@@ -4463,7 +4641,7 @@ async def trigger_channel(position: int):
 
         # 1. Execute all standard modules first
         for module in standard_modules:
-            execute_module(module)
+            execute_module(module, scheduled=scheduled)
 
             # Separator between modules (unless it's the last standard one)
             if module != standard_modules[-1]:
@@ -4494,7 +4672,7 @@ async def trigger_channel(position: int):
             # Single interactive module - run it directly
             if standard_modules:
                 printer.feed(2)  # Separator from previous content
-            execute_module(interactive_modules[0])
+            execute_module(interactive_modules[0], scheduled=scheduled)
 
         else:
             # Multiple interactive modules - show selection menu
@@ -4562,7 +4740,7 @@ async def trigger_channel(position: int):
                     if hasattr(hw_printer, "reset_buffer"):
                         hw_printer.reset_buffer()
 
-                    execute_module(target_module)
+                    execute_module(target_module, scheduled=scheduled)
 
                     if hasattr(hw_printer, "flush_buffer"):
                         hw_printer.flush_buffer()
@@ -4722,10 +4900,10 @@ async def print_module_direct(module_id: str):
         _clear_print_reservation(clear_hold=False)
 
 
-def _find_incoming_webhook_module_by_path(endpoint_path: str) -> Optional[ModuleInstance]:
+def _find_print_webhook_module_by_path(endpoint_path: str) -> Optional[ModuleInstance]:
     endpoint_path = endpoint_path.strip().strip("/")
     for module in settings.modules.values():
-        if module.type != "incoming_webhook":
+        if module.type != "print_webhook":
             continue
         config = module.config or {}
         if str(config.get("endpoint_path") or "").strip().strip("/") == endpoint_path:
@@ -4752,6 +4930,132 @@ def _module_is_assigned_to_current_channel(module_id: str) -> bool:
         return False
 
     return any(assignment.module_id == module_id for assignment in channel.modules)
+
+
+def _build_print_webhook_metadata_lines(
+    request: Request,
+    config: PrintWebhookConfig,
+) -> List[str]:
+    lines: List[str] = []
+
+    client_host = getattr(request.client, "host", None)
+    if config.print_sender_ip and client_host:
+        lines.append(f"From: {client_host}")
+
+    if config.print_content_type:
+        content_type = print_webhook.normalize_content_type(
+            request.headers.get("content-type", "")
+        )
+        if content_type:
+            lines.append(f"Type: {content_type}")
+
+    if config.print_user_agent:
+        user_agent = (request.headers.get("user-agent") or "").strip()
+        if user_agent:
+            lines.append(f"UA: {user_agent}")
+
+    return lines
+
+
+def _print_print_webhook_job_sync(module_id: str, job: dict) -> None:
+    module = settings.modules.get(module_id)
+    if not module or module.type != "print_webhook":
+        return
+
+    config = PrintWebhookConfig(**(module.config or {}))
+    module_name = module.name or "PRINT WEBHOOK"
+
+    if hasattr(printer, "blip"):
+        printer.blip()
+
+    max_lines = getattr(settings, "max_print_lines", 200)
+    if hasattr(printer, "reset_buffer"):
+        printer.reset_buffer(max_lines)
+
+    print_webhook.print_parsed_job(printer, job, config, module_name)
+
+    if hasattr(printer, "flush_buffer"):
+        printer.flush_buffer()
+
+
+async def _run_print_webhook_print_job(module_id: str, job: dict) -> None:
+    try:
+        await asyncio.to_thread(_print_print_webhook_job_sync, module_id, job)
+    finally:
+        _clear_print_reservation(clear_hold=False)
+
+
+@app.post("/hook/{endpoint_path:path}")
+async def receive_print_webhook(
+    endpoint_path: str,
+    request: Request,
+    background_tasks: BackgroundTasks,
+):
+    module = _find_print_webhook_module_by_path(endpoint_path)
+    if not module:
+        raise HTTPException(status_code=404, detail="Webhook endpoint not found")
+
+    config = PrintWebhookConfig(**(module.config or {}))
+    bearer_token = _extract_bearer_token(request)
+    if config.token and bearer_token != config.token:
+        raise HTTPException(status_code=401, detail="Invalid bearer token")
+
+    if not _module_is_assigned_to_current_channel(module.id):
+        raise HTTPException(
+            status_code=503,
+            detail="Print webhook module is not on the active channel",
+        )
+
+    body = await request.body()
+    try:
+        job = print_webhook.parse_request_payload(
+            content_type=request.headers.get("content-type", ""),
+            body=body,
+            config=config,
+            module_name=module.name or "PRINT WEBHOOK",
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    metadata_lines = _build_print_webhook_metadata_lines(request, config)
+    if metadata_lines:
+        job["metadata_lines"] = metadata_lines
+
+    if not _try_begin_print_job(debounce=False):
+        raise HTTPException(status_code=423, detail="Printer is already busy")
+
+    background_tasks.add_task(_run_print_webhook_print_job, module.id, job)
+    return Response(
+        content='{"message":"Print request accepted"}',
+        status_code=202,
+        media_type="application/json",
+    )
+
+
+@app.post("/debug/test-webhook", dependencies=[Depends(require_admin_access)])
+async def test_webhook(action: WebhookConfig):
+    """
+    Executes a custom webhook immediately for testing.
+    Pass the webhook configuration in the body.
+    Runs blocking operations in a thread pool to avoid blocking the event loop.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    def _run_webhook():
+        webhook.run_webhook(action, printer, module_name=None)
+
+    try:
+        loop = asyncio.get_event_loop()
+        with ThreadPoolExecutor() as executor:
+            await loop.run_in_executor(executor, _run_webhook)
+    except Exception as e:
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error in test_webhook: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500, detail=f"Webhook execution failed: {str(e)}"
+        )
+
+    return {"message": "Webhook executed"}
 
 
 def _preview_webhook_sync(config: dict):

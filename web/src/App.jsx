@@ -339,7 +339,7 @@ function App() {
         auth_username: '',
         auth_password: '',
       },
-      incoming_webhook: {
+      print_webhook: {
         token: '',
         endpoint_path: '',
         print_header: '',

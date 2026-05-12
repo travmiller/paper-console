@@ -21,7 +21,6 @@ from app.modules import news as news_module
 from app.modules import calendar as calendar_module
 from app.modules import history as history_module
 from app import factory_reset as factory_reset_module
-from datetime import timedelta, timezone
 import arrow
 
 
@@ -448,7 +447,7 @@ def test_check_for_updates_falls_back_to_stable_when_beta_lane_has_no_prerelease
     assert result["release_channel"] == "beta"
 
 
-def test_check_for_updates_does_not_offer_semver_downgrade(monkeypatch, tmp_path):
+def test_check_for_updates_offers_stable_channel_switch_from_beta(monkeypatch, tmp_path):
     project_root = tmp_path / "project"
     app_dir = project_root / "app"
     app_dir.mkdir(parents=True)
@@ -484,9 +483,54 @@ def test_check_for_updates_does_not_offer_semver_downgrade(monkeypatch, tmp_path
 
     result = asyncio.run(main_module.check_for_updates())
 
+    assert result["available"] is True
+    assert result["up_to_date"] is False
+    assert result["current_version"] == "v0.2.11-beta.2"
+    assert result["latest_version"] == "v0.2.10"
+    assert result["release_channel"] == "stable"
+
+
+def test_check_for_updates_does_not_offer_older_stable_target_from_stable(
+    monkeypatch, tmp_path
+):
+    project_root = tmp_path / "project"
+    app_dir = project_root / "app"
+    app_dir.mkdir(parents=True)
+    fake_main_path = app_dir / "main.py"
+    fake_main_path.write_text("# test stub\n", encoding="utf-8")
+    (project_root / ".version").write_text("v0.2.11\n", encoding="utf-8")
+
+    class DummyResponse:
+        def raise_for_status(self):
+            return None
+
+        def json(self):
+            return [
+                {"tag_name": "v0.2.10", "draft": False, "prerelease": False},
+            ]
+
+    def fake_requests_get(url, headers=None, timeout=None):  # noqa: ARG001
+        assert url.endswith("/releases")
+        return DummyResponse()
+
+    monkeypatch.setattr(main_module, "__file__", str(fake_main_path))
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        types.SimpleNamespace(release_channel="stable"),
+        raising=False,
+    )
+    monkeypatch.setitem(
+        sys.modules,
+        "requests",
+        types.SimpleNamespace(get=fake_requests_get),
+    )
+
+    result = asyncio.run(main_module.check_for_updates())
+
     assert result["available"] is False
     assert result["up_to_date"] is True
-    assert result["current_version"] == "v0.2.11-beta.2"
+    assert result["current_version"] == "v0.2.11"
     assert result["latest_version"] == "v0.2.10"
     assert result["release_channel"] == "stable"
 
@@ -930,8 +974,8 @@ def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
             return None
         raise asyncio.CancelledError
 
-    async def fake_trigger_channel(position):
-        triggered.append(position)
+    async def fake_trigger_channel(position, scheduled=False):
+        triggered.append((position, scheduled))
 
     monkeypatch.setattr(main_module.arrow, "now", lambda *_args, **_kwargs: frozen_now)
     monkeypatch.setattr(main_module.asyncio, "sleep", fake_sleep)
@@ -956,6 +1000,42 @@ def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
 
     assert triggered == []
     main_module._clear_print_reservation()
+
+
+def test_run_weather_prefetch_cycle_warms_upcoming_scheduled_weather(monkeypatch):
+    calls = []
+    main_module._weather_prefetch_state.clear()
+
+    async def run_cycle():
+        await main_module._run_weather_prefetch_cycle(
+            arrow.get("2026-04-03T07:57:30")
+        )
+        await asyncio.sleep(0)
+
+    module = types.SimpleNamespace(id="weather-one", type="weather", config={"city_name": "Worcester"})
+    channel = ChannelConfig(
+        modules=[ChannelModuleAssignment(module_id="weather-one", order=0)],
+        schedule=["08:00"],
+    )
+
+    monkeypatch.setattr(
+        main_module,
+        "settings",
+        types.SimpleNamespace(
+            channels={1: channel},
+            modules={"weather-one": module},
+        ),
+    )
+    monkeypatch.setattr(main_module, "_weather_prefetch_lead_seconds", lambda *_args: 180)
+    monkeypatch.setattr(
+        main_module.weather,
+        "prefetch_weather",
+        lambda config, module_id=None: calls.append((module_id, dict(config or {}))) or {"ok": True},
+    )
+
+    asyncio.run(run_cycle())
+
+    assert calls == [("weather-one", {"city_name": "Worcester"})]
 
 
 def test_printer_driver_handles_serial_init_failure(monkeypatch):
@@ -1021,19 +1101,18 @@ def test_news_module_uses_configurable_country_and_page_size(monkeypatch):
 
 
 def test_calendar_rrule_respects_exdate_in_window():
-    now = arrow.now(timezone.utc).floor("day").datetime
-    start = now + timedelta(hours=9)
-    skip = start + timedelta(days=1)
+    now = arrow.now("UTC").floor("day")
+    start = now.shift(hours=9)
+    skip = start.shift(days=1)
 
-    dt_fmt = "%Y%m%dT%H%M%SZ"
     ics = "\r\n".join(
         [
             "BEGIN:VCALENDAR",
             "VERSION:2.0",
             "BEGIN:VEVENT",
-            f"DTSTART:{start.strftime(dt_fmt)}",
+            f"DTSTART:{start.format('YYYYMMDDTHHmmss')}Z",
             "RRULE:FREQ=DAILY;COUNT=3",
-            f"EXDATE:{skip.strftime(dt_fmt)}",
+            f"EXDATE:{skip.format('YYYYMMDDTHHmmss')}Z",
             "SUMMARY:Recurring test event",
             "END:VEVENT",
             "END:VCALENDAR",
@@ -1046,7 +1125,7 @@ def test_calendar_rrule_respects_exdate_in_window():
 
     assert start.date() in event_days
     assert skip.date() not in event_days
-    assert (start + timedelta(days=2)).date() in event_days
+    assert start.shift(days=2).date() in event_days
 
 
 def test_calendar_config_accepts_ui_sources_without_label():
@@ -1539,10 +1618,11 @@ def test_execute_module_passes_instance_id_to_modules_that_accept_it(monkeypatch
 
     captured = {}
 
-    def fake_execute(printer, config, module_name, module_id=None):  # noqa: ARG001
+    def fake_execute(printer, config, module_name, module_id=None, scheduled=False):  # noqa: ARG001
         captured["module_id"] = module_id
         captured["module_name"] = module_name
         captured["config"] = config
+        captured["scheduled"] = scheduled
 
     monkeypatch.setattr(
         main_module,
@@ -1557,11 +1637,12 @@ def test_execute_module_passes_instance_id_to_modules_that_accept_it(monkeypatch
         config={"reset_game": False},
     )
 
-    assert main_module.execute_module(module) is True
+    assert main_module.execute_module(module, scheduled=True) is True
     assert captured == {
         "module_id": "adventure-one",
         "module_name": "Cave Run",
         "config": {"reset_game": False},
+        "scheduled": True,
     }
 
 

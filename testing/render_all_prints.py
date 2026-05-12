@@ -19,7 +19,6 @@ from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 from typing import Optional
-from datetime import date, timedelta
 import arrow
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -194,11 +193,11 @@ class CapturePrinter(SerialPrinterDriver):
         self._max_lines_hit = False
 
 
-def _build_snapshot_calendar_ics(reference_day: Optional[date] = None) -> str:
-    today = reference_day or date.today()
+def _build_snapshot_calendar_ics(reference_day: Optional[object] = None) -> str:
+    today = arrow.get(reference_day).date() if reference_day is not None else arrow.now().date()
     timed_one = arrow.get(today).shift(hours=9, minutes=30).naive
-    timed_two = arrow.get(today + timedelta(days=1)).shift(hours=18).naive
-    all_day = today + timedelta(days=3)
+    timed_two = arrow.get(today).shift(days=1, hours=18).naive
+    all_day = arrow.get(today).shift(days=3).date()
     return "\r\n".join(
         [
             "BEGIN:VCALENDAR",

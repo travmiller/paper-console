@@ -6,7 +6,6 @@ import threading
 import time
 import unicodedata
 import logging
-from datetime import date
 from typing import List, Optional, Any
 
 import serial

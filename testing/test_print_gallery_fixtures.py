@@ -1,9 +1,9 @@
 """Regression tests for snapshot gallery fixture data."""
 
-from datetime import date
 import importlib.util
 from pathlib import Path
 
+import arrow
 from app.config import CalendarConfig
 from app.drivers.printer_mock import PrinterDriver
 from app.modules import calendar as calendar_module
@@ -76,7 +76,7 @@ def test_calendar_view_mode_snapshots_force_day_and_week(monkeypatch, tmp_path):
 
 
 def test_calendar_day_view_prints_agenda_list():
-    today = date.today()
+    today = arrow.now().date()
     captured = []
 
     class FakePrinter:
@@ -152,7 +152,7 @@ def test_snapshot_email_defaults_override_live_credentials_with_mock():
 
 
 def test_calendar_receipt_accepts_mock_ics_content(capsys):
-    today = date.today()
+    today = arrow.now().date()
     ics = "\r\n".join(
         [
             "BEGIN:VCALENDAR",
@@ -233,7 +233,7 @@ def test_history_reference_date_uses_target_day(monkeypatch, capsys):
     )
 
     output = capsys.readouterr().out
-    assert captured["target_date"] == date(1969, 7, 20)
+    assert captured["target_date"] == arrow.get("1969-07-20").floor("day")
     assert captured["items"] == [
         {"year": 1969, "text": "First event"},
         {"year": 1970, "text": "Second event"},

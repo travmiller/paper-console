@@ -10,9 +10,6 @@ Coverage:
 """
 
 import pytest
-import datetime as dt
-from datetime import timedelta
-from zoneinfo import ZoneInfo
 
 import arrow
 from croniter import croniter
@@ -349,9 +346,9 @@ class TestCronEvaluation:
     def test_daily_cron_next_occurrence(self):
         """Daily cron should have next occurrence within 24 hours."""
         cron_expr = "30 14 * * *"
-        base = dt.datetime(2026, 5, 8, 12, 0, 0)
+        base = arrow.get("2026-05-08T12:00:00").naive
         cron = croniter(cron_expr, base)
-        next_run = cron.get_next(dt.datetime)
+        next_run = arrow.get(cron.get_next(float)).naive
         
         # Next run should be within 24 hours
         delta = (next_run - base).total_seconds()
@@ -360,10 +357,10 @@ class TestCronEvaluation:
     def test_weekday_cron_skips_weekends(self):
         """Weekday cron (MON-FRI) should skip weekend dates."""
         cron_expr = "0 9 * * MON-FRI"
-        cron = croniter(cron_expr, dt.datetime(2026, 5, 8, 0, 0))  # Friday
+        cron = croniter(cron_expr, arrow.get("2026-05-08T00:00:00").naive)  # Friday
         
         # Get next 3 runs
-        runs = [cron.get_next(dt.datetime) for _ in range(3)]
+        runs = [arrow.get(cron.get_next(float)).naive for _ in range(3)]
         
         # All should be weekdays
         for run in runs:
@@ -381,7 +378,7 @@ class TestCronEvaluation:
         now_ny = arrow.now(tz_ny).naive
 
         cron = croniter(cron_expr, now_ny)
-        next_run = cron.get_next(dt.datetime)
+        next_run = arrow.get(cron.get_next(float))
         
         # Next run should be 14:00 in NY time
         assert next_run.hour == 14
@@ -406,7 +403,7 @@ class TestSchedulerTriggerLogic:
         tz_obj = pytz.timezone(rule_tz)
         
         # Create a specific time: 2:00 PM on a Monday in NYC
-        now_ny = tz_obj.localize(dt.datetime(2026, 5, 11, 14, 0, 0))
+        now_ny = arrow.get(2026, 5, 11, 14, 0, 0, tzinfo=tz_obj).datetime
         now_naive = now_ny.replace(tzinfo=None)
         
         cron_expr = "0 14 * * *"
@@ -414,7 +411,7 @@ class TestSchedulerTriggerLogic:
         
         # The current time 2:00 PM should be a valid cron occurrence
         # (next run from 2:00 PM should be tomorrow at 2:00 PM)
-        next_run = cron.get_next(dt.datetime)
+        next_run = arrow.get(cron.get_next(float))
         assert next_run.hour == 14
         assert next_run.minute == 0
         # It should be tomorrow
@@ -430,13 +427,13 @@ class TestSchedulerTriggerLogic:
         cron_expr = "0 14 * * *"
         
         # Create two croniter instances at same time
-        test_time = dt.datetime(2026, 5, 11, 14, 0, 0)
+        test_time = arrow.get("2026-05-11T14:00:00").naive
         cron1 = croniter(cron_expr, test_time)
         cron2 = croniter(cron_expr, test_time)
         
         # Both should give same next run
-        next1 = cron1.get_next(dt.datetime)
-        next2 = cron2.get_next(dt.datetime)
+        next1 = arrow.get(cron1.get_next(float))
+        next2 = arrow.get(cron2.get_next(float))
         
         assert next1 == next2
 

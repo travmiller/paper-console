@@ -1,8 +1,6 @@
 import json
 from typing import Dict, Any, List
 from pathlib import Path
-from datetime import date
-import datetime as dt
 import arrow
 from app.utils import wrap_text, wrap_text_pixels
 from PIL import Image, ImageDraw
@@ -11,7 +9,7 @@ from app.module_registry import register_module
 LOCAL_DB_PATH = Path(__file__).resolve().parent.parent / "data" / "history.json"
 
 
-def get_events_for_date(target_date: date) -> List[str]:
+def get_events_for_date(target_date: arrow.Arrow) -> List[str]:
     """Reads events for a specific date from the local database."""
     month = str(target_date.month)
     day = str(target_date.day)
@@ -33,26 +31,22 @@ def get_events_for_date(target_date: date) -> List[str]:
 
 def get_events_for_today() -> List[str]:
     """Reads events for the current date from the local database."""
-    return get_events_for_date(arrow.now().date())
+    return get_events_for_date(arrow.now())
 
 
-def _resolve_reference_date(config: Dict[str, Any] | None) -> date:
+def _resolve_reference_date(config: Dict[str, Any] | None) -> arrow.Arrow:
     if not config:
-        return arrow.now().date()
+        return arrow.now().floor("day")
 
     raw_value = config.get("reference_date")
     if isinstance(raw_value, arrow.Arrow):
-        return raw_value.date()
-    if isinstance(raw_value, dt.datetime):
-        return raw_value.date()
-    if isinstance(raw_value, date):
-        return raw_value
-    if isinstance(raw_value, str):
+        return raw_value.floor("day")
+    if raw_value is not None:
         try:
-            return arrow.get(raw_value).date()
+            return arrow.get(raw_value).floor("day")
         except Exception:
             pass
-    return arrow.now().date()
+    return arrow.now().floor("day")
 
 
 @register_module(
@@ -96,7 +90,7 @@ def format_history_receipt(
 
     # Header
     printer.print_header(module_name or "ON THIS DAY", icon="hourglass")
-    printer.print_caption(target_date.strftime("%B %d, %Y"))
+    printer.print_caption(target_date.format("MMMM DD, YYYY"))
     printer.print_line()
 
     if not selected_events:

@@ -141,6 +141,19 @@ function configForType(typeId) {
       return { ical_sources: [], view_mode: "month" };
     case "webhook":
       return { url: "", method: "GET", headers: {}, json_path: "" };
+    case "print_webhook":
+      return {
+        token: "",
+        endpoint_path: "",
+        print_header: "",
+        print_sender_ip: false,
+        print_content_type: false,
+        print_user_agent: false,
+        accept_text: true,
+        accept_images: true,
+        accept_json: true,
+        max_image_height_dots: 4096,
+      };
     case "text":
       return {
         content_doc: { type: "doc", content: [{ type: "paragraph" }] },

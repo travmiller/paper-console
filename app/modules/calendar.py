@@ -1,8 +1,6 @@
 import requests
 import pytz
 import logging
-import datetime as dt
-from datetime import timedelta, date
 from typing import List, Dict, Any, Optional
 from icalendar import Calendar
 from dateutil.rrule import rrulestr
@@ -17,6 +15,26 @@ import arrow
 APP_CONFIG = app.config  # Alias to avoid confusion if needed
 logger = logging.getLogger(__name__)
 MAX_ICS_BYTES = 1024 * 1024
+
+
+def _today_local():
+    return arrow.now().date()
+
+
+def _tomorrow_local():
+    return arrow.now().shift(days=1).date()
+
+
+def _month_start(day_value):
+    return arrow.get(day_value).floor("month").date()
+
+
+def _next_month_start(day_value):
+    return arrow.get(day_value).shift(months=1).floor("month").date()
+
+
+def _coerce_date(value):
+    return arrow.get(value).date()
 
 
 def fetch_ics(url: str) -> Optional[str]:
@@ -37,7 +55,7 @@ def fetch_ics(url: str) -> Optional[str]:
 
 def parse_events(
     ics_content: str, days_to_show: int, timezone_str: str
-) -> Dict[date, List[Dict]]:
+) -> Dict[object, List[Dict]]:
     """
     Parses ICS content and returns events grouped by date.
     Only includes events for Today -> Today + days_to_show.
@@ -56,15 +74,15 @@ def parse_events(
     except:
         local_tz = pytz.UTC
 
-    now = arrow.now(local_tz).datetime
+    now = arrow.now(local_tz)
     today = now.date()
-    end_date = today + timedelta(days=days_to_show)
+    end_date = now.shift(days=days_to_show).date()
 
     # We want a window of time to search for events
     # Start from beginning of today
-    start_dt = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    start_dt = now.floor("day").datetime
     # End at end of the last day
-    end_dt = start_dt + timedelta(days=days_to_show)
+    end_dt = now.floor("day").shift(days=days_to_show).datetime
 
     events_by_day = {}
 
@@ -80,19 +98,15 @@ def parse_events(
             start = dtstart.dt
 
             # Handle all-day events (date objects)
-            is_all_day = False
-            if not isinstance(start, dt.datetime):
-                is_all_day = True
-                # Convert to datetime for comparison logic (midnight local)
-                # Note: All day events in ICS usually don't have TZ, so we assume local context or keep naive?
-                # Usually safe to treat as date.
-                pass
+            is_all_day = not hasattr(start, "hour")
+            if is_all_day:
+                start = arrow.get(start).date()
             else:
                 # Ensure timezone awareness
                 if start.tzinfo is None:
-                    start = local_tz.localize(start)
+                    start = arrow.get(start, tzinfo=local_tz).datetime
                 else:
-                    start = start.astimezone(local_tz)
+                    start = arrow.get(start).to(local_tz).datetime
 
             event_instances = []
 
@@ -101,7 +115,7 @@ def parse_events(
                 try:
                     rrule_start = start
                     if is_all_day:
-                        rrule_start = dt.datetime.combine(start, dt.time.min)
+                        rrule_start = arrow.get(start).floor("day").naive
 
                     rule = rrulestr(
                         component["RRULE"].to_ical().decode(), dtstart=rrule_start
@@ -132,17 +146,17 @@ def parse_events(
                         for ex in exdate_props:
                             for ex_dt_val in getattr(ex, "dts", []):
                                 ex_dt = ex_dt_val.dt
-                                if isinstance(ex_dt, dt.datetime):
+                                if hasattr(ex_dt, "hour"):
                                     if ex_dt.tzinfo is None and rrule_start.tzinfo is not None:
-                                        ex_dt = local_tz.localize(ex_dt)
+                                        ex_dt = arrow.get(ex_dt, tzinfo=local_tz).datetime
                                     elif (
                                         ex_dt.tzinfo is not None
                                         and rrule_start.tzinfo is not None
                                     ):
-                                        ex_dt = ex_dt.astimezone(local_tz)
+                                        ex_dt = arrow.get(ex_dt).to(local_tz).datetime
                                     exdate_keys.add(ex_dt)
                                 else:
-                                    exdate_keys.add(ex_dt)
+                                    exdate_keys.add(arrow.get(ex_dt).date())
 
                     for occurrence in rule.between(query_start, query_end, inc=True):
                         if occurrence in exdate_keys or occurrence.date() in exdate_keys:
@@ -152,7 +166,7 @@ def parse_events(
                             event_instances.append((occurrence.date(), True))
                         else:
                             if occurrence.tzinfo is None and local_tz:
-                                occurrence = local_tz.localize(occurrence)
+                                occurrence = arrow.get(occurrence, tzinfo=local_tz).datetime
                             event_instances.append((occurrence, False))
 
                     # Include RDATE manual additions that may not be part of RRULE expansion.
@@ -166,16 +180,17 @@ def parse_events(
                         for rdate_entry in rdate_props:
                             for rdate_dt_val in getattr(rdate_entry, "dts", []):
                                 rdt = rdate_dt_val.dt
-                                if isinstance(rdt, dt.datetime):
+                                if hasattr(rdt, "hour"):
                                     if rdt.tzinfo is None:
-                                        rdt = local_tz.localize(rdt)
+                                        rdt = arrow.get(rdt, tzinfo=local_tz).datetime
                                     else:
-                                        rdt = rdt.astimezone(local_tz)
+                                        rdt = arrow.get(rdt).to(local_tz).datetime
                                     if query_start <= rdt <= query_end:
                                         event_instances.append((rdt, False))
-                                elif isinstance(rdt, date):
-                                    if today <= rdt < end_date:
-                                        event_instances.append((rdt, True))
+                                else:
+                                    rdt_date = arrow.get(rdt).date()
+                                    if today <= rdt_date < end_date:
+                                        event_instances.append((rdt_date, True))
                 except Exception:
                     # Fallback to just the main event
                     if is_all_day:
@@ -192,7 +207,7 @@ def parse_events(
             for evt_dt, evt_is_all_day in event_instances:
                 key = (
                     evt_dt.isoformat()
-                    if isinstance(evt_dt, dt.datetime)
+                    if hasattr(evt_dt, "hour")
                     else str(evt_dt)
                 )
                 if key in seen_instance_keys:
@@ -204,9 +219,7 @@ def parse_events(
             for evt_dt, evt_is_all_day in deduped_instances:
                 # Check bounds
                 evt_date = (
-                    evt_dt
-                    if isinstance(evt_dt, date) and not isinstance(evt_dt, dt.datetime)
-                    else evt_dt.date()
+                    evt_dt if not hasattr(evt_dt, "hour") else evt_dt.date()
                 )
 
                 if today <= evt_date < end_date:
@@ -240,12 +253,13 @@ def _print_calendar_day_view(printer, sorted_dates, all_events):
         return
     
     d = sorted_dates[0]
+    today = _today_local()
     events = all_events[d]
     events.sort(key=lambda x: x["sort_key"])
     
     # Day header
     day_name = d.strftime("%A").upper()
-    if d == date.today():
+    if d == today:
         day_name = "TODAY"
     
     printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
@@ -295,17 +309,15 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
     """Full month calendar view with events."""
 
     # Get current month
-    today = date.today()
-    month_start = date(today.year, today.month, 1)
+    today = _today_local()
+    tomorrow = _tomorrow_local()
+    month_start = _month_start(today)
     
     # Calculate first day of week for the month (Monday = 0)
     first_weekday = month_start.weekday()
     
     # Calculate number of days in month
-    if today.month == 12:
-        next_month = date(today.year + 1, 1, 1)
-    else:
-        next_month = date(today.year, today.month + 1, 1)
+    next_month = _next_month_start(month_start)
 
     # Convert all_events to format expected by calendar grid (date string -> event count)
     # Also collect all events in the month
@@ -313,7 +325,7 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
     month_events_by_date = {}  # All events in the current month
     
     for d, events in all_events.items():
-        date_key = d.isoformat() if isinstance(d, date) else str(d)
+        date_key = _coerce_date(d).isoformat()
         events_by_date[date_key] = len(events)
         
         # If date is in current month, add to month events
@@ -322,7 +334,7 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
     
     # Calculate grid start (first Sunday before or on month start)
     days_since_sunday = first_weekday + 1  # Monday=0, so +1
-    grid_start = month_start - timedelta(days=days_since_sunday % 7)
+    grid_start = arrow.get(month_start).shift(days=-(days_since_sunday % 7)).date()
     
     # Print full month calendar grid with event highlighting.
     cell_size = _calendar_grid_cell_size(printer)
@@ -351,9 +363,9 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
             
             # Day header
             day_name = d.strftime("%A").upper()
-            if d == date.today():
+            if d == today:
                 day_name = "TODAY"
-            elif d == date.today() + timedelta(days=1):
+            elif d == tomorrow:
                 day_name = "TOMORROW"
             
             printer.print_bold(f"{day_name} {d.strftime('%m/%d')}")
@@ -380,9 +392,9 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
             
             # Day header
             day_name = d.strftime("%A").upper()
-            if d == date.today():
+            if d == today:
                 day_name = "TODAY"
-            elif d == date.today() + timedelta(days=1):
+            elif d == tomorrow:
                 day_name = "TOMORROW"
             
             printer.print_bold(f"{day_name} {d.strftime('%m/%d')}")
@@ -404,15 +416,17 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
 
 def _print_calendar_compact_view(printer, sorted_dates, all_events):
     """Compact timeline view for 3 days with visual separators."""
+    today = _today_local()
+    tomorrow = _tomorrow_local()
     for i, d in enumerate(sorted_dates[:3]):
         events = all_events[d]
         events.sort(key=lambda x: x["sort_key"])
         
         # Day header
         day_name = d.strftime("%A").upper()
-        if d == date.today():
+        if d == today:
             day_name = "TODAY"
-        elif d == date.today() + timedelta(days=1):
+        elif d == tomorrow:
             day_name = "TOMORROW"
         
         printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
@@ -438,11 +452,12 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
     # Convert all_events to format expected by calendar grid (date string -> event count)
     events_by_date = {}
     for d, events in all_events.items():
-        date_key = d.isoformat() if isinstance(d, date) else str(d)
+        date_key = _coerce_date(d).isoformat()
         events_by_date[date_key] = len(events)
     
     # Print week calendar grid.
-    today = date.today()
+    today = _today_local()
+    tomorrow = _tomorrow_local()
     cell_size = _calendar_grid_cell_size(printer)
     font_sm = getattr(printer, "_get_font", lambda s: None)("regular_sm")
     img = draw_calendar_grid_image(
@@ -463,9 +478,9 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
         
         # Day header
         day_name = d.strftime("%A").upper()
-        if d == date.today():
+        if d == today:
             day_name = "TODAY"
-        elif d == date.today() + timedelta(days=1):
+        elif d == tomorrow:
             day_name = "TOMORROW"
         
         printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
@@ -569,11 +584,8 @@ def format_calendar_receipt(
 
     if view_mode == "month":
         # Parse events for the entire current month
-        today = date.today()
-        if today.month == 12:
-            next_month = date(today.year + 1, 1, 1)
-        else:
-            next_month = date(today.year, today.month + 1, 1)
+        today = _today_local()
+        next_month = _next_month_start(today)
         parse_days = (next_month - today).days + 1  # Include today through end of month
     elif view_mode == "day":
         parse_days = 1
@@ -623,7 +635,7 @@ def format_calendar_receipt(
 def draw_calendar_grid_image(
     weeks: int,
     cell_size: int,
-    start_date: date,
+    start_date,
     events_by_date: dict,
     font,
     highlight_date=None,
@@ -632,11 +644,11 @@ def draw_calendar_grid_image(
 ) -> Image.Image:
     """Draw a calendar grid to an image."""
     if not start_date:
-        start_date = date.today()
+        start_date = _today_local()
 
     # Align the grid so columns are always Sunday -> Saturday.
     days_since_sunday = (start_date.weekday() + 1) % 7
-    grid_start = start_date - timedelta(days=days_since_sunday)
+    grid_start = arrow.get(start_date).shift(days=-days_since_sunday).date()
 
     day_key_top_pad = 4
     day_key_bottom_pad = 2
@@ -674,7 +686,7 @@ def draw_calendar_grid_image(
         for day in range(7):
             cell_x = x0 + day * cell_size
             cell_y = grid_top + week * cell_size
-            cell_date = grid_start + timedelta(days=week * 7 + day)
+            cell_date = arrow.get(grid_start).shift(days=week * 7 + day).date()
 
             is_today = bool(highlight_date and cell_date == highlight_date)
             is_current_month = True
