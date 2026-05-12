@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw
 
 import app.config
 from app.drivers.printer_mock import PrinterDriver
-from app.config import format_print_datetime
+from app.config import current_datetime, format_print_datetime, format_time
 from app.module_registry import register_module
 
 logger = logging.getLogger(__name__)
@@ -198,6 +198,75 @@ def get_weather_condition(code: int) -> str:
     return "Unknown"
 
 
+def _parse_hourly_forecast_datetime(value: Any) -> Optional[datetime]:
+    """Parse Open-Meteo hourly timestamps into local datetimes."""
+    if not isinstance(value, str) or not value:
+        return None
+
+    time_str_clean = value.split("+")[0].split("Z")[0]
+    try:
+        if len(time_str_clean) == 16:
+            return datetime.strptime(time_str_clean, "%Y-%m-%dT%H:%M")
+        if len(time_str_clean) >= 19:
+            return datetime.strptime(time_str_clean[:19], "%Y-%m-%dT%H:%M:%S")
+    except ValueError:
+        return None
+    return None
+
+
+def _format_hourly_label(dt: datetime, anchor_hour: datetime) -> str:
+    """Format one hourly forecast label relative to the print-time hour."""
+    if dt == anchor_hour:
+        return "Now"
+    return format_time(dt).replace(":00", "")
+
+
+def _normalize_hourly_forecast_for_print(
+    hourly_forecast: list,
+    *,
+    reference_time: Optional[datetime] = None,
+) -> list:
+    """Filter and relabel hourly forecast rows for the actual print time."""
+    if not hourly_forecast:
+        return []
+
+    reference_time = reference_time or current_datetime()
+    if getattr(reference_time, "tzinfo", None) is not None:
+        reference_time = reference_time.replace(tzinfo=None)
+    anchor_hour = reference_time.replace(minute=0, second=0, microsecond=0)
+    normalized = []
+
+    for hour_data in hourly_forecast:
+        if not isinstance(hour_data, dict):
+            continue
+
+        dt = _parse_hourly_forecast_datetime(hour_data.get("hour_iso"))
+        if dt is None:
+            hour_value = hour_data.get("hour")
+            if hour_value not in (None, ""):
+                try:
+                    dt = anchor_hour.replace(hour=int(hour_value), minute=0)
+                    if dt < anchor_hour:
+                        continue
+                except (TypeError, ValueError):
+                    dt = None
+
+        if dt is not None and dt < anchor_hour:
+            continue
+
+        normalized_hour = copy.deepcopy(hour_data)
+        if dt is not None:
+            normalized_hour["time"] = _format_hourly_label(dt, anchor_hour)
+            normalized_hour["hour"] = dt.strftime("%H")
+            normalized_hour["hour_iso"] = dt.strftime("%Y-%m-%dT%H:%M")
+        normalized.append(normalized_hour)
+
+        if len(normalized) >= 24:
+            break
+
+    return normalized
+
+
 def _fetch_weather(
     config: Optional[Dict[str, Any]] = None,
     *,
@@ -362,7 +431,9 @@ def _fetch_weather(
         today_low = int(daily_min[0])
 
         hourly_forecast = []
-        current_time = datetime.now()
+        current_time = current_datetime()
+        if getattr(current_time, "tzinfo", None) is not None:
+            current_time = current_time.replace(tzinfo=None)
         current_hour = current_time.replace(minute=0, second=0, microsecond=0)
 
         hourly_times = hourly.get("time", []) if isinstance(hourly, dict) else []
@@ -373,17 +444,8 @@ def _fetch_weather(
         )
 
         for i in range(len(hourly_times)):
-            time_str = hourly_times[i]
-            time_str_clean = time_str.split("+")[0].split("Z")[0]
-
-            try:
-                if len(time_str_clean) == 16:
-                    dt = datetime.strptime(time_str_clean, "%Y-%m-%dT%H:%M")
-                elif len(time_str_clean) >= 19:
-                    dt = datetime.strptime(time_str_clean[:19], "%Y-%m-%dT%H:%M:%S")
-                else:
-                    continue
-            except Exception:
+            dt = _parse_hourly_forecast_datetime(hourly_times[i])
+            if dt is None:
                 continue
 
             if dt < current_hour:
@@ -398,18 +460,11 @@ def _fetch_weather(
                 else None
             )
 
-            current_hour_dt = datetime.now().replace(minute=0, second=0, microsecond=0)
-            if dt == current_hour_dt:
-                time_display = "Now"
-            else:
-                time_display = dt.strftime("%I %p")
-                if time_display.startswith("0"):
-                    time_display = time_display[1:]
-
             hourly_forecast.append(
                 {
-                    "time": time_display,
+                    "time": _format_hourly_label(dt, current_hour),
                     "hour": dt.strftime("%H"),
+                    "hour_iso": dt.strftime("%Y-%m-%dT%H:%M"),
                     "temperature": temp,
                     "condition": condition,
                     "precipitation": precip_prob,
@@ -1094,6 +1149,10 @@ def format_weather_receipt(
             }
     else:
         weather = get_weather(config, module_id=module_id)
+
+    weather["hourly_forecast"] = _normalize_hourly_forecast_for_print(
+        weather.get("hourly_forecast", []),
+    )
 
     # Header
     printer.print_header(module_name or "WEATHER", icon="cloud-sun")

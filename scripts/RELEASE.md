@@ -43,6 +43,22 @@ The canonical publish path is a Git tag push.
 - Tags with a hyphen, such as `v1.2.3-beta.1`, are published as GitHub prereleases.
 - Tags without a hyphen, such as `v1.2.3`, are published as normal stable releases.
 
+## Recommended branch lanes
+
+Use separate long-lived branches for stable-ready and beta-only work:
+
+- `main`: stable-ready branch. Only merge changes here that you would ship to the normal customer OTA lane.
+- `beta`: integration branch for prerelease-only work that should remain off the stable path until proven.
+
+For urgent production fixes:
+
+1. Create a short-lived hotfix branch from the latest stable tag, for example `release/v1.2.3-hotfix`.
+2. Apply only the production fix there.
+3. Tag and publish the next stable release from that hotfix branch.
+4. Cherry-pick the same fix onto `main` and `beta` as needed so the lanes converge intentionally.
+
+This keeps stable releases from accidentally inheriting beta-only modules or unfinished UI work.
+
 You can also run the workflow manually with `workflow_dispatch`, but normal day-to-day releases should use tag pushes so the Git tag and published release stay aligned.
 
 ## Stable release path
@@ -125,7 +141,7 @@ Current implementation note:
 
 For a stable release:
 
-1. Merge the intended changes to `main`.
+1. Start from `main` only if it is already stable-ready. Otherwise create a hotfix branch from the latest stable tag and apply only the intended stable changes there.
 2. Run local tests and build checks.
 3. Run `npm audit` in `web/` and fix audit findings before tagging.
 4. If dependency fixes rebuild `web/dist`, commit the lockfile and generated dist assets before tagging.
@@ -135,7 +151,7 @@ For a stable release:
 
 For a beta release:
 
-1. Merge the intended changes to `main`.
+1. Merge the intended prerelease changes to `beta`.
 2. Run local tests and build checks.
 3. Run `npm audit` in `web/` and fix audit findings before tagging.
 4. If dependency fixes rebuild `web/dist`, commit the lockfile and generated dist assets before tagging.

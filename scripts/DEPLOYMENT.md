@@ -204,7 +204,7 @@ For more advanced workflows, you can integrate these scripts with CI/CD systems:
 
 1. **Test Locally First**: Always test changes locally before deploying
 2. **Commit Messages**: Use descriptive commit messages
-3. **Branch Strategy**: Deploy from stable branches (main/master)
+3. **Branch Strategy**: Deploy from a stable-ready branch. Use `main` for stable-ready work, `beta` for prerelease-only work, and short-lived `release/vX.Y.Z-hotfix` branches when you need to patch the current stable tag without bringing beta features along.
 4. **Backup Config**: Keep `config.json` backed up (it's gitignored)
 5. **Monitor Logs**: Check service logs after deployment: `sudo journalctl -u pc-1.service -f`
 

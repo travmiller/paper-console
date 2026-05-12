@@ -208,6 +208,74 @@ def test_prefetch_weather_uses_longer_timeout_and_populates_cache(monkeypatch):
     assert weather["ok"] is True
     assert cached is not None
     assert cached["city"] == "Worcester"
+    assert cached["hourly_forecast"][0]["hour_iso"] == now.strftime("%Y-%m-%dT%H:%M")
+
+
+def test_normalize_hourly_forecast_for_print_drops_prefetch_hour_and_relables_next_hour():
+    reference_time = datetime(2026, 5, 12, 11, 0, 0)
+
+    hourly_forecast = [
+        {
+            "time": "Now",
+            "hour": "10",
+            "hour_iso": "2026-05-12T10:00",
+            "temperature": 62,
+            "condition": "Clear",
+            "precipitation": 0,
+        },
+        {
+            "time": "11 AM",
+            "hour": "11",
+            "hour_iso": "2026-05-12T11:00",
+            "temperature": 64,
+            "condition": "Clear",
+            "precipitation": 0,
+        },
+        {
+            "time": "12 PM",
+            "hour": "12",
+            "hour_iso": "2026-05-12T12:00",
+            "temperature": 66,
+            "condition": "Partly Cloudy",
+            "precipitation": 10,
+        },
+    ]
+
+    normalized = weather_module._normalize_hourly_forecast_for_print(
+        hourly_forecast,
+        reference_time=reference_time,
+    )
+
+    assert [row["hour"] for row in normalized] == ["11", "12"]
+    assert [row["time"] for row in normalized] == ["Now", "12 PM"]
+
+
+def test_normalize_hourly_forecast_for_print_preserves_legacy_cached_rows():
+    reference_time = datetime(2026, 5, 12, 11, 0, 0)
+
+    hourly_forecast = [
+        {
+            "time": "Now",
+            "hour": "11",
+            "temperature": 64,
+            "condition": "Clear",
+            "precipitation": 0,
+        },
+        {
+            "time": "12 PM",
+            "hour": "12",
+            "temperature": 66,
+            "condition": "Partly Cloudy",
+            "precipitation": 10,
+        },
+    ]
+
+    normalized = weather_module._normalize_hourly_forecast_for_print(
+        hourly_forecast,
+        reference_time=reference_time,
+    )
+
+    assert [row["time"] for row in normalized] == ["Now", "12 PM"]
 
 
 def test_get_cached_weather_discards_entries_older_than_ten_minutes():
@@ -240,6 +308,7 @@ def test_get_cached_weather_discards_entries_older_than_ten_minutes():
 
 def test_format_weather_receipt_scheduled_uses_cached_weather(monkeypatch):
     weather_module.clear_weather_cache()
+    reference_time = datetime(2026, 5, 12, 11, 0, 0)
     monkeypatch.setattr(
         weather_module,
         "get_cached_weather",
@@ -251,7 +320,32 @@ def test_format_weather_receipt_scheduled_uses_cached_weather(monkeypatch):
             "high": 75,
             "low": 65,
             "forecast": [],
-            "hourly_forecast": [],
+            "hourly_forecast": [
+                {
+                    "time": "Now",
+                    "hour": "10",
+                    "hour_iso": "2026-05-12T10:00",
+                    "temperature": 70,
+                    "condition": "Clear",
+                    "precipitation": 0,
+                },
+                {
+                    "time": "11 AM",
+                    "hour": "11",
+                    "hour_iso": "2026-05-12T11:00",
+                    "temperature": 72,
+                    "condition": "Clear",
+                    "precipitation": 0,
+                },
+                {
+                    "time": "12 PM",
+                    "hour": "12",
+                    "hour_iso": "2026-05-12T12:00",
+                    "temperature": 74,
+                    "condition": "Partly Cloudy",
+                    "precipitation": 10,
+                },
+            ],
             "temperature_unit": "fahrenheit",
         },
     )
@@ -262,6 +356,14 @@ def test_format_weather_receipt_scheduled_uses_cached_weather(monkeypatch):
     )
     monkeypatch.setattr(weather_module, "draw_current_conditions_panel", lambda *_args, **_kwargs: object())
     monkeypatch.setattr(weather_module, "_build_24_hour_summary", lambda *_args, **_kwargs: "Mild and clear.")
+    captured = {}
+
+    def fake_draw_hourly_forecast_image(hourly_forecast, *_args, **_kwargs):
+        captured["hourly_forecast"] = hourly_forecast
+        return object()
+
+    monkeypatch.setattr(weather_module, "draw_hourly_forecast_image", fake_draw_hourly_forecast_image)
+    monkeypatch.setattr(weather_module, "current_datetime", lambda: reference_time)
 
     printer = _WeatherPrinter()
     weather_module.format_weather_receipt(
@@ -275,6 +377,8 @@ def test_format_weather_receipt_scheduled_uses_cached_weather(monkeypatch):
     output = "\n".join(printer.lines)
     assert "Forecast unavailable." not in output
     assert "Mild and clear." in output
+    assert [row["time"] for row in captured["hourly_forecast"]] == ["Now", "12 PM"]
+    assert [row["hour"] for row in captured["hourly_forecast"]] == ["11", "12"]
 
 
 def test_get_rss_articles_keeps_total_receipt_length_capped(monkeypatch):
