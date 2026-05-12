@@ -1,8 +1,10 @@
 """Regression tests for merged module configuration features."""
 
-from datetime import datetime
+from datetime import date, datetime
 from types import SimpleNamespace
 
+from app.modules import calendar as calendar_module
+from app.modules import history as history_module
 from app.modules import rss as rss_module
 from app.modules import weather as weather_module
 
@@ -37,6 +39,9 @@ class _WeatherPrinter:
     def print_subheader(self, text):
         self.lines.append(str(text))
 
+    def print_bold(self, text):
+        self.lines.append(str(text))
+
     def print_body(self, text):
         self.lines.append(str(text))
 
@@ -63,7 +68,7 @@ class _FakeRSSResponse:
 def test_get_weather_defaults_temperature_unit_when_config_missing(monkeypatch):
     weather_module.clear_weather_cache()
     captured = {}
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    now = datetime(2026, 5, 12, 11, 0, 0)
 
     monkeypatch.setattr(weather_module.app.config.settings, "latitude", 42.0, raising=False)
     monkeypatch.setattr(weather_module.app.config.settings, "longitude", -71.0, raising=False)
@@ -79,6 +84,7 @@ def test_get_weather_defaults_temperature_unit_when_config_missing(monkeypatch):
         "Worcester",
         raising=False,
     )
+    monkeypatch.setattr(weather_module, "current_date", lambda: now.date())
 
     def fake_get(url, params=None, timeout=0):  # noqa: ARG001
         captured["params"] = dict(params or {})
@@ -111,6 +117,44 @@ def test_get_weather_defaults_temperature_unit_when_config_missing(monkeypatch):
     assert weather["temperature_unit"] == "fahrenheit"
     assert weather["city"] == "Worcester"
     assert weather["ok"] is True
+    assert weather["forecast"][0]["day"] == "Today"
+
+
+def test_history_module_uses_configured_local_date(monkeypatch):
+    captured = {}
+
+    def fake_get_events_for_date(target_date):
+        captured["date"] = target_date
+        return ["Example event"]
+
+    monkeypatch.setattr(history_module, "current_date", lambda: date(2026, 5, 12))
+    monkeypatch.setattr(history_module, "get_events_for_date", fake_get_events_for_date)
+
+    events = history_module.get_events_for_today()
+
+    assert events == ["Example event"]
+    assert captured["date"] == date(2026, 5, 12)
+
+
+def test_calendar_day_view_labels_today_using_configured_local_date(monkeypatch):
+    printer = _WeatherPrinter()
+    target_date = date(2026, 5, 12)
+    events = {
+        target_date: [
+            {
+                "sort_key": "09:00",
+                "is_all_day": False,
+                "time": "9:00 AM",
+                "summary": "Breakfast meeting",
+            }
+        ]
+    }
+
+    monkeypatch.setattr(calendar_module, "current_date", lambda: target_date)
+
+    calendar_module._print_calendar_day_view(printer, [target_date], events)
+
+    assert "TODAY (05/12)" in printer.lines
 
 
 def test_get_weather_retries_then_returns_unavailable_without_placeholder_rows(monkeypatch):
@@ -176,7 +220,9 @@ def test_format_weather_receipt_prints_unavailable_message(monkeypatch):
 def test_prefetch_weather_uses_longer_timeout_and_populates_cache(monkeypatch):
     weather_module.clear_weather_cache()
     captured = {}
-    now = datetime.now().replace(minute=0, second=0, microsecond=0)
+    now = datetime(2026, 5, 12, 11, 0, 0)
+    monkeypatch.setattr(weather_module, "current_date", lambda: now.date())
+    monkeypatch.setattr(weather_module, "current_datetime", lambda: now)
 
     def fake_get(url, params=None, timeout=0):  # noqa: ARG001
         captured["timeout"] = timeout

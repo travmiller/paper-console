@@ -9,6 +9,7 @@ import time
 import imaplib
 import types
 from pathlib import Path
+from fastapi import BackgroundTasks
 
 import app.main as main_module
 import app.wifi_manager as wifi_manager
@@ -21,7 +22,7 @@ from app.modules import news as news_module
 from app.modules import calendar as calendar_module
 from app.modules import history as history_module
 from app import factory_reset as factory_reset_module
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 
 def _completed(returncode: int = 0, stdout: str = "", stderr: str = ""):
@@ -966,11 +967,6 @@ def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
     triggered = []
     sleep_calls = {"count": 0}
 
-    class FrozenDateTime:
-        @classmethod
-        def now(cls):
-            return datetime(2026, 4, 3, 12, 0)
-
     async def fake_sleep(_seconds):
         sleep_calls["count"] += 1
         if sleep_calls["count"] == 1:
@@ -980,7 +976,7 @@ def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
     async def fake_trigger_channel(position, scheduled=False):
         triggered.append((position, scheduled))
 
-    monkeypatch.setattr(main_module, "datetime", FrozenDateTime)
+    monkeypatch.setattr(main_module, "current_datetime", lambda: datetime(2026, 4, 3, 12, 0))
     monkeypatch.setattr(main_module.asyncio, "sleep", fake_sleep)
     monkeypatch.setattr(main_module, "trigger_channel", fake_trigger_channel)
     monkeypatch.setattr(
@@ -1003,6 +999,64 @@ def test_scheduler_loop_skips_trigger_when_hold_reserved(monkeypatch):
 
     assert triggered == []
     main_module._clear_print_reservation()
+
+
+def test_scheduler_loop_uses_configured_local_time(monkeypatch):
+    triggered = []
+    sleep_calls = {"count": 0}
+
+    async def fake_sleep(_seconds):
+        sleep_calls["count"] += 1
+        if sleep_calls["count"] == 1:
+            return None
+        raise asyncio.CancelledError
+
+    async def fake_trigger_channel(position, scheduled=False):
+        triggered.append((position, scheduled))
+
+    monkeypatch.setattr(main_module, "current_datetime", lambda: datetime(2026, 4, 3, 12, 0))
+    monkeypatch.setattr(main_module.asyncio, "sleep", fake_sleep)
+    monkeypatch.setattr(main_module, "trigger_channel", fake_trigger_channel)
+    monkeypatch.setattr(
+        main_module.settings,
+        "channels",
+        {1: types.SimpleNamespace(schedule=["12:00"])},
+    )
+    monkeypatch.setattr(main_module, "_try_begin_print_job", lambda debounce=False: True)
+
+    try:
+        asyncio.run(main_module.scheduler_loop())
+    except asyncio.CancelledError:
+        pass
+
+    assert triggered == [(1, True)]
+
+
+def test_update_settings_reports_timezone_sync_failure_without_blocking_save(monkeypatch):
+    base_settings = main_module.Settings()
+    new_settings = base_settings.model_copy(deep=True)
+    new_settings.timezone = "Europe/Paris"
+
+    monkeypatch.setattr(main_module, "settings", base_settings)
+    monkeypatch.setattr(main_module, "validate_module_config", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(
+        main_module,
+        "_sync_system_timezone",
+        lambda timezone: {
+            "attempted": True,
+            "success": False,
+            "status": "failed",
+            "timezone": timezone,
+            "message": f"Paper Console will use {timezone}, but system timezone sync failed.",
+            "error": "permission denied",
+        },
+    )
+
+    response = asyncio.run(main_module.update_settings(new_settings, BackgroundTasks()))
+
+    assert response["config"].timezone == "Europe/Paris"
+    assert response["timezone_sync"]["status"] == "failed"
+    assert main_module.settings.timezone == "Europe/Paris"
 
 
 def test_run_weather_prefetch_cycle_warms_upcoming_scheduled_weather(monkeypatch):
@@ -1037,6 +1091,43 @@ def test_run_weather_prefetch_cycle_warms_upcoming_scheduled_weather(monkeypatch
     asyncio.run(run_cycle())
 
     assert calls == [("weather-one", {"city_name": "Worcester"})]
+
+
+def test_calendar_day_view_uses_configured_local_today_label(monkeypatch):
+    lines = []
+    target_date = date(2026, 5, 12)
+
+    class FakePrinter:
+        def print_subheader(self, text):
+            lines.append(str(text))
+
+        def feed(self, _count):
+            return None
+
+        def print_bold(self, text):
+            lines.append(str(text))
+
+        def print_body(self, text):
+            lines.append(str(text))
+
+    monkeypatch.setattr(calendar_module, "current_date", lambda: target_date)
+
+    calendar_module._print_calendar_day_view(
+        FakePrinter(),
+        [target_date],
+        {
+            target_date: [
+                {
+                    "sort_key": "09:00",
+                    "is_all_day": False,
+                    "time": "9:00 AM",
+                    "summary": "Breakfast",
+                }
+            ]
+        },
+    )
+
+    assert lines[0] == "TODAY (05/12)"
 
 
 def test_printer_driver_handles_serial_init_failure(monkeypatch):

@@ -3,6 +3,7 @@ from typing import Dict, Any, List
 from pathlib import Path
 from datetime import date, datetime
 from app.utils import wrap_text, wrap_text_pixels
+from app.config import current_date
 from PIL import Image, ImageDraw
 from app.module_registry import register_module
 
@@ -31,12 +32,12 @@ def get_events_for_date(target_date: date) -> List[str]:
 
 def get_events_for_today() -> List[str]:
     """Reads events for the current date from the local database."""
-    return get_events_for_date(datetime.now().date())
+    return get_events_for_date(current_date())
 
 
 def _resolve_reference_date(config: Dict[str, Any] | None) -> date:
     if not config:
-        return datetime.now().date()
+        return current_date()
 
     raw_value = config.get("reference_date")
     if isinstance(raw_value, datetime):
@@ -51,7 +52,7 @@ def _resolve_reference_date(config: Dict[str, Any] | None) -> date:
                 return date.fromisoformat(raw_value)
             except ValueError:
                 pass
-    return datetime.now().date()
+    return current_date()
 
 
 @register_module(

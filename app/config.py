@@ -492,6 +492,11 @@ def current_datetime() -> datetime:
         return datetime.now()
 
 
+def current_date():
+    """Return today's date in the configured timezone."""
+    return current_datetime().date()
+
+
 def format_print_datetime(
     dt: Optional[datetime] = None,
     time_format: Optional[str] = None,

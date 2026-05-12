@@ -29,7 +29,9 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat }) => 
         </div>
 
         <div className='space-y-4'>
-          <div className='text-sm text-gray-600 mb-4 '>Add times when this channel should automatically print.</div>
+          <div className='text-sm text-gray-600 mb-4 '>
+            Add times when this channel should automatically print. Times use the timezone from General Settings.
+          </div>
 
           <div className='space-y-2 max-h-[300px] overflow-y-auto'>
             {(channel?.schedule || []).map((time, idx) => (

@@ -93,6 +93,7 @@ from app.config import (
     ChannelModuleAssignment,
     ChannelConfig,
     PRINTER_WIDTH,
+    current_datetime,
 )
 
 # Import modules package to trigger auto-discovery and registration
@@ -391,7 +392,7 @@ async def scheduler_loop():
         try:
             await asyncio.sleep(10)
 
-            now = datetime.now()
+            now = current_datetime()
             await _run_weather_prefetch_cycle(now)
             current_time = now.strftime("%H:%M")
 
@@ -1571,6 +1572,8 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
     global settings
     import app.config as config_module
     validation_warnings: List[str] = []
+    previous_timezone = getattr(settings, "timezone", None)
+    timezone_changed = new_settings.timezone != previous_timezone
 
     # Update in-memory - create new settings object
     settings = new_settings
@@ -1604,6 +1607,15 @@ async def update_settings(new_settings: Settings, background_tasks: BackgroundTa
     background_tasks.add_task(save_settings_background, settings.model_copy(deep=True))
 
     response = {"message": "Settings saved", "config": settings}
+    if timezone_changed:
+        timezone_sync = _sync_system_timezone(settings.timezone)
+        response["timezone_sync"] = timezone_sync
+        if timezone_sync.get("status") == "failed":
+            logger.warning(
+                "Paper Console timezone saved as %s, but system timezone sync failed: %s",
+                settings.timezone,
+                timezone_sync.get("error") or timezone_sync.get("message"),
+            )
     if validation_warnings:
         response["validation_warnings"] = validation_warnings
     return response
@@ -1641,14 +1653,10 @@ async def reload_settings():
 # --- SYSTEM TIME API ---
 
 
-@app.get("/api/system/timezone")
-async def get_system_timezone():
-    """
-    Get the current system timezone.
-    """
+def _read_system_timezone_info() -> Dict[str, Optional[str] | bool]:
+    """Best-effort lookup of the host OS timezone."""
     try:
         if platform.system() == "Linux":
-            # Try timedatectl first
             try:
                 result = subprocess.run(
                     ["timedatectl", "show", "-p", "Timezone", "--value"],
@@ -1664,7 +1672,6 @@ async def get_system_timezone():
             except Exception:
                 logger.debug("timedatectl timezone lookup failed", exc_info=True)
 
-            # Fallback to /etc/timezone
             try:
                 with open("/etc/timezone", "r") as f:
                     timezone = f.read().strip()
@@ -1676,7 +1683,6 @@ async def get_system_timezone():
             except Exception:
                 logger.debug("/etc/timezone fallback lookup failed", exc_info=True)
 
-        # Fallback to environment variable
         timezone = os.environ.get("TZ")
         if timezone:
             return {
@@ -1689,13 +1695,99 @@ async def get_system_timezone():
             "found": False,
             "message": "Could not detect system timezone",
         }
-
     except Exception as e:
         return {
             "timezone": None,
             "found": False,
             "error": str(e),
         }
+
+
+def _sync_system_timezone(timezone: str) -> Dict[str, Optional[str] | bool]:
+    """Best-effort OS timezone sync that never determines app behavior."""
+    current_info = _read_system_timezone_info()
+    current_timezone = current_info.get("timezone")
+    if current_info.get("found") and current_timezone == timezone:
+        return {
+            "attempted": False,
+            "success": True,
+            "status": "already_synced",
+            "timezone": timezone,
+            "system_timezone": current_timezone,
+            "message": f"System timezone already matches {timezone}.",
+        }
+
+    if platform.system() != "Linux":
+        return {
+            "attempted": False,
+            "success": False,
+            "status": "unsupported_platform",
+            "timezone": timezone,
+            "system_timezone": current_timezone,
+            "message": "System timezone sync is only supported on Linux device builds.",
+        }
+
+    try:
+        result = subprocess.run(
+            ["sudo", "timedatectl", "set-timezone", timezone],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0:
+            return {
+                "attempted": True,
+                "success": False,
+                "status": "failed",
+                "timezone": timezone,
+                "system_timezone": current_timezone,
+                "error": (result.stderr or "Failed to set timezone").strip(),
+                "message": (
+                    f"Paper Console will use {timezone}, but system timezone sync failed."
+                ),
+            }
+    except subprocess.TimeoutExpired:
+        return {
+            "attempted": True,
+            "success": False,
+            "status": "failed",
+            "timezone": timezone,
+            "system_timezone": current_timezone,
+            "error": "Command timed out",
+            "message": (
+                f"Paper Console will use {timezone}, but system timezone sync timed out."
+            ),
+        }
+    except Exception as e:
+        return {
+            "attempted": True,
+            "success": False,
+            "status": "failed",
+            "timezone": timezone,
+            "system_timezone": current_timezone,
+            "error": str(e),
+            "message": (
+                f"Paper Console will use {timezone}, but system timezone sync failed."
+            ),
+        }
+
+    refreshed_info = _read_system_timezone_info()
+    return {
+        "attempted": True,
+        "success": True,
+        "status": "synced",
+        "timezone": timezone,
+        "system_timezone": refreshed_info.get("timezone") or timezone,
+        "message": f"System timezone synced to {timezone}.",
+    }
+
+
+@app.get("/api/system/timezone")
+async def get_system_timezone():
+    """
+    Get the current system timezone.
+    """
+    return _read_system_timezone_info()
 
 
 @app.get("/api/system/timezone/list")
@@ -1789,49 +1881,10 @@ async def set_system_timezone(request: SetTimezoneRequest):
                 "message": "The specified timezone is not valid.",
             }
 
-        if platform.system() == "Linux":
-            # Use timedatectl to set timezone
-            result = subprocess.run(
-                ["sudo", "timedatectl", "set-timezone", timezone],
-                capture_output=True,
-                text=True,
-                timeout=10,
-            )
-
-            if result.returncode != 0:
-                return {
-                    "success": False,
-                    "error": result.stderr or "Failed to set timezone",
-                    "message": "Could not set system timezone. Ensure the application has sudo privileges.",
-                }
-
-            return {
-                "success": True,
-                "message": f"System timezone set to {timezone}",
-                "timezone": timezone,
-            }
-
-        elif platform.system() == "Windows":
-            # Windows doesn't easily support timezone changes via command line
-            # Would need to use tzutil or registry edits
-            return {
-                "success": False,
-                "error": "Timezone setting not supported on Windows",
-                "message": "Please set timezone through Windows settings.",
-            }
-
-        else:
-            return {
-                "success": False,
-                "error": f"Timezone setting not supported on {platform.system()}",
-                "message": "System timezone setting is only supported on Linux.",
-            }
-
-    except subprocess.TimeoutExpired:
+        result = _sync_system_timezone(timezone)
         return {
-            "success": False,
-            "error": "Command timed out",
-            "message": "Setting timezone timed out. Please try again.",
+            "success": bool(result.get("success")),
+            **result,
         }
     except Exception as e:
         return {

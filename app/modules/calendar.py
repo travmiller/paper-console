@@ -6,7 +6,7 @@ from typing import List, Dict, Any, Optional
 from icalendar import Calendar
 from dateutil.rrule import rrulestr
 from app.drivers.printer_mock import PrinterDriver
-from app.config import CalendarConfig, format_print_datetime, format_time
+from app.config import CalendarConfig, current_date, format_print_datetime, format_time
 import app.config
 from app.module_registry import register_module
 from PIL import Image, ImageDraw
@@ -15,6 +15,15 @@ import app.config  # Ensure app.config is imported for timezone access
 APP_CONFIG = app.config  # Alias to avoid confusion if needed
 logger = logging.getLogger(__name__)
 MAX_ICS_BYTES = 1024 * 1024
+
+
+def _relative_day_label(target_date: date, today: date) -> str:
+    """Format a day header relative to the configured local date."""
+    if target_date == today:
+        return "TODAY"
+    if target_date == today + timedelta(days=1):
+        return "TOMORROW"
+    return target_date.strftime("%A").upper()
 
 
 def fetch_ics(url: str) -> Optional[str]:
@@ -242,9 +251,7 @@ def _print_calendar_day_view(printer, sorted_dates, all_events):
     events.sort(key=lambda x: x["sort_key"])
     
     # Day header
-    day_name = d.strftime("%A").upper()
-    if d == date.today():
-        day_name = "TODAY"
+    day_name = _relative_day_label(d, current_date())
     
     printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
     printer.feed(1)
@@ -293,7 +300,7 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
     """Full month calendar view with events."""
 
     # Get current month
-    today = date.today()
+    today = current_date()
     month_start = date(today.year, today.month, 1)
     
     # Calculate first day of week for the month (Monday = 0)
@@ -348,11 +355,7 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
             events.sort(key=lambda x: x["sort_key"])
             
             # Day header
-            day_name = d.strftime("%A").upper()
-            if d == date.today():
-                day_name = "TODAY"
-            elif d == date.today() + timedelta(days=1):
-                day_name = "TOMORROW"
+            day_name = _relative_day_label(d, today)
             
             printer.print_bold(f"{day_name} {d.strftime('%m/%d')}")
             
@@ -377,11 +380,7 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
             events.sort(key=lambda x: x["sort_key"])
             
             # Day header
-            day_name = d.strftime("%A").upper()
-            if d == date.today():
-                day_name = "TODAY"
-            elif d == date.today() + timedelta(days=1):
-                day_name = "TOMORROW"
+            day_name = _relative_day_label(d, today)
             
             printer.print_bold(f"{day_name} {d.strftime('%m/%d')}")
             
@@ -402,16 +401,13 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
 
 def _print_calendar_compact_view(printer, sorted_dates, all_events):
     """Compact timeline view for 3 days with visual separators."""
+    today = current_date()
     for i, d in enumerate(sorted_dates[:3]):
         events = all_events[d]
         events.sort(key=lambda x: x["sort_key"])
         
         # Day header
-        day_name = d.strftime("%A").upper()
-        if d == date.today():
-            day_name = "TODAY"
-        elif d == date.today() + timedelta(days=1):
-            day_name = "TOMORROW"
+        day_name = _relative_day_label(d, today)
         
         printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
         
@@ -440,7 +436,7 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
         events_by_date[date_key] = len(events)
     
     # Print week calendar grid.
-    today = date.today()
+    today = current_date()
     cell_size = _calendar_grid_cell_size(printer)
     font_sm = getattr(printer, "_get_font", lambda s: None)("regular_sm")
     img = draw_calendar_grid_image(
@@ -460,11 +456,7 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
         events.sort(key=lambda x: x["sort_key"])
         
         # Day header
-        day_name = d.strftime("%A").upper()
-        if d == date.today():
-            day_name = "TODAY"
-        elif d == date.today() + timedelta(days=1):
-            day_name = "TOMORROW"
+        day_name = _relative_day_label(d, today)
         
         printer.print_subheader(f"{day_name} ({d.strftime('%m/%d')})")
         
@@ -567,7 +559,7 @@ def format_calendar_receipt(
 
     if view_mode == "month":
         # Parse events for the entire current month
-        today = date.today()
+        today = current_date()
         if today.month == 12:
             next_month = date(today.year + 1, 1, 1)
         else:
@@ -632,7 +624,7 @@ def draw_calendar_grid_image(
     from datetime import timedelta
 
     if not start_date:
-        start_date = date.today()
+        start_date = current_date()
 
     # Align the grid so columns are always Sunday -> Saturday.
     days_since_sunday = (start_date.weekday() + 1) % 7

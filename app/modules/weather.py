@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw
 
 import app.config
 from app.drivers.printer_mock import PrinterDriver
-from app.config import current_datetime, format_print_datetime, format_time
+from app.config import current_date, current_datetime, format_print_datetime, format_time
 from app.module_registry import register_module
 
 logger = logging.getLogger(__name__)
@@ -386,7 +386,7 @@ def _fetch_weather(
         daily_weathercode = _require_list(data, "daily.weathercode")
         daily_precip_prob = daily.get("precipitation_probability_max", [])
 
-        today = datetime.now().date()
+        today = current_date()
 
         for i in range(min(len(daily_times), 7)):
             try:
