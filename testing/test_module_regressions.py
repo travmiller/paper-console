@@ -211,12 +211,12 @@ def test_prefetch_weather_uses_longer_timeout_and_populates_cache(monkeypatch):
     assert cached["hourly_forecast"][0]["hour_iso"] == now.strftime("%Y-%m-%dT%H:%M")
 
 
-def test_normalize_hourly_forecast_for_print_drops_prefetch_hour_and_relables_next_hour():
+def test_normalize_hourly_forecast_for_print_drops_prefetch_hour_and_keeps_explicit_labels():
     reference_time = datetime(2026, 5, 12, 11, 0, 0)
 
     hourly_forecast = [
         {
-            "time": "Now",
+            "time": "10 AM",
             "hour": "10",
             "hour_iso": "2026-05-12T10:00",
             "temperature": 62,
@@ -247,7 +247,7 @@ def test_normalize_hourly_forecast_for_print_drops_prefetch_hour_and_relables_ne
     )
 
     assert [row["hour"] for row in normalized] == ["11", "12"]
-    assert [row["time"] for row in normalized] == ["Now", "12 PM"]
+    assert [row["time"] for row in normalized] == ["11 AM", "12 PM"]
 
 
 def test_normalize_hourly_forecast_for_print_preserves_legacy_cached_rows():
@@ -255,7 +255,7 @@ def test_normalize_hourly_forecast_for_print_preserves_legacy_cached_rows():
 
     hourly_forecast = [
         {
-            "time": "Now",
+            "time": "11 AM",
             "hour": "11",
             "temperature": 64,
             "condition": "Clear",
@@ -275,7 +275,7 @@ def test_normalize_hourly_forecast_for_print_preserves_legacy_cached_rows():
         reference_time=reference_time,
     )
 
-    assert [row["time"] for row in normalized] == ["Now", "12 PM"]
+    assert [row["time"] for row in normalized] == ["11 AM", "12 PM"]
 
 
 def test_get_cached_weather_discards_entries_older_than_ten_minutes():
@@ -322,7 +322,7 @@ def test_format_weather_receipt_scheduled_uses_cached_weather(monkeypatch):
             "forecast": [],
             "hourly_forecast": [
                 {
-                    "time": "Now",
+                    "time": "10 AM",
                     "hour": "10",
                     "hour_iso": "2026-05-12T10:00",
                     "temperature": 70,
@@ -377,7 +377,7 @@ def test_format_weather_receipt_scheduled_uses_cached_weather(monkeypatch):
     output = "\n".join(printer.lines)
     assert "Forecast unavailable." not in output
     assert "Mild and clear." in output
-    assert [row["time"] for row in captured["hourly_forecast"]] == ["Now", "12 PM"]
+    assert [row["time"] for row in captured["hourly_forecast"]] == ["11 AM", "12 PM"]
     assert [row["hour"] for row in captured["hourly_forecast"]] == ["11", "12"]
 
 

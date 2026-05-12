@@ -215,9 +215,7 @@ def _parse_hourly_forecast_datetime(value: Any) -> Optional[datetime]:
 
 
 def _format_hourly_label(dt: datetime, anchor_hour: datetime) -> str:
-    """Format one hourly forecast label relative to the print-time hour."""
-    if dt == anchor_hour:
-        return "Now"
+    """Format one hourly forecast label using its explicit forecast hour."""
     return format_time(dt).replace(":00", "")
 
 
