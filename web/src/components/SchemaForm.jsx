@@ -190,6 +190,11 @@ const SchemaField = ({
     const type = schema.type;
     const title = schema.title || label;
     const fieldPath = path.join('.');
+    const description = resolveFieldDescription({
+        description: schema.description,
+        fieldPath,
+        rootValue,
+    });
     const fieldError = showValidation && fieldPath ? validationErrors[fieldPath] : '';
     const hasError = Boolean(fieldError);
     const errorId = hasError
