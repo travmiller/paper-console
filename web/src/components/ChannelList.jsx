@@ -59,8 +59,6 @@ const ChannelList = ({
         return Array.isArray(cfg.ical_sources) && cfg.ical_sources.some((s) => isNonEmptyString(s?.url));
       case 'webhook':
         return isNonEmptyString(cfg.url);
-      case 'print_webhook':
-        return Boolean(cfg.accept_text || cfg.accept_images || cfg.accept_json);
       case 'text':
         return hasVisibleRichText(cfg.content_doc);
       case 'weather':
@@ -414,17 +412,17 @@ const ChannelList = ({
                       type='button'
                       onClick={() => setShowScheduleModal(pos)}
                       className={`group flex items-center gap-1 px-2 py-1 rounded border-2 transition-all cursor-pointer ${
-                        channel.schedule && channel.schedule.length > 0
+                        ((channel.schedule_rules?.length || 0) + (channel.schedule?.length || 0)) > 0
                           ? 'bg-transparent shadow-sm'
                           : 'bg-transparent border-gray-300 hover:border-black hover:bg-white'
                       }`}
-                      style={channel.schedule && channel.schedule.length > 0 ? { color: 'var(--color-brass)', borderColor: 'var(--color-brass)' } : {}}
-                      onMouseEnter={(e) => { if (channel.schedule && channel.schedule.length > 0) e.currentTarget.style.backgroundColor = 'var(--color-brass-10)'; }}
-                      onMouseLeave={(e) => { if (channel.schedule && channel.schedule.length > 0) e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      style={((channel.schedule_rules?.length || 0) + (channel.schedule?.length || 0)) > 0 ? { color: 'var(--color-brass)', borderColor: 'var(--color-brass)' } : {}}
+                      onMouseEnter={(e) => { if (((channel.schedule_rules?.length || 0) + (channel.schedule?.length || 0)) > 0) e.currentTarget.style.backgroundColor = 'var(--color-brass-10)'; }}
+                      onMouseLeave={(e) => { if (((channel.schedule_rules?.length || 0) + (channel.schedule?.length || 0)) > 0) e.currentTarget.style.backgroundColor = 'transparent'; }}
                       aria-label={`Configure schedule for channel ${pos}`}
                       title='Configure Schedule'>
-                      <ScheduleIcon className={`w-3.5 h-3.5 transition-all ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: 'var(--color-brass)' } : {}} />
-                      <span className={`text-xs font-bold ${channel.schedule?.length > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={channel.schedule?.length > 0 ? { color: 'var(--color-brass)' } : {}}>{channel.schedule?.length || 0}</span>
+                      <ScheduleIcon className={`w-3.5 h-3.5 transition-all ${((channel.schedule_rules?.length || 0) + (channel.schedule?.length || 0)) > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={((channel.schedule_rules?.length || 0) + (channel.schedule?.length || 0)) > 0 ? { color: 'var(--color-brass)' } : {}} />
+                      <span className={`text-xs font-bold ${((channel.schedule_rules?.length || 0) + (channel.schedule?.length || 0)) > 0 ? '' : 'text-gray-400 group-hover:text-black'}`} style={((channel.schedule_rules?.length || 0) + (channel.schedule?.length || 0)) > 0 ? { color: 'var(--color-brass)' } : {}}>{(channel.schedule_rules?.length || 0) + (channel.schedule?.length || 0)}</span>
                     </button>
                   </div>
                 </div>

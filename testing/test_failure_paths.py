@@ -14,6 +14,7 @@ from fastapi import BackgroundTasks
 import app.main as main_module
 import app.wifi_manager as wifi_manager
 from app.config import CalendarConfig, ChannelConfig, ChannelModuleAssignment, ModuleInstance
+from app.schedule_utils import legacy_schedule_to_rules
 from app.drivers.printer_serial import PrinterDriver
 from app.drivers.printer_mock import PrinterDriver as MockPrinterDriver
 from app.modules import email_client
@@ -1014,14 +1015,19 @@ def test_scheduler_loop_uses_configured_local_time(monkeypatch):
     async def fake_trigger_channel(position, scheduled=False):
         triggered.append((position, scheduled))
 
-    monkeypatch.setattr(main_module, "current_datetime", lambda: datetime(2026, 4, 3, 12, 0))
+    monkeypatch.setattr(
+        main_module,
+        "current_datetime",
+        lambda: datetime(2026, 4, 3, 16, 0, 30, tzinfo=timezone.utc),
+    )
     monkeypatch.setattr(main_module.asyncio, "sleep", fake_sleep)
     monkeypatch.setattr(main_module, "trigger_channel", fake_trigger_channel)
     monkeypatch.setattr(
         main_module.settings,
         "channels",
-        {1: types.SimpleNamespace(schedule=["12:00"])},
+        {1: types.SimpleNamespace(schedule=["12:00"], schedule_rules=[])},
     )
+    monkeypatch.setattr(main_module.settings, "timezone", "America/New_York")
     monkeypatch.setattr(main_module, "_try_begin_print_job", lambda debounce=False: True)
 
     try:
@@ -1030,6 +1036,37 @@ def test_scheduler_loop_uses_configured_local_time(monkeypatch):
         pass
 
     assert triggered == [(1, True)]
+
+
+def test_channel_schedule_rules_converts_legacy_schedule_to_cron(monkeypatch):
+    monkeypatch.setattr(main_module.settings, "timezone", "America/Chicago")
+
+    channel = types.SimpleNamespace(schedule=["09:05", "18:30"])
+
+    rules = main_module._channel_schedule_rules(channel)
+
+    assert rules == legacy_schedule_to_rules(["09:05", "18:30"], "America/Chicago")
+
+
+def test_channel_schedule_rules_prefers_explicit_schedule_rules(monkeypatch):
+    monkeypatch.setattr(main_module.settings, "timezone", "UTC")
+    channel = types.SimpleNamespace(
+        schedule=["09:05"],
+        schedule_rules=[
+            {
+                "expression": "15 6 * * MON-FRI",
+                "timezone": "America/New_York",
+                "enabled": True,
+            }
+        ],
+    )
+
+    rules = main_module._channel_schedule_rules(channel)
+
+    assert len(rules) == 1
+    assert rules[0]["expression"] == "15 6 * * MON-FRI"
+    assert rules[0]["timezone"] == "UTC"
+    assert rules[0]["enabled"] is True
 
 
 def test_update_settings_reports_timezone_sync_failure_without_blocking_save(monkeypatch):

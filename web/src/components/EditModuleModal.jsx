@@ -33,7 +33,6 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
   const [showValidation, setShowValidation] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUserEdited, setHasUserEdited] = useState(false);
-  const [saveError, setSaveError] = useState('');
 
   useEffect(() => {
     if (!moduleId || !module) return;
@@ -43,7 +42,6 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
     setShowValidation(false);
     setIsSaving(false);
     setHasUserEdited(false);
-    setSaveError('');
   }, [moduleId, module]);
 
   useEffect(() => {
@@ -54,8 +52,6 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
 
   const validationErrors = useMemo(() => getModuleValidationErrors(module), [module]);
   const validationIssueCount = Object.keys(validationErrors).length;
-  const typeDef = moduleTypes.find((t) => t.id === module?.type);
-  const configDescription = typeDef?.configSchema?.description || '';
 
   const isDirty = stableSerialize(module) !== initialSnapshotRef.current;
 
@@ -78,13 +74,10 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
 
     try {
       setIsSaving(true);
-      setSaveError('');
       const savedModule = await Promise.resolve(onSave(moduleId, module));
       initialSnapshotRef.current = stableSerialize(savedModule || module);
       setHasUserEdited(false);
       onClose();
-    } catch (error) {
-      setSaveError(error instanceof Error ? error.message : 'Failed to save module');
     } finally {
       setIsSaving(false);
     }
@@ -111,13 +104,8 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
           <div>
             <h3 id='edit-module-title' className='text-xl font-bold text-black mb-1 '>Edit Module</h3>
             <div className={`text-gray-600 text-sm `}>
-              <span className="font-mono">Type: {typeDef?.label}</span>
+              <span className="font-mono">Type: {moduleTypes.find((t) => t.id === module?.type)?.label}</span>
             </div>
-            {configDescription ? (
-              <p className="mt-2 text-xs leading-4 text-zinc-500 max-w-[40rem]">
-                {configDescription}
-              </p>
-            ) : null}
           </div>
           <CloseButton
             onClick={handleRequestClose}
@@ -126,15 +114,12 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
         </div>
 
         <div className='mb-6'>
-          <div className='mb-2'>
-            <label className={`${commonClasses.label} leading-tight`}>Module Name</label>
-          </div>
+          <label className={commonClasses.label}>Module Name</label>
           <input
             type='text'
             value={module?.name || ''}
             onChange={(e) => {
               setHasUserEdited(true);
-              setSaveError('');
               setModule((prev) => (prev ? { ...prev, name: e.target.value } : prev));
             }}
             className={`${commonClasses.input} ${
@@ -144,7 +129,7 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
             aria-describedby={showValidation && validationErrors.name ? 'module-name-error' : undefined}
           />
           {showValidation && validationErrors.name && (
-            <p id='module-name-error' className='text-xs mt-2' style={{ color: 'var(--color-error)' }}>
+            <p id='module-name-error' className='text-xs mt-1' style={{ color: 'var(--color-error)' }}>
               {validationErrors.name}
             </p>
           )}
@@ -154,13 +139,9 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
           <div>
             <ModuleConfig
               module={module}
-              suppressRootDescription
               validationErrors={validationErrors}
               showValidation={showValidation}
-              onUserInteraction={() => {
-                setHasUserEdited(true);
-                setSaveError('');
-              }}
+              onUserInteraction={() => setHasUserEdited(true)}
               updateConfig={(field, value) => {
                 setModule((prev) =>
                   prev
@@ -182,7 +163,6 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
                     initialSnapshotRef.current = stableSerialize(freshModule);
                     setShowValidation(false);
                     setHasUserEdited(false);
-                    setSaveError('');
                   }
                 } catch (e) {
                   console.error('Failed to refresh module:', e);
@@ -191,12 +171,6 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
             />
           </div>
         )}
-
-        {saveError ? (
-          <div className='mt-4 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-700'>
-            {saveError}
-          </div>
-        ) : null}
 
         <div className='-mx-4 sm:-mx-6 mt-6 px-4 sm:px-6 py-4 border-t-2 border-gray-300 bg-bg-card flex items-center justify-between gap-3'>
           <div className='flex items-center'>

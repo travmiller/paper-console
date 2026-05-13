@@ -1,6 +1,6 @@
+from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, Dict, List, Any, Union, Literal
-from datetime import datetime
 import json
 import os
 import uuid
@@ -154,6 +154,9 @@ class ChannelConfig(BaseModel):
 
     # Schedule: List of times in "HH:MM" 24h format to automatically print this channel
     schedule: List[str] = []
+
+    # Cron schedule rules with optional per-rule timezone override.
+    schedule_rules: List[Dict[str, Any]] = []
 
 
 from pydantic import field_validator, Field
@@ -509,6 +512,7 @@ def current_datetime() -> datetime:
 def current_date():
     """Return today's date in the configured timezone."""
     return current_datetime().date()
+
 
 
 def format_print_datetime(

@@ -1,4 +1,3 @@
-from datetime import datetime, timedelta
 import pytz
 import math
 from astral import LocationInfo
@@ -6,6 +5,7 @@ from astral.sun import sun, zenith_and_azimuth
 from astral.moon import phase
 from typing import Dict, Any, List, Tuple
 from PIL import Image, ImageDraw
+import arrow
 
 import app.config
 from app.config import format_print_datetime, format_time
@@ -33,7 +33,9 @@ def get_moon_phase_text(moon_phase: float) -> str:
     elif moon_phase < 23: return "Last Qtr"
     else: return "Wan Crescent"
 
-def get_sun_path_data(now: datetime, city: LocationInfo, tz: pytz.BaseTzInfo) -> List[Tuple[datetime, float]]:
+def get_sun_path_data(
+    now: arrow.Arrow, city: LocationInfo, tz: pytz.BaseTzInfo
+) -> List[Tuple[arrow.Arrow, float]]:
     """Calculate sun altitude throughout a full 24-hour day.
     
     Returns a list of (datetime, altitude) tuples where altitude is in degrees.
@@ -41,38 +43,48 @@ def get_sun_path_data(now: datetime, city: LocationInfo, tz: pytz.BaseTzInfo) ->
     Shows a full sine wave with day on the left and night on the right.
     """
     # Get sunrise and sunset for the day
-    s = sun(city.observer, date=now, tzinfo=tz)
+    s = sun(city.observer, date=now.date(), tzinfo=tz)
     sunrise = s["sunrise"]
     sunset = s["sunset"]
     
     # Get sunrise for next day to complete the night period
-    next_day = now + timedelta(days=1)
-    s_next = sun(city.observer, date=next_day, tzinfo=tz)
+    next_day = now.shift(days=1)
+    s_next = sun(city.observer, date=next_day.date(), tzinfo=tz)
     next_sunrise = s_next["sunrise"]
     
     # First, collect day period (sunrise to sunset) - will be on the left
     day_data = []
-    current = sunrise.replace(minute=(sunrise.minute // 15) * 15, second=0, microsecond=0)
-    while current <= sunset:
+    current = arrow.get(sunrise).replace(
+        minute=(sunrise.minute // 15) * 15,
+        second=0,
+        microsecond=0,
+    )
+    sunset_arrow = arrow.get(sunset)
+    next_sunrise_arrow = arrow.get(next_sunrise)
+    while current <= sunset_arrow:
         try:
-            zenith, _ = zenith_and_azimuth(city.observer, current, with_refraction=True)
+            zenith, _ = zenith_and_azimuth(city.observer, current.datetime, with_refraction=True)
             altitude = 90.0 - zenith
             day_data.append((current, altitude))
         except:
             day_data.append((current, -90.0))
-        current += timedelta(minutes=15)
+        current = current.shift(minutes=15)
     
     # Then, collect night period (sunset to next sunrise) - will be on the right
     night_data = []
-    current = sunset.replace(minute=(sunset.minute // 15) * 15, second=0, microsecond=0)
-    while current < next_sunrise:
+    current = arrow.get(sunset).replace(
+        minute=(sunset.minute // 15) * 15,
+        second=0,
+        microsecond=0,
+    )
+    while current < next_sunrise_arrow:
         try:
-            zenith, _ = zenith_and_azimuth(city.observer, current, with_refraction=True)
+            zenith, _ = zenith_and_azimuth(city.observer, current.datetime, with_refraction=True)
             altitude = 90.0 - zenith
             night_data.append((current, altitude))
         except:
             night_data.append((current, -90.0))
-        current += timedelta(minutes=15)
+        current = current.shift(minutes=15)
     
     # Combine: day first (left), then night (right)
     return day_data + night_data
@@ -80,23 +92,23 @@ def get_sun_path_data(now: datetime, city: LocationInfo, tz: pytz.BaseTzInfo) ->
 def get_almanac_data():
     """Calculates local astronomical data for today."""
     tz = pytz.timezone(app.config.settings.timezone)
-    now = datetime.now(tz)
+    now = arrow.now(tz)
     
     city = get_city_info()
 
     # Sun Calculations
-    s = sun(city.observer, date=now, tzinfo=tz)
+    s = sun(city.observer, date=now.date(), tzinfo=tz)
     
     # Calculate sun path for visualization
     sun_path = get_sun_path_data(now, city, tz)
     
     # Moon Calculations
     # Astral's phase() returns 0..28 roughly
-    current_phase = phase(now)
+    current_phase = phase(now.datetime)
     
     # Calculate current sun position
     try:
-        current_zenith, _ = zenith_and_azimuth(city.observer, now, with_refraction=True)
+        current_zenith, _ = zenith_and_azimuth(city.observer, now.datetime, with_refraction=True)
         current_altitude = 90.0 - current_zenith
     except:
         current_altitude = -90.0
@@ -106,11 +118,11 @@ def get_almanac_data():
     day_minutes = (day_length_seconds % 3600) // 60
 
     return {
-        "date": now.strftime("%A, %b %d %Y"),
+        "date": now.format("dddd, MMM DD YYYY"),
         "sunrise": format_time(s["sunrise"]),
         "sunset": format_time(s["sunset"]),
-        "sunrise_dt": s["sunrise"],
-        "sunset_dt": s["sunset"],
+        "sunrise_dt": arrow.get(s["sunrise"]),
+        "sunset_dt": arrow.get(s["sunset"]),
         "current_time": now,
         "current_altitude": current_altitude,
         "sun_path": sun_path,
@@ -220,9 +232,9 @@ def draw_moon_phase_image(phase: float, size: int) -> Image.Image:
 
 def draw_sun_path_image(
     sun_path: list,
-    sunrise: datetime,
-    sunset: datetime,
-    current_time: datetime,
+    sunrise: arrow.Arrow,
+    sunset: arrow.Arrow,
+    current_time: arrow.Arrow,
     current_altitude: float,
     sunrise_time: str,
     sunset_time: str,

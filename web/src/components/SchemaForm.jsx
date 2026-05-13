@@ -7,7 +7,6 @@ import WebhookTest from './widgets/WebhookTest';
 import ActionButton from './widgets/ActionButton';
 import RichTextEditor from './widgets/RichTextEditor';
 import ImageWidget from './widgets/ImageWidget';
-import { generatePrintWebhookToken, normalizePrintWebhookEndpointPath } from '../utils';
 
 const copyToClipboard = async (text) => {
   if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
@@ -43,8 +42,7 @@ const resolveFieldDescription = ({ description, fieldPath, rootValue }) => {
   if (!description) return description;
 
   if (fieldPath === 'endpoint_path' && description.includes('/hook/<endpoint_path>')) {
-    const endpointPath =
-      normalizePrintWebhookEndpointPath(rootValue?.endpoint_path) || 'your-endpoint';
+    const endpointPath = (rootValue?.endpoint_path || '').trim() || 'your-endpoint';
     return description.replace('/hook/<endpoint_path>', `/hook/${endpointPath}`);
   }
 
@@ -53,8 +51,7 @@ const resolveFieldDescription = ({ description, fieldPath, rootValue }) => {
 
 const PrintWebhookHelp = ({ rootValue = {} }) => {
   const [copiedLabel, setCopiedLabel] = React.useState('');
-  const endpointPath =
-    normalizePrintWebhookEndpointPath(rootValue.endpoint_path) || 'your-endpoint';
+  const endpointPath = (rootValue.endpoint_path || '').trim() || 'your-endpoint';
   const token = rootValue.token || '';
   const origin = typeof window !== 'undefined' ? window.location.origin : 'http://pc-1.local';
   const endpointUrl = `${origin}/hook/${endpointPath}`;
@@ -89,14 +86,14 @@ ${authHeader}-H 'Content-Type: image/png' \\
         setCopiedLabel((current) => (current === label ? '' : current));
       }, 1200);
     } catch (error) {
-      console.error('Failed to copy print endpoint example:', error);
+      console.error('Failed to copy print webhook example:', error);
     }
   };
 
   return (
     <div className="mb-4 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-4 space-y-3">
       <div>
-        <div className="text-sm font-bold text-black">How to send to this print endpoint</div>
+        <div className="text-sm font-bold text-black">How to send to this print webhook</div>
         <p className="text-xs text-zinc-600 mt-1">
           POST to <code className="bg-white px-1 py-0.5 rounded">{endpointUrl}</code>
         </p>
@@ -135,110 +132,6 @@ ${authHeader}-H 'Content-Type: image/png' \\
   );
 };
 
-const AdvancedSection = ({
-  title = 'Advanced',
-  description = '',
-  fields = [],
-  parentSchema,
-  parentUiSchema = {},
-  parentValue,
-  parentPath,
-  parentRequired = [],
-  rootValue,
-  onRootChange,
-  moduleId,
-  moduleType,
-  onActionComplete,
-  validationErrors = {},
-  showValidation = false,
-  onUserInteraction = () => {},
-}) => {
-  const validFields = fields.filter((field) => parentSchema?.properties?.[field]);
-  if (validFields.length === 0) {
-    return null;
-  }
-
-  return (
-    <details className="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
-      <summary className="cursor-pointer select-none list-none">
-        <div className="flex items-center justify-between gap-3">
-          <div className="text-sm font-bold text-black">{title}</div>
-          <div className="text-xs text-zinc-400 uppercase tracking-wide">Show</div>
-        </div>
-        {description ? (
-          <p className="mt-1 pr-8 text-xs leading-4 text-zinc-500">{description}</p>
-        ) : null}
-      </summary>
-      <div className="mt-4">
-        {validFields.map((field) => {
-          const fieldSchema = parentSchema.properties[field];
-          const fieldUiSchema = parentUiSchema?.[field] || {};
-          const fieldValue = parentValue?.[field];
-
-          return (
-            <SchemaField
-              key={field}
-              schema={fieldSchema}
-              uiSchema={fieldUiSchema}
-              value={fieldValue}
-              onChange={(val) => {
-                onUserInteraction();
-                onRootChange({
-                  ...rootValue,
-                  [field]: val,
-                });
-              }}
-              path={[...parentPath, field]}
-              label={fieldSchema.title || field}
-              required={parentRequired.includes(field)}
-              rootValue={rootValue}
-              onRootChange={onRootChange}
-              moduleId={moduleId}
-              moduleType={moduleType}
-              onActionComplete={onActionComplete}
-              validationErrors={validationErrors}
-              showValidation={showValidation}
-              onUserInteraction={onUserInteraction}
-            />
-          );
-        })}
-      </div>
-    </details>
-  );
-};
-
-const FieldHeading = ({
-  title,
-  required = false,
-  compact = false,
-  description = '',
-  action = null,
-}) => {
-  if (!title && !description && !action) {
-    return null;
-  }
-
-  return (
-    <div className={compact ? 'mb-1.5 space-y-0' : 'mb-2 space-y-0'}>
-      {(title || action) ? (
-        <div className="flex justify-between items-center gap-2">
-          {title ? (
-            <label
-              className={`${compact ? commonClasses.labelSmall : commonClasses.label} leading-tight`}
-            >
-              {title} {required && <span className="text-red-500 ml-1" title="Required">*</span>}
-            </label>
-          ) : <div />}
-          {action}
-        </div>
-      ) : null}
-      {description ? (
-        <p className="text-xs leading-4 text-zinc-500">{description}</p>
-      ) : null}
-    </div>
-  );
-};
-
 /**
  * A lightweight JSON Schema form renderer.
  * Supports: string, number, boolean, object, array.
@@ -249,9 +142,7 @@ const SchemaForm = ({
   uiSchema = {},
   formData = {},
   onChange,
-  suppressRootDescription = false,
   moduleId,
-  moduleType,
   onActionComplete,
   validationErrors = {},
   showValidation = false,
@@ -260,18 +151,16 @@ const SchemaForm = ({
   if (!schema) return null;
 
   return (
-    <div>
+    <div className="space-y-4">
       <SchemaField 
         schema={schema} 
         uiSchema={uiSchema} 
         value={formData} 
         onChange={(val) => onChange(val)} 
         path={[]} 
-        suppressRootDescription={suppressRootDescription}
         rootValue={formData}
         onRootChange={onChange}
         moduleId={moduleId}
-        moduleType={moduleType}
         onActionComplete={onActionComplete}
         validationErrors={validationErrors}
         showValidation={showValidation}
@@ -287,14 +176,12 @@ const SchemaField = ({
   value,
   onChange,
   path,
-  suppressRootDescription = false,
   label,
   required,
   compact,
   rootValue,
   onRootChange,
   moduleId,
-  moduleType,
   onActionComplete,
   validationErrors = {},
   showValidation = false,
@@ -346,8 +233,8 @@ const SchemaField = ({
     // 4. CUSTOM WIDGETS
     if (widget === 'location-search') {
         return (
-            <div className="mb-6">
-                <FieldHeading title={title} description={description} />
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
                 <LocationSearch
                     value={value}
                     onChange={(next) => {
@@ -355,19 +242,16 @@ const SchemaField = ({
                         onChange(next);
                     }}
                 />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
                 {hasError && <p id={errorId} className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{fieldError}</p>}
             </div>
         );
     }
-
-    if (widget === 'hidden') {
-        return null;
-    }
     
     if (widget === 'key-value-list') {
         return (
-            <div className="mb-6">
-                <FieldHeading title={title} description={description} />
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
                 <KeyValueList
                     value={value}
                     onChange={(next) => {
@@ -375,6 +259,7 @@ const SchemaField = ({
                         onChange(next);
                     }}
                 />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
                 {hasError && <p id={errorId} className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{fieldError}</p>}
             </div>
         );
@@ -383,8 +268,8 @@ const SchemaField = ({
     if (widget === 'preset-select') {
         const presets = uiOptions.presets || {};
         return (
-            <div className="mb-6">
-                <FieldHeading title={title} description={description} />
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
                 <PresetSelect 
                     value={value} 
                     onChange={(next) => {
@@ -400,6 +285,7 @@ const SchemaField = ({
                         }
                     }}
                 />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
                 {hasError && <p id={errorId} className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{fieldError}</p>}
             </div>
         );
@@ -407,7 +293,7 @@ const SchemaField = ({
     
     if (widget === 'webhook-test') {
         return (
-            <div className="mb-6">
+            <div className="mb-4">
                 <WebhookTest formData={rootValue} />
             </div>
         );
@@ -426,8 +312,8 @@ const SchemaField = ({
     
     if (widget === 'image') {
       return (
-        <div className='mb-6'>
-          <FieldHeading title={title} description={description} />
+        <div className='mb-4'>
+          {title && <label className={commonClasses.label}>{title}</label>}
           <ImageWidget
             value={value}
             onChange={(next) => {
@@ -437,6 +323,9 @@ const SchemaField = ({
             schema={schema}
             uiSchema={uiSchema}
           />
+          {description && (
+            <p className='text-xs text-zinc-500 mt-1'>{description}</p>
+          )}
           {hasError && (
             <p id={errorId} className='text-xs mt-1' style={{ color: 'var(--color-error)' }}>
               {fieldError}
@@ -449,11 +338,11 @@ const SchemaField = ({
     if (widget === 'print-webhook-help') {
         return <PrintWebhookHelp rootValue={rootValue} />;
     }
-
+    
     if (widget === 'richtext') {
         return (
-            <div className="mb-6">
-                <FieldHeading title={title} description={description} />
+            <div className="mb-4">
+                {title && <label className={commonClasses.label}>{title}</label>}
                 <RichTextEditor
                     value={value}
                     onChange={(next) => {
@@ -461,6 +350,7 @@ const SchemaField = ({
                         onChange(next);
                     }}
                 />
+                {description && <p className="text-xs text-zinc-500 mt-1">{description}</p>}
             </div>
         );
     }
@@ -468,43 +358,16 @@ const SchemaField = ({
     // 1. OBJECTS
     if (type === 'object') {
         const isInline = uiOptions.layout === 'inline' || uiOptions.layout === 'compact';
-        const showObjectDescription = !(suppressRootDescription && path.length === 0);
-        const advancedSectionFields = new Set();
-
-        Object.entries(schema.properties || {}).forEach(([key]) => {
-            const propUiSchema = uiSchema?.[key] || {};
-            if (propUiSchema['ui:widget'] !== 'advanced-section') {
-                return;
-            }
-
-            const sectionFields = propUiSchema['ui:options']?.fields || [];
-            sectionFields.forEach((field) => {
-                if (field !== key) {
-                    advancedSectionFields.add(field);
-                }
-            });
-        });
         
         return (
-            <div className={isInline ? "flex flex-wrap gap-x-4 gap-y-2 items-end" : ""}>
-                {(title || (description && showObjectDescription)) && !isInline ? (
-                    <div className="mb-4 space-y-0">
-                        {title ? (
-                            <h3 className="font-bold text-sm leading-tight text-zinc-700 uppercase tracking-wider">
-                                {title}
-                            </h3>
-                        ) : null}
-                        {description && showObjectDescription ? (
-                            <p className="text-xs leading-4 text-zinc-500">{description}</p>
-                        ) : null}
-                    </div>
-                ) : null}
+            <div className={isInline ? "flex flex-wrap gap-x-4 gap-y-2 items-end" : "space-y-3"}>
+                {title && !isInline && <h3 className="font-bold text-sm text-zinc-700 uppercase tracking-wider">{title}</h3>}
+                {description && !isInline && <p className="text-xs text-zinc-500 mb-2">{description}</p>}
                 
                 {Object.entries(schema.properties || {}).map(([key, propSchema]) => {
                     const propUiSchema = uiSchema?.[key] || {};
                     const propValue = value?.[key];
                     const isCompactItem = isInline || propUiSchema['ui:options']?.compact;
-                    const propWidget = propUiSchema['ui:widget'];
                     
                     // Support conditional visibility with ui:showWhen
                     const showWhen = propUiSchema['ui:showWhen'];
@@ -516,34 +379,6 @@ const SchemaField = ({
                         if (!allowedValues.includes(siblingValue)) {
                             return null; // Hide this field
                         }
-                    }
-
-                    if (advancedSectionFields.has(key) && propWidget !== 'advanced-section') {
-                        return null;
-                    }
-
-                    if (propWidget === 'advanced-section') {
-                        return (
-                            <AdvancedSection
-                                key={key}
-                                title={propSchema.title || key}
-                                description={propSchema.description || ''}
-                                fields={propUiSchema['ui:options']?.fields || []}
-                                parentSchema={schema}
-                                parentUiSchema={uiSchema}
-                                parentValue={value}
-                                parentPath={path}
-                                parentRequired={schema.required || []}
-                                rootValue={rootValue}
-                                onRootChange={onRootChange}
-                                moduleId={moduleId}
-                                moduleType={moduleType}
-                                onActionComplete={onActionComplete}
-                                validationErrors={validationErrors}
-                                showValidation={showValidation}
-                                onUserInteraction={onUserInteraction}
-                            />
-                        );
                     }
                     
                     return (
@@ -557,14 +392,12 @@ const SchemaField = ({
                                     onChange(newValue);
                                 }}
                                 path={[...path, key]}
-                                suppressRootDescription={suppressRootDescription}
                                 label={propSchema.title || key}
                                 required={schema.required && schema.required.includes(key)}
                                 compact={isCompactItem}
                                 rootValue={rootValue}
                                 onRootChange={onRootChange}
                                 moduleId={moduleId}
-                                moduleType={moduleType}
                                 onActionComplete={onActionComplete}
                                 validationErrors={validationErrors}
                                 showValidation={showValidation}
@@ -604,21 +437,11 @@ const SchemaField = ({
         };
 
         return (
-            <div className="mb-6 space-y-3">
-                {(title || description) ? (
-                    <div className="space-y-0">
-                        <div className="flex justify-between items-center">
-                            {title ? (
-                                <label className={`${commonClasses.label} leading-tight`}>
-                                    {title}
-                                </label>
-                            ) : null}
-                        </div>
-                        {description ? (
-                            <p className="text-xs leading-4 text-zinc-500">{description}</p>
-                        ) : null}
-                    </div>
-                ) : null}
+            <div className="space-y-2">
+                 <div className="flex justify-between items-center">
+                    {title && <label className={commonClasses.label}>{title}</label>}
+                </div>
+                {description && <p className="text-xs text-zinc-500 mb-2">{description}</p>}
                 
                 <div className="space-y-2">
                     {items.map((item, index) => (
@@ -636,7 +459,6 @@ const SchemaField = ({
                                     onChange={(val) => handleChangeItem(index, val)}
                                     path={[...path, index]}
                                     moduleId={moduleId}
-                                    moduleType={moduleType}
                                     validationErrors={validationErrors}
                                     showValidation={showValidation}
                                     onUserInteraction={onUserInteraction}
@@ -678,8 +500,7 @@ const SchemaField = ({
     // 3. BOOLEANS
     if (type === 'boolean') {
         return (
-            <div className={compact ? 'mb-0' : 'mb-6'}>
-                <div className={`flex items-start gap-3 ${compact ? 'py-0' : 'py-0.5'}`}>
+            <div className={`flex items-center gap-2 ${compact ? 'py-0' : 'py-1'}`}>
                 <input 
                     type="checkbox"
                     checked={value || false}
@@ -690,61 +511,52 @@ const SchemaField = ({
                     className="w-4 h-4 text-black rounded border-2 border-zinc-300 focus:ring-0 focus:ring-offset-0"
                     style={{ accentColor: 'black' }}
                 />
-                <div
-                  className="cursor-pointer select-none"
+                <label
+                  className={`text-sm text-black select-none cursor-pointer ${compact ? 'font-medium' : ''}`}
                   onClick={() => {
                     onUserInteraction();
                     onChange(!value);
                   }}>
-                    {title ? (
-                        <div className={`text-sm text-black ${compact ? 'font-medium' : ''}`}>
-                            {title}
-                        </div>
-                    ) : null}
-                    {description ? (
-                        <p className="text-xs leading-4 text-zinc-500 mt-0">{description}</p>
-                    ) : null}
-                </div>
-            </div>
-            {hasError && <p id={errorId} className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{fieldError}</p>}
+                    {title}
+                </label>
             </div>
         );
     }
 
     // 5. STRINGS & NUMBERS
-    const headerText = [description, numericRangeText].filter(Boolean).join(' ');
-    const randomExampleAction = uiSchema?.['ui:randomExample'] ? (
-        <button
-            type="button"
-            onClick={() => {
-                const examples = uiSchema['ui:randomExample'];
-                if (Array.isArray(examples) && examples.length > 0) {
-                    const available = examples.filter(ex => ex !== value);
-                    if (available.length === 0) {
-                        const random = examples[Math.floor(Math.random() * examples.length)];
-                        onChange(random);
-                    } else {
-                        const random = available[Math.floor(Math.random() * available.length)];
-                        onChange(random);
-                    }
-                }
-            }}
-            className="text-xs text-zinc-400 hover:text-black hover:underline cursor-pointer transition-colors"
-            title="Insert random example"
-        >
-            Generate Example
-        </button>
-    ) : null;
-
     return (
-        <div className={compact ? "mb-0" : "mb-6"}>
-            <FieldHeading
-                title={title}
-                required={required}
-                compact={compact}
-                description={!compact ? headerText : ''}
-                action={randomExampleAction}
-            />
+        <div className={compact ? "mb-0" : "mb-2"}>
+            {title && (
+                <div className="flex justify-between items-center mb-1">
+                    <label className={compact ? commonClasses.labelSmall : commonClasses.label}>
+                        {title} {required && <span className="text-red-500 ml-1" title="Required">*</span>}
+                    </label>
+                    {uiSchema?.['ui:randomExample'] && (
+                        <button
+                            type="button"
+                            onClick={() => {
+                                const examples = uiSchema['ui:randomExample'];
+                                if (Array.isArray(examples) && examples.length > 0) {
+                                    // Filter out current value to ensure a change if possible
+                                    const available = examples.filter(ex => ex !== value);
+                                    if (available.length === 0) {
+                                        // If only one option or all match, just pick random from full list
+                                        const random = examples[Math.floor(Math.random() * examples.length)];
+                                        onChange(random);
+                                    } else {
+                                        const random = available[Math.floor(Math.random() * available.length)];
+                                        onChange(random);
+                                    }
+                                }
+                            }}
+                            className="text-xs text-zinc-400 hover:text-black hover:underline cursor-pointer transition-colors"
+                            title="Insert random example"
+                        >
+                            Generate Example
+                        </button>
+                    )}
+                </div>
+            )}
             {schema.enum ? (
                 <select
                     value={value ?? schema.default ?? ''}
@@ -778,22 +590,8 @@ const SchemaField = ({
                     aria-invalid={hasError}
                     aria-describedby={errorId}
                 />
-            ) : widget === 'password' ? (
-                <PasswordInput
-                    compact={compact}
-                    hasError={hasError}
-                    value={value ?? schema.default ?? ''}
-                    allowRegenerate={moduleType === 'print_webhook' && fieldPath === 'token'}
-                    onChange={(nextValue) => {
-                        onUserInteraction();
-                        onChange(nextValue);
-                    }}
-                    placeholder={uiSchema?.['ui:placeholder']}
-                    errorId={errorId}
-                />
             ) : (
                 <input
-                    type={isNumberField ? 'number' : 'text'}
                     min={isNumberField ? schema.minimum : undefined}
                     max={isNumberField ? schema.maximum : undefined}
                     step={isNumberField ? (type === 'integer' ? 1 : (schema.multipleOf || 'any')) : undefined}
@@ -827,83 +625,16 @@ const SchemaField = ({
                     aria-describedby={errorId}
                 />
             )}
+             {(description || numericRangeText) && !compact && (
+                <p className="text-xs text-zinc-500 mt-1">
+                    {[description, numericRangeText].filter(Boolean).join(' ')}
+                </p>
+             )}
              {hasError && <p id={errorId} className="text-xs mt-1" style={{ color: 'var(--color-error)' }}>{fieldError}</p>}
         </div>
     );
 };
 
-const PasswordInput = ({
-    compact,
-    hasError,
-    value,
-    allowRegenerate = false,
-    onChange,
-    placeholder,
-    errorId,
-}) => {
-    const [revealed, setRevealed] = React.useState(false);
-    const [copied, setCopied] = React.useState(false);
-
-    const inputClass = compact ? commonClasses.inputSmall : commonClasses.input;
-
-    const handleCopy = async () => {
-        if (typeof navigator === 'undefined' || !navigator.clipboard || !value) {
-            return;
-        }
-        try {
-            await navigator.clipboard.writeText(value);
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 1200);
-        } catch (error) {
-            console.error('Failed to copy secret field:', error);
-        }
-    };
-
-    const handleRegenerate = () => {
-        onChange(generatePrintWebhookToken());
-    };
-
-    return (
-        <div className="flex flex-wrap gap-2 items-stretch">
-            <input
-                type={revealed ? 'text' : 'password'}
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                className={`${inputClass} ${hasError ? 'border-red-500' : ''}`}
-                style={hasError ? { borderColor: 'var(--color-error)' } : undefined}
-                placeholder={placeholder}
-                aria-invalid={hasError}
-                aria-describedby={errorId}
-            />
-            <button
-                type="button"
-                onClick={() => setRevealed((current) => !current)}
-                className={commonClasses.buttonGhost}
-            >
-                {revealed ? 'Hide' : 'Show'}
-            </button>
-            {allowRegenerate ? (
-                <button
-                    type="button"
-                    onClick={handleRegenerate}
-                    className={commonClasses.buttonGhost}
-                    title="Generate a new bearer token"
-                >
-                    Regenerate
-                </button>
-            ) : null}
-            <button
-                type="button"
-                onClick={handleCopy}
-                className={commonClasses.buttonGhost}
-                disabled={!value}
-                title={value ? 'Copy value' : 'Nothing to copy'}
-            >
-                {copied ? 'Copied' : 'Copy'}
-            </button>
-        </div>
-    );
-};
 
 // Helper: Create empty value based on schema type
 const createEmptyValue = (schema) => {

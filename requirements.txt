@@ -6,6 +6,8 @@ requests
 feedparser
 icalendar
 pytz
+arrow
+croniter
 python-dateutil
 astral
 beautifulsoup4

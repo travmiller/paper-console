@@ -20,8 +20,8 @@ import subprocess
 import sys
 import tarfile
 import tempfile
-from datetime import datetime, timezone
 from pathlib import Path
+import arrow
 
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -214,7 +214,7 @@ def write_metadata(version: str, tarball_path: Path, output_dir: Path) -> None:
         "version": version,
         "tarball": tarball_path.name,
         "sha256": sha,
-        "generated_at": datetime.now(timezone.utc).isoformat(),
+        "generated_at": arrow.utcnow().isoformat(),
     }
     manifest_path = output_dir / f"release-manifest-{version}.json"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")

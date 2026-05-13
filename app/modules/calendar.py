@@ -1,6 +1,7 @@
 import requests
 import pytz
 import logging
+import arrow
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Any, Optional
 from icalendar import Calendar
@@ -222,7 +223,7 @@ def parse_events(
 
                     time_str = "All Day"
                     if not evt_is_all_day:
-                        time_str = format_time(evt_dt)
+                        time_str = format_time(arrow.get(evt_dt))
 
                     events_by_day[evt_date].append(
                         {
@@ -532,7 +533,7 @@ def _resolve_view_mode(config: CalendarConfig) -> str:
     }
 )
 def format_calendar_receipt(
-    printer: PrinterDriver, config: CalendarConfig, module_name: str = None
+    printer: PrinterDriver, config: CalendarConfig, module_name: Optional[str] = None
 ):
     """Fetches and prints the calendar agenda."""
 

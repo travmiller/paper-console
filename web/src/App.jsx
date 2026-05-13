@@ -211,12 +211,12 @@ function App() {
     }, 500); // 500ms debounce
   };
 
-  const updateChannelSchedule = async (position, schedule) => {
+  const updateChannelSchedule = async (position, schedulePayload) => {
     try {
       const response = await adminAuthFetch(`/api/channels/${position}/schedule`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(schedule),
+        body: JSON.stringify(schedulePayload),
       });
 
       if (!response.ok) throw new Error('Failed to update schedule');
@@ -347,6 +347,7 @@ function App() {
       print_webhook: {
         token: '',
         endpoint_path: '',
+        print_header: '',
         print_sender_ip: false,
         print_content_type: false,
         print_user_agent: false,
@@ -372,18 +373,7 @@ function App() {
         }),
       });
 
-      if (!response.ok) {
-        let detail = 'Failed to create module';
-        try {
-          const errorData = await response.json();
-          if (typeof errorData?.detail === 'string' && errorData.detail.trim()) {
-            detail = errorData.detail.trim();
-          }
-        } catch (_error) {
-          // Fall back to the generic message if the error body is not JSON.
-        }
-        throw new Error(detail);
-      }
+      if (!response.ok) throw new Error('Failed to create module');
 
       const data = await response.json();
       setModules((prev) => ({ ...prev, [data.module.id]: data.module }));
@@ -392,7 +382,7 @@ function App() {
       return data.module;
     } catch (err) {
       console.error('Error creating module:', err);
-      setStatus({ type: 'error', message: err.message || 'Failed to create module' });
+      setStatus({ type: 'error', message: 'Failed to create module' });
       return null;
     }
   };
@@ -444,18 +434,7 @@ function App() {
         body: JSON.stringify(moduleToUpdate),
       });
 
-      if (!response.ok) {
-        let detail = 'Failed to update module';
-        try {
-          const errorData = await response.json();
-          if (typeof errorData?.detail === 'string' && errorData.detail.trim()) {
-            detail = errorData.detail.trim();
-          }
-        } catch (_error) {
-          // Fall back to the generic message if the error body is not JSON.
-        }
-        throw new Error(detail);
-      }
+      if (!response.ok) throw new Error('Failed to update module');
 
       const data = await response.json();
       setModules((prev) => ({ ...prev, [moduleId]: data.module }));
@@ -464,7 +443,7 @@ function App() {
       return data.module;
     } catch (err) {
       console.error('Error updating module:', err);
-      setStatus({ type: 'error', message: err.message || 'Failed to update module' });
+      setStatus({ type: 'error', message: 'Failed to update module' });
       const response = await adminAuthFetch(`/api/modules/${moduleId}`);
       if (response.ok) {
         const data = await response.json();
@@ -934,8 +913,9 @@ function App() {
           position={showScheduleModal}
           channel={settings.channels[showScheduleModal] || {}}
           onClose={() => setShowScheduleModal(null)}
-          onUpdate={(newSchedule) => updateChannelSchedule(showScheduleModal, newSchedule)}
+          onUpdate={(schedulePayload) => updateChannelSchedule(showScheduleModal, schedulePayload)}
           timeFormat={settings.time_format}
+          timezone={settings.timezone}
         />
 
         <APInstructionsModal show={showAPInstructions} wifiStatus={wifiStatus} />
