@@ -12,7 +12,7 @@ export const commonClasses = {
   inputSmall: 'w-full p-2 text-sm bg-white border-2 border-zinc-300 rounded-lg text-black focus:border-black focus:outline-none ',
 
   // Labels
-  label: 'block mb-2 text-sm text-black  font-bold',
+  label: 'block mb-1 text-sm text-black  font-bold',
   labelSmall: 'block mb-1 text-xs text-black  font-bold',
 
   // Cards
@@ -34,4 +34,3 @@ export const commonClasses = {
   textMuted: 'text-zinc-600 text-sm ',
   textSubtle: 'text-xs text-zinc-500 ',
 };
-

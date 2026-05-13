@@ -3,8 +3,8 @@
 import hashlib
 import shlex
 import subprocess
+from datetime import datetime
 from pathlib import Path
-import arrow
 
 import app.device_password as device_password
 import app.modules  # noqa: F401 - triggers module auto-registration
@@ -33,7 +33,7 @@ def test_default_settings_use_stable_release_channel():
 
 
 def test_print_datetime_includes_configured_time_format():
-    dt = arrow.get(2026, 4, 21, 16, 5)
+    dt = datetime(2026, 4, 21, 16, 5)
 
     assert (
         format_print_datetime(dt, time_format="12h")

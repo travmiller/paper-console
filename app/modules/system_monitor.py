@@ -2,13 +2,13 @@ import shutil
 import socket
 import os
 import logging
+from datetime import datetime
 from typing import Dict, Any
 from app.wifi_manager import get_wifi_status
 from app.utils import wrap_text
 from app.module_registry import register_module
 from app.config import format_print_datetime
 from PIL import Image, ImageDraw
-import arrow
 
 logger = logging.getLogger(__name__)
 
@@ -176,7 +176,8 @@ def format_system_monitor_receipt(
             for line in f:
                 if line.startswith("btime"):
                     boot_timestamp = int(line.split()[1])
-                    boot_str = arrow.get(boot_timestamp).format("MMM DD HH:mm")
+                    boot_time = datetime.fromtimestamp(boot_timestamp)
+                    boot_str = boot_time.strftime("%b %d %H:%M")
                     printer.print_caption(f"Boot: {boot_str}")
                     break
     except Exception:

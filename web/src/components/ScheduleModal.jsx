@@ -87,7 +87,7 @@ const ScheduleModal = ({ position, channel, onClose, onUpdate, timeFormat, timez
 
         <div className='space-y-4'>
           <div className='text-sm text-gray-600'>
-            Use <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800">cron rules</a> to control print timing.
+            Use <a href="https://crontab.guru/" target="_blank" rel="noopener noreferrer" className="underline text-blue-600 hover:text-blue-800">cron rules</a> to define when this channel should automatically print. Schedules use the timezone from General Settings.
           </div>
 
           <div className='text-sm text-gray-600'>

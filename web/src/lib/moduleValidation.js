@@ -1,3 +1,5 @@
+import { normalizePrintWebhookEndpointPath } from '../utils';
+
 export const getModuleValidationErrors = (module) => {
   const errors = {};
   const config = module?.config || {};
@@ -73,6 +75,19 @@ export const getModuleValidationErrors = (module) => {
       if (!authPassword) {
         errors.auth_password = 'Password is required for this auth type.';
       }
+    }
+  }
+
+  if (module?.type === 'print_webhook') {
+    const endpointPath = String(config.endpoint_path || '').trim();
+    const enabledTypes = [config.accept_text, config.accept_images, config.accept_json].some(Boolean);
+
+    if (endpointPath && !normalizePrintWebhookEndpointPath(endpointPath)) {
+      errors.endpoint_path = 'Use letters, numbers, or hyphens in the endpoint path.';
+    }
+
+    if (!enabledTypes) {
+      errors.accept_text = 'Enable at least one accepted payload type.';
     }
   }
 

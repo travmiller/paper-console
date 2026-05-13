@@ -8,6 +8,7 @@ from PIL import Image
 from starlette.requests import Request
 
 import app.main as main_module
+import app.print_webhook_service as print_webhook_service
 from app.config import ChannelConfig, ChannelModuleAssignment, ModuleInstance, PrintWebhookConfig
 from app.modules import print_webhook
 
@@ -117,6 +118,56 @@ def test_print_webhook_module_type_is_registered():
         module_type["id"] == "print_webhook"
         for module_type in result["moduleTypes"]
     )
+
+
+def test_normalize_print_webhook_generates_token_when_requested(monkeypatch):
+    module = _print_module(token="", endpoint_path="")
+    monkeypatch.setattr(
+        print_webhook_service,
+        "generate_token",
+        lambda: "generated-token-123",
+    )
+
+    print_webhook_service.normalize_module_config(
+        {},
+        module,
+        generate_token_if_missing=True,
+    )
+
+    assert module.config["token"] == "generated-token-123"
+    assert module.config["endpoint_path"] == "front-door"
+
+
+def test_normalize_print_webhook_allows_blank_token_when_not_generating():
+    module = _print_module(token="", endpoint_path="")
+
+    print_webhook_service.normalize_module_config({}, module)
+
+    assert module.config["token"] == ""
+    assert module.config["endpoint_path"] == "front-door"
+
+
+def test_normalize_print_webhook_generates_unique_endpoint_path_when_needed():
+    existing = _print_module(
+        module_id="existing-print",
+        endpoint_path="print-endpoint",
+        name="Print Endpoint",
+    )
+    module = _print_module(
+        module_id="new-print",
+        endpoint_path="",
+        token="",
+        name="Print Endpoint",
+    )
+
+    print_webhook_service.normalize_module_config(
+        {existing.id: existing},
+        module,
+        generate_token_if_missing=True,
+    )
+
+    assert module.config["endpoint_path"] == "print-endpoint-2"
+    assert module.config["token"] != ""
 
 
 def test_receive_print_webhook_returns_404_for_unknown_endpoint(monkeypatch):
@@ -343,6 +394,41 @@ def test_parse_request_payload_for_json_print_job_decodes_image_data():
     assert isinstance(job["items"][1]["image_bytes"], bytes)
 
 
+def test_parse_request_payload_uses_module_name_when_json_title_missing():
+    module_config = PrintWebhookConfig(
+        token="secret",
+        endpoint_path="front-door",
+        print_header="Legacy Header",
+    )
+    body = b'{"subtitle":"Motion","items":[{"type":"text","text":"Someone is here."}]}'
+
+    job = print_webhook.parse_request_payload(
+        content_type="application/json",
+        body=body,
+        config=module_config,
+        module_name="Front Door",
+    )
+
+    assert job["title"] == "Front Door"
+
+
+def test_parse_request_payload_text_uses_module_name_over_legacy_header():
+    module_config = PrintWebhookConfig(
+        token="secret",
+        endpoint_path="front-door",
+        print_header="Legacy Header",
+    )
+
+    job = print_webhook.parse_request_payload(
+        content_type="text/plain",
+        body=b"Motion detected",
+        config=module_config,
+        module_name="Front Door",
+    )
+
+    assert job["title"] == "Front Door"
+
+
 def test_print_parsed_job_prints_text_and_remote_image(monkeypatch):
     printer = _RecordingPrinter()
     module_config = PrintWebhookConfig(
@@ -432,7 +518,7 @@ def test_build_print_webhook_metadata_lines_respects_config():
         print_user_agent=True,
     )
 
-    lines = main_module._build_print_webhook_metadata_lines(request, config)
+    lines = print_webhook_service.build_metadata_lines(request, config)
 
     assert lines == [
         "From: 127.0.0.1",

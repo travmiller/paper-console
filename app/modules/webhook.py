@@ -140,7 +140,7 @@ def request_webhook_response(action: WebhookConfig):
 @register_module(
     type_id="webhook",
     label="Webhook",
-    description="Fetch and print data from any API endpoint",
+    description="Fetch and print data from a URL or API",
     icon="plugs",
     offline=False,
     category="utilities",

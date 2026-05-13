@@ -1,6 +1,6 @@
 """Regression tests for snapshot gallery fixture data."""
 
-from datetime import date, datetime
+from datetime import date
 import importlib.util
 from pathlib import Path
 

@@ -9,6 +9,33 @@ export const formatTimeForDisplay = (time24, timeFormat = '12h') => {
   return `${h12}:${minutes} ${ampm}`;
 };
 
+export const normalizePrintWebhookEndpointPath = (value) => {
+  const slug = String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+
+  return slug;
+};
+
+export const generatePrintWebhookToken = () => {
+  const bytes = new Uint8Array(18);
+
+  if (globalThis.crypto?.getRandomValues) {
+    globalThis.crypto.getRandomValues(bytes);
+    let binary = '';
+    bytes.forEach((byte) => {
+      binary += String.fromCharCode(byte);
+    });
+    return btoa(binary)
+      .replace(/\+/g, '-')
+      .replace(/\//g, '_')
+      .replace(/=+$/g, '');
+  }
+  return `pc1_${Math.random().toString(36).slice(2)}${Math.random().toString(36).slice(2)}`;
+};
+
 export const validateHHMM = (timeValue) => /^([01]\d|2[0-3]):([0-5]\d)$/.test(String(timeValue || '').trim());
 
 export const validateCronExpression = (expression) => {

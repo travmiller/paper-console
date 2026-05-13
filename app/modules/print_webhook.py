@@ -77,7 +77,7 @@ def parse_request_payload(
             raise ValueError("text/plain is disabled for this module")
         return {
             "job_type": "text",
-            "title": config.print_header or module_name,
+            "title": module_name or "WEBHOOK",
             "text": body.decode("utf-8", errors="replace"),
         }
 
@@ -89,7 +89,7 @@ def parse_request_payload(
         _validate_raster_image_bytes(body)
         return {
             "job_type": "image",
-            "title": config.print_header or module_name,
+            "title": module_name or "WEBHOOK",
             "image_bytes": body,
         }
 
@@ -138,7 +138,7 @@ def parse_request_payload(
 
         return {
             "job_type": "json",
-            "title": str(payload.get("title") or config.print_header or module_name),
+            "title": str(payload.get("title") or module_name or "WEBHOOK"),
             "subtitle": str(payload.get("subtitle") or "").strip(),
             "items": normalized_items,
         }
@@ -168,7 +168,7 @@ def print_parsed_job(
     config: PrintWebhookConfig,
     module_name: str,
 ) -> None:
-    header = (job.get("title") or config.print_header or module_name or "WEBHOOK").strip()
+    header = (job.get("title") or module_name or "WEBHOOK").strip()
     printer.print_header(header, icon="plugs")
     printer.print_caption(format_print_datetime())
 
@@ -229,44 +229,24 @@ def print_parsed_job(
 
 @register_module(
     type_id="print_webhook",
-    label="Print Webhook",
-    description="Receive webhooks and print their text or images immediately",
+    label="Print Endpoint",
+    description="Receive print jobs from automations and webhooks",
     icon="plugs-connected",
     offline=False,
     category="utilities",
     config_schema={
         "type": "object",
-        "description": "Print webhook payloads immediately when this module is on the active dial channel.",
+        "description": "Print incoming requests immediately when this module is on the active dial channel.",
         "properties": {
             "endpoint_path": {
                 "type": "string",
                 "title": "Endpoint Path",
-                "description": "Unique URL suffix for this webhook. Final route is /hook/<endpoint_path>.",
+                "description": "Optional unique URL suffix for this webhook. Leave blank to generate one from the module name. Final route is /hook/<endpoint_path>.",
             },
             "token": {
                 "type": "string",
                 "title": "Bearer Token",
                 "description": "Optional. If set, send it as Authorization: Bearer <token>. Leave blank to accept unauthenticated requests.",
-            },
-            "print_header": {
-                "type": "string",
-                "title": "Printed Header",
-                "description": "Optional header shown on printed receipts when the payload does not provide a title.",
-            },
-            "print_sender_ip": {
-                "type": "boolean",
-                "title": "Print Sender IP",
-                "default": False,
-            },
-            "print_content_type": {
-                "type": "boolean",
-                "title": "Print Content Type",
-                "default": False,
-            },
-            "print_user_agent": {
-                "type": "boolean",
-                "title": "Print User Agent",
-                "default": False,
             },
             "accept_text": {
                 "type": "boolean",
@@ -283,6 +263,26 @@ def print_parsed_job(
                 "title": "Accept JSON print jobs",
                 "default": True,
             },
+            "advanced_metadata": {
+                "type": "null",
+                "title": "Advanced",
+                "description": "Optional request details to include on the printed receipt.",
+            },
+            "print_sender_ip": {
+                "type": "boolean",
+                "title": "Print Sender IP",
+                "default": False,
+            },
+            "print_content_type": {
+                "type": "boolean",
+                "title": "Print Content Type",
+                "default": False,
+            },
+            "print_user_agent": {
+                "type": "boolean",
+                "title": "Print User Agent",
+                "default": False,
+            },
             "max_image_height_dots": {
                 "type": "integer",
                 "title": "Max Image Height (dots)",
@@ -292,12 +292,20 @@ def print_parsed_job(
             },
             "delivery_help": {"type": "null", "title": ""},
         },
-        "required": ["endpoint_path"],
     },
     ui_schema={
         "token": {"ui:widget": "password"},
         "endpoint_path": {"ui:placeholder": "front-door-camera"},
-        "print_header": {"ui:placeholder": "Front Door"},
+        "advanced_metadata": {
+            "ui:widget": "advanced-section",
+            "ui:options": {
+                "fields": [
+                    "print_sender_ip",
+                    "print_content_type",
+                    "print_user_agent",
+                ]
+            },
+        },
         "delivery_help": {"ui:widget": "print-webhook-help"},
     },
 )

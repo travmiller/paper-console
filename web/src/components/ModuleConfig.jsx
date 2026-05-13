@@ -8,6 +8,7 @@ const ModuleConfig = ({
   module,
   updateConfig,
   onRefresh,
+  suppressRootDescription = false,
   validationErrors = {},
   showValidation = false,
   onUserInteraction = () => {},
@@ -36,7 +37,9 @@ const ModuleConfig = ({
               uiSchema={uiSchema}
               formData={config}
               onChange={handleSchemaChange}
+              suppressRootDescription={suppressRootDescription}
               moduleId={module.id}
+              moduleType={module.type}
               onActionComplete={onRefresh}
               validationErrors={validationErrors}
               showValidation={showValidation}

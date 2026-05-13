@@ -59,6 +59,8 @@ const ChannelList = ({
         return Array.isArray(cfg.ical_sources) && cfg.ical_sources.some((s) => isNonEmptyString(s?.url));
       case 'webhook':
         return isNonEmptyString(cfg.url);
+      case 'print_webhook':
+        return Boolean(cfg.accept_text || cfg.accept_images || cfg.accept_json);
       case 'text':
         return hasVisibleRichText(cfg.content_doc);
       case 'weather':
