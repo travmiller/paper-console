@@ -75,9 +75,11 @@ def test_calendar_view_mode_snapshots_force_day_and_week(monkeypatch, tmp_path):
     assert all("BEGIN:VCALENDAR" in item[3] for item in captured)
 
 
-def test_calendar_day_view_prints_agenda_list():
-    today = date.today()
+def test_calendar_day_view_prints_agenda_list(monkeypatch):
+    today = date(2026, 5, 12)
     captured = []
+
+    monkeypatch.setattr(calendar_module, "current_date", lambda: today)
 
     class FakePrinter:
         width = 42
@@ -151,8 +153,25 @@ def test_snapshot_email_defaults_override_live_credentials_with_mock():
     assert email_config["mock_messages"][0]["subject"] == "Hi Grandma"
 
 
-def test_calendar_receipt_accepts_mock_ics_content(capsys):
-    today = date.today()
+def test_calendar_receipt_accepts_mock_ics_content(monkeypatch, capsys):
+    today = date(2026, 5, 12)
+    monkeypatch.setattr(calendar_module, "current_date", lambda: today)
+    monkeypatch.setattr(
+        calendar_module,
+        "parse_events",
+        lambda ics_content, days_to_show, timezone_str: {
+            today: [
+                {
+                    "time": "10:30 AM",
+                    "summary": "Mock calendar event",
+                    "sort_key": "10:30",
+                    "datetime": None,
+                    "is_all_day": False,
+                }
+            ]
+        },
+    )
+
     ics = "\r\n".join(
         [
             "BEGIN:VCALENDAR",
