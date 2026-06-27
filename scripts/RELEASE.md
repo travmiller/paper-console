@@ -11,6 +11,26 @@ For each release version (example: `v1.2.3`), publish:
 - `release-manifest-v1.2.3.json` (metadata)
 - Optional: `SHA256SUMS` (aggregate checksums for all release files)
 
+## Release notes policy
+
+Every GitHub release should include user-facing patch notes before the release is considered complete.
+
+Patch notes appear in the PC-1 Settings UI, so write them for people using the device, not for developers reading git history:
+
+- Describe visible behavior changes, fixes, setup impacts, and update caveats.
+- Name the feature or module the user recognizes, such as Calendar, Updates, Slack, WiFi, or Print Endpoint.
+- Avoid implementation details such as lockfiles, dependency churn, CI, refactors, test changes, internal filenames, or branch names unless they directly affect user behavior.
+- Prefer concrete language: "Calendar events from large Google iCal feeds now print correctly" instead of "stream ICS response bodies."
+- Keep notes non-empty. If a release only contains internal maintenance, summarize the user benefit or say there are no user-visible behavior changes.
+
+Use `scripts/RELEASE_NOTES_TEMPLATE.md` as the starting point. After the tag-driven workflow publishes the GitHub release, add or verify notes with:
+
+```bash
+gh release edit v1.2.3 --notes-file scripts/RELEASE_NOTES_TEMPLATE.md
+```
+
+Replace the template content with release-specific notes before running that command.
+
 ## One-time prerequisites
 
 - Ensure `web/` builds successfully (`npm ci && npm run build`)
@@ -178,7 +198,8 @@ For a stable release:
 4. If dependency fixes rebuild `web/dist`, commit the lockfile and generated dist assets before tagging.
 5. Push `vX.Y.Z`.
 6. Confirm the GitHub release published successfully.
-7. Confirm a production device on the stable channel sees the update in General Settings.
+7. Add or verify user-facing GitHub release notes.
+8. Confirm a production device on the stable channel sees the update and patch notes in General Settings.
 
 For a beta release:
 
@@ -188,7 +209,8 @@ For a beta release:
 4. If dependency fixes rebuild `web/dist`, commit the lockfile and generated dist assets before tagging.
 5. Push a prerelease tag for the next stable target, such as `vX.(Y+1).0-beta.N` or `vX.(Y+1).0-rc.N`.
 6. Confirm GitHub marked the release as a prerelease.
-7. Confirm a production device with **Beta Releases** enabled sees the update in General Settings.
+7. Add or verify user-facing GitHub release notes.
+8. Confirm a production device with **Beta Releases** enabled sees the update and patch notes in General Settings.
 
 For a stable hotfix that should also reach beta:
 
