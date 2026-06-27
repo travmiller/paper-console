@@ -138,6 +138,68 @@ def test_calendar_day_view_prints_agenda_list(monkeypatch):
     ) in captured
 
 
+def test_calendar_week_and_month_views_do_not_truncate_normal_long_titles(monkeypatch):
+    today = date(2026, 5, 12)
+    long_title = (
+        "Mock calendar event with a descriptive title that is longer than "
+        "one thermal printer line but should still be preserved"
+    )
+    captured = []
+
+    monkeypatch.setattr(calendar_module, "current_date", lambda: today)
+
+    class FakePrinter:
+        width = 42
+
+        def print_subheader(self, text):
+            captured.append(("subheader", text))
+
+        def print_bold(self, text):
+            captured.append(("bold", text))
+
+        def print_body(self, text):
+            captured.append(("body", text))
+
+        def print_line(self):
+            captured.append(("line", ""))
+
+        def feed(self, lines):  # noqa: ARG002
+            captured.append(("feed", lines))
+
+        def print_image(self, image):
+            captured.append(("image", image.size))
+
+    events = {
+        today: [
+            {
+                "time": "9:30 AM",
+                "summary": long_title,
+                "sort_key": "09:30",
+                "datetime": None,
+                "is_all_day": False,
+            }
+        ]
+    }
+
+    printer = FakePrinter()
+    calendar_module._print_calendar_week_view(printer, [today], events)
+    calendar_module._print_calendar_month_view(printer, [today], events)
+
+    body_lines = [text for kind, text in captured if kind == "body"]
+    assert f"9:30 AM {long_title}" in body_lines
+    assert f"  9:30 AM {long_title}" in body_lines
+    assert all(".." not in line for line in body_lines)
+
+
+def test_calendar_event_titles_have_high_safety_cap():
+    title = "A" * (calendar_module.MAX_EVENT_TITLE_CHARS + 20)
+
+    rendered = calendar_module._event_title(title)
+
+    assert len(rendered) == calendar_module.MAX_EVENT_TITLE_CHARS
+    assert rendered.endswith("...")
+
+
 def test_snapshot_email_defaults_override_live_credentials_with_mock():
     render_all_prints = _load_render_all_prints_module()
 
@@ -159,7 +221,7 @@ def test_calendar_receipt_accepts_mock_ics_content(monkeypatch, capsys):
     monkeypatch.setattr(
         calendar_module,
         "parse_events",
-        lambda ics_content, days_to_show, timezone_str: {
+        lambda ics_content, days_to_show, timezone_str, **kwargs: {  # noqa: ARG005
             today: [
                 {
                     "time": "10:30 AM",

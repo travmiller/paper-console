@@ -14,7 +14,13 @@ import app.config  # Ensure app.config is imported for timezone access
 
 APP_CONFIG = app.config  # Alias to avoid confusion if needed
 logger = logging.getLogger(__name__)
-MAX_ICS_BYTES = 1024 * 1024
+MAX_ICS_BYTES = 10 * 1024 * 1024
+ICS_CHUNK_BYTES = 64 * 1024
+MAX_EVENT_TITLE_CHARS = 240
+
+
+class CalendarParseError(ValueError):
+    """Raised when an iCal payload cannot be parsed."""
 
 
 def _relative_day_label(target_date: date, today: date) -> str:
@@ -26,13 +32,45 @@ def _relative_day_label(target_date: date, today: date) -> str:
     return target_date.strftime("%A").upper()
 
 
+def _event_title(summary: Any) -> str:
+    """Return a printable event title with a high safety cap."""
+    title = str(summary or "").strip() or "Untitled event"
+    if len(title) <= MAX_EVENT_TITLE_CHARS:
+        return title
+    return title[: MAX_EVENT_TITLE_CHARS - 3].rstrip() + "..."
+
+
+def _print_calendar_event_inline(printer, event, *, indent: str = ""):
+    time_label = "All Day" if event.get("is_all_day") else event.get("time", "")
+    summary = _event_title(event.get("summary", ""))
+    printer.print_body(f"{indent}{time_label:<8}{summary}")
+
+
 def fetch_ics(url: str) -> Optional[str]:
     """Fetches the ICS file content from a URL."""
+    response = None
     try:
-        response = requests.get(url, timeout=15)
+        response = requests.get(url, timeout=15, stream=True)
         response.raise_for_status()
-        # Limit response size to prevent memory issues.
-        text = response.text[:MAX_ICS_BYTES]
+
+        chunks = []
+        total_bytes = 0
+        response_encoding = getattr(response, "encoding", None) or "utf-8"
+        for chunk in response.iter_content(chunk_size=ICS_CHUNK_BYTES):
+            if not chunk:
+                continue
+            if isinstance(chunk, str):
+                chunk = chunk.encode(response_encoding, errors="replace")
+            total_bytes += len(chunk)
+            if total_bytes > MAX_ICS_BYTES:
+                logger.warning(
+                    "Calendar feed exceeded maximum size of %s bytes.",
+                    MAX_ICS_BYTES,
+                )
+                return None
+            chunks.append(chunk)
+
+        text = b"".join(chunks).decode(response_encoding, errors="replace")
         if not text.lstrip("\ufeff \t\r\n").upper().startswith("BEGIN:VCALENDAR"):
             logger.warning("Calendar feed response was not an ICS calendar.")
             return None
@@ -40,21 +78,34 @@ def fetch_ics(url: str) -> Optional[str]:
     except Exception as exc:
         logger.warning("Calendar feed request failed: %s", type(exc).__name__)
         return None
+    finally:
+        close = getattr(response, "close", None)
+        if callable(close):
+            close()
 
 
 def parse_events(
-    ics_content: str, days_to_show: int, timezone_str: str
+    ics_content: str,
+    days_to_show: int,
+    timezone_str: str,
+    *,
+    raise_on_parse_error: bool = False,
 ) -> Dict[date, List[Dict]]:
     """
     Parses ICS content and returns events grouped by date.
     Only includes events for Today -> Today + days_to_show.
     """
     if not ics_content:
+        if raise_on_parse_error:
+            raise CalendarParseError("Calendar feed was empty.")
         return {}
 
     try:
         cal = Calendar.from_ical(ics_content)
-    except Exception:
+    except Exception as exc:
+        logger.warning("Calendar feed could not be parsed.", exc_info=True)
+        if raise_on_parse_error:
+            raise CalendarParseError("Calendar feed could not be parsed.") from exc
         return {}
 
     # Timezone setup
@@ -258,7 +309,7 @@ def _print_calendar_day_view(printer, sorted_dates, all_events):
 
     for i, event in enumerate(events):
         time_label = "All Day" if event.get("is_all_day") else event.get("time", "")
-        summary = str(event.get("summary", "")).strip() or "Untitled event"
+        summary = _event_title(event.get("summary", ""))
 
         printer.print_bold(time_label)
         printer.print_body(summary)
@@ -360,15 +411,7 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
             printer.print_bold(f"{day_name} {d.strftime('%m/%d')}")
             
             for evt in events:
-                time_str = evt["time"]
-                summary = evt["summary"]
-                
-                # Truncate summary to fit
-                max_len = printer.width - 12
-                if len(summary) > max_len:
-                    summary = summary[: max_len - 1] + ".."
-                
-                printer.print_body(f"  {time_str:<8}{summary}")
+                _print_calendar_event_inline(printer, evt, indent="  ")
             
             if i < len(sorted_month_dates) - 1:
                 printer.print_line()
@@ -385,15 +428,7 @@ def _print_calendar_month_view(printer, sorted_dates, all_events):
             printer.print_bold(f"{day_name} {d.strftime('%m/%d')}")
             
             for evt in events:
-                time_str = evt["time"]
-                summary = evt["summary"]
-                
-                # Truncate summary to fit
-                max_len = printer.width - 12
-                if len(summary) > max_len:
-                    summary = summary[: max_len - 1] + ".."
-                
-                printer.print_body(f"  {time_str:<8}{summary}")
+                _print_calendar_event_inline(printer, evt, indent="  ")
             
             if i < len(sorted_dates) - 1:
                 printer.print_line()
@@ -413,15 +448,7 @@ def _print_calendar_compact_view(printer, sorted_dates, all_events):
         
         # Print events in compact list format
         for evt in events:
-            time_str = evt["time"]
-            summary = evt["summary"]
-            
-            # Truncate summary to fit
-            max_len = printer.width - 8
-            if len(summary) > max_len:
-                summary = summary[: max_len - 1] + ".."
-            
-            printer.print_body(f"{time_str:<8}{summary}")
+            _print_calendar_event_inline(printer, evt)
         
         if i < len(sorted_dates) - 1:
             printer.print_line()
@@ -462,15 +489,7 @@ def _print_calendar_week_view(printer, sorted_dates, all_events):
         
         # Print events in compact list format
         for evt in events:
-            time_str = evt["time"]
-            summary = evt["summary"]
-            
-            # Truncate summary to fit
-            max_len = printer.width - 8
-            if len(summary) > max_len:
-                summary = summary[: max_len - 1] + ".."
-            
-            printer.print_body(f"{time_str:<8}{summary}")
+            _print_calendar_event_inline(printer, evt)
         
         if i < len(sorted_dates) - 1:
             printer.print_line()
@@ -586,14 +605,28 @@ def format_calendar_receipt(
         printer.print_body("Check the iCal URL.")
         return
 
+    parsed_payloads = 0
     for ics_data in calendar_payloads:
-        events = parse_events(
-            ics_data, parse_days, app.config.settings.timezone
-        )
+        try:
+            events = parse_events(
+                ics_data,
+                parse_days,
+                app.config.settings.timezone,
+                raise_on_parse_error=True,
+            )
+        except CalendarParseError:
+            continue
+
+        parsed_payloads += 1
         for d, evts in events.items():
             if d not in all_events:
                 all_events[d] = []
             all_events[d].extend(evts)
+
+    if calendar_payloads and parsed_payloads == 0:
+        printer.print_body("Could not read calendar feed.")
+        printer.print_body("Check the iCal URL.")
+        return
 
     if not all_events:
         printer.print_body("No upcoming events.")

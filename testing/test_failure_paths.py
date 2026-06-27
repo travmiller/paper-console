@@ -362,6 +362,28 @@ def test_fetch_release_data_uses_highest_semver_not_release_order(monkeypatch):
     assert result["tag_name"] == "v0.2.11-beta.2"
 
 
+def test_release_notes_payload_truncates_extreme_release_body():
+    notes = "A" * (main_module.MAX_RELEASE_NOTES_CHARS + 20)
+
+    payload = main_module._release_notes_payload(
+        {
+            "name": "Test Release",
+            "body": notes,
+            "html_url": "https://github.com/example/repo/releases/tag/v1.0.0",
+            "published_at": "2026-06-27T00:00:00Z",
+            "prerelease": True,
+        }
+    )
+
+    assert payload["release_name"] == "Test Release"
+    assert len(payload["release_notes"]) == main_module.MAX_RELEASE_NOTES_CHARS
+    assert payload["release_notes"].endswith("...")
+    assert payload["release_notes_truncated"] is True
+    assert payload["release_url"].endswith("/v1.0.0")
+    assert payload["published_at"] == "2026-06-27T00:00:00Z"
+    assert payload["is_prerelease"] is True
+
+
 def test_check_for_updates_uses_beta_channel_in_production(monkeypatch, tmp_path):
     project_root = tmp_path / "project"
     app_dir = project_root / "app"
@@ -376,7 +398,15 @@ def test_check_for_updates_uses_beta_channel_in_production(monkeypatch, tmp_path
 
         def json(self):
             return [
-                {"tag_name": "v0.2.0-beta.1", "draft": False, "prerelease": True},
+                {
+                    "tag_name": "v0.2.0-beta.1",
+                    "name": "Beta one",
+                    "body": "## Fixes\n\n- Calendar notes",
+                    "html_url": "https://github.com/travmiller/paper-console/releases/tag/v0.2.0-beta.1",
+                    "published_at": "2026-06-27T00:00:00Z",
+                    "draft": False,
+                    "prerelease": True,
+                },
                 {"tag_name": "v0.1.9", "draft": False, "prerelease": False},
             ]
 
@@ -403,6 +433,12 @@ def test_check_for_updates_uses_beta_channel_in_production(monkeypatch, tmp_path
     assert result["current_version"] == "v0.1.0"
     assert result["latest_version"] == "v0.2.0-beta.1"
     assert result["release_channel"] == "beta"
+    assert result["release_name"] == "Beta one"
+    assert result["release_notes"] == "## Fixes\n\n- Calendar notes"
+    assert result["release_notes_truncated"] is False
+    assert result["release_url"].endswith("/v0.2.0-beta.1")
+    assert result["published_at"] == "2026-06-27T00:00:00Z"
+    assert result["is_prerelease"] is True
 
 
 def test_check_for_updates_falls_back_to_stable_when_beta_lane_has_no_prerelease(
@@ -1193,6 +1229,102 @@ def test_news_module_uses_configurable_country_and_page_size(monkeypatch):
     assert captured["params"]["pageSize"] == 7
 
 
+def _large_google_style_calendar_with_upcoming_event():
+    now = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    future = now + timedelta(days=1, hours=15)
+
+    historical_events = []
+    for i in range(15000):
+        start = datetime(2020, 1, 1, tzinfo=timezone.utc) + timedelta(
+            days=i % 365,
+            minutes=i,
+        )
+        historical_events.extend(
+            [
+                "BEGIN:VEVENT",
+                f"DTSTART:{start.strftime('%Y%m%dT%H%M%SZ')}",
+                f"DTEND:{(start + timedelta(hours=1)).strftime('%Y%m%dT%H%M%SZ')}",
+                f"SUMMARY:Old event {i}",
+                "END:VEVENT",
+            ]
+        )
+
+    ics = "\r\n".join(
+        [
+            "BEGIN:VCALENDAR",
+            "VERSION:2.0",
+            "PRODID:-//Google Inc//Google Calendar 70.9054//EN",
+            "CALSCALE:GREGORIAN",
+            *historical_events,
+            "BEGIN:VEVENT",
+            f"DTSTART:{future.strftime('%Y%m%dT%H%M%SZ')}",
+            f"DTEND:{(future + timedelta(hours=1)).strftime('%Y%m%dT%H%M%SZ')}",
+            "SUMMARY:Upcoming event beyond old cap",
+            "END:VEVENT",
+            "END:VCALENDAR",
+            "",
+        ]
+    )
+
+    assert len(ics.encode("utf-8")) > 1024 * 1024
+    assert len(ics.encode("utf-8")) < calendar_module.MAX_ICS_BYTES
+    return ics, future.date()
+
+
+class _DummyCalendarResponse:
+    encoding = "utf-8"
+
+    def __init__(self, body: str | bytes):
+        self.body = body.encode("utf-8") if isinstance(body, str) else body
+        self.closed = False
+
+    def raise_for_status(self):
+        return None
+
+    def iter_content(self, chunk_size=1):
+        for start in range(0, len(self.body), chunk_size):
+            yield self.body[start : start + chunk_size]
+
+    def close(self):
+        self.closed = True
+
+
+def test_fetch_ics_does_not_truncate_large_google_calendar(monkeypatch):
+    ics, event_day = _large_google_style_calendar_with_upcoming_event()
+    response = _DummyCalendarResponse(ics)
+    captured = {}
+
+    def fake_get(url, timeout=0, stream=False):  # noqa: ARG001
+        captured["stream"] = stream
+        return response
+
+    monkeypatch.setattr(calendar_module.requests, "get", fake_get)
+
+    fetched = calendar_module.fetch_ics("https://calendar.google.com/private/basic.ics")
+    assert captured["stream"] is True
+    assert response.closed is True
+    assert fetched is not None
+    assert "Upcoming event beyond old cap" in fetched
+
+    events = calendar_module.parse_events(fetched, days_to_show=7, timezone_str="UTC")
+    assert event_day in events
+    assert events[event_day][0]["summary"] == "Upcoming event beyond old cap"
+
+
+def test_fetch_ics_rejects_feed_that_exceeds_size_limit(monkeypatch):
+    monkeypatch.setattr(calendar_module, "MAX_ICS_BYTES", 64)
+    response = _DummyCalendarResponse(b"BEGIN:VCALENDAR\r\n" + (b"X" * 80))
+
+    monkeypatch.setattr(
+        calendar_module.requests,
+        "get",
+        lambda url, timeout=0, stream=False: response,  # noqa: ARG005
+    )
+
+    assert calendar_module.fetch_ics("https://example.com/too-large.ics") is None
+    assert response.closed is True
+
+
 def test_calendar_rrule_respects_exdate_in_window():
     now = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     start = now + timedelta(hours=9)
@@ -1239,16 +1371,12 @@ def test_calendar_config_accepts_ui_sources_without_label():
 
 
 def test_fetch_ics_rejects_non_calendar_response(monkeypatch):
-    class DummyResponse:
-        text = "<html><title>Sign in</title></html>"
-
-        def raise_for_status(self):
-            return None
-
     monkeypatch.setattr(
         calendar_module.requests,
         "get",
-        lambda url, timeout=0: DummyResponse(),  # noqa: ARG005
+        lambda url, timeout=0, stream=False: _DummyCalendarResponse(  # noqa: ARG005
+            "<html><title>Sign in</title></html>"
+        ),
     )
 
     assert calendar_module.fetch_ics("https://example.com/basic.ics") is None
@@ -1269,6 +1397,45 @@ def test_calendar_receipt_reports_unloadable_feed(monkeypatch, capsys):
 
     output = capsys.readouterr().out
     assert "Could not load calendar feed." in output
+    assert "Check the iCal URL." in output
+    assert "No upcoming events." not in output
+
+
+def test_calendar_receipt_reports_unreadable_feed_when_parse_fails(
+    monkeypatch,
+    capsys,
+):
+    monkeypatch.setattr(
+        calendar_module,
+        "fetch_ics",
+        lambda url: "BEGIN:VCALENDAR\r\nBROKEN\r\nEND:VCALENDAR\r\n",  # noqa: ARG005
+    )
+
+    def fake_parse_events(
+        ics_content,
+        days_to_show,
+        timezone_str,
+        *,
+        raise_on_parse_error=False,
+    ):  # noqa: ARG001
+        if raise_on_parse_error:
+            raise calendar_module.CalendarParseError("broken feed")
+        return {}
+
+    monkeypatch.setattr(calendar_module, "parse_events", fake_parse_events)
+
+    printer = MockPrinterDriver()
+    calendar_module.format_calendar_receipt(
+        printer,
+        CalendarConfig(
+            ical_sources=[{"url": "https://example.com/broken.ics"}],
+            view_mode="month",
+        ),
+        "Calendar",
+    )
+
+    output = capsys.readouterr().out
+    assert "Could not read calendar feed." in output
     assert "Check the iCal URL." in output
     assert "No upcoming events." not in output
 

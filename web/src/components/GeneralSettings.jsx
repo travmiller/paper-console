@@ -60,6 +60,20 @@ const GeneralSettings = ({
   const [installMode, setInstallMode] = useState(null);
   const [updateProgress, setUpdateProgress] = useState({ stage: '', progress: 0 });
   const releaseChannel = settings?.release_channel === 'beta' ? 'beta' : 'stable';
+  const releaseNotes = typeof updateStatus?.release_notes === 'string' ? updateStatus.release_notes.trim() : '';
+  const releaseNotesTitle = updateStatus?.latest_version
+    ? `Patch Notes for ${updateStatus.latest_version}`
+    : 'Patch Notes';
+  const publishedDate = updateStatus?.published_at
+    ? new Date(updateStatus.published_at)
+    : null;
+  const publishedDateLabel = publishedDate && !Number.isNaN(publishedDate.getTime())
+    ? publishedDate.toLocaleDateString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    : '';
   const [configTransferMessage, setConfigTransferMessage] = useState({ type: '', message: '', warnings: [] });
   const [exportingConfig, setExportingConfig] = useState(false);
   const [importingConfig, setImportingConfig] = useState(false);
@@ -740,6 +754,44 @@ const GeneralSettings = ({
                 )}
               </div>
             </div>
+          )}
+
+          {updateStatus && !installingUpdate && !updateStatus.error && (
+            <details className='mb-4 rounded-lg border-2 border-gray-300 bg-white p-3 text-sm text-black' open={Boolean(updateStatus.available)}>
+              <summary className='cursor-pointer select-none font-bold'>
+                {releaseNotesTitle}
+              </summary>
+              <div className='mt-3 space-y-2'>
+                {(updateStatus.release_name || publishedDateLabel || updateStatus.is_prerelease) && (
+                  <div className='flex flex-wrap items-center gap-2 text-xs text-gray-600'>
+                    {updateStatus.release_name && (
+                      <span className='font-bold text-black'>{updateStatus.release_name}</span>
+                    )}
+                    {publishedDateLabel && (
+                      <span>{publishedDateLabel}</span>
+                    )}
+                    {updateStatus.is_prerelease && (
+                      <span className='rounded-full border border-gray-400 px-2 py-0.5 font-bold uppercase tracking-wide'>
+                        Beta
+                      </span>
+                    )}
+                  </div>
+                )}
+                <div className='max-h-64 overflow-auto rounded border border-gray-200 bg-gray-50 p-3 font-mono text-xs leading-relaxed whitespace-pre-wrap'>
+                  {releaseNotes || 'No patch notes were published for this release.'}
+                  {updateStatus.release_notes_truncated ? '\n\nNotes were shortened for display.' : ''}
+                </div>
+                {updateStatus.release_url && (
+                  <a
+                    href={updateStatus.release_url}
+                    target='_blank'
+                    rel='noreferrer'
+                    className='inline-block text-xs font-bold text-black underline underline-offset-2 hover:text-gray-700'>
+                    Open GitHub Release
+                  </a>
+                )}
+              </div>
+            </details>
           )}
 
           {updateMessage.message && !installingUpdate && updateMessage.type === 'error' && (

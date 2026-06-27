@@ -2513,6 +2513,27 @@ def _fetch_release_data(
     )
 
 
+MAX_RELEASE_NOTES_CHARS = 12000
+
+
+def _release_notes_payload(release_data: Dict[str, object]) -> Dict[str, object]:
+    """Extract user-facing release note metadata from GitHub release data."""
+    notes = str(release_data.get("body") or "").strip()
+    notes_truncated = False
+    if len(notes) > MAX_RELEASE_NOTES_CHARS:
+        notes = notes[: MAX_RELEASE_NOTES_CHARS - 3].rstrip() + "..."
+        notes_truncated = True
+
+    return {
+        "release_name": str(release_data.get("name") or "").strip(),
+        "release_notes": notes,
+        "release_notes_truncated": notes_truncated,
+        "release_url": str(release_data.get("html_url") or "").strip(),
+        "published_at": str(release_data.get("published_at") or "").strip(),
+        "is_prerelease": bool(release_data.get("prerelease")),
+    }
+
+
 def _get_release_bundle_metadata(
     release_repo: str,
     *,
@@ -2937,6 +2958,7 @@ async def check_for_updates():
             }
 
         latest_version = (release_data.get("tag_name") or "").strip() or "unknown"
+        release_notes = _release_notes_payload(release_data)
         if latest_version == "unknown":
             return {
                 "available": False,
@@ -2958,6 +2980,7 @@ async def check_for_updates():
                 "current_version": current_version,
                 "latest_version": latest_version,
                 "release_channel": release_channel,
+                **release_notes,
             }
 
         return {
@@ -2968,6 +2991,7 @@ async def check_for_updates():
             "current_version": current_version,
             "latest_version": latest_version,
             "release_channel": release_channel,
+            **release_notes,
         }
 
     except subprocess.TimeoutExpired:
