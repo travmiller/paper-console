@@ -10,6 +10,7 @@ import StatusMessage from './components/StatusMessage';
 import ResetSettingsButton from './components/ResetSettingsButton';
 import SettingsLogin from './components/SettingsLogin';
 import { useModuleTypes } from './hooks/useModuleTypes';
+import useTheme from './hooks/useTheme';
 import GitHubIcon from './assets/GitHubIcon';
 import BorderWidthIcon from './assets/BorderWidthIcon';
 import PreferencesIcon from './assets/PreferencesIcon';
@@ -35,6 +36,9 @@ function App() {
     channels: {},
   });
   const [modules, setModules] = useState({});
+  // Undefined until settings load; the index.html pre-paint script holds
+  // the last known theme in the meantime.
+  useTheme(settings.theme);
   const [status, setStatus] = useState({ type: '', message: '' });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');

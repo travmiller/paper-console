@@ -95,15 +95,15 @@ ${authHeader}-H 'Content-Type: image/png' \\
   };
 
   return (
-    <div className="mb-4 rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-4 space-y-3">
+    <div className="mb-4 rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-4 space-y-3">
       <div>
         <div className="text-sm font-bold text-black">How to send to this print endpoint</div>
-        <p className="text-xs text-zinc-600 mt-1">
+        <p className="text-xs text-gray-600 mt-1">
           POST to <code className="bg-white px-1 py-0.5 rounded">{endpointUrl}</code>
         </p>
-        <p className="text-xs text-zinc-600 mt-1">{authNote}</p>
+        <p className="text-xs text-gray-600 mt-1">{authNote}</p>
         {token ? (
-          <p className="text-xs text-zinc-600 mt-1">
+          <p className="text-xs text-gray-600 mt-1">
             Header format: <code className="bg-white px-1 py-0.5 rounded">Authorization: Bearer YOUR_TOKEN_HERE</code>
           </p>
         ) : null}
@@ -126,7 +126,7 @@ ${authHeader}-H 'Content-Type: image/png' \\
                 {copiedLabel === example.label ? 'Copied' : 'Copy'}
               </button>
             </div>
-            <pre className="overflow-x-auto rounded border border-zinc-200 bg-white p-3 text-[11px] leading-5 text-zinc-700 whitespace-pre-wrap">
+            <pre className="overflow-x-auto rounded border border-gray-200 bg-white p-3 text-[11px] leading-5 text-gray-700 whitespace-pre-wrap">
               {example.value}
             </pre>
           </div>
@@ -160,14 +160,14 @@ const AdvancedSection = ({
   }
 
   return (
-    <details className="mb-6 rounded-lg border border-zinc-200 bg-zinc-50 px-4 py-3">
+    <details className="mb-6 rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
       <summary className="cursor-pointer select-none list-none">
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm font-bold text-black">{title}</div>
-          <div className="text-xs text-zinc-400 uppercase tracking-wide">Show</div>
+          <div className="text-xs text-gray-400 uppercase tracking-wide">Show</div>
         </div>
         {description ? (
-          <p className="mt-1 pr-8 text-xs leading-4 text-zinc-500">{description}</p>
+          <p className="mt-1 pr-8 text-xs leading-4 text-gray-500">{description}</p>
         ) : null}
       </summary>
       <div className="mt-4">
@@ -234,7 +234,7 @@ const FieldHeading = ({
         </div>
       ) : null}
       {description ? (
-        <p className="text-xs leading-4 text-zinc-500">{description}</p>
+        <p className="text-xs leading-4 text-gray-500">{description}</p>
       ) : null}
     </div>
   );
@@ -495,12 +495,12 @@ const SchemaField = ({
                 {(title || (description && showObjectDescription)) && !isInline ? (
                     <div className="mb-4 space-y-0">
                         {title ? (
-                            <h3 className="font-bold text-sm leading-tight text-zinc-700 uppercase tracking-wider">
+                            <h3 className="font-bold text-sm leading-tight text-gray-700 uppercase tracking-wider">
                                 {title}
                             </h3>
                         ) : null}
                         {description && showObjectDescription ? (
-                            <p className="text-xs leading-4 text-zinc-500">{description}</p>
+                            <p className="text-xs leading-4 text-gray-500">{description}</p>
                         ) : null}
                     </div>
                 ) : null}
@@ -620,16 +620,16 @@ const SchemaField = ({
                             ) : null}
                         </div>
                         {description ? (
-                            <p className="text-xs leading-4 text-zinc-500">{description}</p>
+                            <p className="text-xs leading-4 text-gray-500">{description}</p>
                         ) : null}
                     </div>
                 ) : null}
                 
                 <div className="space-y-2">
                     {items.map((item, index) => (
-                        <div key={index} className="flex gap-2 items-center p-3 border border-zinc-200 rounded-lg bg-white relative group">
+                        <div key={index} className="flex gap-2 items-center p-3 border border-gray-200 rounded-lg bg-white relative group">
                              {/* Item Number Indicator */}
-                             <div className="flex-shrink-0 w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center text-xs font-mono font-bold text-zinc-500">
+                             <div className="flex-shrink-0 w-6 h-6 rounded-full bg-gray-100 flex items-center justify-center text-xs font-mono font-bold text-gray-500">
                                 {index + 1}
                              </div>
                              
@@ -672,7 +672,7 @@ const SchemaField = ({
                     </button>
                 )}
                 {schema.maxItems && items.length >= schema.maxItems && (
-                    <div className="text-center text-xs text-zinc-400 py-2">
+                    <div className="text-center text-xs text-gray-400 py-2">
                         Maximum limit of {schema.maxItems} reached
                     </div>
                 )}
@@ -692,7 +692,7 @@ const SchemaField = ({
                         onUserInteraction();
                         onChange(e.target.checked);
                     }}
-                    className="w-4 h-4 text-black rounded border-2 border-zinc-300 focus:ring-0 focus:ring-offset-0"
+                    className="w-4 h-4 text-black rounded border-2 border-gray-300 focus:ring-0 focus:ring-offset-0"
                     style={{ accentColor: 'black' }}
                 />
                 <div
@@ -707,7 +707,7 @@ const SchemaField = ({
                         </div>
                     ) : null}
                     {description ? (
-                        <p className="text-xs leading-4 text-zinc-500 mt-0">{description}</p>
+                        <p className="text-xs leading-4 text-gray-500 mt-0">{description}</p>
                     ) : null}
                 </div>
             </div>
@@ -734,7 +734,7 @@ const SchemaField = ({
                     }
                 }
             }}
-            className="text-xs text-zinc-400 hover:text-black hover:underline cursor-pointer transition-colors"
+            className="text-xs text-gray-400 hover:text-black hover:underline cursor-pointer transition-colors"
             title="Insert random example"
         >
             Generate Example

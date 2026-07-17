@@ -77,7 +77,7 @@ const ActionButton = ({
     } else if (style === 'ghost') {
         buttonClass = commonClasses.buttonGhost;
     } else if (style === 'link') {
-        buttonClass = 'text-black hover:text-zinc-600 underline text-sm font-bold disabled:opacity-50';
+        buttonClass = 'text-black hover:text-gray-600 underline text-sm font-bold disabled:opacity-50';
     }
     
     return (

@@ -114,7 +114,7 @@ const EditModuleModal = ({ moduleId, module, setModule, onClose, onSave, onDelet
               <span className="font-mono">Type: {typeDef?.label}</span>
             </div>
             {configDescription ? (
-              <p className="mt-2 text-xs leading-4 text-zinc-500 max-w-[40rem]">
+              <p className="mt-2 text-xs leading-4 text-gray-500 max-w-[40rem]">
                 {configDescription}
               </p>
             ) : null}

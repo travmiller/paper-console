@@ -1,8 +1,8 @@
-// Ink gradient colors (matching CSS variables)
-const INK_BLACK = '#000000';        // --color-ink-black
-const INK_GRAY_DARK = '#3a3a3a';    // --color-ink-gray-dark
-const INK_GRAY_MEDIUM = '#4a4a4a';  // --color-ink-gray-medium
-const INK_GRAY_LIGHT = '#525252';   // --color-ink-gray-light
+// Ink gradient colors — resolved from the theme's CSS variables at paint time
+const INK_BLACK = 'var(--color-ink-black)';
+const INK_GRAY_DARK = 'var(--color-ink-gray-dark)';
+const INK_GRAY_MEDIUM = 'var(--color-ink-gray-medium)';
+const INK_GRAY_LIGHT = 'var(--color-ink-gray-light)';
 
 // Ink-like gradients for card borders (printer ink simulation)
 export const INK_GRADIENTS = [

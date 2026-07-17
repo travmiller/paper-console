@@ -411,7 +411,7 @@ const ChannelList = ({
                       className='group flex items-center justify-center px-2 py-1 rounded border-2 bg-transparent border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
                       aria-label={`Print channel ${pos}`}
                       title='Print Channel'>
-                      <PrintIcon className='w-3.5 h-3.5 text-gray-400 group-hover:text-black transition-all' />
+                      <PrintIcon className='w-3.5 h-3.5 text-gray-600 group-hover:text-black transition-all' />
                     </button>
                     {(() => {
                       const scheduleCount = channelScheduleRuleCount(channel);
@@ -430,8 +430,8 @@ const ChannelList = ({
                           onMouseLeave={(e) => { if (hasSchedules) e.currentTarget.style.backgroundColor = 'transparent'; }}
                           aria-label={`Configure schedule for channel ${pos}`}
                           title='Configure Schedule'>
-                          <ScheduleIcon className={`w-3.5 h-3.5 transition-all ${hasSchedules ? '' : 'text-gray-400 group-hover:text-black'}`} style={hasSchedules ? { color: 'var(--color-brass)' } : {}} />
-                          <span className={`text-xs font-bold ${hasSchedules ? '' : 'text-gray-400 group-hover:text-black'}`} style={hasSchedules ? { color: 'var(--color-brass)' } : {}}>{scheduleCount}</span>
+                          <ScheduleIcon className={`w-3.5 h-3.5 transition-all ${hasSchedules ? '' : 'text-gray-600 group-hover:text-black'}`} style={hasSchedules ? { color: 'var(--color-brass)' } : {}} />
+                          <span className={`text-xs font-bold ${hasSchedules ? '' : 'text-gray-600 group-hover:text-black'}`} style={hasSchedules ? { color: 'var(--color-brass)' } : {}}>{scheduleCount}</span>
                         </button>
                       );
                     })()}
@@ -522,7 +522,7 @@ const ChannelList = ({
                         return (
                           <>
                       <div className='flex items-center gap-1 min-w-0'>
-                        <div className='text-sm font-bold text-gray-700 group-hover:text-black truncate transition-colors flex-1 min-w-0'>{displayName}</div>
+                        <div className='text-sm font-bold text-black truncate flex-1 min-w-0'>{displayName}</div>
                         {hasMalformedConfig && (
                           <span
                             className='inline-flex items-center gap-0.5 text-[9px] font-bold tracking-wide uppercase shrink-0'
@@ -558,7 +558,7 @@ const ChannelList = ({
                         className='px-1.5 py-1 rounded border border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
                         aria-label={`Print module ${item.module.name}`}
                         title='Print this module'>
-                        <PrintIcon className='w-3 h-3 text-gray-400 hover:text-black transition-colors' />
+                        <PrintIcon className='w-3 h-3 text-gray-600 hover:text-black transition-colors' />
                       </button>
                       <div className='flex flex-col gap-0.5'>
                         <button
@@ -608,7 +608,7 @@ const ChannelList = ({
                     onClick={() => setShowAddModuleModal(pos)}
                     onDragOver={(event) => handleDragOver(event, listId)}
                     onDrop={(event) => handleDrop(event, listId)}
-                    className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer'
+                    className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-400 hover:border-black rounded-lg text-gray-600 hover:text-black transition-all text-xs  font-bold tracking-wider cursor-pointer'
                     style={{ backgroundColor: 'transparent' }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-white)'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
@@ -660,7 +660,7 @@ const ChannelList = ({
               return (
                 <div
                   key={module.id}
-                  className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-300 hover:border-black group transition-all dnd-item cursor-pointer'
+                  className='flex items-center justify-between p-3 rounded-lg border-2 border-gray-600 hover:border-black group transition-all dnd-item cursor-pointer'
                   style={{ backgroundColor: 'var(--color-bg-card)' }}
                   onMouseEnter={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-white)', 'important')}
                   onMouseLeave={(e) => e.currentTarget.style.setProperty('background-color', 'var(--color-bg-card)', 'important')}
@@ -680,7 +680,7 @@ const ChannelList = ({
                   role='listitem'>
                   <div className='flex-1 min-w-0 mr-2'>
                     <div className='flex items-center gap-1 min-w-0'>
-                      <div className='text-sm font-bold text-gray-700 group-hover:text-black truncate transition-colors flex-1 min-w-0'>{displayName}</div>
+                      <div className='text-sm font-bold text-black truncate flex-1 min-w-0'>{displayName}</div>
                       {hasMalformedConfig && (
                         <span
                           className='inline-flex items-center gap-0.5 text-[9px] font-bold tracking-wide uppercase shrink-0'
@@ -713,7 +713,7 @@ const ChannelList = ({
                       className='px-1.5 py-1 rounded border border-gray-300 hover:border-black hover:bg-white transition-all cursor-pointer'
                       aria-label={`Print module ${module.name}`}
                       title='Print this module'>
-                      <PrintIcon className='w-3 h-3 text-gray-400 hover:text-black transition-colors' />
+                      <PrintIcon className='w-3 h-3 text-gray-600 hover:text-black transition-colors' />
                     </button>
                     <div className='flex flex-col gap-0.5'>
                       <button
@@ -768,7 +768,7 @@ const ChannelList = ({
                 setShowCreateUnassignedModal(true);
               }
             }}
-            className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-300 hover:border-black rounded-lg text-gray-400 hover:text-black transition-all text-xs font-bold tracking-wider cursor-pointer'
+            className='w-full px-2 py-3 bg-transparent border-2 border-dashed border-gray-400 hover:border-black rounded-lg text-gray-600 hover:text-black transition-all text-xs font-bold tracking-wider cursor-pointer'
             style={{ backgroundColor: 'transparent' }}
             onMouseEnter={(e) => e.currentTarget.style.backgroundColor = 'var(--color-bg-white)'}
             onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}

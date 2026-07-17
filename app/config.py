@@ -297,6 +297,7 @@ class Settings(BaseModel):
     time_sync_mode: str = "manual"  # "manual" or "automatic" for time synchronization mode
     release_channel: Literal["stable", "beta"] = "stable"
     max_print_lines: int = 200  # Maximum lines per print job (0 = no limit)
+    theme: str = "light"  # Web UI theme: "light", "dark", or "system"
 
     # Module Instances: Dictionary of module_id -> ModuleInstance
     # These are reusable module configurations that can be assigned to channels
@@ -334,6 +335,13 @@ class Settings(BaseModel):
     def validate_time_sync_mode(cls, v):
         if v not in ("manual", "automatic"):
             return "manual"
+        return v
+
+    @field_validator("theme")
+    @classmethod
+    def validate_theme(cls, v):
+        if v not in ("light", "dark", "system"):
+            return "light"
         return v
 
     @field_validator("timezone")

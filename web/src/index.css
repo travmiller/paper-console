@@ -114,11 +114,15 @@
   --color-text-gray-700: #6B665F;
   --color-text-black: #000000;
   --color-text-white: #FFFFFF;
+  --color-text-inverse: #FFFCF5;  /* Text on ink/colored chips (paper color) */
   
   --color-error: #DC2626;
   --color-error-light: #DC7171;
+  --color-error-hover: #B91C1C;
   --color-error-10: rgba(220, 38, 38, 0.1);
-  
+
+  --color-success: #16a34a;
+
   --color-bg-base: #F5F2EA;
   --color-bg-card: #FFFCF5;
   --color-bg-nested: #FFFCF5;
@@ -134,13 +138,11 @@
   --color-ink-gray-dark: #3a3a3a;
   --color-ink-gray-medium: #4a4a4a;
   --color-ink-gray-light: #525252;
-  
-  /* Ink gradient colors */
-  --color-ink-black: #000000;
-  --color-ink-gray-dark: #3a3a3a;
-  --color-ink-gray-medium: #4a4a4a;
-  --color-ink-gray-light: #525252;
-  
+
+  /* Drag-and-drop indicator */
+  --color-dnd-indicator: rgba(42, 42, 42, 0.9);
+  --color-dnd-indicator-ring: rgba(42, 42, 42, 0.15);
+
   --color-border-main: #2A2A2A;
   --color-border-gray-200: #D4CFC8;
   --color-border-gray-300: #C4BFB8;
@@ -168,6 +170,63 @@
   background-color: var(--color-bg-base);
 }
 
+/*
+   Dark theme — warm "midnight print room" inversion of the paper palette.
+   Toggled by setting data-theme="dark" on <html> (see useTheme hook).
+*/
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --color-brass: #C9A335;
+  --color-brass-10: rgba(201, 163, 53, 0.12);
+
+  --color-text-main: #E8E4DC;
+  --color-text-muted: #8F8A82;
+  --color-text-gray-300: #6E6961;
+  --color-text-gray-400: #7A756E;
+  --color-text-gray-500: #8F8A82;
+  --color-text-gray-600: #A39E96;
+  --color-text-gray-700: #C4BFB6;
+  --color-text-black: #F2EFE8;
+  --color-text-white: #FFFFFF;
+  --color-text-inverse: #181613;
+
+  --color-error: #E05B52;
+  --color-error-light: #C96860;
+  --color-error-hover: #E97B73;
+  --color-error-10: rgba(224, 91, 82, 0.12);
+
+  --color-success: #4CAF6E;
+
+  --color-bg-base: #131210;
+  --color-bg-card: #1C1A17;
+  --color-bg-nested: #131210;
+  --color-bg-input: #26231F;
+  --color-bg-white: #2E2B26;
+  --color-bg-gray-50: #211F1B;
+  --color-bg-gray-100: #2B2823;
+  --color-bg-gray-200: #38342E;
+  --color-bg-dark: #0C0B0A;
+
+  /* Ink gradient colors — lifted to read as a frame on dark paper */
+  --color-ink-black: #45413A;
+  --color-ink-gray-dark: #5C5850;
+  --color-ink-gray-medium: #666259;
+  --color-ink-gray-light: #706C63;
+
+  --color-dnd-indicator: rgba(232, 228, 220, 0.9);
+  --color-dnd-indicator-ring: rgba(232, 228, 220, 0.15);
+
+  --color-border-main: #E8E4DC;
+  --color-border-gray-200: #38342E;
+  --color-border-gray-300: #443F38;
+  --color-border-gray-400: #57534B;
+  --color-border-gray-600: #8F8A82;
+  --color-border-gray-700: #E8E4DC;
+  --color-border-gray-800: #E8E4DC;
+  --color-border-scrollbar: #443F38;
+}
+
 body {
   margin: 0;
   display: flex;
@@ -177,6 +236,22 @@ body {
   justify-content: center;
   background-color: var(--color-bg-base);
   color: var(--color-text-main);
+}
+
+/* Brass-tinted text selection */
+::selection {
+  background-color: color-mix(in srgb, var(--color-brass) 30%, transparent);
+}
+
+/* Keyboard focus ring (inputs keep their border-color focus treatment) */
+:focus-visible {
+  outline: 2px solid var(--color-brass);
+  outline-offset: 2px;
+}
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: none;
 }
 
 /* Custom Scrollbar */
@@ -199,7 +274,10 @@ body {
    Force-include utility classes 
 */
 @layer utilities {
-  .text-white { color: var(--color-text-black) !important; } 
+  /* Static white text always sits on ink/colored chips — render it as paper */
+  .text-white { color: var(--color-text-inverse) !important; }
+  /* Ink chips (step badges, progress bars) */
+  .bg-black { background-color: var(--color-text-main) !important; }
   .text-gray-300 { color: var(--color-text-gray-300) !important; }
   .text-gray-400 { color: var(--color-text-gray-400) !important; }
   .text-gray-500 { color: var(--color-text-gray-500) !important; }
@@ -213,6 +291,10 @@ body {
   .group:hover .group-hover\:border-black { border-color: var(--color-border-main) !important; }
   .hover\:bg-white:hover { background-color: var(--color-bg-white) !important; }
   .group:hover .group-hover\:bg-white { background-color: var(--color-bg-white) !important; }
+
+  /* Inverted hover (primary buttons): ink background, paper text */
+  .hover\:bg-black:hover { background-color: var(--color-text-main) !important; }
+  .hover\:text-white:hover { color: var(--color-text-inverse) !important; }
   
   /* Warm grey borders */
   .border-gray-200 { border-color: var(--color-border-gray-200) !important; }
@@ -270,6 +352,21 @@ body {
   .bg-orange-50 { background-color: var(--color-error-10) !important; }
   .border-amber-700 { border-color: var(--color-error) !important; }
   .border-orange-500 { border-color: var(--color-error) !important; }
+
+  /* Align stock red utilities to the error tokens */
+  .text-red-300, .text-red-400 { color: var(--color-error-light) !important; }
+  .text-red-500, .text-red-600, .text-red-700 { color: var(--color-error) !important; }
+  .border-red-300, .border-red-400, .border-red-500 { border-color: var(--color-error) !important; }
+  .border-red-700\/60, .border-red-800\/40 { border-color: var(--color-error-light) !important; }
+  .bg-red-50 { background-color: var(--color-error-10) !important; }
+  .bg-red-500, .bg-red-600, .bg-red-700 { background-color: var(--color-error) !important; }
+  .hover\:bg-red-600:hover, .hover\:bg-red-700:hover { background-color: var(--color-error-hover) !important; }
+
+  /* Warning/link/success accents route through brand tokens */
+  .text-yellow-600, .text-yellow-700 { color: var(--color-brass) !important; }
+  .text-blue-600 { color: var(--color-brass) !important; }
+  .hover\:text-blue-800:hover { color: var(--color-text-main) !important; }
+  .text-green-600 { color: var(--color-success) !important; }
   
   /* Hover background utilities - white instead of gray */
   .hover\:bg-gray-50:hover { background-color: var(--color-bg-white) !important; }
@@ -331,8 +428,12 @@ body {
   transition: background-color 120ms ease, box-shadow 120ms ease;
 }
 .dnd-list[data-drop-active="true"] {
-  background: linear-gradient(180deg, rgba(174, 134, 29, 0.08), rgba(174, 134, 29, 0.02));
-  box-shadow: inset 0 0 0 1px rgba(174, 134, 29, 0.15);
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--color-brass) 8%, transparent),
+    color-mix(in srgb, var(--color-brass) 2%, transparent)
+  );
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-brass) 15%, transparent);
   border-radius: 0.75rem;
 }
 .dnd-indicator {
@@ -341,11 +442,11 @@ body {
   right: 12px;
   height: 2px;
   margin-top: 0 !important;
-  background: rgba(42, 42, 42, 0.9);
+  background: var(--color-dnd-indicator);
   border-radius: 999px;
   pointer-events: none;
   z-index: 1;
-  box-shadow: 0 0 0 1px rgba(42, 42, 42, 0.15);
+  box-shadow: 0 0 0 1px var(--color-dnd-indicator-ring);
   transition: top 120ms ease;
 }
 .dnd-item[draggable="true"] {

@@ -264,20 +264,20 @@ const ImageWidget: React.FC<ImageWidgetProps> = ({
         type="file"
         accept={accept}
         onChange={handleChange}
-        className="block w-full text-sm text-slate-500
+        className="block w-full text-sm text-gray-500
           file:mr-4 file:py-2 file:px-4
           file:rounded-md file:border-0
           file:text-sm file:font-semibold
-          file:bg-slate-100 file:text-slate-700
-          hover:file:bg-slate-200 cursor-pointer"
+          file:bg-gray-100 file:text-gray-700
+          hover:file:bg-gray-200 cursor-pointer"
       />
       {editSrc && (
-        <div className="space-y-3 p-3 border rounded-lg bg-slate-50 border-slate-200 shadow-sm">
-          <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+        <div className="space-y-3 p-3 border rounded-lg bg-gray-50 border-gray-200 shadow-sm">
+          <div className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
             Adjust Print Preview
           </div>
           <div
-            className="mx-auto border border-slate-300 rounded overflow-hidden bg-white shadow-inner"
+            className="mx-auto border border-gray-300 rounded overflow-hidden bg-white shadow-inner"
             style={{
               maxWidth: PRINTER_WIDTH * displayScale,
               height: currentPreviewHeight * displayScale,
@@ -318,7 +318,7 @@ const ImageWidget: React.FC<ImageWidgetProps> = ({
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400 font-mono">ZOOM</span>
+            <span className="text-xs text-gray-400 font-mono">ZOOM</span>
             <input
               type="range"
               min="0.1"
@@ -326,11 +326,11 @@ const ImageWidget: React.FC<ImageWidgetProps> = ({
               step="0.01"
               value={zoom}
               onChange={(e) => setZoom(parseFloat(e.target.value))}
-              className="flex-1 accent-black h-2.5 bg-slate-200 rounded-lg appearance-none cursor-pointer border border-slate-300 shadow-sm"
+              className="flex-1 accent-black h-2.5 bg-gray-200 rounded-lg appearance-none cursor-pointer border border-gray-300 shadow-sm"
             />
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400 font-mono">ROTATE</span>
+            <span className="text-xs text-gray-400 font-mono">ROTATE</span>
             <button
               type="button"
               onClick={() => {
@@ -343,19 +343,19 @@ const ImageWidget: React.FC<ImageWidgetProps> = ({
                   });
                 }
               }}
-              className="flex-1 py-1 border rounded-md text-sm bg-white border-slate-300 shadow-sm hover:bg-slate-50 transition-colors"
+              className="flex-1 py-1 border rounded-md text-sm bg-white border-gray-300 shadow-sm hover:bg-gray-50 transition-colors"
             >
               Rotate 90°
             </button>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-xs text-slate-400 font-mono">
+            <span className="text-xs text-gray-400 font-mono">
               ASPECT RATIO
             </span>
             <select
               value={selectedAspectRatio}
               onChange={(e) => setSelectedAspectRatio(e.target.value)}
-              className="flex-1 p-1 border rounded-md text-sm bg-white border-slate-300 shadow-sm"
+              className="flex-1 p-1 border rounded-md text-sm bg-white border-gray-300 shadow-sm"
             >
               {ASPECT_RATIOS.map((ratio) => (
                 <option key={ratio.value} value={ratio.value}>
@@ -376,7 +376,7 @@ const ImageWidget: React.FC<ImageWidgetProps> = ({
               className="h-auto object-contain"
             />
           ) : (
-            <div className="p-2 text-xs text-slate-500">File attached</div>
+            <div className="p-2 text-xs text-gray-500">File attached</div>
           )}
           <button
             type="button"

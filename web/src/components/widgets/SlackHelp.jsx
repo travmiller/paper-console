@@ -184,7 +184,7 @@ const SlackHelp = ({ rootValue = {} }) => {
         )}
       </div>
 
-      <p className="text-xs text-zinc-500 leading-5">
+      <p className="text-xs text-gray-500 leading-5">
         Pressing the print button on a channel with this module prints a
         connection status receipt.
       </p>
@@ -198,11 +198,11 @@ const SlackHelp = ({ rootValue = {} }) => {
       </button>
 
       {showSetup && (
-        <div className="rounded-lg border-2 border-dashed border-zinc-300 bg-zinc-50 p-4 space-y-2">
+        <div className="rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 p-4 space-y-2">
           <div className="text-sm font-bold text-black">How to connect Slack</div>
           <ol className="list-decimal pl-4 space-y-2">
             {SETUP_STEPS.map((step, idx) => (
-              <li key={idx} className="text-xs text-zinc-600 leading-5">
+              <li key={idx} className="text-xs text-gray-600 leading-5">
                 {step}
               </li>
             ))}
@@ -219,7 +219,7 @@ const SlackHelp = ({ rootValue = {} }) => {
                 {copied ? 'Copied' : 'Copy'}
               </button>
             </div>
-            <pre className="overflow-x-auto rounded border border-zinc-200 bg-white p-3 text-[11px] leading-4 text-zinc-700 whitespace-pre max-h-48 overflow-y-auto">
+            <pre className="overflow-x-auto rounded border border-gray-200 bg-white p-3 text-[11px] leading-4 text-gray-700 whitespace-pre max-h-48 overflow-y-auto">
               {MANIFEST_JSON}
             </pre>
           </div>

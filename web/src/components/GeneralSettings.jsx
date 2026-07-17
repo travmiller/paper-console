@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { SunIcon, MoonIcon, MonitorIcon } from '@phosphor-icons/react';
 import { formatTimeForDisplay } from '../utils';
 import { INK_GRADIENTS } from '../constants';
 import PrimaryButton from './PrimaryButton';
@@ -16,7 +17,7 @@ const GeneralSettings = ({
   onConfigImported,
 }) => {
   const inputClass = 'w-full p-3 text-base border-2 border-gray-300 rounded-lg focus:outline-none box-border';
-  const labelClass = 'block mb-2 font-bold';
+  const labelClass = 'block mb-2 text-sm text-black font-bold';
 
   // Use shared ink gradients
   const inkGradients = INK_GRADIENTS;
@@ -910,7 +911,7 @@ const GeneralSettings = ({
 
           {/* Universal Location Search Component */}
           <div className='mb-4'>
-            <label className='block mb-2 text-sm text-gray-600 font-bold'>Set Location</label>
+            <label className='block mb-2 text-sm text-black font-bold'>Set Location</label>
             <LocationSearch 
               value={settings} 
               onChange={(newLoc) => saveGlobalSettings(newLoc)} 
@@ -926,7 +927,7 @@ const GeneralSettings = ({
 
           {/* Time Format */}
           <div className='mb-4'>
-            <label className='block mb-2 text-sm text-gray-600  font-bold'>Time Format</label>
+            <label className='block mb-2 text-sm text-black font-bold'>Time Format</label>
             <select
               value={settings.time_format || '12h'}
               onChange={(e) => saveGlobalSettings({ time_format: e.target.value })}
@@ -939,7 +940,7 @@ const GeneralSettings = ({
 
           {/* Time Synchronization Mode */}
           <div className='mb-4'>
-            <label className='block mb-3 text-sm font-medium text-black  font-bold'>Set Time</label>
+            <label className='block mb-3 text-sm text-black font-bold'>Set Time</label>
 
             {/* Mode Selection - Tabs */}
             <div className='flex gap-0 mb-0'>
@@ -1101,6 +1102,48 @@ const GeneralSettings = ({
         </div>
       </div>
 
+      {/* Appearance */}
+      <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[4] }}>
+        <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
+          <h3 className='font-bold text-black  text-lg tracking-tight mb-3'>Appearance</h3>
+          <div className='flex flex-wrap items-center justify-between gap-4'>
+            <p className='flex-1 min-w-40 text-sm text-gray-600 '>
+              System follows the appearance setting of the device you're browsing from.
+            </p>
+            <div className='inline-flex rounded-full border-2 border-black bg-white p-1 shadow-sm'>
+              {[
+                { value: 'light', Icon: SunIcon },
+                { value: 'dark', Icon: MoonIcon },
+                { value: 'system', Icon: MonitorIcon },
+              ].map((choice) => {
+                const value = choice.value;
+                const ThemeIcon = choice.Icon;
+                const selected = (settings?.theme || 'light') === value;
+                return (
+                  <button
+                    key={value}
+                    type='button'
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wide transition ${
+                      selected
+                        ? 'active-inverted'
+                        : 'bg-transparent text-black hover:bg-gray-100'
+                    }`}
+                    aria-pressed={selected}
+                    onClick={() => {
+                      if (selected) return;
+                      saveGlobalSettings({ theme: value });
+                    }}
+                  >
+                    <ThemeIcon className='w-3.5 h-3.5' weight='bold' />
+                    {value}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Printer Settings */}
       <div className='rounded-xl p-[4px] shadow-lg' style={{ background: inkGradients[3] }}>
         <div className='bg-bg-card rounded-lg p-4 flex flex-col'>
@@ -1133,7 +1176,7 @@ const GeneralSettings = ({
           <div className='space-y-4'>
             <div className='p-4 border-2 border-gray-300 rounded-lg'>
               <div className='flex items-center justify-between mb-2 gap-3'>
-                <span className='text-sm font-medium text-black  font-bold'>Password Storage</span>
+                <span className='text-sm text-black font-bold'>Password Storage</span>
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-medium border-2 ${
                     devicePasswordBadgeMuted ? 'bg-white text-gray-500 border-gray-300' : 'bg-white text-black border-black'
@@ -1157,7 +1200,7 @@ const GeneralSettings = ({
 
                 {showDevicePasswordChange && (
                   <div className='p-4 border-2 border-gray-300 rounded-lg'>
-                    <h4 className='text-sm font-medium text-black mb-3  font-bold'>Change Device Password</h4>
+                    <h4 className='text-sm text-black mb-3 font-bold'>Change Device Password</h4>
                     <div className='space-y-3'>
                       <div>
                         <label className='block mb-2 text-sm text-black  font-bold'>Current Device Password</label>
@@ -1210,7 +1253,7 @@ const GeneralSettings = ({
               </>
             ) : (
               <div className='p-4 border-2 border-gray-300 rounded-lg'>
-                <p className='text-sm text-gray-500 '>
+                <p className='text-sm text-gray-600 '>
                   {devicePasswordUnavailableMessage}
                 </p>
               </div>
@@ -1244,7 +1287,7 @@ const GeneralSettings = ({
               {/* SSH Status */}
               <div className='p-4 border-2 border-gray-300 rounded-lg'>
                 <div className='flex items-center justify-between mb-2'>
-                  <span className='text-sm font-medium text-black  font-bold'>SSH Service</span>
+                  <span className='text-sm text-black font-bold'>SSH Service</span>
                   <span
                     className={`px-3 py-1 rounded-full text-xs font-medium  border-2 ${
                       sshStatus.enabled && sshStatus.active
@@ -1368,7 +1411,7 @@ const GeneralSettings = ({
             </div>
           ) : (
             <div className='p-4 border-2 border-gray-300 rounded-lg'>
-              <p className='text-sm text-gray-500 '>SSH isn't available in testing mode</p>
+              <p className='text-sm text-gray-600 '>SSH isn't available in testing mode</p>
             </div>
           )}
         </div>
