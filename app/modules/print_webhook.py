@@ -270,9 +270,14 @@ def parse_request_payload(
 
             raise ValueError(f"Unsupported print item type: {item_type or 'unknown'}")
 
+        if "title" in payload and payload.get("title") is None:
+            parsed_title: Any = None
+        else:
+            parsed_title = str(payload.get("title") or module_name or "WEBHOOK")
+
         return {
             "job_type": "json",
-            "title": str(payload.get("title") or module_name or "WEBHOOK"),
+            "title": parsed_title,
             "subtitle": str(payload.get("subtitle") or "").strip(),
             "items": normalized_items,
         }
@@ -302,19 +307,20 @@ def print_parsed_job(
     config: PrintWebhookConfig,
     module_name: str,
 ) -> None:
-    header = (job.get("title") or module_name or "WEBHOOK").strip()
-    printer.print_header(header, icon="plugs")
-    printer.print_caption(format_print_datetime())
+    if not ("title" in job and job.get("title") is None):
+        header = (job.get("title") or module_name or "WEBHOOK").strip()
+        printer.print_header(header, icon="plugs")
+        printer.print_caption(format_print_datetime())
 
-    subtitle = (job.get("subtitle") or "").strip()
-    if subtitle:
-        printer.print_caption(subtitle)
+        subtitle = (job.get("subtitle") or "").strip()
+        if subtitle:
+            printer.print_caption(subtitle)
 
-    for line in job.get("metadata_lines") or []:
-        if line:
-            printer.print_caption(line)
+        for line in job.get("metadata_lines") or []:
+            if line:
+                printer.print_caption(line)
 
-    printer.print_line()
+        printer.print_line()
 
     if job["job_type"] == "text":
         printer.print_body(job.get("text") or "")

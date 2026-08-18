@@ -491,6 +491,24 @@ def test_parse_request_payload_uses_module_name_when_json_title_missing():
     assert job["title"] == "Front Door"
 
 
+def test_parse_request_payload_preserves_explicit_null_json_title():
+    module_config = PrintWebhookConfig(
+        token="secret",
+        endpoint_path="front-door",
+    )
+    body = b'{"title":null,"subtitle":"Motion","items":[{"type":"text","text":"Someone is here."}]}'
+
+    job = print_webhook.parse_request_payload(
+        content_type="application/json",
+        body=body,
+        config=module_config,
+        module_name="Front Door",
+    )
+
+    assert "title" in job
+    assert job["title"] is None
+
+
 def test_parse_request_payload_text_uses_module_name_over_legacy_header():
     module_config = PrintWebhookConfig(
         token="secret",
@@ -636,6 +654,32 @@ def test_print_parsed_job_prints_request_metadata_lines():
     assert "From: 127.0.0.1" in printer.captions
     assert "Type: application/json" in printer.captions
     assert "UA: curl/8.7.1" in printer.captions
+
+
+def test_print_parsed_job_skips_start_block_when_title_is_none():
+    printer = _RecordingPrinter()
+    module_config = PrintWebhookConfig(
+        token="secret",
+        endpoint_path="front-door",
+    )
+
+    print_webhook.print_parsed_job(
+        printer,
+        {
+            "job_type": "json",
+            "title": None,
+            "subtitle": None,
+            "items": [{"type": "text", "text": "Someone is at the door."}],
+            "metadata_lines": ["From: 127.0.0.1"],
+        },
+        module_config,
+        "Print Webhook",
+    )
+
+    assert printer.headers == []
+    assert printer.lines == 0
+    assert printer.captions == []
+    assert printer.body == ["Someone is at the door."]
 
 
 def test_build_print_webhook_metadata_lines_respects_config():
