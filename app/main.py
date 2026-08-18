@@ -173,6 +173,50 @@ def _printer_is_available() -> bool:
     return True
 
 
+def _read_printer_status() -> Dict[str, object]:
+    """Return a concise printer activity snapshot for preflight checks."""
+    reserved = False
+    print_in_progress = False
+    hold_action_in_progress = False
+
+    try:
+        with hardware.print_lock:
+            now = time.time()
+            hardware.expire_stale_hold_action_locked(now)
+            print_in_progress = bool(hardware.print_in_progress)
+            hold_action_in_progress = bool(hardware.hold_action_in_progress)
+            reserved = bool(print_in_progress or hold_action_in_progress)
+    except Exception:
+        logger.debug("Printer reservation snapshot failed", exc_info=True)
+
+    available = _printer_is_available()
+    hardware_busy: Optional[bool] = None
+    if available:
+        busy_probe = getattr(printer, "is_printer_busy", None)
+        if callable(busy_probe):
+            try:
+                hardware_busy = bool(busy_probe())
+            except Exception:
+                logger.debug("Printer hardware busy probe failed", exc_info=True)
+
+    active = bool(reserved or hardware_busy is True)
+    if not available:
+        reason = "unavailable"
+    elif print_in_progress:
+        reason = "printing"
+    elif hold_action_in_progress:
+        reason = "hold"
+    elif hardware_busy is True:
+        reason = "hardware_busy"
+    else:
+        reason = "idle"
+
+    return {
+        "ready": bool(available and not active),
+        "reason": reason,
+    }
+
+
 async def task_watchdog():
     """Monitor background tasks and restart them if they die unexpectedly."""
     global email_polling_task, scheduler_task
@@ -1416,6 +1460,12 @@ async def read_root():
         "current_channel": pos,
         "current_module": module_info,
     }
+
+
+@app.get("/api/printer/status")
+async def get_printer_status():
+    """Return current printer availability and busy status."""
+    return _read_printer_status()
 
 
 class AuthLoginRequest(BaseModel):

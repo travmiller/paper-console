@@ -711,3 +711,46 @@ def test_run_print_webhook_print_job_clears_reservation(monkeypatch):
     assert printer.body == ["Motion detected"]
     assert printer.flushed == 1
     assert cleared == [False]
+
+
+def test_api_printer_status_reports_reservation_busy(monkeypatch):
+    monkeypatch.setattr(main_module, "_printer_is_available", lambda: True)
+    monkeypatch.setattr(hardware_module, "print_in_progress", True)
+    monkeypatch.setattr(hardware_module, "hold_action_in_progress", False)
+
+    status = asyncio.run(main_module.get_printer_status())
+
+    assert status["ready"] is False
+    assert status["reason"] == "printing"
+
+
+def test_api_printer_status_reports_hardware_busy(monkeypatch):
+    class _BusyPrinter:
+        def is_printer_busy(self):
+            return True
+
+    monkeypatch.setattr(main_module, "printer", _BusyPrinter())
+    monkeypatch.setattr(main_module, "_printer_is_available", lambda: True)
+    monkeypatch.setattr(hardware_module, "print_in_progress", False)
+    monkeypatch.setattr(hardware_module, "hold_action_in_progress", False)
+
+    status = asyncio.run(main_module.get_printer_status())
+
+    assert status["ready"] is False
+    assert status["reason"] == "hardware_busy"
+
+
+def test_api_printer_status_reports_idle_and_accepting_jobs(monkeypatch):
+    class _IdlePrinter:
+        def is_printer_busy(self):
+            return False
+
+    monkeypatch.setattr(main_module, "printer", _IdlePrinter())
+    monkeypatch.setattr(main_module, "_printer_is_available", lambda: True)
+    monkeypatch.setattr(hardware_module, "print_in_progress", False)
+    monkeypatch.setattr(hardware_module, "hold_action_in_progress", False)
+
+    status = asyncio.run(main_module.get_printer_status())
+
+    assert status["ready"] is True
+    assert status["reason"] == "idle"
