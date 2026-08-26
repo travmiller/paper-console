@@ -1,4 +1,5 @@
 from datetime import datetime
+import threading
 
 from app.config import DEFAULT_CUTTER_FEED_LINES
 
@@ -23,6 +24,16 @@ class PrinterDriver:
         self.font_size = self.FONT_SIZE
         self.line_spacing = self.LINE_HEIGHT - self.FONT_SIZE
         self.line_height = self.LINE_HEIGHT
+        self._cancel_event = threading.Event()
+
+    def request_cancel(self) -> None:
+        self._cancel_event.set()
+
+    def clear_cancel_request(self) -> None:
+        self._cancel_event.clear()
+
+    def is_cancel_requested(self) -> bool:
+        return self._cancel_event.is_set()
     
     def _load_font(self):
         """Mock font loading - returns None."""

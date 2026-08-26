@@ -133,6 +133,7 @@ from app.hardware import (
     try_begin_print_job,
     reserve_hold_action,
     promote_hold_to_print_job,
+    request_print_cancel,
     clear_print_reservation,
 )
 import app.location_lookup as location_lookup
@@ -574,7 +575,14 @@ def on_button_long_press_threadsafe():
 def on_button_long_press_ready_threadsafe():
     """Callback fired at 5s hold threshold to signal 'you can release now'."""
     try:
-        reserve_hold_action()
+        # While a receipt is active, the same five-second gesture cancels it.
+        # Returning True tells the button driver not to open Quick Actions when
+        # this press is released (or escalate it to factory reset at 15s).
+        if request_print_cancel():
+            return True
+
+        if not reserve_hold_action():
+            return False
         # Half-line tactile feed cue.
         if hasattr(printer, "feed_dots"):
             printer.feed_dots(12)
@@ -582,6 +590,7 @@ def on_button_long_press_ready_threadsafe():
             printer.blip()
     except Exception:
         logger.debug("Long-press ready tactile cue failed", exc_info=True)
+    return False
 
 
 def _print_channel_config_summary(position: int):
@@ -1500,6 +1509,13 @@ async def health_check():
     health["components"]["printer"] = (
         "available" if _printer_is_available() else "unavailable"
     )
+    if hardware.printer_uart_reboot_pending:
+        health["reboot_pending"] = True
+        health["components"]["printer_uart"] = "migration reboot pending"
+    elif hardware.printer_uart_preparation is not None:
+        health["components"]["printer_uart"] = (
+            hardware.printer_uart_preparation.status
+        )
     health["components"]["dial"] = "available" if dial else "unavailable"
     health["components"]["button"] = "available" if button else "unavailable"
     health["components"]["gpio"] = "available" if _is_raspberry_pi else "mock"
@@ -4802,6 +4818,14 @@ async def manual_trigger():
     finally:
         clear_print_reservation(clear_hold=False)
     return {"message": "Triggered"}
+
+
+@app.post("/debug/cancel-print", dependencies=[Depends(require_admin_access)])
+async def debug_cancel_print():
+    """Request the same safe cancellation used by the five-second button hold."""
+    if not request_print_cancel():
+        raise HTTPException(status_code=409, detail="No print is currently in progress")
+    return {"message": "Print cancellation requested"}
 
 
 @app.post("/action/dial/{position}", dependencies=[Depends(require_admin_access)])

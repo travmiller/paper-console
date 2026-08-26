@@ -10,6 +10,12 @@ if [ "$EUID" -ne 0 ]; then
   exit 1
 fi
 
+# Prevent the runtime's OTA migration guard from rebooting in the middle of
+# initial provisioning. /run is cleared automatically on reboot.
+SETUP_IN_PROGRESS_MARKER="/run/pc1-setup-in-progress"
+touch "$SETUP_IN_PROGRESS_MARKER"
+trap 'rm -f "$SETUP_IN_PROGRESS_MARKER"' EXIT
+
 echo "--- PC-1 Setup ---"
 
 # 1. Set Hostname
@@ -29,14 +35,17 @@ else
 fi
 
 # 2. Configure Serial Port for Printer
-# The thermal printer uses GPIO serial (/dev/serial0 -> /dev/ttyS0)
-# We need to disable the serial console but keep the hardware enabled
+# The thermal printer uses GPIO serial. Disable the serial console now; the
+# privileged helper later in this script pins /dev/serial0 to the PL011 UART.
 echo "Configuring serial port for printer..."
 
 # Disable serial console login service
 systemctl stop serial-getty@ttyS0.service 2>/dev/null || true
 systemctl disable serial-getty@ttyS0.service 2>/dev/null || true
 systemctl mask serial-getty@ttyS0.service 2>/dev/null || true
+systemctl stop serial-getty@ttyAMA0.service 2>/dev/null || true
+systemctl disable serial-getty@ttyAMA0.service 2>/dev/null || true
+systemctl mask serial-getty@ttyAMA0.service 2>/dev/null || true
 
 # Use raspi-config non-interactively to:
 # - Disable serial console (do_serial_cons 1 = disabled)
@@ -279,6 +288,9 @@ echo "Setting up WiFi AP script..."
 chmod +x "$PROJECT_DIR/scripts/wifi_ap_nmcli.sh"
 # Ensure the script uses LF line endings (avoid /bin/bash^M issues after editing on Windows)
 sed -i 's/\r$//' "$PROJECT_DIR/scripts/wifi_ap_nmcli.sh" || true
+
+echo "Migrating printer serial port to the PL011 UART..."
+"$PROJECT_DIR/scripts/wifi_ap_nmcli.sh" ensure-printer-uart
 
 # Give sudo access for WiFi management AND service control (no password required)
 echo "Configuring sudo permissions for WiFi management and service control..."

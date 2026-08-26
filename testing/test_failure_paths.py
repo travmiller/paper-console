@@ -9,7 +9,8 @@ import time
 import imaplib
 import types
 from pathlib import Path
-from fastapi import BackgroundTasks
+from fastapi import BackgroundTasks, HTTPException
+import pytest
 
 import app.main as main_module
 import app.hardware as hardware_module
@@ -850,6 +851,97 @@ def test_clear_print_reservation_updates_debounce_from_completion(monkeypatch):
     assert hardware_module.print_in_progress is False
     assert hardware_module.last_print_time == now
     assert drained == ["drained"]
+
+
+def test_clear_print_reservation_preserves_an_active_button_hold(monkeypatch):
+    drained = []
+
+    class FakeButton:
+        is_pressed = True
+
+        def drain_pending_events(self):
+            drained.append("drained")
+
+    monkeypatch.setattr(hardware_module, "button", FakeButton())
+    monkeypatch.setattr(hardware_module, "print_in_progress", True)
+
+    hardware_module.clear_print_reservation(clear_hold=False)
+
+    assert hardware_module.print_in_progress is False
+    assert drained == []
+
+
+def test_print_cancellation_tracks_active_job_and_resets_for_next_job(monkeypatch):
+    calls = []
+
+    class FakePrinter:
+        def request_cancel(self):
+            calls.append("cancel")
+
+        def clear_cancel_request(self):
+            calls.append("clear")
+
+    monkeypatch.setattr(hardware_module, "printer", FakePrinter())
+    monkeypatch.setattr(hardware_module, "print_in_progress", False)
+    monkeypatch.setattr(hardware_module, "hold_action_in_progress", False)
+    monkeypatch.setattr(hardware_module, "hold_action_started_at", 0.0)
+    monkeypatch.setattr(hardware_module, "last_print_time", 0.0)
+
+    assert hardware_module.request_print_cancel() is False
+    assert hardware_module.try_begin_print_job(debounce=False) is True
+    assert calls == ["clear"]
+    assert hardware_module.request_print_cancel() is True
+    assert calls == ["clear", "cancel"]
+
+    hardware_module.clear_print_reservation()
+    assert calls == ["clear", "cancel", "clear"]
+
+
+def test_long_press_threshold_cancels_print_without_reserving_menu(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        main_module, "request_print_cancel", lambda: calls.append("cancel") or True
+    )
+    monkeypatch.setattr(
+        main_module, "reserve_hold_action", lambda: calls.append("reserve") or True
+    )
+
+    assert main_module.on_button_long_press_ready_threadsafe() is True
+    assert calls == ["cancel"]
+
+
+def test_long_press_threshold_preserves_quick_actions_when_idle(monkeypatch):
+    calls = []
+
+    class FakePrinter:
+        def feed_dots(self, dots):
+            calls.append(("feed", dots))
+
+    monkeypatch.setattr(main_module, "printer", FakePrinter())
+    monkeypatch.setattr(main_module, "request_print_cancel", lambda: False)
+    monkeypatch.setattr(
+        main_module, "reserve_hold_action", lambda: calls.append("reserve") or True
+    )
+
+    assert main_module.on_button_long_press_ready_threadsafe() is False
+    assert calls == ["reserve", ("feed", 12)]
+
+
+def test_debug_cancel_print_requests_active_job_cancellation(monkeypatch):
+    monkeypatch.setattr(main_module, "request_print_cancel", lambda: True)
+
+    result = asyncio.run(main_module.debug_cancel_print())
+
+    assert result == {"message": "Print cancellation requested"}
+
+
+def test_debug_cancel_print_rejects_when_no_job_is_active(monkeypatch):
+    monkeypatch.setattr(main_module, "request_print_cancel", lambda: False)
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(main_module.debug_cancel_print())
+
+    assert exc_info.value.status_code == 409
 
 
 def test_try_begin_print_job_clears_stale_hold_reservation(monkeypatch):

@@ -13,17 +13,30 @@ _is_raspberry_pi = platform.system() == "Linux" and os.path.exists(
     "/proc/device-tree/model"
 )
 
+printer_uart_preparation = None
+printer_uart_reboot_pending = False
 if _is_raspberry_pi:
+    from app.printer_uart import prepare_printer_uart
+
+    printer_uart_preparation = prepare_printer_uart()
+    printer_uart_reboot_pending = printer_uart_preparation.suppress_printer_output
+
+if _is_raspberry_pi and not printer_uart_reboot_pending:
     try:
         from app.drivers.printer_serial import PrinterDriver
+    except ImportError:
+        from app.drivers.printer_mock import PrinterDriver
+else:
+    from app.drivers.printer_mock import PrinterDriver
+
+if _is_raspberry_pi:
+    try:
         from app.drivers.dial_gpio import DialDriver
         from app.drivers.button_gpio import ButtonDriver
     except ImportError:
-        from app.drivers.printer_mock import PrinterDriver
         from app.drivers.dial_mock import DialDriver
         from app.drivers.button_mock import ButtonDriver
 else:
-    from app.drivers.printer_mock import PrinterDriver
     from app.drivers.dial_mock import DialDriver
     from app.drivers.button_mock import ButtonDriver
 
@@ -84,6 +97,20 @@ def try_begin_print_job(*, debounce: bool = False) -> bool:
 
         print_in_progress = True
         last_print_time = current_time
+        if hasattr(printer, "clear_cancel_request"):
+            printer.clear_cancel_request()
+        return True
+
+
+def request_print_cancel() -> bool:
+    """Cancel the active logical print job, if one is currently reserved."""
+    with print_lock:
+        if not print_in_progress:
+            return False
+        if not hasattr(printer, "request_cancel"):
+            return False
+        printer.request_cancel()
+        logger.info("Print cancellation requested by the user")
         return True
 
 
@@ -131,11 +158,17 @@ def clear_print_reservation(*, clear_hold: bool = True):
             # Start debounce from the end of the physical print window, not the start.
             last_print_time = time.time()
         print_in_progress = False
+        if hasattr(printer, "clear_cancel_request"):
+            printer.clear_cancel_request()
         if clear_hold:
             hold_action_in_progress = False
             hold_action_started_at = 0.0
 
-    if hasattr(button, "drain_pending_events"):
+    # Do not disturb the press that requested cancellation while it is still
+    # physically held; its release must remain marked as consumed.
+    if not getattr(button, "is_pressed", False) and hasattr(
+        button, "drain_pending_events"
+    ):
         try:
             button.drain_pending_events()
         except Exception:
