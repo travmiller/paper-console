@@ -13,17 +13,30 @@ _is_raspberry_pi = platform.system() == "Linux" and os.path.exists(
     "/proc/device-tree/model"
 )
 
+printer_uart_preparation = None
+printer_uart_reboot_pending = False
 if _is_raspberry_pi:
+    from app.printer_uart import prepare_printer_uart
+
+    printer_uart_preparation = prepare_printer_uart()
+    printer_uart_reboot_pending = printer_uart_preparation.suppress_printer_output
+
+if _is_raspberry_pi and not printer_uart_reboot_pending:
     try:
         from app.drivers.printer_serial import PrinterDriver
+    except ImportError:
+        from app.drivers.printer_mock import PrinterDriver
+else:
+    from app.drivers.printer_mock import PrinterDriver
+
+if _is_raspberry_pi:
+    try:
         from app.drivers.dial_gpio import DialDriver
         from app.drivers.button_gpio import ButtonDriver
     except ImportError:
-        from app.drivers.printer_mock import PrinterDriver
         from app.drivers.dial_mock import DialDriver
         from app.drivers.button_mock import ButtonDriver
 else:
-    from app.drivers.printer_mock import PrinterDriver
     from app.drivers.dial_mock import DialDriver
     from app.drivers.button_mock import ButtonDriver
 

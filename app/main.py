@@ -1500,6 +1500,13 @@ async def health_check():
     health["components"]["printer"] = (
         "available" if _printer_is_available() else "unavailable"
     )
+    if hardware.printer_uart_reboot_pending:
+        health["reboot_pending"] = True
+        health["components"]["printer_uart"] = "migration reboot pending"
+    elif hardware.printer_uart_preparation is not None:
+        health["components"]["printer_uart"] = (
+            hardware.printer_uart_preparation.status
+        )
     health["components"]["dial"] = "available" if dial else "unavailable"
     health["components"]["button"] = "available" if button else "unavailable"
     health["components"]["gpio"] = "available" if _is_raspberry_pi else "mock"
