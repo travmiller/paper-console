@@ -1,4 +1,5 @@
 import math
+import json
 import os
 import platform
 import random
@@ -6,7 +7,8 @@ import threading
 import time
 import unicodedata
 import logging
-from datetime import datetime, date
+from datetime import datetime, date, timezone
+from pathlib import Path
 from typing import List, Optional, Any
 
 import serial
@@ -21,6 +23,14 @@ except Exception:  # pragma: no cover - non-Pi environments
     GPIOHANDLE_REQUEST_INPUT = 0
 
 logger = logging.getLogger(__name__)
+
+
+class PrinterTransportError(RuntimeError):
+    """Raised when a receipt cannot be transmitted completely."""
+
+    def __init__(self, message: str, *, bytes_written: int = 0):
+        super().__init__(message)
+        self.bytes_written = max(0, int(bytes_written))
 
 
 class PrinterDriver:
@@ -73,6 +83,23 @@ class PrinterDriver:
     SPACING_LARGE = 16  # Section spacing (between modules)
     BUSY_PIN_GPIO = 18  # Printer DTR line from the wiring table
 
+    # QR204 transport framing. Each strip is its own GS v 0 command, but the
+    # strips are transmitted continuously as one logical receipt. NUL is
+    # ignored by the printer in command mode; guard NULs can therefore replace
+    # a few missing raster payload bytes without shifting the next command.
+    RASTER_STRIP_ROWS = 24
+    RASTER_GUARD_BYTES = 4
+    SERIAL_WRITE_CHUNK_BYTES = 128
+
+    # DTR is useful when it asserts, but the deployed wiring does not make it a
+    # reliable prerequisite for progress. Wait for a stable assertion, then
+    # stop consulting it for the current receipt if it remains high too long.
+    BUSY_PIN_DEBOUNCE_SECONDS = 0.01
+    BUSY_PIN_POLL_SECONDS = 0.005
+    BUSY_PIN_WAIT_TIMEOUT = 15.0
+
+    INCIDENT_LOG_MAX_BYTES = 256 * 1024
+
     def __init__(
         self,
         width: int = 42,  # Characters per line
@@ -86,8 +113,10 @@ class PrinterDriver:
         self.baudrate = baudrate
         self.last_init_error = None
         self._io_lock = threading.RLock()
+        self._incident_lock = threading.Lock()
         self._busy_chip = None
         self._busy_handle = None
+        self.last_transport_stats = {}
         # Buffer for print operations (prints are always inverted/reversed)
         # Each item is a tuple: ('text', line) or ('feed', count) or ('qr', data).
         self.print_buffer = []
@@ -148,6 +177,7 @@ class PrinterDriver:
                 parity=serial.PARITY_NONE,
                 stopbits=serial.STOPBITS_ONE,
                 timeout=1,
+                write_timeout=5,
             )
 
             if self.ser.in_waiting:
@@ -1066,83 +1096,208 @@ class PrinterDriver:
         except Exception:
             return None
 
-    def _send_bitmap(self, img: Image.Image):
-        """Send a bitmap image to the printer using GS v 0 raster command.
+    def _incident_log_path(self) -> Path:
+        configured = os.environ.get("PC1_PRINTER_INCIDENT_LOG", "").strip()
+        if configured:
+            return Path(configured)
+        project_root = Path(__file__).resolve().parents[2]
+        return project_root / "printer-incidents.log"
 
-        Optimized for speed: builds the entire command as one buffer
-        and sends it in a single write operation.
+    def _record_transport_incident(self, event: str, **details):
+        """Persist one bounded incident record without logging normal jobs to SD."""
+        payload = {
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "event": event,
+            "port": self.port,
+            "baudrate": self.baudrate,
+            **details,
+        }
+        logger.error("Printer transport incident %s: %s", event, details)
+
+        try:
+            encoded = (json.dumps(payload, default=str, sort_keys=True) + "\n").encode(
+                "utf-8"
+            )
+            path = self._incident_log_path()
+            backup = path.with_name(f"{path.stem}.previous{path.suffix}")
+            with self._incident_lock:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                current_size = path.stat().st_size if path.exists() else 0
+                if current_size + len(encoded) > self.INCIDENT_LOG_MAX_BYTES:
+                    backup.unlink(missing_ok=True)
+                    path.replace(backup)
+                with path.open("ab") as incident_file:
+                    incident_file.write(encoded)
+        except Exception:
+            # Incident reporting must not replace the original printer failure.
+            logger.debug("Could not persist printer incident", exc_info=True)
+
+    def _encode_raster_strip(self, strip: Image.Image) -> bytes:
+        """Encode one independently framed GS v 0 strip plus recovery guards."""
+        strip = strip.convert("1")
+        width, height = strip.size
+        if width % 8 != 0:
+            raise ValueError("Raster strip width must be byte-aligned")
+
+        bytes_per_row = width // 8
+        header = b"\x1d\x76\x30\x00" + bytes(
+            [
+                bytes_per_row & 0xFF,
+                (bytes_per_row >> 8) & 0xFF,
+                height & 0xFF,
+                (height >> 8) & 0xFF,
+            ]
+        )
+        payload = bytes(byte ^ 0xFF for byte in strip.tobytes())
+        guards = b"\x00" * self.RASTER_GUARD_BYTES
+        return header + payload + guards
+
+    def _wait_for_busy_clear(self) -> tuple[float, bool, bool]:
+        """Advisory DTR wait returning (seconds, asserted, timed_out)."""
+        if self._read_busy_pin() != 1:
+            return 0.0, False, False
+
+        wait_started = time.monotonic()
+        time.sleep(self.BUSY_PIN_DEBOUNCE_SECONDS)
+        if self._read_busy_pin() != 1:
+            return time.monotonic() - wait_started, False, False
+
+        while self._read_busy_pin() == 1:
+            elapsed = time.monotonic() - wait_started
+            if elapsed >= self.BUSY_PIN_WAIT_TIMEOUT:
+                return elapsed, True, True
+            time.sleep(self.BUSY_PIN_POLL_SECONDS)
+
+        return time.monotonic() - wait_started, True, False
+
+    def _flush_serial(self):
+        if not self.ser or not self.ser.is_open:
+            raise PrinterTransportError("Printer serial interface is unavailable")
+        try:
+            self.ser.flush()
+        except Exception as exc:
+            raise PrinterTransportError("Printer serial flush failed") from exc
+
+    def _send_bitmap(self, img: Image.Image):
+        """Send a bitmap as guarded, consecutive raster strips.
+
+        Strips are protocol boundaries, not separate print jobs: there are no
+        feeds or printer-idle waits between them. Flushing the host UART at each
+        boundary keeps a future cancellation from leaving unsent bytes queued.
         """
         if img is None:
-            return
+            return {}
+
+        width, height = img.size
+        if width % 8 != 0:
+            new_width = ((width // 8) + 1) * 8
+            new_img = Image.new("1", (new_width, height), 1)
+            new_img.paste(img, (0, 0))
+            img = new_img
+            width = new_width
+        img = img.convert("1")
+
+        started = time.monotonic()
+        stats = {
+            "width": width,
+            "height": height,
+            "strips": 0,
+            "bytes_sent": 0,
+            "busy_wait_events": 0,
+            "busy_wait_seconds": 0.0,
+            "busy_pin_timed_out": False,
+        }
+        consult_busy_pin = True
+        active_strip = 0
 
         try:
-            width, height = img.size
+            for active_strip, top in enumerate(
+                range(0, height, self.RASTER_STRIP_ROWS), start=1
+            ):
+                bottom = min(top + self.RASTER_STRIP_ROWS, height)
+                command = self._encode_raster_strip(img.crop((0, top, width, bottom)))
 
-            # Ensure width is multiple of 8 for byte alignment
-            if width % 8 != 0:
-                new_width = ((width // 8) + 1) * 8
-                new_img = Image.new("1", (new_width, height), 1)
-                new_img.paste(img, (0, 0))
-                img = new_img
-                width = new_width
+                for offset in range(0, len(command), self.SERIAL_WRITE_CHUNK_BYTES):
+                    if consult_busy_pin:
+                        waited, asserted, timed_out = self._wait_for_busy_clear()
+                        stats["busy_wait_seconds"] += waited
+                        if asserted:
+                            stats["busy_wait_events"] += 1
+                        if timed_out:
+                            stats["busy_pin_timed_out"] = True
+                            consult_busy_pin = False
+                            self._record_transport_incident(
+                                "busy_pin_timeout",
+                                strip=active_strip,
+                                waited_seconds=round(waited, 3),
+                            )
 
-            # Convert to 1-bit if not already
-            img = img.convert("1")
+                    chunk = command[offset : offset + self.SERIAL_WRITE_CHUNK_BYTES]
+                    stats["bytes_sent"] += self._write(chunk)
 
-            # Get raw pixel bytes directly (more efficient than iterating)
-            pixels = img.tobytes()
-            bytes_per_row = width // 8
+                # This waits for the host UART only, not printer mechanical idle.
+                self._flush_serial()
+                stats["strips"] = active_strip
 
-            # Build complete command in one buffer
-            # GS v 0 - Print raster bit image
-            xL = bytes_per_row & 0xFF
-            xH = (bytes_per_row >> 8) & 0xFF
-            yL = height & 0xFF
-            yH = (height >> 8) & 0xFF
+            stats["elapsed_seconds"] = time.monotonic() - started
+            self.last_transport_stats = dict(stats)
+            logger.info(
+                "Bitmap transport complete: %dx%d strips=%d bytes=%d elapsed=%.3fs "
+                "busy_waits=%d busy_seconds=%.3f",
+                width,
+                height,
+                stats["strips"],
+                stats["bytes_sent"],
+                stats["elapsed_seconds"],
+                stats["busy_wait_events"],
+                stats["busy_wait_seconds"],
+            )
+            return stats
+        except Exception as exc:
+            if isinstance(exc, PrinterTransportError):
+                stats["bytes_sent"] += exc.bytes_written
+            stats["elapsed_seconds"] = time.monotonic() - started
+            stats["failed_strip"] = active_strip
+            stats["error"] = str(exc)
+            self.last_transport_stats = dict(stats)
+            self._record_transport_incident(
+                "bitmap_send_failed",
+                width=width,
+                height=height,
+                strip=active_strip,
+                bytes_sent=stats["bytes_sent"],
+                error=str(exc),
+            )
+            logger.exception("Bitmap transport failed at strip %d", active_strip)
+            if isinstance(exc, PrinterTransportError):
+                raise
+            raise PrinterTransportError("Bitmap transport failed") from exc
 
-            # Pre-allocate the complete command buffer
-            # Header (8 bytes) + raster data
-            command = bytearray(8 + len(pixels))
-            command[0:4] = b"\x1d\x76\x30\x00"  # GS v 0 command
-            command[4:8] = bytes([xL, xH, yL, yH])
+    def _write(self, data: bytes) -> int:
+        """Write every byte or raise instead of silently accepting truncation."""
+        if not data:
+            return 0
+        if not self.ser or not self.ser.is_open:
+            raise PrinterTransportError("Printer serial interface is unavailable")
 
-            # PIL 1-bit mode: 0 = black, 255 = white (packed into bytes)
-            # Printer expects: 1 = black dot, 0 = white
-            # PIL packs 8 pixels per byte, MSB first, but inverted from what printer expects
-            # So we need to invert the bytes
-            for i, byte in enumerate(pixels):
-                command[8 + i] = byte ^ 0xFF  # Invert bits
-
-            # Send entire image in chunks to prevent buffer overflow
-            logger.debug("Sending bitmap: %dx%d (%d bytes)", width, height, len(command))
-            CHUNK_SIZE = 4096
-            total_sent = 0
-            for i in range(0, len(command), CHUNK_SIZE):
-                chunk = command[i : i + CHUNK_SIZE]
-                self._write(bytes(chunk))
-                total_sent += len(chunk)
-                # Small yield to let hardware buffer drain slightly
-                time.sleep(0.01)
-            logger.debug("Bitmap send complete. Total bytes: %d", total_sent)
-
-
-        except Exception:
-            pass
-
-    def _write(self, data: bytes):
-        """Internal helper to write bytes to serial interface.
-
-        Sends data without waiting for transmission to complete.
-        This allows the printer to buffer data while we continue processing.
-        """
-        try:
-            with self._io_lock:
-                if self.ser and self.ser.is_open:
-                    # Write all data at once - don't flush() as that blocks
-                    # until all bytes transmit (slow at 9600 baud)
-                    self.ser.write(data)
-        except Exception:
-            logger.exception("Serial write failed")
+        with self._io_lock:
+            total_written = 0
+            view = memoryview(data)
+            while total_written < len(data):
+                try:
+                    written = self.ser.write(view[total_written:])
+                except Exception as exc:
+                    raise PrinterTransportError(
+                        f"Serial write failed after {total_written}/{len(data)} bytes",
+                        bytes_written=total_written,
+                    ) from exc
+                if not written or written < 0:
+                    raise PrinterTransportError(
+                        f"Serial write made no progress at {total_written}/{len(data)} bytes",
+                        bytes_written=total_written,
+                    )
+                total_written += int(written)
+            return total_written
 
     def _read(self, size: int = 1, timeout: float = 1.0) -> bytes:
         """Read bytes from serial interface. Returns empty bytes on error."""
