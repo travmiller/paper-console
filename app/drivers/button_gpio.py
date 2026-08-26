@@ -188,7 +188,8 @@ class ButtonDriver:
                     self.triggered_actions.add("long_press_threshold")
                     if self.long_press_ready_callback:
                         try:
-                            self.long_press_ready_callback()
+                            if self.long_press_ready_callback():
+                                self.triggered_actions.add("long_press_consumed")
                         except Exception:
                             pass
 
@@ -196,6 +197,7 @@ class ButtonDriver:
                 if (
                     duration >= self.factory_reset_duration
                     and "factory_reset" not in self.triggered_actions
+                    and "long_press_consumed" not in self.triggered_actions
                 ):
                     if self.factory_reset_callback:
                         self.triggered_actions.add("factory_reset")
@@ -247,6 +249,7 @@ class ButtonDriver:
             and hold_duration >= self.long_press_duration
             and hold_duration < self.factory_reset_duration
             and "factory_reset" not in self.triggered_actions
+            and "long_press_consumed" not in self.triggered_actions
             and self.long_press_callback
         ):
             try:

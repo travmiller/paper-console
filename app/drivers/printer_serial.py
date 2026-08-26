@@ -114,6 +114,7 @@ class PrinterDriver:
         self.last_init_error = None
         self._io_lock = threading.RLock()
         self._incident_lock = threading.Lock()
+        self._cancel_event = threading.Event()
         self._busy_chip = None
         self._busy_handle = None
         self.last_transport_stats = {}
@@ -1178,6 +1179,17 @@ class PrinterDriver:
         except Exception as exc:
             raise PrinterTransportError("Printer serial flush failed") from exc
 
+    def request_cancel(self) -> None:
+        """Request that the active receipt stop at the next safe raster boundary."""
+        self._cancel_event.set()
+
+    def clear_cancel_request(self) -> None:
+        """Prepare the transport for a new logical print job."""
+        self._cancel_event.clear()
+
+    def is_cancel_requested(self) -> bool:
+        return self._cancel_event.is_set()
+
     def _send_bitmap(self, img: Image.Image):
         """Send a bitmap as guarded, consecutive raster strips.
 
@@ -1206,6 +1218,7 @@ class PrinterDriver:
             "busy_wait_events": 0,
             "busy_wait_seconds": 0.0,
             "busy_pin_timed_out": False,
+            "cancelled": False,
         }
         consult_busy_pin = True
         active_strip = 0
@@ -1214,6 +1227,14 @@ class PrinterDriver:
             for active_strip, top in enumerate(
                 range(0, height, self.RASTER_STRIP_ROWS), start=1
             ):
+                # A strip is one complete GS v 0 command. Stopping here avoids
+                # leaving the printer inside a partially transmitted raster
+                # payload, which could desynchronize every command after it.
+                if self.is_cancel_requested():
+                    stats["cancelled"] = True
+                    stats["cancelled_after_strip"] = stats["strips"]
+                    break
+
                 bottom = min(top + self.RASTER_STRIP_ROWS, height)
                 command = self._encode_raster_strip(img.crop((0, top, width, bottom)))
 
@@ -1239,8 +1260,21 @@ class PrinterDriver:
                 self._flush_serial()
                 stats["strips"] = active_strip
 
+            if self.is_cancel_requested():
+                stats["cancelled"] = True
+                stats["cancelled_after_strip"] = stats["strips"]
+
             stats["elapsed_seconds"] = time.monotonic() - started
             self.last_transport_stats = dict(stats)
+            if stats["cancelled"]:
+                logger.info(
+                    "Bitmap transport cancelled after strip=%d bytes=%d elapsed=%.3fs",
+                    stats["strips"],
+                    stats["bytes_sent"],
+                    stats["elapsed_seconds"],
+                )
+                return stats
+
             logger.info(
                 "Bitmap transport complete: %dx%d strips=%d bytes=%d elapsed=%.3fs "
                 "busy_waits=%d busy_seconds=%.3f",
@@ -1756,7 +1790,10 @@ class PrinterDriver:
             img = self._render_unified_bitmap(ops)
             if img:
                 logger.debug("Rendered unified bitmap: %s", img.size)
-                self._send_bitmap(img)
+                transport_stats = self._send_bitmap(img)
+                if transport_stats.get("cancelled") or self.is_cancel_requested():
+                    logger.info("Skipping post-print feed after receipt cancellation")
+                    return
                 # Ensure all data is transmitted before returning
                 if self.ser and self.ser.is_open:
                     try:

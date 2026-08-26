@@ -55,10 +55,33 @@ def _make_driver(fake_serial):
     driver.baudrate = 9600
     driver._io_lock = threading.RLock()
     driver._incident_lock = threading.Lock()
+    driver._cancel_event = threading.Event()
     driver._busy_chip = None
     driver._busy_handle = None
     driver.last_transport_stats = {}
     return driver
+
+
+def test_send_bitmap_cancels_only_between_complete_raster_strips():
+    fake_serial = _FakeSerial()
+    driver = _make_driver(fake_serial)
+    original_flush = fake_serial.flush
+
+    def cancel_after_first_strip():
+        original_flush()
+        if fake_serial.flush_calls == 1:
+            driver.request_cancel()
+
+    fake_serial.flush = cancel_after_first_strip
+
+    stats = driver._send_bitmap(Image.new("1", (384, 72), 0))
+
+    first_strip_size = 8 + (48 * 24) + driver.RASTER_GUARD_BYTES
+    assert len(fake_serial.written) == first_strip_size
+    assert stats["cancelled"] is True
+    assert stats["strips"] == 1
+    assert stats["cancelled_after_strip"] == 1
+    assert driver.last_transport_stats == stats
 
 
 def test_send_bitmap_uses_guarded_24_row_strips():
