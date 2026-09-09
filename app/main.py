@@ -175,45 +175,31 @@ def _printer_is_available() -> bool:
 
 
 def _read_printer_status() -> Dict[str, object]:
-    """Return a concise printer activity snapshot for preflight checks."""
-    reserved = False
-    print_in_progress = False
-    hold_action_in_progress = False
+    """Report logical job readiness without sending commands to the printer.
 
-    try:
-        with hardware.print_lock:
-            now = time.time()
-            hardware.expire_stale_hold_action_locked(now)
-            print_in_progress = bool(hardware.print_in_progress)
-            hold_action_in_progress = bool(hardware.hold_action_in_progress)
-            reserved = bool(print_in_progress or hold_action_in_progress)
-    except Exception:
-        logger.debug("Printer reservation snapshot failed", exc_info=True)
+    Serial status queries take the same I/O lock held throughout a receipt.
+    Polling it here would block the event loop, including remote cancellation.
+    The reservation stays active through transport completion/cancellation.
+    """
+    with hardware.print_lock:
+        hardware.expire_stale_hold_action_locked(time.time())
+        print_in_progress = bool(hardware.print_in_progress)
+        hold_action_in_progress = bool(hardware.hold_action_in_progress)
 
-    available = _printer_is_available()
-    hardware_busy: Optional[bool] = None
-    if available:
-        busy_probe = getattr(printer, "is_printer_busy", None)
-        if callable(busy_probe):
-            try:
-                hardware_busy = bool(busy_probe())
-            except Exception:
-                logger.debug("Printer hardware busy probe failed", exc_info=True)
-
-    active = bool(reserved or hardware_busy is True)
+    available = (
+        not hardware.printer_uart_reboot_pending and _printer_is_available()
+    )
     if not available:
         reason = "unavailable"
     elif print_in_progress:
         reason = "printing"
     elif hold_action_in_progress:
         reason = "hold"
-    elif hardware_busy is True:
-        reason = "hardware_busy"
     else:
         reason = "idle"
 
     return {
-        "ready": bool(available and not active),
+        "ready": reason == "idle",
         "reason": reason,
     }
 
@@ -1473,7 +1459,7 @@ async def read_root():
 
 @app.get("/api/printer/status")
 async def get_printer_status():
-    """Return current printer availability and busy status."""
+    """Return advisory job readiness, not physical health or a job reservation."""
     return _read_printer_status()
 
 

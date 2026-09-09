@@ -768,10 +768,10 @@ def test_api_printer_status_reports_reservation_busy(monkeypatch):
     assert status["reason"] == "printing"
 
 
-def test_api_printer_status_reports_hardware_busy(monkeypatch):
+def test_api_printer_status_does_not_probe_hardware(monkeypatch):
     class _BusyPrinter:
         def is_printer_busy(self):
-            return True
+            pytest.fail("Status polling must not query the serial printer")
 
     monkeypatch.setattr(main_module, "printer", _BusyPrinter())
     monkeypatch.setattr(main_module, "_printer_is_available", lambda: True)
@@ -780,8 +780,8 @@ def test_api_printer_status_reports_hardware_busy(monkeypatch):
 
     status = asyncio.run(main_module.get_printer_status())
 
-    assert status["ready"] is False
-    assert status["reason"] == "hardware_busy"
+    assert status["ready"] is True
+    assert status["reason"] == "idle"
 
 
 def test_api_printer_status_reports_idle_and_accepting_jobs(monkeypatch):

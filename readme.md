@@ -216,6 +216,19 @@ Available modules: **News API**, **RSS Feeds**, **Weather**, **Email Inbox**, **
 * **Settings File:** `config.json` (auto-saved, gitignored)
 * **Reset:** "Reset All Settings" button restores factory defaults
 
+### Printer Status API
+
+Webhook clients can poll `GET /api/printer/status` without authentication. It returns
+`{"ready": true, "reason": "idle"}` when the printer driver is available and no
+print or button-hold action has reserved it. Otherwise, `ready` is `false` with
+reason `printing`, `hold`, or `unavailable` (including a pending printer UART reboot).
+
+This is an advisory snapshot of application readiness. It does not query the
+physical printer, detect paper/power faults, or reserve the next job. A print stays
+busy until completion or cancellation cleanup. Clients must still handle HTTP
+`423` from the print webhook if another job starts before their request arrives,
+as well as the endpoint's authentication and content validation errors.
+
 ### Local Validation Workflows
 For non-Pi development, use the local test and snapshot workflows:
 
